@@ -5,19 +5,24 @@ import { describe, expect, it } from 'vitest';
 import { parseGtaDat } from './gta-dat.parser';
 import { parseIpl } from './ipl.parser';
 
-/** Resolve the first IPL file referenced by static/data/gta.dat, if present. */
+/** Resolve the first real `.ipl` file referenced by static/data/gta.dat (skip .zon). */
 function referencedIpl(): null | string {
   const datPath = join(process.cwd(), 'static', 'data', 'gta.dat');
   if (!existsSync(datPath)) {
     return null;
   }
-  const relative = parseGtaDat(readFileSync(datPath, 'utf8')).ipl[0];
-  if (!relative) {
-    return null;
+  for (const relative of parseGtaDat(readFileSync(datPath, 'utf8')).ipl) {
+    const normalized = relative.replace(/\\/g, '/').toLowerCase();
+    if (!normalized.endsWith('.ipl')) {
+      continue;
+    }
+    const resolved = join(process.cwd(), 'static', normalized);
+    if (existsSync(resolved)) {
+      return resolved;
+    }
   }
-  const resolved = join(process.cwd(), 'static', relative.replace(/\\/g, '/').toLowerCase());
 
-  return existsSync(resolved) ? resolved : null;
+  return null;
 }
 
 describe('parseIpl', () => {

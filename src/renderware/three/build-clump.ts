@@ -29,6 +29,14 @@ export interface BuildClumpOptions {
   convertToYUp?: boolean;
 }
 
+/** A single-material renderable slice of a clump (for InstancedMesh). */
+export interface RenderPart {
+  geometry: BufferGeometry;
+  material: MeshStandardMaterial;
+  /** Local atomic-frame transform, in native Z-up. */
+  matrix: Matrix4;
+}
+
 export function buildClump(clump: RWClump, textures?: Map<string, Texture>, options: BuildClumpOptions = {}): Group {
   const root = new Group();
   root.name = 'RWClump';
@@ -56,6 +64,60 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>, opti
   }
 
   return root;
+}
+
+/**
+ * Flatten a clump into single-material {@link RenderPart}s for instanced
+ * rendering. Unlike {@link buildClump} (one multi-material Mesh per atomic),
+ * each part carries exactly one geometry + one material so it can drive an
+ * InstancedMesh. Parts stay in native Z-up — the caller (map scene root) does
+ * the single Z-up→Y-up rotation. Shared vertex attributes are reused across a
+ * model's parts so the GPU uploads them once.
+ */
+export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>): RenderPart[] {
+  const parts: RenderPart[] = [];
+  for (const atomic of clump.atomics) {
+    const rw = clump.geometries[atomic.geometryIndex];
+    if (!rw) {
+      continue;
+    }
+    const frame = clump.frames[atomic.frameIndex];
+    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+
+    const position = new BufferAttribute(rw.positions, 3);
+    const uv = rw.uvLayers.length > 0 ? new BufferAttribute(rw.uvLayers[0], 2) : null;
+    const color = rw.prelitColors ? prelitColorAttribute(rw.prelitColors) : null;
+    const normal = vertexNormalAttribute(position, rw);
+
+    groupTrianglesByMaterial(rw.triangles, rw.materials.length).forEach((tris, materialIndex) => {
+      if (tris.length === 0) {
+        return;
+      }
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', position);
+      if (uv) {
+        geometry.setAttribute('uv', uv);
+      }
+      if (color) {
+        geometry.setAttribute('color', color);
+      }
+      geometry.setAttribute('normal', normal);
+      const index: number[] = [];
+      for (const tri of tris) {
+        index.push(tri.a, tri.b, tri.c);
+      }
+      geometry.setIndex(index);
+      geometry.computeBoundingSphere();
+
+      const rwMaterial = rw.materials[materialIndex] ?? rw.materials[0];
+      const material = rwMaterial
+        ? buildMaterial(rwMaterial, rw, textures)
+        : new MeshStandardMaterial({ vertexColors: color !== null });
+      parts.push({ geometry, material, matrix });
+    });
+  }
+
+  return parts;
 }
 
 function buildGeometry(rw: RWGeometry): BufferGeometry {
@@ -140,4 +202,31 @@ function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount: number
   }
 
   return groups;
+}
+
+function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {
+  const colors = new Float32Array((prelit.length / 4) * 3);
+  for (let i = 0, j = 0; i < prelit.length; i += 4, j += 3) {
+    colors[j] = prelit[i] / 255;
+    colors[j + 1] = prelit[i + 1] / 255;
+    colors[j + 2] = prelit[i + 2] / 255;
+  }
+
+  return new BufferAttribute(colors, 3);
+}
+
+function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): BufferAttribute {
+  if (rw.normals) {
+    return new BufferAttribute(rw.normals, 3);
+  }
+  const temporary = new BufferGeometry();
+  temporary.setAttribute('position', position);
+  const index: number[] = [];
+  for (const tri of rw.triangles) {
+    index.push(tri.a, tri.b, tri.c);
+  }
+  temporary.setIndex(index);
+  temporary.computeVertexNormals();
+
+  return temporary.getAttribute('normal') as BufferAttribute;
 }

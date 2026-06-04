@@ -1,3 +1,3 @@
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
 - [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers (src/gta-sa-parsers) + R3F map walker (src/map)
-- [Binary IPL render approach](binary-ipl-render-approach.md) — current per-instance build; planned rework to model catalog/instancing
+- [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading

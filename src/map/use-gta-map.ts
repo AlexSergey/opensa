@@ -33,15 +33,30 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
+/** Like fetchText but tolerant: returns null for a missing file or network error. */
+async function fetchTextOrNull(url: string): Promise<null | string> {
+  try {
+    const response = await fetch(url);
+
+    return response.ok ? response.text() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Probe <base>/ipl_binary/<name>_stream{0,1,…}.ipl until one is missing. */
 async function loadBinaryStreams(base: string, basename: string): Promise<IplInstance[]> {
   const instances: IplInstance[] = [];
   for (let index = 0; ; index += 1) {
-    const response = await fetch(streamIplUrl(base, basename, index));
-    if (!response.ok) {
-      break;
+    try {
+      const response = await fetch(streamIplUrl(base, basename, index));
+      if (!response.ok) {
+        break;
+      }
+      instances.push(...parseBinaryIpl(await response.arrayBuffer()));
+    } catch {
+      break; // network error — stop probing this basename
     }
-    instances.push(...parseBinaryIpl(await response.arrayBuffer()));
   }
 
   return instances;
@@ -50,16 +65,25 @@ async function loadBinaryStreams(base: string, basename: string): Promise<IplIns
 async function loadMap(datUrl: string, base: string): Promise<MapDefinitions> {
   const dat = parseGtaDat(await fetchText(datUrl));
 
+  // Missing IDE/IPL files (referenced by gta.dat but not extracted) are skipped
+  // rather than aborting the whole map.
   const catalog: MapDefinitions['catalog'] = new Map();
   for (const idePath of dat.ide) {
-    for (const def of parseIde(await fetchText(datChildUrl(base, idePath)))) {
+    const text = await fetchTextOrNull(datChildUrl(base, idePath));
+    if (text === null) {
+      continue;
+    }
+    for (const def of parseIde(text)) {
       catalog.set(def.id, def);
     }
   }
 
   const instances: IplInstance[] = [];
   for (const iplPath of dat.ipl) {
-    instances.push(...parseIpl(await fetchText(datChildUrl(base, iplPath))));
+    const text = await fetchTextOrNull(datChildUrl(base, iplPath));
+    if (text !== null) {
+      instances.push(...parseIpl(text));
+    }
     // Full-detail placement lives in the matching binary stream IPLs (named
     // <ipl>_stream<N>.ipl), extracted from the IMG into static/ipl_binary.
     instances.push(...(await loadBinaryStreams(base, iplBasename(iplPath))));
