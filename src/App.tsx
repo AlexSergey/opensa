@@ -3,21 +3,51 @@ import { Canvas } from '@react-three/fiber';
 import { type ReactElement, Suspense } from 'react';
 
 import { MapScene } from './map/map-scene';
+import { useArchiveDownload } from './map/use-archive-download';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
+
+const ARCHIVE_URL = `${BASE}/models/gta3.img`;
 
 // CJ's house on Grove Street, Ganton (GTA SA world coords, Z-up).
 const GANTON_CJ_HOME: [number, number, number] = [2495, -1687, 13];
 
 export function App(): ReactElement {
+  const { archive, error } = useArchiveDownload(ARCHIVE_URL);
+
+  if (error !== null) {
+    return <Overlay text={`Failed to load model archive: ${error}`} />;
+  }
+  if (archive === null) {
+    return <Overlay text="Loading map…" />;
+  }
+
   return (
     <Canvas camera={{ far: 100000, near: 0.1, position: [0, 50, 100] }}>
       <ambientLight intensity={1.5} />
       <directionalLight intensity={1.5} position={[50, 100, 50]} />
       <Suspense fallback={null}>
-        <MapScene base={BASE} datUrl={`${BASE}/data/gta.dat`} focus={GANTON_CJ_HOME} />
+        <MapScene archive={archive} base={BASE} datUrl={`${BASE}/data/gta.dat`} focus={GANTON_CJ_HOME} />
       </Suspense>
       <OrbitControls makeDefault />
     </Canvas>
+  );
+}
+
+function Overlay({ text }: { text: string }): ReactElement {
+  return (
+    <div
+      style={{
+        alignItems: 'center',
+        color: '#fff',
+        display: 'flex',
+        fontFamily: 'sans-serif',
+        height: '100%',
+        justifyContent: 'center',
+        width: '100%',
+      }}
+    >
+      {text}
+    </div>
   );
 }

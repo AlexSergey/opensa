@@ -3,13 +3,13 @@ import { type InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { IdeObjectDef, IplInstance } from '../gta-sa-parsers';
 import type { RenderPart } from '../renderware';
+import type { ImgArchive } from './img-archive';
 
 import { useModelParts } from './use-model-parts';
 
 interface ModelInstancesProps {
-  base: string;
+  archive: ImgArchive;
   def: IdeObjectDef;
-  imgDir: string;
   instances: IplInstance[];
 }
 
@@ -19,8 +19,8 @@ interface ModelInstancesProps {
  * transforms composed with the part's local frame. Collapses thousands of
  * repeated objects (poles, palms, lampposts) into a handful of draw calls.
  */
-export function ModelInstances({ base, def, imgDir, instances }: ModelInstancesProps): ReactElement {
-  const parts = useModelParts(base, imgDir, def);
+export function ModelInstances({ archive, def, instances }: ModelInstancesProps): ReactElement {
+  const parts = useModelParts(archive, def);
 
   return (
     <>

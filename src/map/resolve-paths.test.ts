@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { datChildUrl, imgAssetUrl, iplBasename, normalizeDatPath, streamIplUrl } from './resolve-paths';
+import { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from './resolve-paths';
 
 describe('normalizeDatPath', () => {
   it('converts backslashes to slashes and lowercases', () => {
@@ -21,17 +21,6 @@ describe('datChildUrl', () => {
 
   it('avoids double slashes when the base has a trailing slash', () => {
     expect(datChildUrl('http://x:3001/', 'DATA\\a.ide')).toBe('http://x:3001/data/a.ide');
-  });
-});
-
-describe('imgAssetUrl', () => {
-  it('builds an asset url inside an IMG folder', () => {
-    expect(imgAssetUrl('http://x:3001', 'IMG\\basicmap', 'gplane', 'dff')).toBe(
-      'http://x:3001/img/basicmap/gplane.dff',
-    );
-    expect(imgAssetUrl('http://x:3001', 'img/basicmap', 'basicmain', 'TXD')).toBe(
-      'http://x:3001/img/basicmap/basicmain.txd',
-    );
   });
 });
 

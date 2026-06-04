@@ -211,6 +211,19 @@ const customJsConfig = {
   ...js.configs.recommended,
 };
 
+// Node build/pack scripts: Node globals (Buffer, process, …), allow console.
+const scriptsConfig = {
+  files: ['scripts/**/*.{js,mjs,cjs}'],
+  languageOptions: {
+    globals: {
+      ...globals.node,
+    },
+  },
+  rules: {
+    'no-console': 'off',
+  },
+};
+
 const perfectionistConfig = {
   files: sourceFiles,
   ...perfectionist.configs['recommended-natural'],
@@ -257,6 +270,7 @@ export default [
   customPackageJsonConfig,
   packageJson.configs.stylistic,
   customJsConfig,
+  scriptsConfig,
   {
     settings: {
       react: {

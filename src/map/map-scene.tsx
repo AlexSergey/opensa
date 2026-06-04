@@ -1,7 +1,8 @@
-import { type ReactElement, Suspense, useMemo, useRef } from 'react';
+import { type ReactElement, useMemo, useRef } from 'react';
 import { type Group } from 'three';
 
 import type { IdeObjectDef, IplInstance } from '../gta-sa-parsers';
+import type { ImgArchive } from './img-archive';
 
 import { isLodModel } from '../gta-sa-parsers';
 import { FitCamera } from './fit-camera';
@@ -10,6 +11,7 @@ import { modelKey } from './model-key';
 import { useGtaMap } from './use-gta-map';
 
 interface MapSceneProps {
+  archive: ImgArchive;
   base: string;
   datUrl: string;
   /** Optional GTA Z-up world point to focus the camera on. */
@@ -27,9 +29,8 @@ interface ModelGroup {
  * instances whose definition is known. The root applies the single Z-up→Y-up
  * rotation; FitCamera frames the scene (or a focus point).
  */
-export function MapScene({ base, datUrl, focus }: MapSceneProps): ReactElement {
-  const { catalog, imgDirs, instances } = useGtaMap(datUrl, base);
-  const imgDir = imgDirs[0] ?? 'img/gta3';
+export function MapScene({ archive, base, datUrl, focus }: MapSceneProps): ReactElement {
+  const { catalog, instances } = useGtaMap(datUrl, base);
   const groupRef = useRef<Group>(null);
 
   const models = useMemo(() => {
@@ -55,9 +56,7 @@ export function MapScene({ base, datUrl, focus }: MapSceneProps): ReactElement {
     <>
       <group ref={groupRef} rotation={[-Math.PI / 2, 0, 0]}>
         {models.map((model) => (
-          <Suspense fallback={null} key={modelKey(model.def)}>
-            <ModelInstances base={base} def={model.def} imgDir={imgDir} instances={model.instances} />
-          </Suspense>
+          <ModelInstances archive={archive} def={model.def} instances={model.instances} key={modelKey(model.def)} />
         ))}
       </group>
       <FitCamera expected={models.length} focus={focus} groupRef={groupRef} />

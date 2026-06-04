@@ -23,6 +23,7 @@
     "lint:code": "eslint .",
     "lint:commit": "commitlint --config .commitlintrc.cjs --edit",
     "lint:ts": "tsc --noEmit",
+    "pack:img": "node scripts/pack-img.mjs",
     "preview": "vite preview",
     "serve:static": "serve static -l 3001 --cors",
     "test": "vitest run",

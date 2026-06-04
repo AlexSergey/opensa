@@ -5,11 +5,6 @@ export function datChildUrl(base: string, datPath: string): string {
   return joinUrl(base, normalizeDatPath(datPath));
 }
 
-/** URL of an asset (dff/txd) inside an IMG folder. */
-export function imgAssetUrl(base: string, imgDir: string, name: string, ext: string): string {
-  return joinUrl(base, `${normalizeDatPath(imgDir)}/${name.toLowerCase()}.${ext.toLowerCase()}`);
-}
-
 /** Base name (no path, no extension, lowercased) of a DAT IPL path. */
 export function iplBasename(datPath: string): string {
   const file = normalizeDatPath(datPath).split('/').pop() ?? '';
