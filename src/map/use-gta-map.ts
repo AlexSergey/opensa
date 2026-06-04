@@ -2,8 +2,8 @@ import { use } from 'react';
 
 import type { IplInstance, MapDefinitions } from '../gta-sa-parsers';
 
-import { parseGtaDat, parseIde, parseIpl } from '../gta-sa-parsers';
-import { datChildUrl, normalizeDatPath } from './resolve-paths';
+import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl } from '../gta-sa-parsers';
+import { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from './resolve-paths';
 
 /** Suspense-friendly cache so `use()` reads a stable promise per (base, datUrl). */
 const cache = new Map<string, Promise<MapDefinitions>>();
@@ -33,6 +33,20 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
+/** Probe <base>/ipl_binary/<name>_stream{0,1,…}.ipl until one is missing. */
+async function loadBinaryStreams(base: string, basename: string): Promise<IplInstance[]> {
+  const instances: IplInstance[] = [];
+  for (let index = 0; ; index += 1) {
+    const response = await fetch(streamIplUrl(base, basename, index));
+    if (!response.ok) {
+      break;
+    }
+    instances.push(...parseBinaryIpl(await response.arrayBuffer()));
+  }
+
+  return instances;
+}
+
 async function loadMap(datUrl: string, base: string): Promise<MapDefinitions> {
   const dat = parseGtaDat(await fetchText(datUrl));
 
@@ -46,6 +60,9 @@ async function loadMap(datUrl: string, base: string): Promise<MapDefinitions> {
   const instances: IplInstance[] = [];
   for (const iplPath of dat.ipl) {
     instances.push(...parseIpl(await fetchText(datChildUrl(base, iplPath))));
+    // Full-detail placement lives in the matching binary stream IPLs (named
+    // <ipl>_stream<N>.ipl), extracted from the IMG into static/ipl_binary.
+    instances.push(...(await loadBinaryStreams(base, iplBasename(iplPath))));
   }
 
   return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances };

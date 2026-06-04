@@ -3,8 +3,9 @@ import { type ReactElement, useMemo } from 'react';
 
 import type { IdeObjectDef, IplInstance } from '../gta-sa-parsers';
 
-import { DFFLoader, TXDLoader } from '../renderware';
+import { buildClump, TXDLoader } from '../renderware';
 import { imgAssetUrl } from './resolve-paths';
+import { useClump } from './use-clump';
 
 interface MapInstanceProps {
   base: string;
@@ -14,23 +15,22 @@ interface MapInstanceProps {
 }
 
 /**
- * Render one placed IPL instance: load its model + textures (kept in native
- * Z-up so the parent map group handles the world axis), then position and
- * orient a clone at the instance's transform.
+ * Render one placed IPL instance. The TXD (stateless loader, safe to share) and
+ * the parsed DFF clump are both loaded under Suspense, so by the time we build
+ * the Group both are guaranteed ready — textures can't lose the race. The model
+ * is kept in native Z-up; the parent map group converts to Y-up.
  */
 export function MapInstance({ base, def, imgDir, instance }: MapInstanceProps): ReactElement {
   const textures = useLoader(TXDLoader, imgAssetUrl(base, imgDir, def.txdName, 'txd'));
-  const model = useLoader(DFFLoader, imgAssetUrl(base, imgDir, def.modelName, 'dff'), (loader) => {
-    loader.setTextures(textures).setConvertToYUp(false);
-  });
+  const clump = useClump(imgAssetUrl(base, imgDir, def.modelName, 'dff'));
 
   const object = useMemo(() => {
-    const clone = model.clone();
-    clone.position.set(instance.position[0], instance.position[1], instance.position[2]);
-    clone.quaternion.set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3]);
+    const group = buildClump(clump, textures, { convertToYUp: false });
+    group.position.set(instance.position[0], instance.position[1], instance.position[2]);
+    group.quaternion.set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3]);
 
-    return clone;
-  }, [model, instance]);
+    return group;
+  }, [clump, textures, instance]);
 
   return <primitive object={object} />;
 }

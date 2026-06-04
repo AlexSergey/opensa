@@ -10,9 +10,21 @@ export function imgAssetUrl(base: string, imgDir: string, name: string, ext: str
   return joinUrl(base, `${normalizeDatPath(imgDir)}/${name.toLowerCase()}.${ext.toLowerCase()}`);
 }
 
+/** Base name (no path, no extension, lowercased) of a DAT IPL path. */
+export function iplBasename(datPath: string): string {
+  const file = normalizeDatPath(datPath).split('/').pop() ?? '';
+
+  return file.replace(/\.[^.]*$/, '');
+}
+
 /** Backslashes -> slashes, drop leading slashes, lowercased (on-disk assets are lowercase). */
 export function normalizeDatPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+}
+
+/** URL of the Nth binary stream IPL for a text IPL base name. */
+export function streamIplUrl(base: string, basename: string, index: number): string {
+  return joinUrl(base, `ipl_binary/${basename}_stream${index}.ipl`);
 }
 
 function joinUrl(base: string, path: string): string {
