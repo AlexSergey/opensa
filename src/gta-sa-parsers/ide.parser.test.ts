@@ -2,7 +2,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { parseGtaDat } from './gta-dat.parser';
 import { parseIde } from './ide.parser';
+
+/** Resolve the first IDE/IPL file referenced by static/data/gta.dat, if present. */
+function referencedFromDat(kind: 'ide' | 'ipl'): null | string {
+  const datPath = join(process.cwd(), 'static', 'data', 'gta.dat');
+  if (!existsSync(datPath)) {
+    return null;
+  }
+  const dat = parseGtaDat(readFileSync(datPath, 'utf8'));
+  const relative = (kind === 'ide' ? dat.ide : dat.ipl)[0];
+  if (!relative) {
+    return null;
+  }
+  const resolved = join(process.cwd(), 'static', relative.replace(/\\/g, '/').toLowerCase());
+
+  return existsSync(resolved) ? resolved : null;
+}
 
 describe('parseIde', () => {
   it('parses objs rows and ignores other sections', () => {
@@ -36,13 +53,15 @@ describe('parseIde', () => {
   });
 });
 
-const idePath = join(process.cwd(), 'static', 'data', 'maps', 'basic', 'basicmap.ide');
+const idePath = referencedFromDat('ide');
 
-describe.skipIf(!existsSync(idePath))('parseIde (real basicmap.ide)', () => {
-  it('defines gplane (5000) and testground (5404)', () => {
-    const defs = parseIde(readFileSync(idePath, 'utf8'));
-    const byId = new Map(defs.map((d) => [d.id, d]));
-    expect(byId.get(5000)).toMatchObject({ modelName: 'gplane', txdName: 'basicmain' });
-    expect(byId.get(5404)).toMatchObject({ modelName: 'testground', txdName: 'testground' });
+// Map-agnostic: parses whichever IDE the current gta.dat references.
+describe.skipIf(!idePath)('parseIde (real IDE from gta.dat)', () => {
+  it('parses object definitions with model and txd names', () => {
+    const defs = parseIde(readFileSync(idePath!, 'utf8'));
+    expect(defs.length).toBeGreaterThan(0);
+    expect(defs[0].modelName.length).toBeGreaterThan(0);
+    expect(defs[0].txdName.length).toBeGreaterThan(0);
+    expect(Number.isInteger(defs[0].id)).toBe(true);
   });
 });

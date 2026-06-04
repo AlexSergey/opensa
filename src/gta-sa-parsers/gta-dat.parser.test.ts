@@ -36,12 +36,12 @@ describe('parseGtaDat', () => {
 
 const datPath = join(process.cwd(), 'static', 'data', 'gta.dat');
 
+// Map-agnostic: asserts structure for whatever gta.dat currently lives in static/.
 describe.skipIf(!existsSync(datPath))('parseGtaDat (real gta.dat)', () => {
-  it('references one IMG, one IDE and one IPL', () => {
+  it('references at least one IMG, IDE and IPL', () => {
     const dat = parseGtaDat(readFileSync(datPath, 'utf8'));
-    expect(dat.img).toHaveLength(1);
-    expect(dat.ide).toHaveLength(1);
-    expect(dat.ipl).toHaveLength(1);
-    expect(dat.ide[0].toLowerCase()).toContain('basicmap.ide');
+    expect(dat.img.length).toBeGreaterThan(0);
+    expect(dat.ide.length).toBeGreaterThan(0);
+    expect(dat.ipl.length).toBeGreaterThan(0);
   });
 });
