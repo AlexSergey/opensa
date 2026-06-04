@@ -1,1 +1,2 @@
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
+- [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers (src/gta-sa-parsers) + R3F map walker (src/map)

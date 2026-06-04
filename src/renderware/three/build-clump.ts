@@ -23,7 +23,13 @@ import { GeometryFlag } from '../parser/constants';
  * normals are computed. The root is rotated from RenderWare's Z-up space into
  * three.js Y-up.
  */
-export function buildClump(clump: RWClump, textures?: Map<string, Texture>): Group {
+export interface BuildClumpOptions {
+  /** Rotate the result from RenderWare Z-up into three.js Y-up. Default true.
+   *  Set false when placing instances in shared GTA world (Z-up) space. */
+  convertToYUp?: boolean;
+}
+
+export function buildClump(clump: RWClump, textures?: Map<string, Texture>, options: BuildClumpOptions = {}): Group {
   const root = new Group();
   root.name = 'RWClump';
 
@@ -45,7 +51,9 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>): Gro
     root.add(mesh);
   }
 
-  root.rotateX(-Math.PI / 2); // RenderWare Z-up -> three.js Y-up
+  if (options.convertToYUp ?? true) {
+    root.rotateX(-Math.PI / 2); // RenderWare Z-up -> three.js Y-up
+  }
 
   return root;
 }

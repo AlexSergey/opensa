@@ -1,31 +1,20 @@
-import type { ReactElement } from 'react';
-
 import { OrbitControls } from '@react-three/drei';
-import { Canvas, useLoader } from '@react-three/fiber';
-import { Suspense } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { type ReactElement, Suspense } from 'react';
 
-import { DFFLoader, TXDLoader } from './renderware';
+import { MapScene } from './map/map-scene';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
 
 export function App(): ReactElement {
   return (
-    <Canvas camera={{ position: [0, 4, 10] }}>
+    <Canvas camera={{ far: 5000, position: [0, 60, 80] }}>
       <ambientLight intensity={1.5} />
-      <directionalLight intensity={1.5} position={[5, 10, 5]} />
+      <directionalLight intensity={1.5} position={[50, 100, 50]} />
       <Suspense fallback={null}>
-        <Model />
+        <MapScene base={BASE} datUrl={`${BASE}/data/gta.dat`} />
       </Suspense>
-      <OrbitControls target={[0, 4, 0]} />
+      <OrbitControls target={[0, 24, 0]} />
     </Canvas>
   );
-}
-
-function Model(): ReactElement {
-  const textures = useLoader(TXDLoader, `${BASE}/bsor.txd`);
-  const model = useLoader(DFFLoader, `${BASE}/bsor_cedar1_hi.dff`, (loader) => {
-    loader.setTextures(textures);
-  });
-
-  return <primitive object={model} />;
 }

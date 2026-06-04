@@ -14,6 +14,8 @@ import { buildClump } from './build-clump';
  * extensions callback) to apply a texture dictionary produced by TXDLoader.
  */
 export class DFFLoader extends Loader<Group> {
+  private convertToYUp = true;
+
   private textures?: TextureDictionary;
 
   override load(
@@ -29,7 +31,8 @@ export class DFFLoader extends Loader<Group> {
       url,
       (buffer) => {
         try {
-          onLoad(buildClump(parseDff(buffer as ArrayBuffer), this.textures));
+          const clump = parseDff(buffer as ArrayBuffer);
+          onLoad(buildClump(clump, this.textures, { convertToYUp: this.convertToYUp }));
         } catch (error) {
           this.manager.itemError(url);
           onError?.(error);
@@ -38,6 +41,13 @@ export class DFFLoader extends Loader<Group> {
       onProgress,
       onError,
     );
+  }
+
+  /** Keep models in native Z-up space (for placing instances in GTA world space). */
+  setConvertToYUp(convert: boolean): this {
+    this.convertToYUp = convert;
+
+    return this;
   }
 
   /** Inject textures to resolve material texture names against. */
