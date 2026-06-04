@@ -1,3 +1,5 @@
+import type { Texture } from 'three';
+
 import {
   CompressedTexture,
   DataTexture,
@@ -8,10 +10,10 @@ import {
   RGBA_S3TC_DXT5_Format,
   RGBAFormat,
   SRGBColorSpace,
-  Texture,
   UnsignedByteType,
 } from 'three';
-import { RWTexture, RWTextureDictionary } from '../parser/types';
+
+import type { RWTexture, RWTextureDictionary } from '../parser/types';
 
 const DXT_FORMAT = {
   dxt1: RGBA_S3TC_DXT1_Format,
@@ -25,7 +27,24 @@ export function buildTextureMap(dict: RWTextureDictionary): Map<string, Texture>
   for (const rw of dict.textures) {
     map.set(rw.name.toLowerCase(), buildTexture(rw));
   }
+
   return map;
+}
+
+function buildCompressedTexture(rw: RWTexture): CompressedTexture {
+  const format = DXT_FORMAT[rw.format as keyof typeof DXT_FORMAT];
+  const mipmaps = rw.mipmaps.map((m) => ({ data: m.data, height: m.height, width: m.width }));
+  const texture = new CompressedTexture(mipmaps, rw.width, rw.height, format, UnsignedByteType);
+  // Only enable trilinear mipmapping when the chain is actually present.
+  texture.minFilter = mipmaps.length > 1 ? LinearMipmapLinearFilter : texture.magFilter;
+
+  return texture;
+}
+
+function buildDataTexture(rw: RWTexture): DataTexture {
+  const base = rw.mipmaps[0];
+
+  return new DataTexture(base.data, base.width, base.height, RGBAFormat, UnsignedByteType);
 }
 
 function buildTexture(rw: RWTexture): Texture {
@@ -37,19 +56,6 @@ function buildTexture(rw: RWTexture): Texture {
   texture.name = rw.name;
   texture.userData.hasAlpha = rw.hasAlpha;
   texture.needsUpdate = true;
-  return texture;
-}
 
-function buildCompressedTexture(rw: RWTexture): CompressedTexture {
-  const format = DXT_FORMAT[rw.format as keyof typeof DXT_FORMAT];
-  const mipmaps = rw.mipmaps.map((m) => ({ data: m.data, width: m.width, height: m.height }));
-  const texture = new CompressedTexture(mipmaps, rw.width, rw.height, format, UnsignedByteType);
-  // Only enable trilinear mipmapping when the chain is actually present.
-  texture.minFilter = mipmaps.length > 1 ? LinearMipmapLinearFilter : texture.magFilter;
   return texture;
-}
-
-function buildDataTexture(rw: RWTexture): DataTexture {
-  const base = rw.mipmaps[0];
-  return new DataTexture(base.data, base.width, base.height, RGBAFormat, UnsignedByteType);
 }

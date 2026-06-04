@@ -15,4 +15,6 @@ Loader lives in `src/renderware/`, deliberately layered:
 
 DFF triangles are packed `[v2,v1,matIdx,v3]`; geometry often has no stored normals + prelit vertex colors (baked SA lighting → renders dark). TXD textures keyed by lowercased name. Plan: `.claude/plans/001-renderware-dff-loader.md`.
 
+Tests: vitest (config `vitest.config.ts`, node env; `npm test` / `test:watch` / `test:coverage`). Specs co-located `src/renderware/**/*.test.ts` (52 tests, ~97% stmt / 100% func). Synthetic RW byte buffers built via helpers in `src/renderware/test-utils.ts` (`chunk()`, `u32`, `f32a`, `fixedString`, `toArrayBuffer`…). Parser/loader specs also assert against the real `static/` assets, guarded by `it.skipIf(!existsSync(...))`. Loader specs stub `FileLoader.prototype.load` with `vi.spyOn` to avoid I/O.
+
 Explicit extension points (not yet done): skinning (SkinPLG), multi-atomic clumps, frame parenting, tristrip via BinMeshPLG, 16-bit/PAL rasters fully, COL/IMG/IDE/IPL world streaming. See [[project-overview]].

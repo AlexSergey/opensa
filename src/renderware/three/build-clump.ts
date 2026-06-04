@@ -1,3 +1,5 @@
+import type { Texture } from 'three';
+
 import {
   BufferAttribute,
   BufferGeometry,
@@ -7,10 +9,11 @@ import {
   Matrix4,
   Mesh,
   MeshStandardMaterial,
-  Texture,
 } from 'three';
+
+import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parser/types';
+
 import { GeometryFlag } from '../parser/constants';
-import { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parser/types';
 
 /**
  * Convert a parsed RWClump into a renderable three.js Group.
@@ -43,6 +46,7 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>): Gro
   }
 
   root.rotateX(-Math.PI / 2); // RenderWare Z-up -> three.js Y-up
+
   return root;
 }
 
@@ -87,7 +91,37 @@ function buildGeometry(rw: RWGeometry): BufferGeometry {
     geometry.computeVertexNormals();
   }
   geometry.computeBoundingSphere();
+
   return geometry;
+}
+
+function buildMaterial(rw: RWMaterial, geometry: RWGeometry, textures?: Map<string, Texture>): MeshStandardMaterial {
+  const map = rw.texture && textures ? (textures.get(rw.texture.name.toLowerCase()) ?? null) : null;
+  const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
+  const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
+
+  const material = new MeshStandardMaterial({
+    alphaTest: transparent ? 0.5 : 0,
+    color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
+    map,
+    metalness: 0,
+    roughness: 1,
+    side: transparent ? DoubleSide : FrontSide,
+    transparent,
+    vertexColors: hasVertexColors,
+  });
+  material.name = rw.texture?.name ?? 'material';
+
+  return material;
+}
+
+function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = rotation;
+  const matrix = new Matrix4();
+  // RW stores right/up/at basis vectors; lay them into column-major Matrix4.
+  matrix.set(r0, r3, r6, position[0], r1, r4, r7, position[1], r2, r5, r8, position[2], 0, 0, 0, 1);
+
+  return matrix;
 }
 
 function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount: number): RWTriangle[][] {
@@ -96,41 +130,6 @@ function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount: number
     const slot = tri.materialIndex < groups.length ? tri.materialIndex : 0;
     groups[slot].push(tri);
   }
+
   return groups;
-}
-
-function buildMaterial(
-  rw: RWMaterial,
-  geometry: RWGeometry,
-  textures?: Map<string, Texture>,
-): MeshStandardMaterial {
-  const map = rw.texture && textures ? textures.get(rw.texture.name.toLowerCase()) ?? null : null;
-  const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
-  const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
-
-  const material = new MeshStandardMaterial({
-    map,
-    color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
-    vertexColors: hasVertexColors,
-    transparent,
-    alphaTest: transparent ? 0.5 : 0,
-    side: transparent ? DoubleSide : FrontSide,
-    roughness: 1,
-    metalness: 0,
-  });
-  material.name = rw.texture?.name ?? 'material';
-  return material;
-}
-
-function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
-  const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = rotation;
-  const matrix = new Matrix4();
-  // RW stores right/up/at basis vectors; lay them into column-major Matrix4.
-  matrix.set(
-    r0, r3, r6, position[0],
-    r1, r4, r7, position[1],
-    r2, r5, r8, position[2],
-    0, 0, 0, 1,
-  );
-  return matrix;
 }

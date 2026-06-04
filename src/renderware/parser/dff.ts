@@ -1,7 +1,9 @@
+import type { ChunkHeader } from './chunks';
+import type { RWAtomic, RWClump, RWFrame, RWGeometry, RWMaterial, RWTriangle } from './types';
+
 import { BinaryStream } from './binary-stream';
-import { ChunkHeader, findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
+import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
 import { GeometryFlag, RwSection } from './constants';
-import { RWAtomic, RWClump, RWFrame, RWGeometry, RWMaterial, RWTriangle } from './types';
 
 /**
  * Parse a RenderWare Clump (.dff) into a renderer-agnostic RWClump.
@@ -25,21 +27,33 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
 
   forEachChild(stream, clumpHeader.dataStart, clumpHeader.end, (child) => {
     switch (child.type) {
+      case RwSection.ATOMIC:
+        atomics.push(parseAtomic(stream, child));
+        break;
       case RwSection.FRAME_LIST:
         frames = parseFrameList(stream, child);
         break;
       case RwSection.GEOMETRY_LIST:
         geometries = parseGeometryList(stream, child);
         break;
-      case RwSection.ATOMIC:
-        atomics.push(parseAtomic(stream, child));
-        break;
       default:
         break;
     }
   });
 
-  return { frames, geometries, atomics };
+  return { atomics, frames, geometries };
+}
+
+function parseAtomic(stream: BinaryStream, header: ChunkHeader): RWAtomic {
+  const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
+  if (!struct) {
+    throw new Error('Atomic missing Struct');
+  }
+  stream.seek(struct.dataStart);
+  const frameIndex = stream.u32();
+  const geometryIndex = stream.u32();
+
+  return { frameIndex, geometryIndex };
 }
 
 function parseFrameList(stream: BinaryStream, header: ChunkHeader): RWFrame[] {
@@ -53,14 +67,20 @@ function parseFrameList(stream: BinaryStream, header: ChunkHeader): RWFrame[] {
   const frames: RWFrame[] = [];
   for (let i = 0; i < numFrames; i += 1) {
     const rotation = [
-      stream.f32(), stream.f32(), stream.f32(),
-      stream.f32(), stream.f32(), stream.f32(),
-      stream.f32(), stream.f32(), stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
+      stream.f32(),
     ];
     const position = stream.vec3();
     const parentIndex = stream.i32();
     stream.skip(4); // matrix creation flags
-    frames.push({ rotation, position, parentIndex, name: '' });
+    frames.push({ name: '', parentIndex, position, rotation });
   }
 
   // Frame names live in per-frame Extension chunks following the Struct.
@@ -80,16 +100,6 @@ function parseFrameList(stream: BinaryStream, header: ChunkHeader): RWFrame[] {
   return frames;
 }
 
-function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
-  const geometries: RWGeometry[] = [];
-  forEachChild(stream, header.dataStart, header.end, (child) => {
-    if (child.type === RwSection.GEOMETRY) {
-      geometries.push(parseGeometry(stream, child));
-    }
-  });
-  return geometries;
-}
-
 function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
   const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
   if (!struct) {
@@ -104,70 +114,26 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
   const numVertices = stream.u32();
   const numMorphTargets = stream.u32();
 
-  let prelitColors: Uint8Array | null = null;
-  if (flags & GeometryFlag.PRELIT) {
-    prelitColors = stream.bytes(numVertices * 4);
-  }
-
-  const uvLayers: Float32Array[] = [];
-  for (let layer = 0; layer < numUVLayers; layer += 1) {
-    const uv = new Float32Array(numVertices * 2);
-    for (let i = 0; i < uv.length; i += 1) {
-      uv[i] = stream.f32();
-    }
-    uvLayers.push(uv);
-  }
-
-  const triangles: RWTriangle[] = [];
-  for (let i = 0; i < numTriangles; i += 1) {
-    // RW packs faces as [vertex2, vertex1, materialIndex, vertex3].
-    const b = stream.u16();
-    const a = stream.u16();
-    const materialIndex = stream.u16();
-    const c = stream.u16();
-    triangles.push({ a, b, c, materialIndex });
-  }
-
-  let positions = new Float32Array(numVertices * 3);
-  let normals: Float32Array | null = null;
-  for (let target = 0; target < numMorphTargets; target += 1) {
-    stream.skip(16); // bounding sphere (x, y, z, radius)
-    const hasVertices = stream.u32();
-    const hasNormals = stream.u32();
-    if (hasVertices) {
-      const verts = new Float32Array(numVertices * 3);
-      for (let i = 0; i < verts.length; i += 1) {
-        verts[i] = stream.f32();
-      }
-      if (target === 0) {
-        positions = verts;
-      }
-    }
-    if (hasNormals) {
-      const norms = new Float32Array(numVertices * 3);
-      for (let i = 0; i < norms.length; i += 1) {
-        norms[i] = stream.f32();
-      }
-      if (target === 0) {
-        normals = norms;
-      }
-    }
-  }
+  const prelitColors = flags & GeometryFlag.PRELIT ? stream.bytes(numVertices * 4) : null;
+  const uvLayers = readUVLayers(stream, numUVLayers, numVertices);
+  const triangles = readTriangles(stream, numTriangles);
+  const { normals, positions } = readMorphTargets(stream, numMorphTargets, numVertices);
 
   const matList = findChild(stream, header.dataStart, header.end, RwSection.MATERIAL_LIST);
   const materials = matList ? parseMaterialList(stream, matList) : [];
 
-  return { flags, numUVLayers, positions, normals, prelitColors, uvLayers, triangles, materials };
+  return { flags, materials, normals, numUVLayers, positions, prelitColors, triangles, uvLayers };
 }
 
-function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMaterial[] {
-  const materials: RWMaterial[] = [];
+function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
+  const geometries: RWGeometry[] = [];
   forEachChild(stream, header.dataStart, header.end, (child) => {
-    if (child.type === RwSection.MATERIAL) {
-      materials.push(parseMaterial(stream, child));
+    if (child.type === RwSection.GEOMETRY) {
+      geometries.push(parseGeometry(stream, child));
     }
   });
-  return materials;
+
+  return geometries;
 }
 
 function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {
@@ -188,10 +154,21 @@ function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {
     texture = parseTexture(stream, texChunk);
   }
 
-  return { color, textured, texture };
+  return { color, texture, textured };
 }
 
-function parseTexture(stream: BinaryStream, header: ChunkHeader): { name: string; maskName: string } {
+function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMaterial[] {
+  const materials: RWMaterial[] = [];
+  forEachChild(stream, header.dataStart, header.end, (child) => {
+    if (child.type === RwSection.MATERIAL) {
+      materials.push(parseMaterial(stream, child));
+    }
+  });
+
+  return materials;
+}
+
+function parseTexture(stream: BinaryStream, header: ChunkHeader): { maskName: string; name: string } {
   // Texture chunk: Struct (filter flags), then two String chunks (name, mask).
   const names: string[] = [];
   forEachChild(stream, header.dataStart, header.end, (child) => {
@@ -199,16 +176,66 @@ function parseTexture(stream: BinaryStream, header: ChunkHeader): { name: string
       names.push(readStringChunk(stream, child));
     }
   });
-  return { name: names[0] ?? '', maskName: names[1] ?? '' };
+
+  return { maskName: names[1] ?? '', name: names[0] ?? '' };
 }
 
-function parseAtomic(stream: BinaryStream, header: ChunkHeader): RWAtomic {
-  const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
-  if (!struct) {
-    throw new Error('Atomic missing Struct');
+function readFloat32Array(stream: BinaryStream, count: number): Float32Array {
+  const out = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    out[i] = stream.f32();
   }
-  stream.seek(struct.dataStart);
-  const frameIndex = stream.u32();
-  const geometryIndex = stream.u32();
-  return { frameIndex, geometryIndex };
+
+  return out;
+}
+
+function readMorphTargets(
+  stream: BinaryStream,
+  numMorphTargets: number,
+  numVertices: number,
+): { normals: Float32Array | null; positions: Float32Array } {
+  let positions: Float32Array = new Float32Array(numVertices * 3);
+  let normals: Float32Array | null = null;
+  for (let target = 0; target < numMorphTargets; target += 1) {
+    stream.skip(16); // bounding sphere (x, y, z, radius)
+    const hasVertices = stream.u32();
+    const hasNormals = stream.u32();
+    if (hasVertices) {
+      const verts = readFloat32Array(stream, numVertices * 3);
+      if (target === 0) {
+        positions = verts;
+      }
+    }
+    if (hasNormals) {
+      const norms = readFloat32Array(stream, numVertices * 3);
+      if (target === 0) {
+        normals = norms;
+      }
+    }
+  }
+
+  return { normals, positions };
+}
+
+function readTriangles(stream: BinaryStream, numTriangles: number): RWTriangle[] {
+  const triangles: RWTriangle[] = [];
+  for (let i = 0; i < numTriangles; i += 1) {
+    // RW packs faces as [vertex2, vertex1, materialIndex, vertex3].
+    const b = stream.u16();
+    const a = stream.u16();
+    const materialIndex = stream.u16();
+    const c = stream.u16();
+    triangles.push({ a, b, c, materialIndex });
+  }
+
+  return triangles;
+}
+
+function readUVLayers(stream: BinaryStream, numUVLayers: number, numVertices: number): Float32Array[] {
+  const uvLayers: Float32Array[] = [];
+  for (let layer = 0; layer < numUVLayers; layer += 1) {
+    uvLayers.push(readFloat32Array(stream, numVertices * 2));
+  }
+
+  return uvLayers;
 }

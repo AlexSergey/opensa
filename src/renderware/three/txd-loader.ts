@@ -1,4 +1,7 @@
-import { FileLoader, Loader, Texture } from 'three';
+import type { Texture } from 'three';
+
+import { FileLoader, Loader } from 'three';
+
 import { parseTxd } from '../parser/txd';
 import { buildTextureMap } from './build-texture';
 
@@ -25,12 +28,8 @@ export class TXDLoader extends Loader<TextureDictionary> {
         try {
           onLoad(buildTextureMap(parseTxd(buffer as ArrayBuffer)));
         } catch (error) {
-          if (onError) {
-            onError(error);
-          } else {
-            console.error(error);
-          }
           this.manager.itemError(url);
+          onError?.(error);
         }
       },
       onProgress,

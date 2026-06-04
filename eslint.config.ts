@@ -43,15 +43,8 @@ const customTypescriptConfig = {
     ...languageOptions,
     parser: tsParser,
     parserOptions: {
-      project: [
-        './tsconfig.eslint.json',
-        './apps/*/tsconfig.json',
-        './apps/*/tsconfig.node.json',
-        './packages/*/tsconfig.json',
-        './packages/*/tsconfig.node.json',
-        './packages/ui-web/tsconfig.storybook.json',
-      ],
-      tsconfigRootDir: import.meta.dirname,
+      project: './tsconfig.eslint.json',
+      tsconfigRootDir: __dirname,
     },
   },
   plugins: {
@@ -100,8 +93,11 @@ const customTypescriptConfig = {
     '@typescript-eslint/explicit-function-return-type': 'warn',
     '@typescript-eslint/naming-convention': [
       'error',
+      // PascalCase (non-strict) is allowed so acronym-prefixed names used by/for
+      // the three.js ecosystem pass — RenderWare types (RWClump, RWGeometry) and
+      // three-style loader classes (DFFLoader, TXDLoader, cf. GLTFLoader).
       {
-        format: ['UPPER_CASE', 'StrictPascalCase'],
+        format: ['UPPER_CASE', 'PascalCase'],
         selector: 'interface',
       },
       {
@@ -109,7 +105,7 @@ const customTypescriptConfig = {
         selector: 'typeLike',
       },
       {
-        format: ['UPPER_CASE', 'StrictPascalCase'],
+        format: ['UPPER_CASE', 'PascalCase'],
         selector: 'class',
       },
     ],
@@ -142,7 +138,9 @@ const customTypescriptConfig = {
         allowImplicit: true,
       },
     ],
-    camelcase: ['error', { properties: 'always' }],
+    // `allow` lets three.js GL enum constants (e.g. RGBA_S3TC_DXT1_Format,
+    // RGBA_S3TC_DXT3_Format) through the otherwise-strict camelCase check.
+    camelcase: ['error', { allow: ['_Format$', '_Type$'], ignoreDestructuring: true, properties: 'always' }],
     'class-methods-use-this': 'off',
     'getter-return': [
       'error',

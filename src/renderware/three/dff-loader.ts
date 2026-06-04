@@ -1,7 +1,11 @@
-import { FileLoader, Group, Loader } from 'three';
+import type { Group } from 'three';
+
+import { FileLoader, Loader } from 'three';
+
+import type { TextureDictionary } from './txd-loader';
+
 import { parseDff } from '../parser/dff';
 import { buildClump } from './build-clump';
-import { TextureDictionary } from './TXDLoader';
 
 /**
  * three.js Loader for RenderWare Clumps (.dff). Resolves to a THREE.Group.
@@ -11,12 +15,6 @@ import { TextureDictionary } from './TXDLoader';
  */
 export class DFFLoader extends Loader<Group> {
   private textures?: TextureDictionary;
-
-  /** Inject textures to resolve material texture names against. */
-  setTextures(textures: TextureDictionary): this {
-    this.textures = textures;
-    return this;
-  }
 
   override load(
     url: string,
@@ -33,16 +31,19 @@ export class DFFLoader extends Loader<Group> {
         try {
           onLoad(buildClump(parseDff(buffer as ArrayBuffer), this.textures));
         } catch (error) {
-          if (onError) {
-            onError(error);
-          } else {
-            console.error(error);
-          }
           this.manager.itemError(url);
+          onError?.(error);
         }
       },
       onProgress,
       onError,
     );
+  }
+
+  /** Inject textures to resolve material texture names against. */
+  setTextures(textures: TextureDictionary): this {
+    this.textures = textures;
+
+    return this;
   }
 }

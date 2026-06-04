@@ -1,7 +1,9 @@
+import type { ChunkHeader } from './chunks';
+import type { RWMipLevel, RWTexture, RWTextureDictionary, RWTextureFormat } from './types';
+
 import { BinaryStream } from './binary-stream';
-import { ChunkHeader, findChild, forEachChild } from './chunks';
+import { findChild, forEachChild } from './chunks';
 import { D3dCompression, RasterFormat, RwSection } from './constants';
-import { RWMipLevel, RWTexture, RWTextureDictionary, RWTextureFormat } from './types';
 
 /**
  * Parse a RenderWare Texture Dictionary (.txd) into RWTextureDictionary.
@@ -28,17 +30,43 @@ export function parseTxd(buffer: ArrayBuffer): RWTextureDictionary {
   return { textures };
 }
 
-function readDictHeader(stream: BinaryStream): ChunkHeader {
-  const type = stream.u32();
-  const size = stream.u32();
-  const version = stream.u32();
-  if (type !== RwSection.TEXTURE_DICTIONARY) {
-    throw new Error(`Not a TXD: expected TexDictionary (0x16), got 0x${type.toString(16)}`);
+/** Map RW format identifiers to the adapter's format tag, or null if unsupported. */
+function classifyFormat(d3dFormat: number, rasterFormat: number): null | RWTextureFormat {
+  switch (d3dFormat) {
+    case D3dCompression.DXT1:
+      return 'dxt1';
+    case D3dCompression.DXT3:
+      return 'dxt3';
+    case D3dCompression.DXT5:
+      return 'dxt5';
+    default:
+      break;
   }
-  return { type, size, version, dataStart: stream.position, end: stream.position + size };
+  if (rasterFormat & (RasterFormat.PAL8 | RasterFormat.PAL4)) {
+    return 'rgba8888'; // expanded from palette below
+  }
+  if ((rasterFormat & RasterFormat.PIXEL_FORMAT_MASK) === RasterFormat.C8888) {
+    return 'rgba8888';
+  }
+
+  return null;
 }
 
-function parseTextureNative(stream: BinaryStream, header: ChunkHeader): RWTexture | null {
+/** Expand 8-bit palette indices to RGBA using a BGRA colour table. */
+function expandPalette(indices: Uint8Array, palette: Uint8Array): Uint8Array {
+  const out = new Uint8Array(indices.length * 4);
+  for (let i = 0; i < indices.length; i += 1) {
+    const p = indices[i] * 4;
+    out[i * 4 + 0] = palette[p + 2];
+    out[i * 4 + 1] = palette[p + 1];
+    out[i * 4 + 2] = palette[p + 0];
+    out[i * 4 + 3] = palette[p + 3];
+  }
+
+  return out;
+}
+
+function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | RWTexture {
   const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
   if (!struct) {
     return null;
@@ -65,7 +93,7 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): RWTextur
   }
 
   // Palettized rasters carry a colour table before the mip data.
-  let palette: Uint8Array | null = null;
+  let palette: null | Uint8Array = null;
   if (rasterFormat & RasterFormat.PAL8) {
     palette = stream.bytes(256 * 4);
   } else if (rasterFormat & RasterFormat.PAL4) {
@@ -78,35 +106,25 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): RWTextur
   }
 
   return {
-    name,
-    maskName,
-    width,
-    height,
     format: palette ? 'rgba8888' : format,
     hasAlpha,
+    height,
+    maskName,
     mipmaps,
+    name,
+    width,
   };
 }
 
-/** Map RW format identifiers to the adapter's format tag, or null if unsupported. */
-function classifyFormat(d3dFormat: number, rasterFormat: number): RWTextureFormat | null {
-  switch (d3dFormat) {
-    case D3dCompression.DXT1:
-      return 'dxt1';
-    case D3dCompression.DXT3:
-      return 'dxt3';
-    case D3dCompression.DXT5:
-      return 'dxt5';
-    default:
-      break;
+function readDictHeader(stream: BinaryStream): ChunkHeader {
+  const type = stream.u32();
+  const size = stream.u32();
+  const version = stream.u32();
+  if (type !== RwSection.TEXTURE_DICTIONARY) {
+    throw new Error(`Not a TXD: expected TexDictionary (0x16), got 0x${type.toString(16)}`);
   }
-  if (rasterFormat & (RasterFormat.PAL8 | RasterFormat.PAL4)) {
-    return 'rgba8888'; // expanded from palette below
-  }
-  if ((rasterFormat & RasterFormat.PIXEL_FORMAT_MASK) === RasterFormat.C8888) {
-    return 'rgba8888';
-  }
-  return null;
+
+  return { dataStart: stream.position, end: stream.position + size, size, type, version };
 }
 
 function readMipmaps(
@@ -115,7 +133,7 @@ function readMipmaps(
   height: number,
   numLevels: number,
   format: RWTextureFormat,
-  palette: Uint8Array | null,
+  palette: null | Uint8Array,
 ): RWMipLevel[] {
   const mipmaps: RWMipLevel[] = [];
   let w = width;
@@ -129,24 +147,12 @@ function readMipmaps(
     } else if (format === 'rgba8888') {
       data = swizzleBgraToRgba(raw);
     }
-    mipmaps.push({ width: Math.max(1, w), height: Math.max(1, h), data });
+    mipmaps.push({ data, height: Math.max(1, h), width: Math.max(1, w) });
     w = Math.max(1, w >> 1);
     h = Math.max(1, h >> 1);
   }
-  return mipmaps;
-}
 
-/** Expand 8-bit palette indices to RGBA using a BGRA colour table. */
-function expandPalette(indices: Uint8Array, palette: Uint8Array): Uint8Array {
-  const out = new Uint8Array(indices.length * 4);
-  for (let i = 0; i < indices.length; i += 1) {
-    const p = indices[i] * 4;
-    out[i * 4 + 0] = palette[p + 2];
-    out[i * 4 + 1] = palette[p + 1];
-    out[i * 4 + 2] = palette[p + 0];
-    out[i * 4 + 3] = palette[p + 3];
-  }
-  return out;
+  return mipmaps;
 }
 
 /** Convert in-place a BGRA byte buffer to RGBA (returns a new buffer). */
@@ -158,5 +164,6 @@ function swizzleBgraToRgba(bgra: Uint8Array): Uint8Array {
     out[i + 2] = bgra[i + 0];
     out[i + 3] = bgra[i + 3];
   }
+
   return out;
 }
