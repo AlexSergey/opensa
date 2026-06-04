@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.file_path | test(\"package-lock\\\\.json\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"package-lock.json is managed by npm automatically.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.file_path | test(\"\\\\.env\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\".env files contain secrets and must not be edited by AI.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.file_path | test(\"CHANGELOG\\\\.md\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"CHANGELOG.md is generated automatically by the release tooling.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.file_path | test(\"(^|/)dist/\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"dist/ contains build artifacts and must not be edited manually.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.file_path | test(\"(^|/)coverage/\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"coverage/ contains generated test reports and must not be edited manually.\"}}' && exit 1 || exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.command | test(\"--legacy-peer-deps\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"--legacy-peer-deps is not allowed. Never modify npm peer dependency resolution behavior.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.command | test(\"git push.*(--force| -f)\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"git push --force is blocked. Force-pushing can overwrite shared remote history.\"}}' && exit 1 || exit 0"
+          },
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.command | test(\"git reset --hard\")' > /dev/null 2>&1 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"git reset --hard is blocked. This irreversibly discards local changes.\"}}' && exit 1 || exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
