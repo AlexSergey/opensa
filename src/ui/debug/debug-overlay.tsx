@@ -21,8 +21,13 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
   const [geometryMode, setGeometryMode] = useState<GeometryMode>('map');
   const [cameraTarget, setCameraTarget] = useState<CameraTarget>('ganton');
   const [showCollision, setShowCollision] = useState(false);
+  const [playing, setPlaying] = useState(() => game.getConfig().gameState === 'play');
   const [selection, setSelection] = useState<null | WorldObjectInfo>(null);
-  const firstReloadRef = useRef(true);
+  // The modes already loaded (start = the bootstrap's initial region). Comparing
+  // against this — rather than a "skip first run" flag — survives React
+  // StrictMode's double-invoked effects, which would otherwise fire a spurious
+  // reload on mount and clobber the camera framing.
+  const appliedModesRef = useRef({ cameraTarget, geometryMode });
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -51,14 +56,14 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
 
   useEffect(() => game.events.on('select', setSelection), [game]);
 
-  // Reload the region when the geometry/camera choice changes (skip the first
-  // run — the initial region is loaded by the canvas host on bootstrap).
+  // Reload the region only when the geometry/camera choice actually changes (the
+  // initial region is loaded by the canvas host on bootstrap).
   useEffect(() => {
-    if (firstReloadRef.current) {
-      firstReloadRef.current = false;
-
+    const applied = appliedModesRef.current;
+    if (applied.geometryMode === geometryMode && applied.cameraTarget === cameraTarget) {
       return;
     }
+    appliedModesRef.current = { cameraTarget, geometryMode };
     const ganton = cameraTarget === 'ganton';
     void game.loadGame(ganton ? GANTON_CJ_HOME : FULL_MAP_CENTER, {
       geometry: geometryMode,
@@ -76,6 +81,30 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
         ×
       </button>
       <div style={styles.title}>DEBUG</div>
+
+      <div style={styles.group}>
+        <div style={styles.groupLabel}>GAME</div>
+        <Radio
+          checked={playing}
+          label="Play"
+          name="game"
+          onSelect={() => {
+            setPlaying(true);
+            game.setGameState('play');
+          }}
+        />
+        <Radio
+          checked={!playing}
+          label="Pause"
+          name="game"
+          onSelect={() => {
+            setPlaying(false);
+            game.setGameState('pause');
+          }}
+        />
+      </div>
+
+      <div style={styles.divider} />
 
       <div style={styles.group}>
         <div style={styles.groupLabel}>GEOMETRY</div>

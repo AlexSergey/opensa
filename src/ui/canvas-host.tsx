@@ -2,10 +2,12 @@ import { type ReactElement, useEffect, useRef, useState } from 'react';
 
 import { Game } from '../game';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
+import { loadPlayerMesh } from '../game/character/load-player';
+import { setupCharacter } from '../game/character/setup-character';
 import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
 import { DebugOverlay } from './debug/debug-overlay';
-import { GANTON_CJ_HOME, GANTON_RADIUS } from './locations';
+import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
 
@@ -90,7 +92,14 @@ export function CanvasHost(): ReactElement {
 
 function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
   bootstrapped ??= (async (): Promise<Game> => {
-    const game = Game.getInstance(canvas, { debugMode: false, showCollision: false, staticUrl: BASE });
+    const game = Game.getInstance(canvas, {
+      camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
+      controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
+      debugMode: false,
+      gameState: 'play',
+      showCollision: false,
+      staticUrl: BASE,
+    });
     game
       .setWorldAdapter(
         new GtaSaWorldAdapter({
@@ -104,6 +113,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
 
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { geometry: 'map', radius: GANTON_RADIUS });
+
+    // Spawn the player (TEMP: a 3ds cube) on CJ's parking lot, then look at it.
+    // It floats until physics lands it (later iterations); spawn raised on purpose.
+    // ECS Transform drives its position via the render-sync system.
+    const player = await loadPlayerMesh(`${BASE}/player/player.3ds`);
+    player.scale.setScalar(0.8);
+    await setupCharacter(game, player, PLAYER_SPAWN);
+    game.frameEntity(player, 12);
 
     return game;
   })();

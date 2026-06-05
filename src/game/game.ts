@@ -1,10 +1,12 @@
 import {
+  Group,
   type Mesh,
   type Object3D,
   type PerspectiveCamera,
   Raycaster,
   type Scene,
   Vector2,
+  Vector3,
   type WebGLRenderer,
 } from 'three';
 
@@ -12,10 +14,10 @@ import { CollisionWorld } from './collision/collision-world';
 import { CameraController } from './core/camera-controller';
 import { Clock } from './core/clock';
 import { createRenderContext } from './core/renderer';
-import { SystemRegistry } from './core/system';
+import { type System, SystemRegistry } from './core/system';
 import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
-import { type Config } from './interfaces/config.interface';
+import { type Config, type GameState } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
@@ -49,6 +51,7 @@ export class Game {
   private readonly collisionWorld = new CollisionWorld();
   private readonly config: Config;
   private context: null | PluginContext = null;
+  private readonly entityRoot = new Group();
   private lastRequest: null | RegionRequest = null;
   private pipeline!: RenderPipeline;
   private readonly plugins: Plugin[] = [];
@@ -62,6 +65,10 @@ export class Game {
   private constructor(canvas: HTMLCanvasElement, config: Config) {
     this.canvas = canvas;
     this.config = config;
+    // Dynamic entities (the player, later NPCs/vehicles) live in GTA Z-up; the
+    // −90°X here is display-only, matching the region group. Physics stays Z-up.
+    this.entityRoot.name = 'EntityRoot';
+    this.entityRoot.rotation.x = -Math.PI / 2;
   }
 
   static getInstance(canvas?: HTMLCanvasElement, config?: Config): Game {
@@ -81,6 +88,13 @@ export class Game {
     return this;
   }
 
+  /** Register a system; the loop runs `fixedUpdate(step)` then `update(delta)` on it. */
+  addSystem(system: System): this {
+    this.systems.add(system);
+
+    return this;
+  }
+
   dispose(): void {
     this.renderer.setAnimationLoop(null);
     this.cameraController.dispose();
@@ -94,9 +108,30 @@ export class Game {
     Game.instance = null;
   }
 
+  /** Point the camera at a spawned entity once (initial framing; `setFollowTarget` trails it). */
+  frameEntity(object: Object3D, distance = 20): void {
+    this.entityRoot.updateMatrixWorld(true);
+    this.cameraController.focus(object.getWorldPosition(new Vector3()), distance);
+  }
+
+  /** The scene camera (read-only handle; e.g. for camera-relative input). */
+  getCamera(): PerspectiveCamera {
+    return this.camera;
+  }
+
   /** The static-world collision for the current region (empty until loadColliders). */
   getCollisionWorld(): CollisionWorld {
     return this.collisionWorld;
+  }
+
+  /** The live config (mutated in place by `setConfig`); systems read it for state. */
+  getConfig(): Readonly<Config> {
+    return this.config;
+  }
+
+  /** Root group for dynamic entity meshes (player, NPCs). Native GTA Z-up content. */
+  getEntityRoot(): Group {
+    return this.entityRoot;
   }
 
   async init(): Promise<void> {
@@ -107,7 +142,8 @@ export class Game {
     this.camera = camera;
     this.renderer = renderer;
     this.scene = scene;
-    this.cameraController = new CameraController(camera, renderer.domElement);
+    this.scene.add(this.entityRoot);
+    this.cameraController = new CameraController(camera, renderer.domElement, this.config);
     this.pipeline = new BasicRenderPipeline(renderer, scene, camera);
     this.context = {
       camera,
@@ -194,7 +230,19 @@ export class Game {
 
   setDebugMode(enabled: boolean): void {
     this.setConfig({ debugMode: enabled });
+    this.cameraController.setMode(enabled ? 'debug' : 'follow');
     this.events.emit('debug-mode', { enabled });
+  }
+
+  /** The object the camera trails in follow mode (null = none). */
+  setFollowTarget(object: null | Object3D): void {
+    this.cameraController.setTarget(object);
+  }
+
+  /** Switch between play (physics + control) and pause (frozen). */
+  setGameState(state: GameState): void {
+    this.setConfig({ gameState: state });
+    this.events.emit('game-state', { state });
   }
 
   /** Toggle the collision wireframe overlay for the current region (debug). */

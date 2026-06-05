@@ -1,0 +1,45 @@
+- [✅] Creating a basic character - a cube
+- [✅] Parsing and collision binding
+- [✅] Basic physics engine
+- [✅] Character movement using controllers
+  - [✅] Camera is following by the player
+  - [✅] Mouse camera rotation
+- [ ] Physics improvement - not lock in the steps
+- [ ] Rendering the character by coordinates
+- [ ] World drawing and LODs
+  - [ ] Render only the zone where coordinates are passed
+  - [ ] The game tracks where the character is moving.
+  - [ ] New areas ahead are gradually loaded.
+  - [ ] Unnecessary data is removed from the background.
+  - [ ] Distant LODs are replaced with full-fledged objects as they approach. - [ ] Streaming
+- [ ] Enable debug
+  - [ ] Make zones load by checking a box, like in MapEditor
+  - [✅] Enable FlyMode
+- [ ] When this is ready, review and fix the rendering of the remaining map
+- [ ] Empty spaces in the desert, etc.
+- [ ] Add the missing 7 files - see .claude memory/plans
+- [ ] Game time
+- [ ] Timecyc
+- [ ] Volumetric cloud / Skybox
+- [ ] Auto loading
+- [ ] Water rendering
+- [ ] Optimizing game archives
+  - [ ] Scripts for creating different archive types
+  - [ ] Load at startup
+    - [ ] Procobj
+    - [ ] LODs
+    - [ ] Auto
+    - [ ] Characters
+    - [ ] Weapons
+  - [ ] Load in background
+    - [ ] Map parts
+- [ ] Loading a car
+- [ ] Loading a character
+- [ ] Animation controls - walking, running, etc.
+- [ ] Getting into a car
+  - [ ] Door opening animation
+- [ ] Basic car controls
+- [ ] Damage system
+- [ ] Weapons
+  - [ ] Animation
+  - [ ] Shooting

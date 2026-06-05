@@ -1,0 +1,64 @@
+import { addComponent, addEntity } from 'bitecs';
+import { describe, expect, it } from 'vitest';
+
+import type { Config } from '../interfaces/config.interface';
+
+import { RigidBody, Transform } from '../ecs/components';
+import { createEcsWorld } from '../ecs/world';
+import { PhysicsWorld } from './physics-world';
+import { PhysicsSystem } from './physics.system';
+import { initRapier } from './rapier';
+
+function config(gameState: Config['gameState']): Config {
+  return {
+    camera: { followDistance: 12, followMaxPolar: 1.5, followMinPolar: 0.25, followZoom: true },
+    controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
+    debugMode: false,
+    gameState,
+    showCollision: false,
+    staticUrl: '',
+  };
+}
+
+async function fallingEntity(): Promise<{
+  eid: number;
+  physics: PhysicsWorld;
+  world: ReturnType<typeof createEcsWorld>;
+}> {
+  const physics = new PhysicsWorld(await initRapier());
+  const world = createEcsWorld();
+  const eid = addEntity(world);
+  addComponent(world, eid, Transform);
+  addComponent(world, eid, RigidBody);
+  RigidBody.handle[eid] = physics.createBox([0, 0, 10], [0.5, 0.5, 0.5]); // falling, no ground
+  Transform.z[eid] = 10;
+
+  return { eid, physics, world };
+}
+
+describe('PhysicsSystem', () => {
+  describe('negative cases', () => {
+    it('does not step or write transforms while paused', async () => {
+      const { eid, physics, world } = await fallingEntity();
+
+      new PhysicsSystem(world, physics, config('pause')).fixedUpdate(1 / 60);
+
+      expect(Transform.z[eid]).toBe(10); // unchanged
+      physics.dispose();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('writes each rigid body transform onto its entity Transform while playing', async () => {
+      const { eid, physics, world } = await fallingEntity();
+
+      new PhysicsSystem(world, physics, config('play')).fixedUpdate(1 / 60);
+
+      expect(Transform.x[eid]).toBe(0);
+      expect(Transform.y[eid]).toBe(0);
+      expect(Transform.z[eid]).toBeLessThan(10); // gravity pulled it down
+      expect(Transform.qw[eid]).toBeCloseTo(1); // unrotated
+      physics.dispose();
+    });
+  });
+});
