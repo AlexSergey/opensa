@@ -41,6 +41,13 @@ export function fixedString(text: string, length: number): Uint8Array {
   return buffer;
 }
 
+export function i16(value: number): Uint8Array {
+  const buffer = new Uint8Array(2);
+  new DataView(buffer.buffer).setInt16(0, value, true);
+
+  return buffer;
+}
+
 export function i32(value: number): Uint8Array {
   const buffer = new Uint8Array(4);
   new DataView(buffer.buffer).setInt32(0, value, true);

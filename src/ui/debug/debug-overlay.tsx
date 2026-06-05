@@ -20,6 +20,7 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
   const [visible, setVisible] = useState(false);
   const [geometryMode, setGeometryMode] = useState<GeometryMode>('map');
   const [cameraTarget, setCameraTarget] = useState<CameraTarget>('ganton');
+  const [showCollision, setShowCollision] = useState(false);
   const [selection, setSelection] = useState<null | WorldObjectInfo>(null);
   const firstReloadRef = useRef(true);
 
@@ -107,6 +108,30 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
           label="Ganton"
           name="camera"
           onSelect={() => setCameraTarget('ganton')}
+        />
+      </div>
+
+      <div style={styles.divider} />
+
+      <div style={styles.group}>
+        <div style={styles.groupLabel}>COLLISION</div>
+        <Radio
+          checked={showCollision}
+          label="Show"
+          name="collision"
+          onSelect={() => {
+            setShowCollision(true);
+            game.setShowCollision(true);
+          }}
+        />
+        <Radio
+          checked={!showCollision}
+          label="Hide"
+          name="collision"
+          onSelect={() => {
+            setShowCollision(false);
+            game.setShowCollision(false);
+          }}
         />
       </div>
 

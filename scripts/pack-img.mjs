@@ -11,7 +11,7 @@ import { pipeline } from 'node:stream/promises';
 const SRC = process.env.IMG_SRC ?? 'static/img/gta3';
 const OUT = process.env.IMG_OUT ?? 'static/models/gta3.img';
 const includeAll = process.argv.includes('--all');
-const KEEP = new Set(['.dff', '.txd']);
+const KEEP = new Set(['.col', '.dff', '.txd']);
 
 mkdirSync(dirname(OUT), { recursive: true });
 

@@ -1,3 +1,4 @@
+export { CollisionWorld } from './collision/collision-world';
 export type { System } from './core/system';
 
 export { EventBus } from './events/event-bus';
@@ -5,6 +6,7 @@ export type { GameEvents } from './events/events.global';
 
 // Public API of the framework-agnostic game engine.
 export { Game } from './game';
+export type { ColliderBox, ColliderShape, ColliderSphere, ModelColliders } from './interfaces/collider.interface';
 export type { Config } from './interfaces/config.interface';
 
 export type { RegionRequest, Vec3, WorldAdapter, WorldObjectInfo } from './interfaces/world-adapter.interface';

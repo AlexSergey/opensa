@@ -8,6 +8,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 
+import { CollisionWorld } from './collision/collision-world';
 import { CameraController } from './core/camera-controller';
 import { Clock } from './core/clock';
 import { createRenderContext } from './core/renderer';
@@ -15,7 +16,7 @@ import { SystemRegistry } from './core/system';
 import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
 import { type Config } from './interfaces/config.interface';
-import { type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
+import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
 
@@ -44,8 +45,11 @@ export class Game {
   private cameraController!: CameraController;
   private readonly canvas: HTMLCanvasElement;
   private readonly clock = new Clock();
+  private readonly collisionObjects: Object3D[] = [];
+  private readonly collisionWorld = new CollisionWorld();
   private readonly config: Config;
   private context: null | PluginContext = null;
+  private lastRequest: null | RegionRequest = null;
   private pipeline!: RenderPipeline;
   private readonly plugins: Plugin[] = [];
   private readonly raycaster = new Raycaster();
@@ -83,11 +87,16 @@ export class Game {
     for (const plugin of this.plugins) {
       plugin.dispose?.();
     }
-    for (const object of this.worldObjects) {
+    for (const object of [...this.worldObjects, ...this.collisionObjects]) {
       disposeObject(object);
     }
     this.renderer.dispose();
     Game.instance = null;
+  }
+
+  /** The static-world collision for the current region (empty until loadColliders). */
+  getCollisionWorld(): CollisionWorld {
+    return this.collisionWorld;
   }
 
   async init(): Promise<void> {
@@ -118,6 +127,16 @@ export class Game {
     this.events.emit('ready');
   }
 
+  /** Populate the collision world for the current region (for a physics system). */
+  async loadColliders(): Promise<void> {
+    if (!this.adapter || !this.lastRequest) {
+      this.collisionWorld.clear();
+
+      return;
+    }
+    this.collisionWorld.set(await this.adapter.loadColliders(this.lastRequest));
+  }
+
   async loadGame(center: Vec3, options: LoadOptions = {}): Promise<void> {
     if (!this.adapter) {
       throw new Error('Game.loadGame requires a world adapter (setWorldAdapter)');
@@ -131,16 +150,16 @@ export class Game {
     }
     this.worldObjects.length = 0;
 
-    const objects = await this.adapter.loadRegion({
-      center,
-      geometry: options.geometry ?? 'map',
-      radius: options.radius ?? 500,
-    });
+    const request: RegionRequest = { center, geometry: options.geometry ?? 'map', radius: options.radius ?? 500 };
+    this.lastRequest = request;
+    const objects = await this.adapter.loadRegion(request);
     for (const object of objects) {
       this.scene.add(object);
       this.worldObjects.push(object);
     }
     this.cameraController.frameObjects(objects);
+    this.collisionWorld.clear(); // region-scoped; a physics layer repopulates via loadColliders()
+    await this.refreshCollision();
     this.events.emit('loaded');
   }
 
@@ -178,10 +197,38 @@ export class Game {
     this.events.emit('debug-mode', { enabled });
   }
 
+  /** Toggle the collision wireframe overlay for the current region (debug). */
+  setShowCollision(enabled: boolean): void {
+    this.setConfig({ showCollision: enabled });
+    void this.refreshCollision();
+  }
+
   setWorldAdapter(adapter: WorldAdapter): this {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Rebuild the collision overlay for the current region (or clear it when off). */
+  private async refreshCollision(): Promise<void> {
+    for (const object of this.collisionObjects) {
+      this.scene.remove(object);
+      disposeObject(object);
+    }
+    this.collisionObjects.length = 0;
+    if (!this.adapter || !this.lastRequest || !this.config.showCollision) {
+      return;
+    }
+    const objects = await this.adapter.loadCollisionDebug(this.lastRequest);
+    if (!this.config.showCollision) {
+      objects.forEach(disposeObject); // toggled off while awaiting
+
+      return;
+    }
+    for (const object of objects) {
+      this.scene.add(object);
+      this.collisionObjects.push(object);
+    }
   }
 
   private start(): void {
@@ -208,14 +255,19 @@ export class Game {
   }
 }
 
-/** Free GPU geometry/material of an object tree. Textures are shared/cached — left intact. */
+/**
+ * Free GPU geometry/material of an object tree (meshes and line segments alike).
+ * Textures are shared/cached — left intact.
+ */
 function disposeObject(object: Object3D): void {
   object.traverse((node) => {
-    const mesh = node as Mesh;
-    if (!mesh.isMesh) {
-      return;
+    const renderable = node as Partial<Mesh>;
+    renderable.geometry?.dispose();
+    const material = renderable.material;
+    if (Array.isArray(material)) {
+      material.forEach((entry) => entry.dispose());
+    } else {
+      material?.dispose();
     }
-    mesh.geometry.dispose();
-    (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) => material.dispose());
   });
 }

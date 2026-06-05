@@ -90,7 +90,7 @@ export function CanvasHost(): ReactElement {
 
 function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
   bootstrapped ??= (async (): Promise<Game> => {
-    const game = Game.getInstance(canvas, { debugMode: false, staticUrl: BASE });
+    const game = Game.getInstance(canvas, { debugMode: false, showCollision: false, staticUrl: BASE });
     game
       .setWorldAdapter(
         new GtaSaWorldAdapter({

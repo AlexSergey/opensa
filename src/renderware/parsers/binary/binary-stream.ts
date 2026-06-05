@@ -43,6 +43,14 @@ export class BinaryStream {
     return value;
   }
 
+  i16(): number {
+    this.require(2);
+    const value = this.view.getInt16(this.cursor, true);
+    this.cursor += 2;
+
+    return value;
+  }
+
   i32(): number {
     this.require(4);
     const value = this.view.getInt32(this.cursor, true);

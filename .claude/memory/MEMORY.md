@@ -3,3 +3,6 @@
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading
 - [Debug panel (TEMPORARY)](debug-panel-temporary.md) — Ctrl+D overlay in src/ui/debug; remove before shipping
 - [Engine refactor status](engine-refactor-status.md) — plan 006; game/renderware split; phases 0–5 DONE (R3F gone); CURRENT src layout
+- [COL collision plan](col-collision-plan.md) — plan 007; COL parse/bind; 215 col libs / 8061 models in gta3.img (COL2+COL3, 100% bind)
+- [Player cube placeholder](player-cube-placeholder.md) — character is TEMP a 3ds cube (static/player/player.3ds); swap for DFF later
+- [Character physics plan](character-physics-plan.md) — plan 008; first char spawn at CJ home; bitECS + Rapier; Z-up physics
