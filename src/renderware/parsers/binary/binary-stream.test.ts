@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { concat, f32, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../test-utils';
+import { concat, f32, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
 import { BinaryStream } from './binary-stream';
 
 describe('BinaryStream', () => {

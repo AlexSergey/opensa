@@ -5,15 +5,15 @@ metadata:
   type: project
 ---
 
-`src/components/debug/` (`debug-panel.tsx`, `debug-types.ts`) is a **temporary** neon overlay for early/primary debugging — **must be removed** before shipping, along with its wiring.
+`src/ui/debug/debug-overlay.tsx` is a **temporary** neon overlay for early/primary debugging — **must be removed** before shipping, along with its mount in `ui/canvas-host.tsx`.
 
 **Why:** quick manual switching while bringing the map up; not a real feature.
 
 **What it does (Ctrl+D toggles it; X button or Ctrl+D closes):** two radio groups + click-inspect —
 - GEOMETRY: `Only Map` (default = exclude LODs, the normal render) / `Only LODs` (render only LOD stand-ins).
-- CAMERA: `Ganton` (default = focus CJ's house AND load only that district, `FOCUS_RADIUS`≈400 units) / `Full Map` (load the whole map, fit bbox).
-- SELECTED: while the popup is open, **`DEBUG_MODE` is true** and clicking a model reports its name / txd / GTA-world coords in the panel.
+- CAMERA: `Ganton` (default = focus CJ's house AND load only that district, `GANTON_RADIUS`≈400 units) / `Full Map` (load the whole map, fit bbox). Both call `game.loadGame(center, { geometry, radius })`.
+- SELECTED: while the popup is open, the game runs in **debug mode** (`game.setDebugMode(true)`) and clicking the canvas raycasts → `game.pick()` → emits `select` → the panel shows the model's name / txd / GTA-world coords.
 
-**`DEBUG_MODE` global** lives in `src/components/debug/debug-state.ts` (`debugState` store: `isEnabled/setMode/selection/select/subscribe`), mirrored to `window.DEBUG_MODE` for the console. **MUST be moved into a proper config module later** (per user). `DEBUG_MODE` follows the popup-open state.
+**Debug mode** is now `Config.debugMode` on the `Game` singleton (set via `game.setDebugMode`, broadcast on the `debug-mode` event) — the old `debugState` store + `window.DEBUG_MODE` global are **gone** (removed in the engine refactor; see [[engine-refactor-status]]).
 
-**Wiring to unwind when removing:** state (`geometryMode`, `cameraTarget`) lives in `src/app.tsx` → `<DebugPanel>` + `<MapScene>`. `MapScene` consumes `geometryMode` + `focus` (focus also drives the district radius filter); `fit-camera.tsx` re-fits via `useEffect` on `focus` change. `model-instances.tsx` `InstancedPart` has an `onClick` that calls `debugState.select(...)` when `debugState.isEnabled()` — remove that. To revert: drop `components/debug`, the `debugState` import + onClick in model-instances, hard-set `MapScene` to map-only + fixed `focus`, remove the `geometryMode` prop. See [[binary-ipl-render-approach]] / [[map-pipeline]].
+**Wiring to unwind when removing:** the overlay holds its own `geometryMode`/`cameraTarget` React state and drives the engine through `Game` methods only (no scene coupling). `ui/canvas-host.tsx` gates `game.pick` on the `debug-mode` event (only raycasts while the overlay is open). To revert: drop `ui/debug/`, remove `<DebugOverlay>` + the `debug-mode`/pick wiring in `canvas-host.tsx`, and hard-set the bootstrap `loadGame` to the desired fixed region. See [[binary-ipl-render-approach]] / [[map-pipeline]] / [[engine-refactor-status]].

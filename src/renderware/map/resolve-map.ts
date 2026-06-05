@@ -1,0 +1,101 @@
+import type { IplInstance, MapDefinitions } from '../parsers/text';
+
+import { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from '../archive';
+import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl } from '../parsers/text';
+
+/** Stream-count manifest ({ basename: count }) so we load exactly the binary
+ * stream IPLs that exist — no probe-by-404 (e.g. `map_stream0.ipl`). */
+type StreamManifest = Record<string, number>;
+
+/**
+ * Resolve a whole map (framework-agnostic): parse gta.dat, merge all IDE object
+ * definitions into a catalog, and concatenate all IPL instances (text + binary
+ * streams). Missing IDE/IPL files are skipped rather than aborting the map.
+ */
+export async function resolveMap(datUrl: string, base: string): Promise<MapDefinitions> {
+  const dat = parseGtaDat(await fetchText(datUrl));
+
+  const catalog: MapDefinitions['catalog'] = new Map();
+  for (const idePath of dat.ide) {
+    const text = await fetchTextOrNull(datChildUrl(base, idePath));
+    if (text === null) {
+      continue;
+    }
+    for (const def of parseIde(text)) {
+      catalog.set(def.id, def);
+    }
+  }
+
+  const manifest = await fetchStreamManifest(base);
+  const instances: IplInstance[] = [];
+  for (const iplPath of dat.ipl) {
+    if (iplPath.toLowerCase().endsWith('.zon')) {
+      continue; // .ZON = zone definitions, not object placement (no inst, no streams)
+    }
+    const text = await fetchTextOrNull(datChildUrl(base, iplPath));
+    if (text !== null) {
+      instances.push(...parseIpl(text));
+    }
+    // Full-detail placement lives in the matching binary stream IPLs.
+    instances.push(...(await loadBinaryStreams(base, iplBasename(iplPath), manifest)));
+  }
+
+  return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances };
+}
+
+async function fetchArrayBufferOrNull(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const response = await fetch(url);
+
+    return response.ok ? await response.arrayBuffer() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchStreamManifest(base: string): Promise<StreamManifest> {
+  try {
+    const response = await fetch(`${base.replace(/\/+$/, '')}/ipl_binary/manifest.json`);
+    if (!response.ok) {
+      return {};
+    }
+
+    return (await response.json()) as StreamManifest;
+  } catch {
+    return {};
+  }
+}
+
+async function fetchText(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  return response.text();
+}
+
+/** Like fetchText but tolerant: returns null for a missing file or network error. */
+async function fetchTextOrNull(url: string): Promise<null | string> {
+  try {
+    const response = await fetch(url);
+
+    return response.ok ? response.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Load the `<name>_stream{0..count-1}.ipl` listed in the manifest for a basename. */
+async function loadBinaryStreams(base: string, basename: string, manifest: StreamManifest): Promise<IplInstance[]> {
+  const count = manifest[basename] ?? 0;
+  const instances: IplInstance[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const buffer = await fetchArrayBufferOrNull(streamIplUrl(base, basename, index));
+    if (buffer !== null) {
+      instances.push(...parseBinaryIpl(buffer));
+    }
+  }
+
+  return instances;
+}

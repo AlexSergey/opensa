@@ -3,9 +3,9 @@ import type { MeshStandardMaterial } from 'three';
 import { DoubleSide, FrontSide, Mesh, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import type { RWClump, RWGeometry, RWMaterial } from '../parser/types';
+import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
-import { GeometryFlag } from '../parser/constants';
+import { GeometryFlag } from '../parsers/binary/constants';
 import { buildClump } from './build-clump';
 
 function alphaTextureMap(): Map<string, Texture> {

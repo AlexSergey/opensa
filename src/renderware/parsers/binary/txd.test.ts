@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { chunk, concat, fixedString, toArrayBuffer, u8, u16, u32 } from '../test-utils';
+import { chunk, concat, fixedString, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
 import { D3dCompression, RasterFormat, RwSection } from './constants';
 import { parseTxd } from './txd';
 

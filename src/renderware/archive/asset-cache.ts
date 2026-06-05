@@ -1,7 +1,10 @@
-import type { RWClump, TextureDictionary } from '../renderware';
+import type { RWClump } from '../parsers/binary/types';
+import type { TextureDictionary } from '../three/txd-loader';
 import type { ImgArchive } from './img-archive';
 
-import { buildTextureMap, parseDff, parseTxd } from '../renderware';
+import { parseDff } from '../parsers/binary/dff';
+import { parseTxd } from '../parsers/binary/txd';
+import { buildTextureMap } from '../three/build-texture';
 
 /**
  * Parse models/textures out of the in-memory WIMG archive, cached by name.

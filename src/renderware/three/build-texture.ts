@@ -13,7 +13,7 @@ import {
   UnsignedByteType,
 } from 'three';
 
-import type { RWTexture, RWTextureDictionary } from '../parser/types';
+import type { RWTexture, RWTextureDictionary } from '../parsers/binary/types';
 
 const DXT_FORMAT = {
   dxt1: RGBA_S3TC_DXT1_Format,

@@ -1,32 +1,27 @@
-import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 
-import type { CameraTarget, GeometryMode } from './debug-types';
+import type { Game, WorldObjectInfo } from '../../game';
 
-import { debugState } from './debug-state';
+import { FULL_MAP_CENTER, GANTON_CJ_HOME, GANTON_RADIUS } from '../locations';
 
-interface DebugPanelProps {
-  cameraTarget: CameraTarget;
-  geometryMode: GeometryMode;
-  onCameraTargetChange: (target: CameraTarget) => void;
-  onGeometryModeChange: (mode: GeometryMode) => void;
-}
+/** How much to load + where to look: the whole map, or just the Ganton district. */
+type CameraTarget = 'full-map' | 'ganton';
+
+/** What geometry to draw: the real map (LODs excluded) or only the LOD stand-ins. */
+type GeometryMode = 'lods' | 'map';
 
 /**
  * TEMPORARY debug overlay (toggle with Ctrl+D) for early development. While open,
- * `DEBUG_MODE` is true and clicking a model reports its name/txd/coords here.
- * Remove this whole `components/debug` folder (and its wiring) before shipping.
+ * the game runs in debug mode and clicking a model reports its name/txd/coords
+ * here. Drives the engine purely through {@link Game} methods + events. Remove
+ * this whole `ui/debug` folder (and its mount) before shipping.
  */
-export function DebugPanel({
-  cameraTarget,
-  geometryMode,
-  onCameraTargetChange,
-  onGeometryModeChange,
-}: DebugPanelProps): null | ReactElement {
+export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
   const [visible, setVisible] = useState(false);
-  const selection = useSyncExternalStore(
-    (onChange) => debugState.subscribe(onChange),
-    () => debugState.selection(),
-  );
+  const [geometryMode, setGeometryMode] = useState<GeometryMode>('map');
+  const [cameraTarget, setCameraTarget] = useState<CameraTarget>('ganton');
+  const [selection, setSelection] = useState<null | WorldObjectInfo>(null);
+  const firstReloadRef = useRef(true);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -42,10 +37,33 @@ export function DebugPanel({
     };
   }, []);
 
-  // DEBUG_MODE follows the popup: on while open, off (and cleared) when closed.
+  // Debug mode follows the popup: on while open, off when closed (clears selection).
   useEffect(() => {
-    debugState.setMode(visible);
-  }, [visible]);
+    game.setDebugMode(visible);
+    if (!visible) {
+      // eslint-disable-next-line no-warning-comments
+      // TODO: Fix that later
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
+      setSelection(null);
+    }
+  }, [game, visible]);
+
+  useEffect(() => game.events.on('select', setSelection), [game]);
+
+  // Reload the region when the geometry/camera choice changes (skip the first
+  // run — the initial region is loaded by the canvas host on bootstrap).
+  useEffect(() => {
+    if (firstReloadRef.current) {
+      firstReloadRef.current = false;
+
+      return;
+    }
+    const ganton = cameraTarget === 'ganton';
+    void game.loadGame(ganton ? GANTON_CJ_HOME : FULL_MAP_CENTER, {
+      geometry: geometryMode,
+      radius: ganton ? GANTON_RADIUS : Infinity,
+    });
+  }, [game, geometryMode, cameraTarget]);
 
   if (!visible) {
     return null;
@@ -64,13 +82,13 @@ export function DebugPanel({
           checked={geometryMode === 'lods'}
           label="Only LODs"
           name="geometry"
-          onSelect={() => onGeometryModeChange('lods')}
+          onSelect={() => setGeometryMode('lods')}
         />
         <Radio
           checked={geometryMode === 'map'}
           label="Only Map"
           name="geometry"
-          onSelect={() => onGeometryModeChange('map')}
+          onSelect={() => setGeometryMode('map')}
         />
       </div>
 
@@ -82,13 +100,13 @@ export function DebugPanel({
           checked={cameraTarget === 'full-map'}
           label="Full Map"
           name="camera"
-          onSelect={() => onCameraTargetChange('full-map')}
+          onSelect={() => setCameraTarget('full-map')}
         />
         <Radio
           checked={cameraTarget === 'ganton'}
           label="Ganton"
           name="camera"
-          onSelect={() => onCameraTargetChange('ganton')}
+          onSelect={() => setCameraTarget('ganton')}
         />
       </div>
 

@@ -1,5 +1,9 @@
 .idea
 node_modules
+static
+static_old
+static2
+src2
 logs
 *.log
 lib-cov/

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { IdeObjectDef } from '../gta-sa-parsers';
+import type { IdeObjectDef } from '../parsers/text';
 
 import { modelKey } from './model-key';
 

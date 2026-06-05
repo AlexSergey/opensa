@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { chunk, concat, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../test-utils';
+import { chunk, concat, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
 import { GeometryFlag, RwSection } from './constants';
 import { parseDff } from './dff';
 

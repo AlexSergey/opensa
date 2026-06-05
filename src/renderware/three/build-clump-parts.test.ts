@@ -1,9 +1,9 @@
 import { Matrix4, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import type { RWClump, RWGeometry, RWMaterial } from '../parser/types';
+import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
-import { GeometryFlag } from '../parser/constants';
+import { GeometryFlag } from '../parsers/binary/constants';
 import { buildClumpParts } from './build-clump';
 
 function clumpWith(geo: RWGeometry): RWClump {

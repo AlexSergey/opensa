@@ -9,7 +9,7 @@ import {
 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import type { RWTexture, RWTextureDictionary } from '../parser/types';
+import type { RWTexture, RWTextureDictionary } from '../parsers/binary/types';
 
 import { buildTextureMap } from './build-texture';
 

@@ -1,4 +1,5 @@
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
-- [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers (src/gta-sa-parsers) + R3F map walker (src/map)
+- [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers + region builder, now under src/renderware/map
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading
-- [Debug panel (TEMPORARY)](debug-panel-temporary.md) — Ctrl+D overlay in src/components/debug; remove before shipping
+- [Debug panel (TEMPORARY)](debug-panel-temporary.md) — Ctrl+D overlay in src/ui/debug; remove before shipping
+- [Engine refactor status](engine-refactor-status.md) — plan 006; game/renderware split; phases 0–5 DONE (R3F gone); CURRENT src layout

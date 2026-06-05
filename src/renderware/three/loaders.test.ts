@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { FileLoader, Group, Mesh } from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RwSection } from '../parser/constants';
+import { RwSection } from '../parsers/binary/constants';
 import { chunk, toArrayBuffer, u32 } from '../test-utils';
 import { DFFLoader } from './dff-loader';
 import { TXDLoader } from './txd-loader';

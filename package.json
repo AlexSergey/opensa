@@ -18,6 +18,7 @@
     "format": "npm run format:prettier && npm run format:code",
     "format:code": "eslint . --fix",
     "format:prettier": "prettier --write \"src/**/*.{ts,json}\"",
+    "gen:ipl-manifest": "node scripts/gen-ipl-manifest.mjs",
     "knip": "knip",
     "lint": "npm run lint:ts && npm run lint:code",
     "lint:code": "eslint .",
@@ -31,8 +32,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@react-three/drei": "10.7.7",
-    "@react-three/fiber": "^9.6.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.177.0"

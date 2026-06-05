@@ -224,6 +224,26 @@ const scriptsConfig = {
   },
 };
 
+// Layer boundary: the generic `game` engine may touch `renderware` only via
+// `game/adapters/**`. Keeps game logic free of GTA-SA-specific implementation.
+const gameBoundaryConfig = {
+  files: ['src/game/**/*.{ts,tsx}'],
+  ignores: ['src/game/adapters/**'],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: ['**/renderware', '**/renderware/**'],
+            message: 'The game layer must access renderware only through game/adapters.',
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const perfectionistConfig = {
   files: sourceFiles,
   ...perfectionist.configs['recommended-natural'],
@@ -271,6 +291,7 @@ export default [
   packageJson.configs.stylistic,
   customJsConfig,
   scriptsConfig,
+  gameBoundaryConfig,
   {
     settings: {
       react: {

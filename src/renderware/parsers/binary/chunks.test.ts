@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { chunk, concat, fixedString, toArrayBuffer, u32 } from '../test-utils';
+import { chunk, concat, fixedString, toArrayBuffer, u32 } from '../../test-utils';
 import { BinaryStream } from './binary-stream';
 import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
 import { RwSection } from './constants';

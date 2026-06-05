@@ -11,9 +11,9 @@ import {
   MeshStandardMaterial,
 } from 'three';
 
-import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parser/types';
+import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/binary/types';
 
-import { GeometryFlag } from '../parser/constants';
+import { GeometryFlag } from '../parsers/binary/constants';
 
 /**
  * Convert a parsed RWClump into a renderable three.js Group.

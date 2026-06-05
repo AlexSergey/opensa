@@ -1,4 +1,4 @@
-import type { IdeObjectDef } from '../gta-sa-parsers';
+import type { IdeObjectDef } from '../parsers/text';
 
 /**
  * Instancing key: object defs that share both model (dff) and texture (txd)

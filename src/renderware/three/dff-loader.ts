@@ -4,7 +4,7 @@ import { FileLoader, Loader } from 'three';
 
 import type { TextureDictionary } from './txd-loader';
 
-import { parseDff } from '../parser/dff';
+import { parseDff } from '../parsers/binary/dff';
 import { buildClump } from './build-clump';
 
 /**

@@ -2,7 +2,7 @@ import type { Texture } from 'three';
 
 import { FileLoader, Loader } from 'three';
 
-import { parseTxd } from '../parser/txd';
+import { parseTxd } from '../parsers/binary/txd';
 import { buildTextureMap } from './build-texture';
 
 export type TextureDictionary = Map<string, Texture>;
