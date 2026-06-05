@@ -31,7 +31,7 @@ export function parseTxd(buffer: ArrayBuffer): RWTextureDictionary {
 }
 
 /** Map RW format identifiers to the adapter's format tag, or null if unsupported. */
-function classifyFormat(d3dFormat: number, rasterFormat: number): null | RWTextureFormat {
+function classifyFormat(d3dFormat: number, rasterFormat: number, depth: number): null | RWTextureFormat {
   switch (d3dFormat) {
     case D3dCompression.DXT1:
       return 'dxt1';
@@ -45,7 +45,11 @@ function classifyFormat(d3dFormat: number, rasterFormat: number): null | RWTextu
   if (rasterFormat & (RasterFormat.PAL8 | RasterFormat.PAL4)) {
     return 'rgba8888'; // expanded from palette below
   }
-  if ((rasterFormat & RasterFormat.PIXEL_FORMAT_MASK) === RasterFormat.C8888) {
+  // Uncompressed 32-bit: A8R8G8B8 (raster C8888) and X8R8G8B8 (raster C888) are
+  // both 4 bytes/pixel — classify by depth so neither is dropped. 16-bit / other
+  // depths are still unsupported.
+  const pixelFormat = rasterFormat & RasterFormat.PIXEL_FORMAT_MASK;
+  if (depth === 32 || pixelFormat === RasterFormat.C8888 || pixelFormat === RasterFormat.C888) {
     return 'rgba8888';
   }
 
@@ -81,13 +85,13 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | R
   const d3dFormat = stream.u32();
   const width = stream.u16();
   const height = stream.u16();
-  stream.u8(); // depth
+  const depth = stream.u8();
   const numLevels = stream.u8();
   stream.u8(); // raster type
   const flags = stream.u8();
   const hasAlpha = (flags & 0x01) !== 0;
 
-  const format = classifyFormat(d3dFormat, rasterFormat);
+  const format = classifyFormat(d3dFormat, rasterFormat, depth);
   if (!format) {
     return null; // unsupported (e.g. 16-bit) — skip, chunk walker advances past it
   }

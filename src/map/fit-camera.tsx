@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { type RefObject, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import { Box3, type Group, type PerspectiveCamera, Vector3 } from 'three';
 
 interface CameraControls {
@@ -26,6 +26,12 @@ export function FitCamera({ expected, focus, groupRef }: FitCameraProps): null {
   const controls = useThree((state) => state.controls) as CameraControls | null;
   const lastCountRef = useRef(-1);
   const focusedRef = useRef(false);
+
+  // Re-fit when the target changes (e.g. debug toggle between district and full map).
+  useEffect(() => {
+    focusedRef.current = false;
+    lastCountRef.current = -1;
+  }, [focus]);
 
   useFrame(() => {
     if (focus) {

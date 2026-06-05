@@ -65,6 +65,17 @@ describe('parseTxd (synthetic)', () => {
     width: 1,
   });
 
+  // X8R8G8B8 / rasterFormat C888 (0x600) — 32-bit; was previously dropped.
+  const x8r8g8b8 = texNative({
+    d3dFormat: 0x16,
+    flags: 0x00,
+    height: 1,
+    mip: u8(11, 22, 33, 0),
+    name: 'raw32x',
+    rasterFormat: RasterFormat.C888,
+    width: 1,
+  });
+
   const palette = new Uint8Array(256 * 4);
   palette.set([1, 2, 3, 4], 0); // palette entry 0 as BGRA
   const palettized = texNative({
@@ -88,10 +99,16 @@ describe('parseTxd (synthetic)', () => {
     width: 2,
   });
 
-  const dict = parseTxd(buildSyntheticTxd([dxt5, uncompressed, palettized, unsupported]));
+  const dict = parseTxd(buildSyntheticTxd([dxt5, uncompressed, x8r8g8b8, palettized, unsupported]));
 
   it('skips textures with unsupported pixel formats but keeps the rest', () => {
-    expect(dict.textures.map((t) => t.name)).toEqual(['compressed', 'raw32', 'paletted']);
+    expect(dict.textures.map((t) => t.name)).toEqual(['compressed', 'raw32', 'raw32x', 'paletted']);
+  });
+
+  it('keeps 32-bit X8R8G8B8 / C888 textures (regression: palm trunks went white)', () => {
+    const tex = dict.textures.find((t) => t.name === 'raw32x')!;
+    expect(tex.format).toBe('rgba8888');
+    expect(Array.from(tex.mipmaps[0].data)).toEqual([33, 22, 11, 0]); // BGRX -> RGBA
   });
 
   it('classifies DXT5 and preserves raw block data', () => {

@@ -1,3 +1,4 @@
+import { type ThreeEvent } from '@react-three/fiber';
 import { type ReactElement, useLayoutEffect, useRef } from 'react';
 import { type InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
@@ -5,6 +6,7 @@ import type { IdeObjectDef, IplInstance } from '../gta-sa-parsers';
 import type { RenderPart } from '../renderware';
 import type { ImgArchive } from './img-archive';
 
+import { debugState } from '../components/debug/debug-state';
 import { useModelParts } from './use-model-parts';
 
 interface ModelInstancesProps {
@@ -25,13 +27,21 @@ export function ModelInstances({ archive, def, instances }: ModelInstancesProps)
   return (
     <>
       {parts.map((part) => (
-        <InstancedPart instances={instances} key={part.geometry.uuid} part={part} />
+        <InstancedPart def={def} instances={instances} key={part.geometry.uuid} part={part} />
       ))}
     </>
   );
 }
 
-function InstancedPart({ instances, part }: { instances: IplInstance[]; part: RenderPart }): ReactElement {
+function InstancedPart({
+  def,
+  instances,
+  part,
+}: {
+  def: IdeObjectDef;
+  instances: IplInstance[];
+  part: RenderPart;
+}): ReactElement {
   const meshRef = useRef<InstancedMesh>(null);
 
   useLayoutEffect(() => {
@@ -46,7 +56,8 @@ function InstancedPart({ instances, part }: { instances: IplInstance[]; part: Re
     const scale = new Vector3(1, 1, 1);
     instances.forEach((instance, i) => {
       pos.set(instance.position[0], instance.position[1], instance.position[2]);
-      quat.set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate.
+      quat.set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3]).conjugate();
       placement.compose(pos, quat, scale);
       composed.multiplyMatrices(placement, part.matrix);
       mesh.setMatrixAt(i, composed);
@@ -55,5 +66,15 @@ function InstancedPart({ instances, part }: { instances: IplInstance[]; part: Re
     mesh.computeBoundingSphere();
   }, [instances, part]);
 
-  return <instancedMesh args={[part.geometry, part.material, instances.length]} ref={meshRef} />;
+  // TEMPORARY: while the debug popup is open, clicking a model reports it.
+  function handleClick(event: ThreeEvent<MouseEvent>): void {
+    if (!debugState.isEnabled() || event.instanceId === undefined) {
+      return;
+    }
+    event.stopPropagation();
+    const instance = instances[event.instanceId];
+    debugState.select({ modelName: def.modelName, position: instance.position, txdName: def.txdName });
+  }
+
+  return <instancedMesh args={[part.geometry, part.material, instances.length]} onClick={handleClick} ref={meshRef} />;
 }

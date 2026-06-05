@@ -1,3 +1,4 @@
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
 - [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers (src/gta-sa-parsers) + R3F map walker (src/map)
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading
+- [Debug panel (TEMPORARY)](debug-panel-temporary.md) — Ctrl+D overlay in src/components/debug; remove before shipping
