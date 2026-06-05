@@ -64,14 +64,15 @@ export class PhysicsWorld {
   /**
    * Build static colliders for the bound map collision: one fixed body per
    * placement (Z-up translation + rotation decomposed from its matrix) carrying
-   * the model's trimesh + box + sphere shapes (model space). Returns the number
-   * of colliders created. Degenerate trimeshes are skipped.
+   * the model's trimesh + box + sphere shapes (model space). Returns the created
+   * body **handles** (for {@link removeBodies} when a cell unloads); placements
+   * whose shapes were all degenerate create no body.
    */
-  createStaticColliders(models: readonly ModelColliders[]): number {
+  createStaticColliders(models: readonly ModelColliders[]): number[] {
     const translation = new Vector3();
     const rotation = new Quaternion();
     const scale = new Vector3();
-    let count = 0;
+    const handles: number[] = [];
 
     for (const model of models) {
       for (const matrix of model.transforms) {
@@ -81,11 +82,15 @@ export class PhysicsWorld {
             .setTranslation(translation.x, translation.y, translation.z)
             .setRotation({ w: rotation.w, x: rotation.x, y: rotation.y, z: rotation.z }),
         );
-        count += this.addShapes(body, model.shape);
+        if (this.addShapes(body, model.shape) > 0) {
+          handles.push(body.handle);
+        } else {
+          this.world.removeRigidBody(body); // no usable shape — don't keep an empty body
+        }
       }
     }
 
-    return count;
+    return handles;
   }
 
   dispose(): void {
@@ -115,6 +120,13 @@ export class PhysicsWorld {
     const r = body.rotation();
 
     return { position: [t.x, t.y, t.z], quaternion: [r.x, r.y, r.z, r.w] };
+  }
+
+  /** Remove static bodies (and their colliders) by handle — e.g. when a cell unloads. */
+  removeBodies(handles: readonly number[]): void {
+    for (const handle of handles) {
+      this.world.removeRigidBody(this.world.getRigidBody(handle));
+    }
   }
 
   /** Set a body's linear velocity (Z-up). */

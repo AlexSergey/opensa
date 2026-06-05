@@ -50,23 +50,23 @@ describe('PhysicsWorld', () => {
   });
 });
 
-describe('PhysicsWorld.createStaticColliders', () => {
+describe('PhysicsWorld.createStaticColliders / removeBodies', () => {
   describe('negative cases', () => {
-    it('creates nothing for no models', async () => {
+    it('creates no bodies for no models', async () => {
       const physics = await makeWorld();
-      expect(physics.createStaticColliders([])).toBe(0);
+      expect(physics.createStaticColliders([])).toHaveLength(0);
       physics.dispose();
     });
 
-    it('skips a model with empty shapes', async () => {
+    it('creates no body for a placement with only degenerate shapes', async () => {
       const physics = await makeWorld();
-      expect(physics.createStaticColliders([model(shape(), [new Matrix4()])])).toBe(0);
+      expect(physics.createStaticColliders([model(shape(), [new Matrix4()])])).toHaveLength(0);
       physics.dispose();
     });
   });
 
   describe('positive cases', () => {
-    it('creates a collider per shape, per placement', async () => {
+    it('returns one body handle per placement', async () => {
       const physics = await makeWorld();
       const colliderShape = shape({
         boxes: [{ max: [1, 1, 1], min: [-1, -1, -1] }],
@@ -76,16 +76,27 @@ describe('PhysicsWorld.createStaticColliders', () => {
       });
       const transforms = [new Matrix4(), new Matrix4().makeTranslation(10, 0, 0)];
 
-      // (trimesh + box + sphere) * 2 placements
-      expect(physics.createStaticColliders([model(colliderShape, transforms)])).toBe(6);
+      // one body per placement (each carrying trimesh + box + sphere)
+      expect(physics.createStaticColliders([model(colliderShape, transforms)])).toHaveLength(2);
       physics.dispose();
     });
 
-    it('counts only the box when there is no mesh', async () => {
+    it('removeBodies frees the ground so a resting box falls again', async () => {
       const physics = await makeWorld();
-      const colliderShape = shape({ boxes: [{ max: [1, 2, 3], min: [0, 0, 0] }] });
+      const ground = model(shape({ boxes: [{ max: [10, 10, 0.5], min: [-10, -10, -0.5] }] }), [new Matrix4()]);
+      const handles = physics.createStaticColliders([ground]); // top surface at z = 0.5
+      const box = physics.createBox([0, 0, 2], [0.5, 0.5, 0.5]);
 
-      expect(physics.createStaticColliders([model(colliderShape, [new Matrix4()])])).toBe(1);
+      for (let i = 0; i < 180; i += 1) {
+        physics.step(STEP);
+      }
+      expect(physics.readBody(box).position[2]).toBeCloseTo(1, 1); // rests on the ground
+
+      physics.removeBodies(handles);
+      for (let i = 0; i < 180; i += 1) {
+        physics.step(STEP);
+      }
+      expect(physics.readBody(box).position[2]).toBeLessThan(0); // ground gone → falls through
       physics.dispose();
     });
   });

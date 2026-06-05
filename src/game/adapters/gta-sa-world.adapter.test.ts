@@ -1,11 +1,31 @@
 import { Matrix4 } from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import type { ColModel } from '../../renderware';
+import type * as Renderware from '../../renderware';
 
-import { toModelColliders } from './gta-sa-world.adapter';
+import { GtaSaWorldAdapter, toModelColliders } from './gta-sa-world.adapter';
 
-function colModel(partial: Partial<ColModel>): ColModel {
+// Stub the network parts of the renderware barrel; keep grid/cell builders real.
+vi.mock('../../renderware', async (importActual) => {
+  const actual = await importActual<typeof Renderware>();
+
+  return {
+    ...actual,
+    loadArchive: (): Promise<Renderware.ImgArchive> => Promise.resolve({ get: () => null, names: [] }),
+    resolveMap: (): Promise<Renderware.MapDefinitions> =>
+      Promise.resolve({
+        catalog: new Map([[1, { drawDistance: 300, flags: 0, id: 1, modelName: 'house', txdName: 'txd' }]]),
+        imgDirs: [],
+        instances: [{ id: 1, interior: 0, lod: -1, modelName: '', position: [10, 10, 0], rotation: [0, 0, 0, 1] }],
+      }),
+  };
+});
+
+function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
+  return { archiveUrl: 'a', base: 'b', cellSize: 250, datUrl: 'd' };
+}
+
+function colModel(partial: Partial<Renderware.ColModel>): Renderware.ColModel {
   return {
     bounds: { center: [0, 0, 0], max: [0, 0, 0], min: [0, 0, 0], radius: 0 },
     boxes: [],
@@ -60,6 +80,44 @@ describe('toModelColliders', () => {
       const result = toModelColliders({ col, name: 'prop', transforms: [] });
       expect(result.shape.boxes).toEqual([{ max: [1, 1, 1], min: [-1, -1, -1] }]);
       expect(result.shape.spheres).toEqual([{ center: [0, 0, 2], radius: 0.5 }]);
+    });
+  });
+});
+
+describe('GtaSaWorldAdapter cell streaming', () => {
+  describe('negative cases', () => {
+    it('throws when loadCell is called before prepare', async () => {
+      await expect(new GtaSaWorldAdapter(cfg()).loadCell({ cx: 0, cy: 0, lod: false })).rejects.toThrow();
+    });
+
+    it('throws when loadCellColliders is called before prepare', async () => {
+      await expect(new GtaSaWorldAdapter(cfg()).loadCellColliders(0, 0)).rejects.toThrow();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('exposes the configured cell size', () => {
+      expect(new GtaSaWorldAdapter(cfg()).cellSize).toBe(250);
+    });
+
+    it('caches a built cell (same array on repeat loads)', async () => {
+      const adapter = new GtaSaWorldAdapter(cfg());
+      await adapter.prepare();
+
+      const first = await adapter.loadCell({ cx: 0, cy: 0, lod: false });
+      const second = await adapter.loadCell({ cx: 0, cy: 0, lod: false });
+
+      expect(second).toBe(first);
+    });
+
+    it('caches a cell’s colliders (same array on repeat loads)', async () => {
+      const adapter = new GtaSaWorldAdapter(cfg());
+      await adapter.prepare();
+
+      const first = await adapter.loadCellColliders(0, 0);
+      const second = await adapter.loadCellColliders(0, 0);
+
+      expect(second).toBe(first);
     });
   });
 });

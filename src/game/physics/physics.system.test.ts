@@ -17,6 +17,7 @@ function config(gameState: Config['gameState']): Config {
     gameState,
     showCollision: false,
     staticUrl: '',
+    streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
   };
 }
 

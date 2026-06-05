@@ -23,6 +23,38 @@ export interface RegionColliders {
 }
 
 /**
+ * Bind grouped instances (by model name) to their collision: look each model up
+ * in the index and emit one entry per model with the per-placement world
+ * transforms (position + conjugated IPL quaternion, unit scale; Z-up). Models
+ * without collision are skipped. Shared by the region + cell collider builders.
+ */
+export function bindColliders(index: CollisionIndex, groups: Map<string, IplInstance[]>): RegionColliders[] {
+  const colliders: RegionColliders[] = [];
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3(1, 1, 1);
+
+  for (const [name, instances] of groups) {
+    const col = getCollision(index, name);
+    if (!col) {
+      continue;
+    }
+    const transforms = instances.map((instance) => {
+      position.set(instance.position[0], instance.position[1], instance.position[2]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate.
+      quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+
+      return new Matrix4().compose(position, quaternion, scale);
+    });
+    colliders.push({ col, name, transforms });
+  }
+
+  return colliders;
+}
+
+/**
  * Bind collision to placed objects for a region (the static-world counterpart of
  * {@link buildRegion}). Filters to exterior (`interior === 0`), the radius and
  * real (non-LOD) models — LODs have no collision — then groups instances by model
@@ -54,36 +86,23 @@ export function buildColliders(
     if (dx * dx + dy * dy > radiusSq) {
       continue;
     }
-    const key = def.modelName.toLowerCase();
-    let instances = groups.get(key);
-    if (!instances) {
-      instances = [];
-      groups.set(key, instances);
-    }
-    instances.push(instance);
+    groupInstanceByModel(groups, def.modelName, instance);
   }
 
-  const colliders: RegionColliders[] = [];
-  const position = new Vector3();
-  const quaternion = new Quaternion();
-  const scale = new Vector3(1, 1, 1);
+  return bindColliders(index, groups);
+}
 
-  for (const [name, instances] of groups) {
-    const col = getCollision(index, name);
-    if (!col) {
-      continue;
-    }
-    const transforms = instances.map((instance) => {
-      position.set(instance.position[0], instance.position[1], instance.position[2]);
-      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate.
-      quaternion
-        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
-        .conjugate();
-
-      return new Matrix4().compose(position, quaternion, scale);
-    });
-    colliders.push({ col, name, transforms });
+/** Group an instance under its lowercased model name (shared by the region + cell builders). */
+export function groupInstanceByModel(
+  groups: Map<string, IplInstance[]>,
+  modelName: string,
+  instance: IplInstance,
+): void {
+  const key = modelName.toLowerCase();
+  let instances = groups.get(key);
+  if (!instances) {
+    instances = [];
+    groups.set(key, instances);
   }
-
-  return colliders;
+  instances.push(instance);
 }

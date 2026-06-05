@@ -1,4 +1,3 @@
-export { CollisionWorld } from './collision/collision-world';
 export type { System } from './core/system';
 
 export { EventBus } from './events/event-bus';
@@ -14,3 +13,6 @@ export type { RegionRequest, Vec3, WorldAdapter, WorldObjectInfo } from './inter
 export { AmbientLightPlugin } from './plugins/ambient-light.plugin';
 export { DirectionalLightPlugin } from './plugins/directional-light.plugin';
 export type { Plugin, PluginContext, RenderPass, RenderPipeline } from './plugins/plugin';
+
+export type { CellCoord } from './streaming/grid';
+export { StreamingSystem } from './streaming/streaming.system';

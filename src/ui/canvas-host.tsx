@@ -6,10 +6,14 @@ import { loadPlayerMesh } from '../game/character/load-player';
 import { setupCharacter } from '../game/character/setup-character';
 import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
+import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
+import { StreamingSystem } from '../game/streaming/streaming.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
+
+const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
 // double-mount (dev) doesn't spin up a second renderer / archive download.
@@ -99,28 +103,33 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       gameState: 'play',
       showCollision: false,
       staticUrl: BASE,
+      streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
     });
-    game
-      .setWorldAdapter(
-        new GtaSaWorldAdapter({
-          archiveUrl: `${BASE}/models/gta3.img`,
-          base: BASE,
-          datUrl: `${BASE}/data/gta.dat`,
-        }),
-      )
-      .addPlugin(new AmbientLightPlugin())
-      .addPlugin(new DirectionalLightPlugin());
+    const adapter = new GtaSaWorldAdapter({
+      archiveUrl: `${BASE}/models/gta3.img`,
+      base: BASE,
+      cellSize: CELL_SIZE,
+      datUrl: `${BASE}/data/gta.dat`,
+    });
+    game.setWorldAdapter(adapter).addPlugin(new AmbientLightPlugin()).addPlugin(new DirectionalLightPlugin());
 
     await game.init();
-    await game.loadGame(GANTON_CJ_HOME, { geometry: 'map', radius: GANTON_RADIUS });
+    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS });
 
     // Spawn the player (TEMP: a 3ds cube) on CJ's parking lot, then look at it.
-    // It floats until physics lands it (later iterations); spawn raised on purpose.
     // ECS Transform drives its position via the render-sync system.
     const player = await loadPlayerMesh(`${BASE}/player/player.3ds`);
     player.scale.setScalar(0.8);
-    await setupCharacter(game, player, PLAYER_SPAWN);
+    const character = await setupCharacter(game, player, PLAYER_SPAWN);
     game.frameEntity(player, 12);
+
+    // Stream map cells around the player (full models near, LODs ringing out).
+    const streaming = new StreamingSystem(adapter, game.getStreamingRoot(), character.viewOf, game.getConfig());
+    game.addSystem(streaming);
+    game.setStreamingSystem(streaming);
+
+    // Stream static collision (HD cells) around the player so it has ground everywhere.
+    game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
 
     return game;
   })();

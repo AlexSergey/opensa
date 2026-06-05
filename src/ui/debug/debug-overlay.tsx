@@ -1,33 +1,26 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 
-import type { Game, WorldObjectInfo } from '../../game';
+import type { CellCoord, Game, WorldObjectInfo } from '../../game';
 
-import { FULL_MAP_CENTER, GANTON_CJ_HOME, GANTON_RADIUS } from '../locations';
-
-/** How much to load + where to look: the whole map, or just the Ganton district. */
-type CameraTarget = 'full-map' | 'ganton';
-
-/** What geometry to draw: the real map (LODs excluded) or only the LOD stand-ins. */
-type GeometryMode = 'lods' | 'map';
+/** Half-width of the section inspector grid (2 → a 5×5 grid around the current cell). */
+const GRID_RADIUS = 2;
+const OFFSETS = Array.from({ length: GRID_RADIUS * 2 + 1 }, (_, i) => i - GRID_RADIUS);
 
 /**
  * TEMPORARY debug overlay (toggle with Ctrl+D) for early development. While open,
- * the game runs in debug mode and clicking a model reports its name/txd/coords
- * here. Drives the engine purely through {@link Game} methods + events. Remove
- * this whole `ui/debug` folder (and its mount) before shipping.
+ * streaming is suspended and the **section inspector** renders the checked grid
+ * cells (around the current one) — as HD, or as LOD with "Show LODs". Clicking a
+ * model reports its name/txd/coords. Closing resumes the normal streaming render.
+ * Remove this whole `ui/debug` folder (and its mount) before shipping.
  */
 export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
   const [visible, setVisible] = useState(false);
-  const [geometryMode, setGeometryMode] = useState<GeometryMode>('map');
-  const [cameraTarget, setCameraTarget] = useState<CameraTarget>('ganton');
-  const [showCollision, setShowCollision] = useState(false);
   const [playing, setPlaying] = useState(() => game.getConfig().gameState === 'play');
+  const [showCollision, setShowCollision] = useState(false);
   const [selection, setSelection] = useState<null | WorldObjectInfo>(null);
-  // The modes already loaded (start = the bootstrap's initial region). Comparing
-  // against this — rather than a "skip first run" flag — survives React
-  // StrictMode's double-invoked effects, which would otherwise fire a spurious
-  // reload on mount and clobber the camera framing.
-  const appliedModesRef = useRef({ cameraTarget, geometryMode });
+  const [center, setCenter] = useState<CellCoord | null>(null);
+  const [selected, setSelected] = useState(() => new Set(['0,0']));
+  const [showLods, setShowLods] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -43,33 +36,48 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
     };
   }, []);
 
-  // Debug mode follows the popup: on while open, off when closed (clears selection).
+  // Debug mode follows the popup: entering captures the current section + seeds the
+  // selection (suspending streaming); leaving resumes streaming.
   useEffect(() => {
     game.setDebugMode(visible);
-    if (!visible) {
-      // eslint-disable-next-line no-warning-comments
-      // TODO: Fix that later
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
+    /* eslint-disable @eslint-react/set-state-in-effect */
+    if (visible) {
+      setCenter(game.getViewCell());
+      setSelected(new Set(['0,0']));
+    } else {
       setSelection(null);
+      setCenter(null);
+      game.setManualCells(null);
     }
+    /* eslint-enable @eslint-react/set-state-in-effect */
   }, [game, visible]);
 
   useEffect(() => game.events.on('select', setSelection), [game]);
 
-  // Reload the region only when the geometry/camera choice actually changes (the
-  // initial region is loaded by the canvas host on bootstrap).
+  // Render the checked sections (relative to the captured centre) while open.
   useEffect(() => {
-    const applied = appliedModesRef.current;
-    if (applied.geometryMode === geometryMode && applied.cameraTarget === cameraTarget) {
+    if (!visible || !center) {
       return;
     }
-    appliedModesRef.current = { cameraTarget, geometryMode };
-    const ganton = cameraTarget === 'ganton';
-    void game.loadGame(ganton ? GANTON_CJ_HOME : FULL_MAP_CENTER, {
-      geometry: geometryMode,
-      radius: ganton ? GANTON_RADIUS : Infinity,
+    const cells = [...selected].map((offset): CellCoord => {
+      const [dx, dy] = offset.split(',');
+
+      return [center[0] + Number(dx), center[1] + Number(dy)];
     });
-  }, [game, geometryMode, cameraTarget]);
+    game.setManualCells(cells, showLods);
+  }, [game, visible, center, selected, showLods]);
+
+  function toggleCell(dx: number, dy: number): void {
+    const key = `${dx},${dy}`;
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(key)) {
+        next.add(key);
+      }
+
+      return next;
+    });
+  }
 
   if (!visible) {
     return null;
@@ -107,37 +115,22 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
       <div style={styles.divider} />
 
       <div style={styles.group}>
-        <div style={styles.groupLabel}>GEOMETRY</div>
-        <Radio
-          checked={geometryMode === 'lods'}
-          label="Only LODs"
-          name="geometry"
-          onSelect={() => setGeometryMode('lods')}
-        />
-        <Radio
-          checked={geometryMode === 'map'}
-          label="Only Map"
-          name="geometry"
-          onSelect={() => setGeometryMode('map')}
-        />
-      </div>
-
-      <div style={styles.divider} />
-
-      <div style={styles.group}>
-        <div style={styles.groupLabel}>CAMERA</div>
-        <Radio
-          checked={cameraTarget === 'full-map'}
-          label="Full Map"
-          name="camera"
-          onSelect={() => setCameraTarget('full-map')}
-        />
-        <Radio
-          checked={cameraTarget === 'ganton'}
-          label="Ganton"
-          name="camera"
-          onSelect={() => setCameraTarget('ganton')}
-        />
+        <div style={styles.groupLabel}>SECTIONS {center ? `(${center[0]}, ${center[1]})` : ''}</div>
+        <div style={styles.grid}>
+          {OFFSETS.flatMap((dy) =>
+            OFFSETS.map((dx) => (
+              <input
+                checked={selected.has(`${dx},${dy}`)}
+                key={`${dx},${dy}`}
+                onChange={() => toggleCell(dx, dy)}
+                style={dx === 0 && dy === 0 ? { ...styles.cell, ...styles.cellCenter } : styles.cell}
+                title={center ? `${center[0] + dx}, ${center[1] + dy}` : `${dx}, ${dy}`}
+                type="checkbox"
+              />
+            )),
+          )}
+        </div>
+        <Checkbox checked={showLods} label="Show LODs" onToggle={() => setShowLods((previous) => !previous)} />
       </div>
 
       <div style={styles.divider} />
@@ -182,6 +175,23 @@ export function DebugOverlay({ game }: { game: Game }): null | ReactElement {
   );
 }
 
+function Checkbox({
+  checked,
+  label,
+  onToggle,
+}: {
+  checked: boolean;
+  label: string;
+  onToggle: () => void;
+}): ReactElement {
+  return (
+    <label style={styles.label}>
+      <input checked={checked} onChange={onToggle} style={styles.radio} type="checkbox" />
+      <span style={checked ? styles.optionActive : styles.option}>{label}</span>
+    </label>
+  );
+}
+
 function Radio({
   checked,
   label,
@@ -207,6 +217,17 @@ const BG = 'rgba(0, 8, 20, 0.92)';
 const BORDER = '#00ffcc55';
 
 const styles: Record<string, React.CSSProperties> = {
+  cell: {
+    accentColor: NEON,
+    cursor: 'pointer',
+    height: 16,
+    margin: 0,
+    width: 16,
+  },
+  cellCenter: {
+    outline: `1px solid ${NEON}`,
+    outlineOffset: 1,
+  },
   close: {
     background: 'transparent',
     border: 'none',
@@ -223,6 +244,11 @@ const styles: Record<string, React.CSSProperties> = {
   divider: {
     borderTop: `1px solid ${BORDER}`,
     margin: '8px 0',
+  },
+  grid: {
+    display: 'grid',
+    gap: 3,
+    gridTemplateColumns: `repeat(${OFFSETS.length}, 1fr)`,
   },
   group: {
     display: 'flex',
@@ -278,7 +304,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 14px',
     position: 'fixed',
     top: 16,
-    width: 150,
+    width: 160,
     zIndex: 1000,
   },
   radio: {

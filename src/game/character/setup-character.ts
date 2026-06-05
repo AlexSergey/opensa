@@ -22,6 +22,8 @@ export interface CharacterContext {
   physics: PhysicsWorld;
   playerEid: number;
   renderRefs: Map<number, Object3D>;
+  /** The player's world position (GTA Z-up), e.g. for streaming to centre on. */
+  viewOf: () => Vec3;
   world: EcsWorld;
 }
 
@@ -57,9 +59,7 @@ export async function setupCharacter(game: Game, player: Object3D, spawn: Vec3):
   ];
 
   const physics = new PhysicsWorld(await initRapier());
-  // Real map collision for the current region (the cube lands on the actual lot).
-  await game.loadColliders();
-  physics.createStaticColliders(game.getCollisionWorld().models);
+  // Map collision is streamed per cell (CollisionStreamingSystem, wired in the bootstrap).
   RigidBody.handle[playerEid] = physics.createCharacterBody(spawn, halfExtents);
 
   game.getEntityRoot().add(player);
@@ -77,5 +77,7 @@ export async function setupCharacter(game: Game, player: Object3D, spawn: Vec3):
   renderSync.update(); // place the mesh now so the immediate camera frame is correct
   game.setFollowTarget(player); // camera trails the player while playing
 
-  return { keyboard, physics, playerEid, renderRefs, world };
+  const viewOf = (): Vec3 => [Transform.x[playerEid], Transform.y[playerEid], Transform.z[playerEid]];
+
+  return { keyboard, physics, playerEid, renderRefs, viewOf, world };
 }

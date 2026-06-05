@@ -6,3 +6,5 @@
 - [COL collision plan](col-collision-plan.md) — plan 007; COL parse/bind; 215 col libs / 8061 models in gta3.img (COL2+COL3, 100% bind)
 - [Player cube placeholder](player-cube-placeholder.md) — character is TEMP a 3ds cube (static/player/player.3ds); swap for DFF later
 - [Character physics plan](character-physics-plan.md) — plan 008; first char spawn at CJ home; bitECS + Rapier; Z-up physics
+- [World streaming plan](world-streaming-plan.md) — plan 009; SA sectioned grid + LOD rendering; dual draw distance
+- [Collision streaming plan](collision-streaming-plan.md) — plan 010; stream static COL per grid cell around the player

@@ -1,11 +1,16 @@
 import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
-import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text';
+import type { IdeObjectDef, IplInstance } from '../parsers/text';
 
 import { getClump, getTextures, modelKey } from '../archive';
-import { isLodModel } from '../parsers/text';
 import { buildClumpParts } from '../three/build-clump';
+
+/**
+ * Shared instancing for the streamed map: grouping instances by model+txd and
+ * building one `InstancedMesh` per single-material part. Used by the per-cell
+ * builder ({@link buildCell}); the map renders through the streaming system.
+ */
 
 /** Per-mesh data for click-inspect / describe. */
 export interface RegionMeshData {
@@ -13,49 +18,23 @@ export interface RegionMeshData {
   instances: IplInstance[];
 }
 
-export interface RegionOptions {
-  /** GTA Z-up world centre of the region. */
-  center: [number, number, number];
-  /** Render the real map (LODs excluded) or only the LOD stand-ins. */
-  geometry: 'lods' | 'map';
-  /** Load radius in GTA units; use `Infinity` for the whole map. */
-  radius: number;
+/** Group an instance under its model+txd key (shared by the cell builder). */
+export function addToGroup(groups: Map<string, RegionMeshData>, def: IdeObjectDef, instance: IplInstance): void {
+  const key = modelKey(def);
+  let group = groups.get(key);
+  if (!group) {
+    group = { def, instances: [] };
+    groups.set(key, group);
+  }
+  group.instances.push(instance);
 }
 
 /**
- * Build the instanced renderables for a region (framework-agnostic). Filters to
- * exterior (`interior === 0`), the chosen geometry kind, and the radius; groups
- * by model+txd; and emits one `InstancedMesh` per single-material part with the
- * GTA world transforms (IPL quaternion conjugated). `userData.region` carries the
- * source data for picking.
+ * Build one `InstancedMesh` per single-material part for each model group, placing
+ * every instance with its GTA world transform (IPL quaternion conjugated, unit
+ * scale). `userData.region` carries the group for picking.
  */
-export function buildRegion(archive: ImgArchive, defs: MapDefinitions, options: RegionOptions): InstancedMesh[] {
-  const { center, geometry, radius } = options;
-  const radiusSq = radius * radius;
-
-  const groups = new Map<string, RegionMeshData>();
-  for (const instance of defs.instances) {
-    const def = defs.catalog.get(instance.id);
-    if (!def || instance.interior !== 0) {
-      continue;
-    }
-    if ((geometry === 'lods') !== isLodModel(def.modelName)) {
-      continue;
-    }
-    const dx = instance.position[0] - center[0];
-    const dy = instance.position[1] - center[1];
-    if (dx * dx + dy * dy > radiusSq) {
-      continue;
-    }
-    const key = modelKey(def);
-    let group = groups.get(key);
-    if (!group) {
-      group = { def, instances: [] };
-      groups.set(key, group);
-    }
-    group.instances.push(instance);
-  }
-
+export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<RegionMeshData>): InstancedMesh[] {
   const meshes: InstancedMesh[] = [];
   const placement = new Matrix4();
   const composed = new Matrix4();
@@ -63,7 +42,7 @@ export function buildRegion(archive: ImgArchive, defs: MapDefinitions, options: 
   const quaternion = new Quaternion();
   const scale = new Vector3(1, 1, 1);
 
-  for (const group of groups.values()) {
+  for (const group of groups) {
     const parts = buildClumpParts(getClump(archive, group.def.modelName), getTextures(archive, group.def.txdName));
     for (const part of parts) {
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);

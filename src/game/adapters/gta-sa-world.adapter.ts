@@ -1,25 +1,29 @@
 import { Group, type Object3D } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
-import type { RegionRequest, WorldAdapter, WorldObjectInfo } from '../interfaces/world-adapter.interface';
+import type { CellRequest, RegionRequest, WorldAdapter, WorldObjectInfo } from '../interfaces/world-adapter.interface';
 
 // game/adapters/** is the only place allowed to import renderware.
 import {
+  buildCell,
+  buildCellColliders,
   buildColliders,
   buildCollisionIndex,
   buildCollisionWireframe,
-  buildRegion,
+  buildWorldGrid,
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
   type RegionColliders,
   type RegionMeshData,
   resolveMap,
+  type WorldGrid,
 } from '../../renderware';
 
 export interface GtaSaWorldConfig {
   archiveUrl: string;
   base: string;
+  cellSize: number;
   datUrl: string;
 }
 
@@ -29,12 +33,18 @@ export interface GtaSaWorldConfig {
  * The −90°X (GTA Z-up → three Y-up) lives here, not in the engine.
  */
 export class GtaSaWorldAdapter implements WorldAdapter {
+  readonly cellSize: number;
+
   private archive: ImgArchive | null = null;
+  private readonly cellCache = new Map<string, Object3D[]>();
+  private readonly colliderCache = new Map<string, ModelColliders[]>();
   private readonly config: GtaSaWorldConfig;
   private defs: MapDefinitions | null = null;
+  private grid: null | WorldGrid = null;
 
   constructor(config: GtaSaWorldConfig) {
     this.config = config;
+    this.cellSize = config.cellSize;
   }
 
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo {
@@ -48,14 +58,35 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   // eslint-disable-next-line
-  async loadColliders(request: RegionRequest): Promise<ModelColliders[]> {
-    if (!this.archive || !this.defs) {
-      throw new Error('GtaSaWorldAdapter.loadColliders called before prepare()');
+  async loadCell(request: CellRequest): Promise<Object3D[]> {
+    if (!this.archive || !this.defs || !this.grid) {
+      throw new Error('GtaSaWorldAdapter.loadCell called before prepare()');
     }
-    const index = buildCollisionIndex(this.archive);
-    const colliders = buildColliders(index, this.defs, { center: request.center, radius: request.radius });
+    const key = `${request.cx},${request.cy},${request.lod ? 'lod' : 'hd'}`;
+    let meshes = this.cellCache.get(key);
+    if (!meshes) {
+      // Native Z-up; the streaming root applies the −90°X (so no per-cell group).
+      meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod);
+      this.cellCache.set(key, meshes);
+    }
 
-    return colliders.map(toModelColliders);
+    return meshes;
+  }
+
+  // eslint-disable-next-line
+  async loadCellColliders(cx: number, cy: number): Promise<ModelColliders[]> {
+    if (!this.archive || !this.defs || !this.grid) {
+      throw new Error('GtaSaWorldAdapter.loadCellColliders called before prepare()');
+    }
+    const key = `${cx},${cy}`;
+    let colliders = this.colliderCache.get(key);
+    if (!colliders) {
+      const index = buildCollisionIndex(this.archive);
+      colliders = buildCellColliders(index, this.defs, this.grid, cx, cy).map(toModelColliders);
+      this.colliderCache.set(key, colliders);
+    }
+
+    return colliders;
   }
 
   // eslint-disable-next-line
@@ -72,25 +103,6 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     return [root];
   }
 
-  // eslint-disable-next-line
-  async loadRegion(request: RegionRequest): Promise<Object3D[]> {
-    if (!this.archive || !this.defs) {
-      throw new Error('GtaSaWorldAdapter.loadRegion called before prepare()');
-    }
-    const meshes = buildRegion(this.archive, this.defs, {
-      center: request.center,
-      geometry: request.geometry,
-      radius: request.radius,
-    });
-    const root = new Group();
-    root.rotation.x = -Math.PI / 2; // GTA Z-up → three.js Y-up
-    for (const mesh of meshes) {
-      root.add(mesh);
-    }
-
-    return [root];
-  }
-
   async prepare(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.archive && this.defs) {
       onProgress?.(1); // already prepared (e.g. a debug reload) — skip the heavy work
@@ -99,6 +111,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
     this.archive = await loadArchive(this.config.archiveUrl);
     this.defs = await resolveMap(this.config.datUrl, this.config.base);
+    this.grid = buildWorldGrid(this.defs, this.cellSize);
     onProgress?.(1);
   }
 }

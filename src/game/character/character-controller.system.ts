@@ -9,7 +9,7 @@ import type { PhysicsWorld } from '../physics/physics-world';
 
 import { PlayerControlled, RigidBody } from '../ecs/components';
 
-const MOVE_SPEED = 6;
+const MOVE_SPEED = 26;
 const JUMP_SPEED = 6;
 
 /**

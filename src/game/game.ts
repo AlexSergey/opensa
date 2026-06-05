@@ -10,7 +10,8 @@ import {
   type WebGLRenderer,
 } from 'three';
 
-import { CollisionWorld } from './collision/collision-world';
+import type { StreamingSystem } from './streaming/streaming.system';
+
 import { CameraController } from './core/camera-controller';
 import { Clock } from './core/clock';
 import { createRenderContext } from './core/renderer';
@@ -21,11 +22,12 @@ import { type Config, type GameState } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
+import { type CellCoord } from './streaming/grid';
 
 const FIXED_STEP = 1 / 60;
 
 interface LoadOptions {
-  geometry?: 'lods' | 'map';
+  /** Radius (world units) the collision zone is built for; streaming handles render. */
   radius?: number;
 }
 
@@ -48,7 +50,6 @@ export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly clock = new Clock();
   private readonly collisionObjects: Object3D[] = [];
-  private readonly collisionWorld = new CollisionWorld();
   private readonly config: Config;
   private context: null | PluginContext = null;
   private readonly entityRoot = new Group();
@@ -59,8 +60,9 @@ export class Game {
   private renderer!: WebGLRenderer;
   private scene!: Scene;
   private started = false;
+  private readonly streamingRoot = new Group();
+  private streamingSystem: null | StreamingSystem = null;
   private readonly systems = new SystemRegistry();
-  private readonly worldObjects: Object3D[] = [];
 
   private constructor(canvas: HTMLCanvasElement, config: Config) {
     this.canvas = canvas;
@@ -69,6 +71,9 @@ export class Game {
     // −90°X here is display-only, matching the region group. Physics stays Z-up.
     this.entityRoot.name = 'EntityRoot';
     this.entityRoot.rotation.x = -Math.PI / 2;
+    // Streamed map cells live in GTA Z-up too; one −90°X for the whole streaming root.
+    this.streamingRoot.name = 'StreamingRoot';
+    this.streamingRoot.rotation.x = -Math.PI / 2;
   }
 
   static getInstance(canvas?: HTMLCanvasElement, config?: Config): Game {
@@ -101,7 +106,7 @@ export class Game {
     for (const plugin of this.plugins) {
       plugin.dispose?.();
     }
-    for (const object of [...this.worldObjects, ...this.collisionObjects]) {
+    for (const object of this.collisionObjects) {
       disposeObject(object);
     }
     this.renderer.dispose();
@@ -119,11 +124,6 @@ export class Game {
     return this.camera;
   }
 
-  /** The static-world collision for the current region (empty until loadColliders). */
-  getCollisionWorld(): CollisionWorld {
-    return this.collisionWorld;
-  }
-
   /** The live config (mutated in place by `setConfig`); systems read it for state. */
   getConfig(): Readonly<Config> {
     return this.config;
@@ -132,6 +132,16 @@ export class Game {
   /** Root group for dynamic entity meshes (player, NPCs). Native GTA Z-up content. */
   getEntityRoot(): Group {
     return this.entityRoot;
+  }
+
+  /** Root group the streaming system adds/removes map cells under (native GTA Z-up). */
+  getStreamingRoot(): Group {
+    return this.streamingRoot;
+  }
+
+  /** The grid cell the streaming view is in (null until streaming is wired). */
+  getViewCell(): CellCoord | null {
+    return this.streamingSystem?.viewCell() ?? null;
   }
 
   async init(): Promise<void> {
@@ -143,6 +153,7 @@ export class Game {
     this.renderer = renderer;
     this.scene = scene;
     this.scene.add(this.entityRoot);
+    this.scene.add(this.streamingRoot);
     this.cameraController = new CameraController(camera, renderer.domElement, this.config);
     this.pipeline = new BasicRenderPipeline(renderer, scene, camera);
     this.context = {
@@ -163,16 +174,6 @@ export class Game {
     this.events.emit('ready');
   }
 
-  /** Populate the collision world for the current region (for a physics system). */
-  async loadColliders(): Promise<void> {
-    if (!this.adapter || !this.lastRequest) {
-      this.collisionWorld.clear();
-
-      return;
-    }
-    this.collisionWorld.set(await this.adapter.loadColliders(this.lastRequest));
-  }
-
   async loadGame(center: Vec3, options: LoadOptions = {}): Promise<void> {
     if (!this.adapter) {
       throw new Error('Game.loadGame requires a world adapter (setWorldAdapter)');
@@ -180,21 +181,9 @@ export class Game {
     this.events.emit('loading', { fraction: 0 });
     await this.adapter.prepare((fraction) => this.events.emit('loading', { fraction }));
 
-    for (const object of this.worldObjects) {
-      this.scene.remove(object);
-      disposeObject(object);
-    }
-    this.worldObjects.length = 0;
-
-    const request: RegionRequest = { center, geometry: options.geometry ?? 'map', radius: options.radius ?? 500 };
-    this.lastRequest = request;
-    const objects = await this.adapter.loadRegion(request);
-    for (const object of objects) {
-      this.scene.add(object);
-      this.worldObjects.push(object);
-    }
-    this.cameraController.frameObjects(objects);
-    this.collisionWorld.clear(); // region-scoped; a physics layer repopulates via loadColliders()
+    // The map renders via the StreamingSystem (cells follow the view); loadGame just
+    // prepares the adapter and seeds the collision zone around `center`.
+    this.lastRequest = { center, geometry: 'map', radius: options.radius ?? 500 };
     await this.refreshCollision();
     this.events.emit('loaded');
   }
@@ -205,7 +194,9 @@ export class Game {
       return;
     }
     this.raycaster.setFromCamera(new Vector2(ndcX, ndcY), this.camera);
-    const hit = this.raycaster.intersectObjects(this.worldObjects, true).find((it) => it.instanceId !== undefined);
+    const hit = this.raycaster
+      .intersectObjects(this.streamingRoot.children, true)
+      .find((it) => it.instanceId !== undefined);
     this.events.emit('select', hit ? this.adapter.describe(hit.object, hit.instanceId) : null);
   }
 
@@ -245,10 +236,20 @@ export class Game {
     this.events.emit('game-state', { state });
   }
 
+  /** Debug: render an explicit set of cells at one detail level (null resumes streaming). */
+  setManualCells(cells: CellCoord[] | null, lod = false): void {
+    this.streamingSystem?.setManualCells(cells, lod);
+  }
+
   /** Toggle the collision wireframe overlay for the current region (debug). */
   setShowCollision(enabled: boolean): void {
     this.setConfig({ showCollision: enabled });
     void this.refreshCollision();
+  }
+
+  /** Register the streaming system so the engine can drive it (view cell, manual cells). */
+  setStreamingSystem(system: StreamingSystem): void {
+    this.streamingSystem = system;
   }
 
   setWorldAdapter(adapter: WorldAdapter): this {

@@ -19,6 +19,7 @@ export interface Config {
   /** Overlay collision (COL) wireframes on the current region (debug). */
   showCollision: boolean;
   staticUrl: string;
+  streaming: StreamingConfig;
 }
 
 /** Remappable keyboard bindings; values are `KeyboardEvent.code`. */
@@ -32,3 +33,15 @@ export interface ControlsConfig {
 
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
+
+/** World streaming / LOD tuning (sectioned grid render). */
+export interface StreamingConfig {
+  /** Grid cell edge in world units (must match the adapter's grid). */
+  cellSize: number;
+  /** Static collision is streamed within this distance of the view (small + a margin). */
+  collisionDrawDistance: number;
+  /** Full (HD) models are streamed within this distance of the view. */
+  hdDrawDistance: number;
+  /** LODs are streamed within this distance (beyond the HD ring). */
+  lodDrawDistance: number;
+}

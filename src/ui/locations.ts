@@ -8,8 +8,5 @@ export const GANTON_CJ_HOME: Vec3 = [2495, -1687, 13];
 // Tune against the real ground / lot centre.
 export const PLAYER_SPAWN: Vec3 = [2495, -1675, 16];
 
-/** Whole-map load: origin centre + an unbounded radius. */
-export const FULL_MAP_CENTER: Vec3 = [0, 0, 0];
-
-/** Load radius around Ganton, in GTA units. */
+/** Radius (GTA units) the collision zone is built for around the spawn. */
 export const GANTON_RADIUS = 400;
