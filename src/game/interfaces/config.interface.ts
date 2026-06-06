@@ -16,6 +16,7 @@ export interface Config {
   controls: ControlsConfig;
   debugMode: boolean;
   gameState: GameState;
+  movement: MovementConfig;
   /** Overlay collision (COL) wireframes on the current region (debug). */
   showCollision: boolean;
   staticUrl: string;
@@ -29,10 +30,22 @@ export interface ControlsConfig {
   jump: string;
   left: string;
   right: string;
+  /** Hold to run (faster); walk otherwise. Optional. */
+  run?: string;
 }
 
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
+
+/** Player movement tuning (world units/second). */
+export interface MovementConfig {
+  /** Upward launch velocity when jumping. */
+  jumpSpeed: number;
+  /** Planar speed while holding the run key. */
+  runSpeed: number;
+  /** Planar speed when walking (default). */
+  walkSpeed: number;
+}
 
 /** World streaming / LOD tuning (sectioned grid render). */
 export interface StreamingConfig {

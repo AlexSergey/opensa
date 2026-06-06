@@ -5,6 +5,8 @@ import type { Vec3 } from '../game/interfaces/world-adapter.interface';
 
 import { Game } from '../game';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
+import { AnimationController } from '../game/character/animation-controller';
+import { CharacterAnimationSystem } from '../game/character/character-animation.system';
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
 import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
@@ -20,9 +22,9 @@ const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streamin
 
 // Player collision box (half-extents) — a human, decoupled from the T-pose mesh bbox.
 const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
-// Stand Tommy up: the native model's "up" is +Y, so rotate +90° about X to point GTA +Z.
-// (scale ≈ 1; tune rotation/scale here if he sits/faces wrong.)
-const TOMMY_PLACEMENT: CharacterPlacement = { rotation: [Math.PI / 2, 0, 0], scale: 1 };
+// The animation (idle/walk) stands the skeleton up in GTA Z-up, so the model needs
+// NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
+const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
 // double-mount (dev) doesn't spin up a second renderer / archive download.
@@ -107,9 +109,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
   bootstrapped ??= (async (): Promise<Game> => {
     const game = Game.getInstance(canvas, {
       camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
-      controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
+      controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
       debugMode: false,
       gameState: 'play',
+      movement: { jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 3 },
       showCollision: false,
       staticUrl: BASE,
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
@@ -129,13 +132,28 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
     const model = await adapter.loadCharacter(`${BASE}/player/tommy.dff`, `${BASE}/player/tommy.txd`);
-    const player = orientCharacter(model.object, TOMMY_PLACEMENT, PLAYER_HALF_EXTENTS[2]);
+    const player = orientCharacter(model.object, TOMMY_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN, {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,
       skeleton: model.skeleton,
     });
     game.frameEntity(player, 12);
+
+    // Animations (ped.ifp from the packed WIMG archive) driven by the movement state machine.
+    const clips = await adapter.loadAnimations(`${BASE}/anim/animations.img`, 'ped.ifp');
+    const animation = new AnimationController(player, clips, character.bonesByName);
+    animation.play('idle_stance', 0);
+    game.addSystem(
+      new CharacterAnimationSystem(
+        animation,
+        character.physics,
+        character.bodyHandle,
+        character.halfExtents[2],
+        player,
+        game.getConfig(),
+      ),
+    );
 
     // Stream map cells around the player (full models near, LODs ringing out).
     const streaming = new StreamingSystem(adapter, game.getStreamingRoot(), character.viewOf, game.getConfig());

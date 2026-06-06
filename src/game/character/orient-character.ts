@@ -1,8 +1,10 @@
-import { Box3, Group, type Object3D, Vector3 } from 'three';
+import { Group, type Object3D } from 'three';
 
-/** How to stand a native character model up in GTA Z-up space. */
+/** How to place a character model inside its wrapper (GTA Z-up space). */
 export interface CharacterPlacement {
-  /** Euler X/Y/Z radians applied to the model so its "up" points along GTA +Z. */
+  /** Position offset (GTA Z-up) — fine-tunes the feet to the box base. Default [0,0,0]. */
+  offset?: [number, number, number];
+  /** Euler X/Y/Z radians. Identity for an animated ped — the idle/walk clip stands it up. */
   rotation: [number, number, number];
   /** Uniform scale (SA character units ≈ metres). */
   scale: number;
@@ -11,23 +13,19 @@ export interface CharacterPlacement {
 /**
  * Wrap a character model so {@link RenderSyncSystem} — which overwrites the
  * wrapper's position + quaternion every frame from the ECS Transform — does not
- * clobber the model's stand-up correction.
+ * clobber the model's placement.
  *
  * The returned wrapper is what the engine syncs/positions; the inner model keeps
- * the {@link CharacterPlacement} rotation/scale that stand it upright, and is
- * shifted so it is centred horizontally on the body and its feet (min Z) rest at
- * the physics box base (−`boxHalfZ`). Coordinates are GTA Z-up (the `entityRoot`
- * applies the −90°X display rotation).
+ * the {@link CharacterPlacement} rotation/scale/offset. For an animated GTA ped
+ * the animation orients the skeleton into GTA Z-up (so `rotation` is identity)
+ * and the model origin (pelvis) sits at the box centre; `offset` nudges the feet
+ * onto the box base. Coordinates are GTA Z-up (the `entityRoot` applies the −90°X
+ * display rotation).
  */
-export function orientCharacter(model: Object3D, placement: CharacterPlacement, boxHalfZ: number): Group {
+export function orientCharacter(model: Object3D, placement: CharacterPlacement): Group {
   model.rotation.set(...placement.rotation);
   model.scale.setScalar(placement.scale);
-  model.position.set(0, 0, 0);
-  model.updateMatrixWorld(true);
-
-  const box = new Box3().setFromObject(model);
-  const center = box.getCenter(new Vector3());
-  model.position.set(-center.x, -center.y, -boxHalfZ - box.min.z);
+  model.position.set(...(placement.offset ?? [0, 0, 0]));
 
   const wrapper = new Group();
   wrapper.name = 'Character';

@@ -18,8 +18,12 @@ const MIN_HALF_EXTENT = 0.1;
 
 /** Handles created for the player, extended by later systems (control). */
 export interface CharacterContext {
+  /** The Rapier rigid-body handle of the player (e.g. for reading velocity/grounded). */
+  bodyHandle: number;
   /** The player mesh's bones keyed by name (empty if not skinned), for the animation manager. */
   bonesByName: Map<string, Bone>;
+  /** Player collision-box half-extents (the controller's grounding half-height is `[2]`). */
+  halfExtents: Vec3;
   keyboard: Keyboard;
   physics: PhysicsWorld;
   playerEid: number;
@@ -95,7 +99,9 @@ export async function setupCharacter(
   const viewOf = (): Vec3 => [Transform.x[playerEid], Transform.y[playerEid], Transform.z[playerEid]];
 
   return {
+    bodyHandle: RigidBody.handle[playerEid],
     bonesByName: options.bonesByName ?? new Map<string, Bone>(),
+    halfExtents: extents,
     keyboard,
     physics,
     playerEid,

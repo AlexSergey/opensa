@@ -64,42 +64,77 @@ scripts/pack-anim-img.mjs        # (secondary) pack static/anim/anim.img/ -> WIM
 
 ## Iterations (each keeps `npm test` + the app green)
 
-1. **IFP (ANP3) parser.** `renderware/parsers/binary/ifp.ts` `parseIfp(buffer): IfpAnimation[]` —
+1. ✅ **IFP (ANP3) parser — DONE.** `renderware/parsers/binary/ifp.ts` `parseIfp(buffer): IfpAnimation[]` —
    `IfpAnimation { name; bones: IfpBone[] }`, `IfpBone { name; boneId; frames: IfpKeyframe[] }`,
-   `IfpKeyframe { rotation:[x,y,z,w]; translation?:[x,y,z]; time:number }` (renderer-agnostic). Tests on a
-   synthetic ANP3 (one anim, a couple bones, types 3 & 4).
+   `IfpKeyframe { rotation:[x,y,z,w]; translation?:[x,y,z]; time:number }` (renderer-agnostic; `rotation`
+   = i16/4096 in file order, `translation` = i16/1024 for type-4 bones, `time` = raw i16). Exported from the
+   barrel. 4 synthetic-ANP3 tests (types 3 & 4; non-ANP3 throws). Verified on real `ped.ifp`: 294 anims,
+   `WALK_civi` 32 bones, **all 916 quats norm ≈ 1** (so order/scale correct), root has translation, times
+   monotonic `0,2,…,68`. 189 tests green. **Time note for iter 2/3:** raw times span 0..68 (step 2, 35
+   frames) → `/60` ≈ 1.13 s is the likely seconds scale (tune in the clip builder).
 
-2. **AnimationClip builder.** `renderware/three/build-anim-clip.ts`
-   `buildAnimationClip(anim: IfpAnimation): THREE.AnimationClip` — per bone a `QuaternionKeyframeTrack`
-   `"<bone>.quaternion"` (+ `VectorKeyframeTrack` `"<bone>.position"` for type-4 root), times in seconds.
-   Bone names trimmed to match the skeleton; **strip root horizontal (X/Y) translation** (physics drives
-   position; keep vertical bob optional). Quaternion conversion isolated so the sign convention can be
-   flipped in one place. Tests on a synthetic `IfpAnimation`.
+2. ✅ **AnimationClip builder — DONE.** `renderware/three/build-anim-clip.ts`
+   `buildAnimationClip(anim, options?): THREE.AnimationClip` — per bone a `QuaternionKeyframeTrack`
+   `"<trimmed bone>.quaternion"`; times scaled to seconds (`timeScale` default `1/60`). **Translation is
+   stripped by default** (`includeTranslation` opt-in → `VectorKeyframeTrack` `"<bone>.position"`): WALK/run
+   bake the forward locomotion into the **root's +Y translation** (WALK 0→1.72, run 0→3.16, accumulating;
+   X/Z flat), and physics owns position, so rotation-only = in-place. Quaternion taken file-order (x,y,z,w);
+   the convention flip (if mirrored) lives here. Barrel-exported; 2 tests. Verified on real `WALK_civi`: 32
+   quaternion tracks, duration **1.133 s** (68/60 — believable cycle), track names match the skeleton
+   (`Root/Pelvis/Spine/Spine1…`). 191 tests green.
+   - **Bone-name retargeting deferred to iter 3** (needs the skeleton): WALK/run are 32/32 by trim alone, but
+     sprint/idle/jump name the root **`Normal`** (not `Root`), and `JUMP_launch` has **`Spine 1`/`Spine 2`**
+     (space) vs the skeleton's `Spine1`/`Spine2`. Iter 3 retargets via `bonesByName` with a normalized key
+     (`trim().toLowerCase().replace(/\s+/g,'')` + alias `normal→root`).
 
-3. **Adapter seam + AnimationController (single clip).** `WorldAdapter.loadAnimations(ifpUrl):
-   Promise<Map<string, AnimationClip>>` (fetch → `parseIfp` → `buildAnimationClip` per anim, keyed by lower
-   name). `game/character/animation-controller.ts`: an `AnimationMixer` on the player render object (its
-   subtree holds the named bones), `play(clipName, fade?)`, `update(delta)`. **Browser checkpoint:** force
-   `WALK_civi` and confirm Tommy animates upright (validates parse + bone mapping + quaternion convention;
-   tune the quaternion flip / time scale here).
+3. ✅ **Adapter seam + AnimationController — DONE (code; browser checkpoint pending).** `WorldAdapter.
+   loadAnimations(ifpUrl): Promise<Map<string, AnimationClip>>` (adapter: `fetchBuffer` → `parseIfp` →
+   `buildAnimationClip` per anim, keyed by lower name). `game/character/animation-controller.ts`
+   `AnimationController(root, clips, bonesByName)`: `AnimationMixer` on the player wrapper; on construction
+   **retargets** every clip's tracks onto the skeleton via exported `retargetClip` (normalized key
+   `trim().toLowerCase().replace(/\s+/g,'')` + alias `normal→root`, drops unmatched, clones — doesn't mutate
+   source). `play(name, fade=0.2)` crossfades looping clips; `update(delta)` ticks the mixer.
+   `character-animation.system.ts` `CharacterAnimationSystem` ticks the controller. Bootstrap loads
+   `ped.ifp`, builds the controller on `player` + `character.bonesByName`, **forces `walk_civi`**, registers
+   the system. 2 `retargetClip` tests; 193 tests green; build clean. **Browser checkpoint pending:** Tommy
+   should walk in place, upright — if mirrored/twisted, flip the quaternion convention in `build-anim-clip`;
+   if too fast/slow, adjust `timeScale`.
 
-4. **Locomotion state machine.** `character-animation.system.ts` (a `System`): each `update`, read planar
-   speed (`physics.getLinvel`) + grounded (`physics.isGrounded`) + sprint key → choose state
-   (idle / walk / run / sprint / jump) → crossfade (~0.15–0.2 s) via the controller; `mixer.update(delta)`.
-   Hardcode the `man` mapping: idle=`IDLE_stance`, walk=`WALK_civi`, run=`run_civi`, sprint=`sprint_civi`,
-   air=`JUMP_glide`. Gate on `gameState === 'play'`. Wire-in via the bootstrap (load `ped.ifp`, build the
-   controller on `character` handles, register the system). **Browser acceptance:** standing = idle, moving
-   = walk, fast = run, airborne = jump; smooth blends; camera/collision unchanged.
+4. ✅ **Locomotion state machine + facing — DONE (code; browser acceptance pending).**
+   `character-animation.system.ts` `CharacterAnimationSystem(controller, physics, body, halfHeight, character,
+   config)`: each `update` (frozen unless `gameState==='play'`) reads `getLinvel` planar speed + `isGrounded`
+   → `clipFor`: not grounded → `jump_glide`; speed `<1` → `idle_stance`; `<18` → `walk_civi`; else `run_civi`
+   → `controller.play(...)` (crossfade 0.2 s); then **turns the body to face movement** (`character.rotation.z
+   = atan2(-vx, vy)` above 0.5 speed; runs after render-sync so it sticks); `controller.update(delta)`.
+   To get walk vs run from one input, the controller gained two speeds + a **run key**:
+   `WALK_SPEED=10`/`RUN_SPEED=26`, `ControlsConfig.run?` (`ShiftLeft`); default walk, hold Shift to run.
+   `CharacterContext` exposes `bodyHandle` + `halfExtents`. Bootstrap plays `idle_stance` initially + registers
+   the system; foot offset `0.04`. 193 tests green; build clean. **Browser acceptance ✅ — camera behind,
+   walks facing forward, turns correctly, idle/walk/run/jump switch.** Facing: store `facing` (default `π` so
+   idle faces away from the camera's −Z start side) and **apply every frame** (render-sync overwrites the
+   wrapper rotation otherwise); update it to `atan2(-vx, vy)` while moving. (Camera is a free-orbit follow at
+   azimuth π, independent of the body.)
 
-5. **Jump sequence + polish.** `JUMP_launch` (rising) → `JUMP_glide` (falling) → `JUMP_land` (on touch),
-   thresholds tuned; run/sprint split by speed or the sprint key; optional `animgrp.dat` parsing for ped
-   gait groups. Tune walk/run speed thresholds + crossfade.
+5. ✅ **Jump sequence + polish — DONE (code; browser acceptance pending).** `AnimationController.play` gained a
+   `loop` flag (`LoopOnce` + `clampWhenFinished` for one-shots) + `duration(name)`. `CharacterAnimationSystem`
+   runs a jump state machine `ground → launch → glide → land → ground`: `ground` (not grounded) → `launch`
+   (`JUMP_launch`, 0.2 s, once); `launch` → `glide` (`JUMP_glide`, 0.5 s, loop) after its duration **or** `vz <
+   0`; `glide`/`launch` (grounded) → `land` (`JUMP_land`, 0.233 s, once); `land` → `ground` after its duration.
+   `FADE 0.12`. 193 tests green; build clean. **Browser acceptance pending:** jump shows launch→glide→land,
+   not a single glide loop; locomotion otherwise unchanged. (`sprint_civi` + `animgrp.dat` gaits remain
+   optional later niceties.)
 
-6. **(Secondary) `anim.img` packer.** `scripts/pack-anim-img.mjs` — bundle `static/anim/anim.img/` (133
-   IFPs) into a WIMG archive (reuse `scripts/pack-img.mjs`: `WIMG0001` header + JSON dir + concatenated
-   data). Decide the output path (folder is named `anim.img`; output e.g. `static/anim/anim.img.wimg` or a
-   configurable `ANIM_OUT`). Lets the broader activity animations load like the model archive later. Not on
-   the walk/run/jump path.
+6. ✅ **`anim.img` packer + load anims from the archive — DONE.** `scripts/pack-anim-img.mjs` (`npm run
+   pack:anim`) bundles **the 133 `static/anim/anim.img/` IFPs + the loose `ped.ifp`** (locomotion isn't in
+   the folder) into a WIMG archive (`WIMG0001` header + JSON dir + concatenated data, like `pack-img.mjs`).
+   Output **`static/anim/animations.img`** (the source folder is named `anim.img`, so the file can't share
+   that name; env-overridable `ANIM_SRC`/`ANIM_PED`/`ANIM_OUT`). Ran it → 134 IFPs, 11.8 MB. `WorldAdapter.
+   loadAnimations(archiveUrl, ifpName)` now `loadArchive` (cached) + `archive.get(ifpName)` + `parseIfp`;
+   bootstrap loads `…/anim/animations.img` `'ped.ifp'`. Other IFPs load free from the cached archive later.
+   193 tests + tsc + eslint + build clean.
+
+**Plan 012 COMPLETE (iters 1–6).** Tommy plays idle/walk/run/jump from the packed animation archive, faces
+his movement, camera behind; speeds/jump live in `Config.movement`.
 
 ## Decisions / open questions
 

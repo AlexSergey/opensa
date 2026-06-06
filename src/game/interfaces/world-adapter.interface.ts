@@ -1,4 +1,4 @@
-import type { Bone, Object3D, Skeleton } from 'three';
+import type { AnimationClip, Bone, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
 import type { ModelColliders } from './collider.interface';
@@ -38,6 +38,8 @@ export interface WorldAdapter {
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo;
   /** Every grid cell that holds content (for the debug section inspector). */
   listCells(): CellCoord[];
+  /** Load one IFP from a packed WIMG animation archive into clips keyed by lowercased name. */
+  loadAnimations(archiveUrl: string, ifpName: string): Promise<Map<string, AnimationClip>>;
   /** Build one grid cell's meshes (native Z-up; the streaming root applies the −90°X). */
   loadCell(request: CellRequest): Promise<Object3D[]>;
   /** Build one grid cell's collision (its HD instances), for streaming the physics colliders. */

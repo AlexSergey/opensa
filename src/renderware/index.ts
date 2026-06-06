@@ -12,12 +12,14 @@ export * from './map';
 export { parseColLibrary } from './parsers/binary/col';
 export * from './parsers/binary/col-types';
 export { parseDff } from './parsers/binary/dff';
+export { type IfpAnimation, type IfpBone, type IfpKeyframe, parseIfp } from './parsers/binary/ifp';
 export { parseTxd } from './parsers/binary/txd';
 export * from './parsers/binary/types';
 
 export * from './parsers/text';
 
 // three.js adapter layer
+export { buildAnimationClip, type BuildAnimClipOptions } from './three/build-anim-clip';
 export { buildClump, buildClumpParts, type RenderPart } from './three/build-clump';
 export { buildCollisionWireframe } from './three/build-col-wireframe';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';

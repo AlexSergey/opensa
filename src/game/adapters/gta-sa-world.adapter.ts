@@ -1,4 +1,4 @@
-import { Group, type Object3D } from 'three';
+import { type AnimationClip, Group, type Object3D } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
 import type {
@@ -12,6 +12,7 @@ import type { CellCoord } from '../streaming/grid';
 
 // game/adapters/** is the only place allowed to import renderware.
 import {
+  buildAnimationClip,
   buildCell,
   buildCellColliders,
   buildClump,
@@ -25,6 +26,7 @@ import {
   loadArchive,
   type MapDefinitions,
   parseDff,
+  parseIfp,
   parseTxd,
   type RegionColliders,
   type RegionMeshData,
@@ -75,6 +77,26 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return [...this.grid.values()].map((cell): CellCoord => [cell.cx, cell.cy]);
+  }
+
+  /**
+   * Load one IFP (e.g. `ped.ifp`) from a packed WIMG animation archive into
+   * `THREE.AnimationClip`s keyed by lowercased animation name. The archive
+   * (built by `scripts/pack-anim-img.mjs`) bundles every IFP; it is cached, so
+   * loading other IFPs from it later is free.
+   */
+  async loadAnimations(archiveUrl: string, ifpName: string): Promise<Map<string, AnimationClip>> {
+    const archive = await loadArchive(archiveUrl);
+    const buffer = archive.get(ifpName);
+    if (!buffer) {
+      throw new Error(`Animation '${ifpName}' not found in ${archiveUrl}`);
+    }
+    const clips = new Map<string, AnimationClip>();
+    for (const anim of parseIfp(buffer)) {
+      clips.set(anim.name.toLowerCase(), buildAnimationClip(anim));
+    }
+
+    return clips;
   }
 
   /**

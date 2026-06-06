@@ -9,9 +9,6 @@ import type { PhysicsWorld } from '../physics/physics-world';
 
 import { PlayerControlled, RigidBody } from '../ecs/components';
 
-const MOVE_SPEED = 26;
-const JUMP_SPEED = 6;
-
 /**
  * Drives player-controlled bodies from the keyboard while the game is playing.
  * Movement is **camera-relative** (W goes where the camera looks): the camera's
@@ -51,10 +48,12 @@ export class CharacterControllerSystem implements System {
     if (this.config.gameState !== 'play') {
       return;
     }
-    const { controls } = this.config;
+    const { controls, movement } = this.config;
+    const speed = controls.run && this.keyboard.isDown(controls.run) ? movement.runSpeed : movement.walkSpeed;
     const move = this.cameraRelativeMove(
       this.axis(controls.forward, controls.back),
       this.axis(controls.right, controls.left),
+      speed,
     );
     const jump = this.keyboard.isDown(controls.jump);
 
@@ -63,7 +62,7 @@ export class CharacterControllerSystem implements System {
       if (!this.physics.isGrounded(handle, this.halfHeight)) {
         continue; // keep air momentum; steer only on the ground
       }
-      const vz = jump ? JUMP_SPEED : this.physics.getLinvel(handle)[2];
+      const vz = jump ? movement.jumpSpeed : this.physics.getLinvel(handle)[2];
       this.physics.setLinvel(handle, [move.x, move.y, vz]);
     }
   }
@@ -72,8 +71,8 @@ export class CharacterControllerSystem implements System {
     return (this.keyboard.isDown(positive) ? 1 : 0) - (this.keyboard.isDown(negative) ? 1 : 0);
   }
 
-  /** Planar velocity (Z-up) for a forward/right input, relative to the camera. */
-  private cameraRelativeMove(forwardInput: number, rightInput: number): { x: number; y: number } {
+  /** Planar velocity (Z-up) for a forward/right input at `speed`, relative to the camera. */
+  private cameraRelativeMove(forwardInput: number, rightInput: number, speed: number): { x: number; y: number } {
     // Camera look direction (scene Y-up) projected to the ground, converted to
     // GTA Z-up: (x, y, z) → (x, −z, 0). Right = forward × up(0,0,1).
     this.camera.getWorldDirection(this.forward);
@@ -88,8 +87,8 @@ export class CharacterControllerSystem implements System {
     let y = this.forward.y * forwardInput + this.right.y * rightInput;
     const length = Math.hypot(x, y);
     if (length > 0) {
-      x = (x / length) * MOVE_SPEED;
-      y = (y / length) * MOVE_SPEED;
+      x = (x / length) * speed;
+      y = (y / length) * speed;
     }
 
     return { x, y };

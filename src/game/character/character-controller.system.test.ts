@@ -22,6 +22,7 @@ function config(gameState: Config['gameState']): Config {
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
     debugMode: false,
     gameState,
+    movement: { jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },

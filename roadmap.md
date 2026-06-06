@@ -21,7 +21,7 @@
 - [✅] Loading a character
   - [ ] Generate collision for peds
 - [ ] Physics improvement - not lock in the steps
-- [ ] Animation controls - walking, running, etc.
+- [✅] Animation controls - walking, running, etc.
 - [ ] Water rendering
 - [ ] Game time
 - [ ] Sky
@@ -47,6 +47,9 @@
   - [ ] Animation
   - [ ] Shooting
 - [ ] Optimizing game archives
+  - [ ] Drop unuzed files
+  - [ ] Gzip
+  - [ ] Client Caching
   - [ ] Scripts for creating different archive types
   - [ ] Load at startup
     - [ ] Procobj
