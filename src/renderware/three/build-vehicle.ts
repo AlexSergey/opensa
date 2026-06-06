@@ -1,15 +1,29 @@
-import type { Texture } from 'three';
+import type { Quaternion, Texture } from 'three';
 import type { MeshStandardMaterial } from 'three';
 
 import { DoubleSide, Group, Matrix4, Mesh, Vector3 } from 'three';
 
-import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
+import type { RWClump, RWFrame, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { buildGeometry, buildMaterial, frameMatrix } from './build-clump';
 
+/** One door: the group rotated about its hinge (open = closed × rotation about up). */
+export interface BuiltDoor {
+  /** Closed-state hinge quaternion. */
+  closed: Quaternion;
+  /** Group rotated to swing the door (mesh is hinge-relative). */
+  pivot: Group;
+  /** 'lf' | 'rf' | 'lr' | 'rr'. */
+  side: string;
+}
+
 /** The renderable vehicle plus its addressable, animatable parts (the dummy rig). */
 export interface BuiltVehicle {
+  /** Swinging doors (pivot at the hinge). */
+  doors: BuiltDoor[];
   root: Group;
+  /** Seat dummy local transforms in vehicle space (null if absent). */
+  seats: { backseat: Matrix4 | null; frontseat: Matrix4 | null };
   wheels: BuiltWheel[];
 }
 
@@ -40,6 +54,9 @@ const SECONDARY_MARKER: [number, number, number] = [255, 0, 175];
 /** The single wheel atomic, instanced at each `wheel_*_dummy`. */
 const WHEEL_FRAME = 'wheel';
 
+/** Door body atomics — `door_{lf|rf|lr|rr}_ok` — wrapped in a hinge pivot so they swing. */
+const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
+
 /** Wheels read a touch small from the vehicles.ide scale alone; nudge them up in-engine. */
 const WHEEL_SCALE_BOOST = 1.25;
 
@@ -58,6 +75,7 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
   const root = new Group();
   root.name = 'RWVehicle';
   const worldCache = new Map<number, Matrix4>();
+  const doors: BuiltDoor[] = [];
 
   let wheelGeometryIndex: null | number = null;
 
@@ -76,6 +94,12 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
       continue;
     }
 
+    const doorSide = frame ? DOOR_RE.exec(name)?.[1] : undefined;
+    if (doorSide && frame) {
+      doors.push(addDoor(root, clump, geometry, frame, doorSide, textures, options, worldCache));
+      continue;
+    }
+
     const mesh = new Mesh(
       buildGeometry(geometry),
       geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
@@ -87,8 +111,43 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
 
   const wheels =
     wheelGeometryIndex === null ? [] : addWheels(root, clump, wheelGeometryIndex, textures, options, worldCache);
+  const seats = {
+    backseat: seatMatrix(clump, 'ped_backseat', worldCache),
+    frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
+  };
 
-  return { root, wheels };
+  return { doors, root, seats, wheels };
+}
+
+/**
+ * Wrap a `door_*_ok` atomic in a pivot at its hinge (`door_*_dummy`) so the door
+ * can swing. The mesh is placed hinge-relative; rotating the pivot about its
+ * local Z (up) opens it. Returns the door's rig handle.
+ */
+function addDoor(
+  root: Group,
+  clump: RWClump,
+  geometry: RWGeometry,
+  frame: RWFrame,
+  side: string,
+  textures: Map<string, Texture>,
+  options: VehicleOptions,
+  worldCache: Map<number, Matrix4>,
+): BuiltDoor {
+  const pivot = new Group();
+  pivot.name = `door_${side}`;
+  pivot.applyMatrix4(frame.parentIndex >= 0 ? worldMatrix(clump, frame.parentIndex, worldCache) : new Matrix4());
+
+  const mesh = new Mesh(
+    buildGeometry(geometry),
+    geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
+  );
+  mesh.name = `door_${side}_ok`;
+  mesh.applyMatrix4(frameMatrix(frame.rotation, frame.position)); // door is hinge-relative
+  pivot.add(mesh);
+  root.add(pivot);
+
+  return { closed: pivot.quaternion.clone(), pivot, side };
 }
 
 /**
@@ -185,6 +244,13 @@ function paintFor(
   }
 
   return null;
+}
+
+/** The world (vehicle-space) transform of a seat dummy frame, or null if absent. */
+function seatMatrix(clump: RWClump, name: string, worldCache: Map<number, Matrix4>): Matrix4 | null {
+  const index = clump.frames.findIndex((f) => f.name.toLowerCase() === name);
+
+  return index >= 0 ? worldMatrix(clump, index, worldCache).clone() : null;
 }
 
 /** Match `wheel_{lf|rf|lb|rb}_dummy` → side flags, or null if not a wheel dummy. */

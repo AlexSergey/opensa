@@ -218,6 +218,11 @@ export class PhysicsWorld {
     this.world.step();
   }
 
+  /** Immediately move a body to a world position (Z-up) — e.g. seating the player in a car. */
+  teleport(handle: number, position: Vec3): void {
+    this.world.getRigidBody(handle).setTranslation({ x: position[0], y: position[1], z: position[2] }, true);
+  }
+
   private addBox(body: RapierBody, box: ColliderBox): number {
     const hx = (box.max[0] - box.min[0]) / 2;
     const hy = (box.max[1] - box.min[1]) / 2;

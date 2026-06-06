@@ -60,6 +60,10 @@ export class CharacterAnimationSystem implements System {
   private readonly model: Object3D | undefined;
   private readonly playerEid: number;
   private readonly runMin: number;
+  /** When set, a one-shot/looped clip (e.g. a car entry/sit) overrides locomotion. */
+  private scriptedClip: null | string = null;
+  private scriptedFacing: null | number = null;
+  private scriptedLoop = true;
   private state: LocoState = 'ground';
   private stateTime = 0;
   /** Facing the body is turning toward (movement direction); `facing` eases to it. */
@@ -80,9 +84,31 @@ export class CharacterAnimationSystem implements System {
     this.runMin = (config.movement.walkSpeed + config.movement.runSpeed) / 2;
   }
 
+  /** Snap the locomotion facing (yaw about +Z) — e.g. so the player faces away from a car on exit. */
+  faceTo(yaw: number): void {
+    this.facing = yaw;
+    this.targetFacing = yaw;
+  }
+
+  /**
+   * Override locomotion with a scripted clip (car entry/sit, …) and optional held
+   * facing (yaw about +Z). Pass `null` to return to keyboard-driven locomotion.
+   */
+  setScripted(clip: null | string, options: { facing?: number; loop?: boolean } = {}): void {
+    this.scriptedClip = clip;
+    this.scriptedLoop = options.loop ?? true;
+    this.scriptedFacing = options.facing ?? null;
+  }
+
   update(delta: number): void {
     if (this.config.gameState !== 'play') {
       return; // freeze the pose while paused
+    }
+
+    if (this.scriptedClip) {
+      this.playScripted(delta);
+
+      return;
     }
 
     const eid = this.playerEid;
@@ -164,6 +190,19 @@ export class CharacterAnimationSystem implements System {
     }
 
     return speed < this.runMin ? CLIPS.walk : CLIPS.run;
+  }
+
+  /** Play the scripted clip (held facing, no locomotion bob) instead of walk/run/idle. */
+  private playScripted(delta: number): void {
+    if (this.scriptedFacing !== null) {
+      this.character.rotation.z = this.scriptedFacing;
+    }
+    this.controller.setSpeed(1);
+    this.controller.play(this.scriptedClip ?? CLIPS.idle, FADE, this.scriptedLoop);
+    this.controller.update(delta);
+    if (this.model) {
+      this.model.position.z = this.baseModelZ;
+    }
   }
 }
 

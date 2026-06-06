@@ -22,6 +22,8 @@ export interface CharacterContext {
   bodyHandle: number;
   /** The player mesh's bones keyed by name (empty if not skinned), for the animation manager. */
   bonesByName: Map<string, Bone>;
+  /** The player controller system — e.g. for scripted auto-run (`runTo`). */
+  controllerSystem: CharacterControllerSystem;
   /** Player collision-box half-extents (the controller's grounding half-height is `[2]`). */
   halfExtents: Vec3;
   keyboard: Keyboard;
@@ -100,7 +102,15 @@ export async function setupCharacter(
   const config = game.getConfig();
   const renderSync = new RenderSyncSystem(world, renderRefs);
   // Order matters: controller moves the capsule → physics steps → render syncs.
-  game.addSystem(new CharacterControllerSystem(world, physics, keyboard, config, controller, game.getCamera()));
+  const controllerSystem = new CharacterControllerSystem(
+    world,
+    physics,
+    keyboard,
+    config,
+    controller,
+    game.getCamera(),
+  );
+  game.addSystem(controllerSystem);
   game.addSystem(new PhysicsSystem(world, physics, config));
   game.addSystem(renderSync);
   renderSync.update(); // place the mesh now so the immediate camera frame is correct
@@ -111,6 +121,7 @@ export async function setupCharacter(
   return {
     bodyHandle: RigidBody.handle[playerEid],
     bonesByName: options.bonesByName ?? new Map<string, Bone>(),
+    controllerSystem,
     halfExtents: extents,
     keyboard,
     physics,

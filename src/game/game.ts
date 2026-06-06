@@ -230,6 +230,11 @@ export class Game {
     this.events.emit('debug-mode', { enabled });
   }
 
+  /** Swing the follow camera to a given orbit azimuth (yaw about world up). */
+  setFollowAzimuth(azimuth: number): void {
+    this.cameraController.setAzimuth(azimuth);
+  }
+
   /** The object the camera trails in follow mode (null = none). */
   setFollowTarget(object: null | Object3D): void {
     this.cameraController.setTarget(object);

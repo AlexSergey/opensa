@@ -15,4 +15,5 @@
 - [Animation manager plan](animation-manager-plan.md) — plan 012; walk/run/jump/idle from ped.ifp (ANP3) driving Tommy's skeleton (DONE)
 - [Player physics plan](player-physics-plan.md) — plan 013; kinematic capsule character controller (collision/inertia/steps/slopes) (DONE)
 - [Simple water plan](simple-water-plan.md) — plan 014; flat textured water surface from water.dat (no shader yet)
-- [Vehicle loading plan](vehicle-loading-plan.md) — plan 015 (DONE); parse vehicle data + static painted/wheeled cars; incl. BinMeshPLG material recovery for modded DFFs
+- [Vehicle loading plan](vehicle-loading-plan.md) — plan 015 (DONE); parse vehicle data + static painted/wheeled cars; incl. BinMeshPLG material recovery for modded DFFs; + COL + wheel rig (dummy)
+- [Enter vehicle plan](enter-vehicle-plan.md) — plan 016; Enter near a car → CJ aligns/opens door/gets in/sits (driver side); anims + door dummy

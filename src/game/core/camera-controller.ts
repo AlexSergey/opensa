@@ -103,6 +103,11 @@ export class CameraController {
     }
   }
 
+  /** Set the follow-orbit azimuth (yaw about world up) — e.g. to swing behind the player on car exit. */
+  setAzimuth(azimuth: number): void {
+    this.azimuth = azimuth;
+  }
+
   setTarget(object: null | Object3D): void {
     this.target = object;
   }

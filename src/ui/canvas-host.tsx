@@ -14,6 +14,7 @@ import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleSystem } from '../game/vehicle/vehicle.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
@@ -153,7 +154,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     const clips = await adapter.loadAnimations(`${BASE}/anim/animations.img`, 'ped.ifp');
     const animation = new AnimationController(player, clips, character.bonesByName);
     animation.play('idle_stance', 0);
-    game.addSystem(new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig()));
+    const animationSystem = new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig());
+    game.addSystem(animationSystem);
 
     // Stream map cells around the player (full models near, LODs ringing out).
     const streaming = new StreamingSystem(adapter, game.getStreamingRoot(), character.viewOf, game.getConfig());
@@ -172,12 +174,28 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     // (spin/steer; idle until vehicle physics drives it).
     const vehicles = new VehicleSystem();
     game.addSystem(vehicles);
+    const enterVehicle = new EnterVehicleSystem(
+      character.keyboard,
+      character.viewOf,
+      character.controllerSystem,
+      character.physics,
+      character.bodyHandle,
+      animationSystem,
+      (azimuth) => game.setFollowAzimuth(azimuth),
+    );
+    game.addSystem(enterVehicle);
     for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
-      const { colliders, object, rig } = await adapter.loadVehicle(model);
+      const { colliders, doors, halfExtents, object, rig, seats } = await adapter.loadVehicle(model);
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
       vehicles.add(rig);
+      // Driver seat = the front-seat dummy mirrored to the −X (driver) side.
+      const seat = seats.frontseat;
+      const seatLocal: [number, number, number] = seat
+        ? [-Math.abs(seat.elements[12]), seat.elements[13], seat.elements[14]]
+        : [-0.4, 0, 0];
+      enterVehicle.add({ doors, halfExtents, heading, position, seatLocal });
 
       if (colliders) {
         const placement = new Matrix4().compose(

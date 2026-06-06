@@ -214,8 +214,23 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     const built = buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
     const col = parseDffCollision(dffBuffer);
     const colliders = col ? toModelColliders({ col, name: col.name, transforms: [] }) : null;
+    // Half-extents from the collision bounds — robust to stray vertices in modded DFFs
+    // (a mesh bbox can blow up); the COL is authored clean.
+    const halfExtents: [number, number] = col
+      ? [
+          Math.max(Math.abs(col.bounds.min[0]), Math.abs(col.bounds.max[0])),
+          Math.max(Math.abs(col.bounds.min[1]), Math.abs(col.bounds.max[1])),
+        ]
+      : [1.2, 2.5];
 
-    return { colliders, object: built.root, rig: new VehicleRig(built.wheels) };
+    return {
+      colliders,
+      doors: built.doors,
+      halfExtents,
+      object: built.root,
+      rig: new VehicleRig(built.wheels),
+      seats: built.seats,
+    };
   }
 
   /**

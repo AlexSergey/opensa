@@ -25,23 +25,27 @@
 - [✅] Water rendering
 - [ ] Vehicle loader
   - [✅] Car collision
-  - [ ] A full dummy framework (rotation/doors/headlights/seats)
-  - [ ] Getting into a car
-    - [ ] Door opening animation
+  - [✅] A full dummy framework (rotation/doors/headlights/seats)
+  - [✅] Getting into a car
+    - [✅] Door opening animation
   - [ ] Car physic
   - [ ] Basic car controls
   - [ ] Car damage system
   - [ ] Vehicle VLO
-  - [ ] Car reflections
   - [ ] Extract parking places to configuration array
+- [ ] Character rigging bug
 - [ ] Game time
 - [ ] Timecyc
 - [ ] Tobj and night objects
-- [ ] Volumetric cloud / Skybox
-- [ ] Sky
-  - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
-  - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
-- [ ] Water shader
+- [ ] Graphics
+  - [ ] Light
+  - [ ] Shadows
+  - [ ] Volumetric cloud / Skybox
+  - [ ] Car reflections
+  - [ ] Sky
+    - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
+    - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
+  - [ ] Water shader
 - [ ] UI Layer
   - [ ] Find good fonts
   - [ ] Show current time

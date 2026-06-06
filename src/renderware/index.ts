@@ -24,7 +24,13 @@ export { buildClump, buildClumpParts, type RenderPart } from './three/build-clum
 export { buildCollisionWireframe } from './three/build-col-wireframe';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';
 export { buildTextureMap } from './three/build-texture';
-export { buildVehicle, type BuiltVehicle, type BuiltWheel, type VehicleOptions } from './three/build-vehicle';
+export {
+  buildVehicle,
+  type BuiltDoor,
+  type BuiltVehicle,
+  type BuiltWheel,
+  type VehicleOptions,
+} from './three/build-vehicle';
 export { buildWater } from './three/build-water';
 export { DFFLoader } from './three/dff-loader';
 export { type TextureDictionary, TXDLoader } from './three/txd-loader';

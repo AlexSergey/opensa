@@ -1,6 +1,7 @@
-import type { AnimationClip, Bone, Object3D, Skeleton } from 'three';
+import type { AnimationClip, Bone, Matrix4, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
+import type { VehicleDoor } from '../vehicle/vehicle-door';
 import type { VehicleRig } from '../vehicle/vehicle-rig';
 import type { ModelColliders } from './collider.interface';
 
@@ -27,13 +28,19 @@ export interface RegionRequest {
 
 export type Vec3 = [number, number, number];
 
-/** A loaded vehicle: the renderable, its model-space collision, and its wheel rig. */
+/** A loaded vehicle: the renderable, its model-space collision, wheel rig, doors and seats. */
 export interface VehicleModel {
   /** Collision in model space (`transforms` empty — the caller sets the placement). */
   colliders: ModelColliders | null;
+  /** Swinging doors (open/close about the hinge). */
+  doors: VehicleDoor[];
+  /** Planar half-extents `[hx, hy]` (vehicle space) from the collision bounds, for routing. */
+  halfExtents: [number, number];
   object: Object3D;
   /** Animatable wheels (spin/steer); register with the vehicle system. */
   rig: VehicleRig;
+  /** Seat dummy local transforms in vehicle space (null if absent). */
+  seats: { backseat: Matrix4 | null; frontseat: Matrix4 | null };
 }
 
 /**

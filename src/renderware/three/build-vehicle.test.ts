@@ -53,6 +53,8 @@ function vehicleClump(): RWClump {
       { frameIndex: 2, geometryIndex: 0 }, // chassis_dam  (skipped)
       { frameIndex: 3, geometryIndex: 0 }, // chassis_vlo  (skipped)
       { frameIndex: 4, geometryIndex: 1 }, // wheel        (instanced)
+      { frameIndex: 10, geometryIndex: 0 }, // door_lf_ok  (hinge pivot)
+      { frameIndex: 11, geometryIndex: 0 }, // door_lf_dam (skipped)
     ],
     frames: [
       { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
@@ -64,6 +66,10 @@ function vehicleClump(): RWClump {
       { name: 'wheel_rf_dummy', parentIndex: 0, position: [-1, 1, 0], rotation: id },
       { name: 'wheel_lb_dummy', parentIndex: 0, position: [1, -1, 0], rotation: id },
       { name: 'wheel_rb_dummy', parentIndex: 0, position: [-1, -1, 0], rotation: id },
+      { name: 'door_lf_dummy', parentIndex: 0, position: [1, 2, 0], rotation: id }, // hinge
+      { name: 'door_lf_ok', parentIndex: 9, position: [0, 0, 0], rotation: id },
+      { name: 'door_lf_dam', parentIndex: 9, position: [0, 0, 0], rotation: id },
+      { name: 'ped_frontseat', parentIndex: 0, position: [0.5, 0, 0.2], rotation: id },
     ],
     geometries: [bodyGeometry, wheelGeometry],
   };
@@ -87,13 +93,26 @@ describe('buildVehicle', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
       expect(group.root.children.map((child) => child.name)).not.toContain('wheel');
     });
+
+    it('exposes only the undamaged door (the _dam variant is skipped)', () => {
+      const { doors } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      expect(doors).toHaveLength(1);
+      expect(doors[0].side).toBe('lf');
+    });
   });
 
   describe('positive cases', () => {
     it('renders the body and instances the wheel at the four dummies', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
       const names = group.root.children.map((child) => child.name).sort();
-      expect(names).toEqual(['chassis_ok', 'wheel_lb_dummy', 'wheel_lf_dummy', 'wheel_rb_dummy', 'wheel_rf_dummy']);
+      expect(names).toEqual([
+        'chassis_ok',
+        'door_lf',
+        'wheel_lb_dummy',
+        'wheel_lf_dummy',
+        'wheel_rb_dummy',
+        'wheel_rf_dummy',
+      ]);
     });
 
     it('exposes the four wheels as rig handles (front pair flagged)', () => {
@@ -101,6 +120,20 @@ describe('buildVehicle', () => {
       expect(wheels).toHaveLength(4);
       expect(wheels.filter((w) => w.front)).toHaveLength(2);
       expect(wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+
+    it('wraps the door in a hinge pivot holding the door mesh', () => {
+      const { doors } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      const { pivot } = doors[0];
+      expect([pivot.position.x, pivot.position.y, pivot.position.z]).toEqual([1, 2, 0]); // hinge dummy world pos
+      expect((pivot.children[0] as Mesh).name).toBe('door_lf_ok');
+    });
+
+    it('exposes the seat dummy transforms', () => {
+      const { seats } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      expect(seats.frontseat).not.toBeNull();
+      expect(seats.frontseat?.elements.slice(12, 15)).toEqual([0.5, 0, 0.2]);
+      expect(seats.backseat).toBeNull();
     });
 
     it('places body parts by their frame world transform', () => {
