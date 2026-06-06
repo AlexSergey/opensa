@@ -5,6 +5,7 @@ import type {
   CellRequest,
   CharacterModel,
   RegionRequest,
+  VehicleModel,
   WorldAdapter,
   WorldObjectInfo,
 } from '../interfaces/world-adapter.interface';
@@ -30,6 +31,7 @@ import {
   type MapDefinitions,
   parseCarcols,
   parseDff,
+  parseDffCollision,
   parseHandling,
   parseIfp,
   parseTxd,
@@ -43,6 +45,7 @@ import {
   type WaterQuad,
   type WorldGrid,
 } from '../../renderware';
+import { VehicleRig } from '../vehicle/vehicle-rig';
 
 /** Sea level (Z) + a large background plane half-size so the ocean reaches the horizon. */
 const SEA_LEVEL = 0;
@@ -187,10 +190,11 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   /**
    * Load a painted, wheeled vehicle by model name. Resolves its `vehicles.ide`
    * definition (txd + wheel scale) and carcol colours, merges the generic
-   * `vehicle.txd` with the car's own TXD, and builds the mesh. Native Z-up — the
-   * caller parents it under the −90°X streaming root.
+   * `vehicle.txd` with the car's own TXD, builds the mesh, and extracts the
+   * collision embedded in the DFF (model space — the caller sets the placement).
+   * Native Z-up — the caller parents it under the −90°X streaming root.
    */
-  async loadVehicle(modelName: string): Promise<Object3D> {
+  async loadVehicle(modelName: string): Promise<VehicleModel> {
     await this.ensureVehicleData();
     const name = modelName.toLowerCase();
     const def = this.vehicleDefs?.get(name);
@@ -207,7 +211,11 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
     const { primary, secondary } = this.resolveVehicleColours(name);
 
-    return buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
+    const built = buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
+    const col = parseDffCollision(dffBuffer);
+    const colliders = col ? toModelColliders({ col, name: col.name, transforms: [] }) : null;
+
+    return { colliders, object: built.root, rig: new VehicleRig(built.wheels) };
   }
 
   /**

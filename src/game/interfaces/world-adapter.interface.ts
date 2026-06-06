@@ -1,6 +1,7 @@
 import type { AnimationClip, Bone, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
+import type { VehicleRig } from '../vehicle/vehicle-rig';
 import type { ModelColliders } from './collider.interface';
 
 /** Request for one streamed grid cell's HD (`lod=false`) or LOD (`lod=true`) meshes. */
@@ -26,6 +27,15 @@ export interface RegionRequest {
 
 export type Vec3 = [number, number, number];
 
+/** A loaded vehicle: the renderable, its model-space collision, and its wheel rig. */
+export interface VehicleModel {
+  /** Collision in model space (`transforms` empty — the caller sets the placement). */
+  colliders: ModelColliders | null;
+  object: Object3D;
+  /** Animatable wheels (spin/steer); register with the vehicle system. */
+  rig: VehicleRig;
+}
+
 /**
  * The seam between the generic `game` engine and a concrete world implementation
  * (GTA SA / renderware). Implemented only under `game/adapters/**`; returns plain
@@ -49,7 +59,7 @@ export interface WorldAdapter {
   /** Build a debug wireframe overlay of the region's collision (empty if unsupported). */
   loadCollisionDebug(request: RegionRequest): Promise<Object3D[]>;
   /** Load a painted, wheeled vehicle by model name (native Z-up; place under the streaming root). */
-  loadVehicle(modelName: string): Promise<Object3D>;
+  loadVehicle(modelName: string): Promise<VehicleModel>;
   /** Build the flat water surface from `water.dat`, textured from the given TXD (native Z-up). */
   loadWater(waterUrl: string, txdUrl: string): Promise<Object3D>;
   /** Download/parse everything needed; reports progress 0..1. */

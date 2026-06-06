@@ -1,6 +1,11 @@
 import type { ColBox, ColFace, ColModel, ColSphere, ColSurface, ColVersion } from './col-types';
 
 import { BinaryStream } from './binary-stream';
+import { findChild, forEachChild, readChunkHeader } from './chunks';
+import { RwSection } from './constants';
+
+/** RenderWare chunk header size (type + size + libraryVersion). */
+const CHUNK_HEADER_BYTES = 12;
 
 const COL_VERSIONS: Record<string, ColVersion | undefined> = {
   COL2: 2,
@@ -48,6 +53,36 @@ export function parseColLibrary(buffer: ArrayBuffer): ColModel[] {
   }
 
   return models;
+}
+
+/**
+ * Extract the collision model embedded in a vehicle/object DFF. GTA SA stores it
+ * as a Collision (0x253f2fa) plugin inside the Clump's Extension, wrapping a
+ * single COL2/COL3 model. Returns null when the DFF carries no collision.
+ */
+export function parseDffCollision(buffer: ArrayBuffer): ColModel | null {
+  const stream = new BinaryStream(buffer);
+  let header = readChunkHeader(stream);
+  while (header.type !== RwSection.CLUMP) {
+    stream.seek(header.end);
+    if (stream.remaining < CHUNK_HEADER_BYTES) {
+      return null;
+    }
+    header = readChunkHeader(stream);
+  }
+
+  let collision: ColModel | null = null;
+  forEachChild(stream, header.dataStart, header.end, (child) => {
+    if (collision || child.type !== RwSection.EXTENSION) {
+      return;
+    }
+    const colChunk = findChild(stream, child.dataStart, child.end, RwSection.COLLISION);
+    if (colChunk) {
+      collision = parseColLibrary(buffer.slice(colChunk.dataStart, colChunk.end))[0] ?? null;
+    }
+  });
+
+  return collision;
 }
 
 function parseModel(body: Uint8Array, version: ColVersion): ColModel {

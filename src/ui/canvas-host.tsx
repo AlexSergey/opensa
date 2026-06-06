@@ -1,4 +1,5 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
@@ -13,6 +14,7 @@ import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { VehicleSystem } from '../game/vehicle/vehicle.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 
@@ -165,12 +167,26 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
     game.getStreamingRoot().add(water);
 
-    // Static painted cars parked near the spawn (native Z-up under the −90°X root).
+    // Static painted cars parked near the spawn (native Z-up under the −90°X root),
+    // each with a fixed collider from the COL embedded in its DFF and a wheel rig
+    // (spin/steer; idle until vehicle physics drives it).
+    const vehicles = new VehicleSystem();
+    game.addSystem(vehicles);
     for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
-      const vehicle = await adapter.loadVehicle(model);
-      vehicle.position.set(position[0], position[1], position[2]);
-      vehicle.rotation.z = heading;
-      game.getStreamingRoot().add(vehicle);
+      const { colliders, object, rig } = await adapter.loadVehicle(model);
+      object.position.set(position[0], position[1], position[2]);
+      object.rotation.z = heading;
+      game.getStreamingRoot().add(object);
+      vehicles.add(rig);
+
+      if (colliders) {
+        const placement = new Matrix4().compose(
+          new Vector3(position[0], position[1], position[2]),
+          new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), heading),
+          new Vector3(1, 1, 1),
+        );
+        character.physics.createStaticColliders([{ ...colliders, transforms: [placement] }]);
+      }
     }
 
     return game;

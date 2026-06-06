@@ -9,7 +9,7 @@ export * from './collision';
 // Framework-agnostic map resolution + region instancing
 export * from './map';
 // Parser layer (renderer-agnostic): binary RW geometry + collision + text map definitions.
-export { parseColLibrary } from './parsers/binary/col';
+export { parseColLibrary, parseDffCollision } from './parsers/binary/col';
 export * from './parsers/binary/col-types';
 export { parseDff } from './parsers/binary/dff';
 export { type IfpAnimation, type IfpBone, type IfpKeyframe, parseIfp } from './parsers/binary/ifp';
@@ -24,7 +24,7 @@ export { buildClump, buildClumpParts, type RenderPart } from './three/build-clum
 export { buildCollisionWireframe } from './three/build-col-wireframe';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';
 export { buildTextureMap } from './three/build-texture';
-export { buildVehicle, type VehicleOptions } from './three/build-vehicle';
+export { buildVehicle, type BuiltVehicle, type BuiltWheel, type VehicleOptions } from './three/build-vehicle';
 export { buildWater } from './three/build-water';
 export { DFFLoader } from './three/dff-loader';
 export { type TextureDictionary, TXDLoader } from './three/txd-loader';

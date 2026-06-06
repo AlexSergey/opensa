@@ -40,8 +40,8 @@ const bodyGeometry = triangleGeometry([
 ]);
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
 
-function meshByName(group: ReturnType<typeof buildVehicle>, name: string): Mesh {
-  return group.children.find((child) => child.name === name) as Mesh;
+function meshByName(vehicle: ReturnType<typeof buildVehicle>, name: string): Mesh {
+  return vehicle.root.children.find((child) => child.name === name) as Mesh;
 }
 
 function vehicleClump(): RWClump {
@@ -69,26 +69,38 @@ function vehicleClump(): RWClump {
   };
 }
 
+/** The scaled wheel mesh nested under its pivot → spinner. */
+function wheelMesh(vehicle: ReturnType<typeof buildVehicle>, dummy: string): Mesh {
+  return meshByName(vehicle, dummy).children[0].children[0] as Mesh;
+}
+
 describe('buildVehicle', () => {
   describe('negative cases', () => {
     it('skips the damaged and LOD body atoms', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      const names = group.children.map((child) => child.name);
+      const names = group.root.children.map((child) => child.name);
       expect(names).not.toContain('chassis_dam');
       expect(names).not.toContain('chassis_vlo');
     });
 
     it('does not render the bare wheel atomic as its own mesh', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      expect(group.children.map((child) => child.name)).not.toContain('wheel');
+      expect(group.root.children.map((child) => child.name)).not.toContain('wheel');
     });
   });
 
   describe('positive cases', () => {
     it('renders the body and instances the wheel at the four dummies', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      const names = group.children.map((child) => child.name).sort();
+      const names = group.root.children.map((child) => child.name).sort();
       expect(names).toEqual(['chassis_ok', 'wheel_lb_dummy', 'wheel_lf_dummy', 'wheel_rb_dummy', 'wheel_rf_dummy']);
+    });
+
+    it('exposes the four wheels as rig handles (front pair flagged)', () => {
+      const { wheels } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      expect(wheels).toHaveLength(4);
+      expect(wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(wheels.every((w) => w.radius > 0)).toBe(true);
     });
 
     it('places body parts by their frame world transform', () => {
@@ -112,8 +124,8 @@ describe('buildVehicle', () => {
 
     it('scales wheels per front/rear (with the in-engine size boost)', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      expect(meshByName(group, 'wheel_lf_dummy').scale.x).toBeCloseTo(0.5 * 1.25);
-      expect(meshByName(group, 'wheel_lb_dummy').scale.x).toBeCloseTo(0.25 * 1.25);
+      expect(wheelMesh(group, 'wheel_lf_dummy').scale.x).toBeCloseTo(0.5 * 1.25);
+      expect(wheelMesh(group, 'wheel_lb_dummy').scale.x).toBeCloseTo(0.25 * 1.25);
     });
 
     it('blends translucent (glass) materials from the colour alpha, even when textured', () => {

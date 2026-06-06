@@ -5,6 +5,8 @@ export const RwSection = {
   ATOMIC: 0x14,
   BIN_MESH_PLG: 0x50e,
   CLUMP: 0x10,
+  // Embedded collision model plugin (COL2/COL3 wrapped in the clump extension)
+  COLLISION: 0x253f2fa,
   EXTENSION: 0x03,
   // Plugin extension chunks
   FRAME: 0x253f2fe,

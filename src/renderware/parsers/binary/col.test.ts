@@ -2,8 +2,9 @@ import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { concat, f32, f32a, fixedString, i16, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
-import { parseColLibrary } from './col';
+import { chunk, concat, f32, f32a, fixedString, i16, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
+import { parseColLibrary, parseDffCollision } from './col';
+import { RwSection } from './constants';
 
 interface ModelSpec {
   bounds?: { center: Vec3; max: Vec3; min: Vec3; radius: number };
@@ -207,6 +208,48 @@ describe('parseColLibrary', () => {
       const models = parseColLibrary(buffer);
       expect(models.map((m) => m.name)).toEqual(['a', 'b']);
       expect(models.map((m) => m.version)).toEqual([2, 3]);
+    });
+  });
+});
+
+/** Wrap a COL library inside a DFF Clump's Extension as the Collision (0x253f2fa) plugin. */
+function dffWithCollision(col: ArrayBuffer): ArrayBuffer {
+  const collision = chunk(RwSection.COLLISION, new Uint8Array(col));
+
+  return toArrayBuffer(chunk(RwSection.CLUMP, chunk(RwSection.EXTENSION, collision)));
+}
+
+describe('parseDffCollision', () => {
+  describe('negative cases', () => {
+    it('returns null when the clump has no collision extension', () => {
+      const dff = toArrayBuffer(chunk(RwSection.CLUMP, chunk(RwSection.STRUCT, u32(0))));
+      expect(parseDffCollision(dff)).toBeNull();
+    });
+
+    it('returns null for non-clump input', () => {
+      expect(parseDffCollision(toArrayBuffer(chunk(RwSection.TEXTURE_DICTIONARY, u32(0))))).toBeNull();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('extracts the COL model embedded in the DFF', () => {
+      const col = buildLibrary([
+        {
+          faces: [{ a: 0, b: 1, c: 2 }],
+          fourcc: 'COL3',
+          modelId: 7,
+          name: 'car_col',
+          vertices: [
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+          ],
+        },
+      ]);
+      const model = parseDffCollision(dffWithCollision(col));
+      expect(model?.name).toBe('car_col');
+      expect(model?.faces).toHaveLength(1);
+      expect(model?.version).toBe(3);
     });
   });
 });

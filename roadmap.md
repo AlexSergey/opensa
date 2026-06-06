@@ -24,7 +24,7 @@
 - [✅] Animation controls - walking, running, etc.
 - [✅] Water rendering
 - [ ] Vehicle loader
-  - [ ] Car collision
+  - [✅] Car collision
   - [ ] A full dummy framework (rotation/doors/headlights/seats)
   - [ ] Getting into a car
     - [ ] Door opening animation

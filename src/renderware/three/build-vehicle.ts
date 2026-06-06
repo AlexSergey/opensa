@@ -7,6 +7,22 @@ import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { buildGeometry, buildMaterial, frameMatrix } from './build-clump';
 
+/** The renderable vehicle plus its addressable, animatable parts (the dummy rig). */
+export interface BuiltVehicle {
+  root: Group;
+  wheels: BuiltWheel[];
+}
+
+/** One placed wheel: the group a rig spins (about the axle) and steers (front, about up). */
+export interface BuiltWheel {
+  /** Front wheels steer; all wheels spin. */
+  front: boolean;
+  /** Wheel radius in world units (roll = distance / radius). */
+  radius: number;
+  /** Group rotated by the rig — its mesh is centred so spin/steer pivot correctly. */
+  spinner: Group;
+}
+
 /** Paint + wheel options resolved from carcols/vehicles.ide. */
 export interface VehicleOptions {
   /** Primary paint RGB (0-255), replaces the `(60,255,0)` marker. */
@@ -34,9 +50,11 @@ const WHEEL_SCALE_BOOST = 1.25;
  * atomic. The wheel is instanced at the four `wheel_*_dummy` frames, scaled per
  * front/rear and mirrored on the right side. Paint markers in material colours
  * are replaced by the carcol primary/secondary. Result stays in native Z-up
- * (the caller's streaming root applies the Z-up→Y-up rotation).
+ * (the caller's streaming root applies the Z-up→Y-up rotation). Wheels are
+ * wrapped in pivot/spinner groups so a {@link BuiltWheel} rig can spin and steer
+ * them.
  */
-export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, options: VehicleOptions): Group {
+export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, options: VehicleOptions): BuiltVehicle {
   const root = new Group();
   root.name = 'RWVehicle';
   const worldCache = new Map<number, Matrix4>();
@@ -67,14 +85,18 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     root.add(mesh);
   }
 
-  if (wheelGeometryIndex !== null) {
-    addWheels(root, clump, wheelGeometryIndex, textures, options, worldCache);
-  }
+  const wheels =
+    wheelGeometryIndex === null ? [] : addWheels(root, clump, wheelGeometryIndex, textures, options, worldCache);
 
-  return root;
+  return { root, wheels };
 }
 
-/** Instance the wheel geometry at each present `wheel_*_dummy` frame. */
+/**
+ * Instance the wheel geometry at each `wheel_*_dummy` frame. Each wheel is a
+ * `pivot` (positioned/oriented like the dummy) → `spinner` (rotated by the rig) →
+ * `mesh` (mirrored on the left, scaled, centred on the pivot). Returns the rig
+ * handles. The spin axis is the pivot's local X (axle), steer is its Z (up).
+ */
 function addWheels(
   root: Group,
   clump: RWClump,
@@ -82,10 +104,12 @@ function addWheels(
   textures: Map<string, Texture>,
   options: VehicleOptions,
   worldCache: Map<number, Matrix4>,
-): void {
-  const wheel = clump.geometries[geometryIndex];
-  const geometry = buildGeometry(wheel);
-  const materials = wheel.materials.map((m) => buildVehicleMaterial(m, wheel, textures, options));
+): BuiltWheel[] {
+  const wheelGeometry = clump.geometries[geometryIndex];
+  const geometry = buildGeometry(wheelGeometry);
+  const materials = wheelGeometry.materials.map((m) => buildVehicleMaterial(m, wheelGeometry, textures, options));
+  const baseRadius = geometry.boundingSphere?.radius ?? 0.5;
+  const wheels: BuiltWheel[] = [];
 
   clump.frames.forEach((frame, index) => {
     const placement = wheelPlacement(frame.name.toLowerCase());
@@ -93,19 +117,32 @@ function addWheels(
       return;
     }
     const scale = (placement.rear ? options.wheelScale[1] : options.wheelScale[0]) * WHEEL_SCALE_BOOST;
-    const matrix = worldMatrix(clump, index, worldCache).clone();
-    if (!placement.right) {
-      // The wheel is modelled facing out on the right (+X) side; spin the left-side
-      // copies 180° about the up axis so their outer face points outward too.
-      matrix.multiply(new Matrix4().makeRotationZ(Math.PI));
-    }
-    matrix.scale(new Vector3(scale, scale, scale));
 
+    const pivot = new Group();
+    pivot.name = frame.name;
+    pivot.applyMatrix4(worldMatrix(clump, index, worldCache)); // dummy position + orientation
+
+    const spinner = new Group();
+    spinner.name = `${frame.name}_spin`;
+    pivot.add(spinner);
+
+    // Mesh centred on the pivot so spin/steer rotate about the axle, not an offset.
+    const local = new Matrix4();
+    if (!placement.right) {
+      // The wheel is modelled facing out on the right (+X) side; mirror the left copies.
+      local.multiply(new Matrix4().makeRotationZ(Math.PI));
+    }
+    local.scale(new Vector3(scale, scale, scale));
     const mesh = new Mesh(geometry, materials);
-    mesh.name = frame.name;
-    mesh.applyMatrix4(matrix);
-    root.add(mesh);
+    mesh.name = `${frame.name}_mesh`;
+    mesh.applyMatrix4(local);
+    spinner.add(mesh);
+
+    root.add(pivot);
+    wheels.push({ front: !placement.rear, radius: baseRadius * scale, spinner });
   });
+
+  return wheels;
 }
 
 /** Like {@link buildMaterial}, but paint markers become the carcol colour (tinting the texture). */
