@@ -1,6 +1,6 @@
 import type { IplInstance, MapDefinitions } from '../parsers/text';
 
-import { isLodModel } from '../parsers/text';
+import { isInterior, isLodModel } from '../parsers/text';
 
 /** One grid cell's placed instances, split into full-detail (HD) and LOD. */
 export interface GridCell {
@@ -14,16 +14,19 @@ export interface GridCell {
 export type WorldGrid = Map<string, GridCell>;
 
 /**
- * Bucket the map's exterior (`interior === 0`) instances into a square grid of
- * the given cell size, splitting each cell into HD (full-detail) and LOD
- * (`lod`-prefixed models) lists. Instances with no catalog def are skipped (they
- * can't be rendered). Pure data — the streaming layer turns cells into meshes.
+ * Bucket the map's exterior instances into a square grid of the given cell size,
+ * splitting each cell into HD (full-detail) and LOD (`lod`-prefixed models) lists.
+ * Instances with no catalog def are skipped (they can't be rendered). Exterior vs
+ * interior is decided by {@link isInterior} — the real interior id is the low byte
+ * of the IPL `interior` field (`value & 0xFF`), so `interior === 0` was too strict
+ * (it dropped exterior objects whose area code is a multiple of 256). Pure data —
+ * the streaming layer turns cells into meshes.
  */
 export function buildWorldGrid(defs: MapDefinitions, cellSize: number): WorldGrid {
   const grid: WorldGrid = new Map();
   for (const instance of defs.instances) {
     const def = defs.catalog.get(instance.id);
-    if (!def || instance.interior !== 0) {
+    if (!def || isInterior(instance.interior)) {
       continue;
     }
     const [cx, cy] = instanceCell(instance.position, cellSize);

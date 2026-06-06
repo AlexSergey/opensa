@@ -58,8 +58,8 @@ describe('buildColliders', () => {
       expect(buildColliders(index(colModel('wall')), defs, WHOLE_MAP)).toEqual([]);
     });
 
-    it('skips interior instances', () => {
-      const defs = mapDefs([def(1, 'wall')], [inst(1, [0, 0, 0], { interior: 13 })]);
+    it('skips hidden-interior instances', () => {
+      const defs = mapDefs([def(1, 'wall')], [inst(1, [0, 0, 0], { interior: 10 })]);
       expect(buildColliders(index(colModel('wall')), defs, WHOLE_MAP)).toEqual([]);
     });
 
@@ -81,6 +81,16 @@ describe('buildColliders', () => {
   });
 
   describe('positive cases', () => {
+    it('binds exterior instances with a non-zero world area code (256-multiple or id 13)', () => {
+      const defs = mapDefs(
+        [def(1, 'wall')],
+        [inst(1, [0, 0, 0], { interior: 1024 }), inst(1, [5, 5, 5], { interior: 13 })],
+      );
+      const colliders = buildColliders(index(colModel('wall')), defs, WHOLE_MAP);
+      expect(colliders).toHaveLength(1);
+      expect(colliders[0].transforms).toHaveLength(2);
+    });
+
     it('binds a placed model to its collision with one transform per placement', () => {
       const defs = mapDefs([def(1, 'wall')], [inst(1, [10, 20, 30]), inst(1, [40, 50, 60])]);
       const colliders = buildColliders(index(colModel('wall', 7)), defs, WHOLE_MAP);

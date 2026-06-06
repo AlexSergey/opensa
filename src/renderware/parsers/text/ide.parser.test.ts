@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { parseGtaDat } from './gta-dat.parser';
-import { parseIde } from './ide.parser';
+import { parseIde, parseTimedObjects } from './ide.parser';
 
 /** Resolve the first IDE/IPL file referenced by static/data/gta.dat, if present. */
 function referencedFromDat(kind: 'ide' | 'ipl'): null | string {
@@ -22,24 +22,36 @@ function referencedFromDat(kind: 'ide' | 'ipl'): null | string {
 }
 
 describe('parseIde', () => {
-  it('parses objs rows and ignores other sections', () => {
+  it('parses objs + anim rows and excludes tobj / non-placeable sections', () => {
     const defs = parseIde(
       [
         'objs',
         '5000, gplane, basicmain, 300, 0',
         '5404, testground, testground, 290, 0',
         'end',
+        'anim',
+        '2, waterfall, water, wfall_anim, 150, 4',
+        'end',
         'tobj',
-        '1, foo, bar, 100, 0, 6, 20',
+        '1, neon_sign, lvneon, 100, 0, 6, 20',
         'end',
         'path',
         'end',
       ].join('\n'),
     );
-    expect(defs).toHaveLength(2);
+    expect(defs).toHaveLength(3);
+    expect(defs.map((d) => d.id).sort((a, b) => a - b)).toEqual([2, 5000, 5404]);
+    expect(defs.find((d) => d.id === 1)).toBeUndefined();
+  });
+
+  it('parses objs rows with id/model/txd', () => {
+    const defs = parseIde(['objs', '5000, gplane, basicmain, 300, 0', 'end'].join('\n'));
     expect(defs[0]).toEqual({ drawDistance: 300, flags: 0, id: 5000, modelName: 'gplane', txdName: 'basicmain' });
-    expect(defs[1].id).toBe(5404);
-    expect(defs[1].txdName).toBe('testground');
+  });
+
+  it('parses anim rows, ignoring the non-numeric anim name', () => {
+    const defs = parseIde(['anim', '2, waterfall, water, wfall_anim, 150, 4', 'end'].join('\n'));
+    expect(defs[0]).toEqual({ drawDistance: 150, flags: 4, id: 2, modelName: 'waterfall', txdName: 'water' });
   });
 
   it('handles the mesh-count + multiple draw-distance variant (max wins)', () => {
@@ -50,6 +62,17 @@ describe('parseIde', () => {
 
   it('returns an empty list when there are no object definitions', () => {
     expect(parseIde('objs\nend\npath\nend')).toEqual([]);
+  });
+});
+
+describe('parseTimedObjects', () => {
+  it('parses tobj rows, stripping the trailing time-on/time-off pair', () => {
+    const defs = parseTimedObjects(['tobj', '1, neon_sign, lvneon, 100, 0, 6, 20', 'end'].join('\n'));
+    expect(defs[0]).toEqual({ drawDistance: 100, flags: 0, id: 1, modelName: 'neon_sign', txdName: 'lvneon' });
+  });
+
+  it('ignores objs / anim sections', () => {
+    expect(parseTimedObjects(['objs', '5000, gplane, basicmain, 300, 0', 'end'].join('\n'))).toEqual([]);
   });
 });
 

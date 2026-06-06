@@ -1,5 +1,6 @@
 import type { Object3D } from 'three';
 
+import type { CellCoord } from '../streaming/grid';
 import type { ModelColliders } from './collider.interface';
 
 /** Request for one streamed grid cell's HD (`lod=false`) or LOD (`lod=true`) meshes. */
@@ -27,6 +28,8 @@ export interface WorldAdapter {
   readonly cellSize: number;
   /** Map a picked object + instance back to its source info. */
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo;
+  /** Every grid cell that holds content (for the debug section inspector). */
+  listCells(): CellCoord[];
   /** Build one grid cell's meshes (native Z-up; the streaming root applies the −90°X). */
   loadCell(request: CellRequest): Promise<Object3D[]>;
   /** Build one grid cell's collision (its HD instances), for streaming the physics colliders. */

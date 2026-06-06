@@ -174,6 +174,11 @@ export class Game {
     this.events.emit('ready');
   }
 
+  /** Every grid cell that holds content (for the debug section inspector). */
+  listCells(): CellCoord[] {
+    return this.adapter?.listCells() ?? [];
+  }
+
   async loadGame(center: Vec3, options: LoadOptions = {}): Promise<void> {
     if (!this.adapter) {
       throw new Error('Game.loadGame requires a world adapter (setWorldAdapter)');

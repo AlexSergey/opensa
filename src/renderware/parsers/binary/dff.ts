@@ -5,6 +5,9 @@ import { BinaryStream } from './binary-stream';
 import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
 import { GeometryFlag, RwSection } from './constants';
 
+/** RenderWare chunk header size (type + size + libraryVersion, 3 × u32). */
+const CHUNK_HEADER_BYTES = 12;
+
 /**
  * Parse a RenderWare Clump (.dff) into a renderer-agnostic RWClump.
  *
@@ -16,9 +19,15 @@ import { GeometryFlag, RwSection } from './constants';
  */
 export function parseDff(buffer: ArrayBuffer): RWClump {
   const stream = new BinaryStream(buffer);
-  const clumpHeader = readChunkHeader(stream);
-  if (clumpHeader.type !== RwSection.CLUMP) {
-    throw new Error(`Not a DFF: expected Clump (0x10), got 0x${clumpHeader.type.toString(16)}`);
+  // Some DFFs (UV-animated — waterfalls, scrolling signs) begin with a UVAnimDict
+  // (0x2B) chunk before the Clump; skip any leading non-Clump chunks to find it.
+  let clumpHeader = readChunkHeader(stream);
+  while (clumpHeader.type !== RwSection.CLUMP) {
+    stream.seek(clumpHeader.end);
+    if (stream.remaining < CHUNK_HEADER_BYTES) {
+      throw new Error('Not a DFF: no Clump (0x10) chunk found');
+    }
+    clumpHeader = readChunkHeader(stream);
   }
 
   let frames: RWFrame[] = [];

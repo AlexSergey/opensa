@@ -1,7 +1,7 @@
-import type { IplInstance, MapDefinitions } from '../parsers/text';
+import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text';
 
 import { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from '../archive';
-import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl } from '../parsers/text';
+import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl, parseTimedObjects } from '../parsers/text';
 
 /** Stream-count manifest ({ basename: count }) so we load exactly the binary
  * stream IPLs that exist — no probe-by-404 (e.g. `map_stream0.ipl`). */
@@ -16,6 +16,7 @@ export async function resolveMap(datUrl: string, base: string): Promise<MapDefin
   const dat = parseGtaDat(await fetchText(datUrl));
 
   const catalog: MapDefinitions['catalog'] = new Map();
+  const timedCatalog = new Map<number, IdeObjectDef>();
   for (const idePath of dat.ide) {
     const text = await fetchTextOrNull(datChildUrl(base, idePath));
     if (text === null) {
@@ -23,6 +24,9 @@ export async function resolveMap(datUrl: string, base: string): Promise<MapDefin
     }
     for (const def of parseIde(text)) {
       catalog.set(def.id, def);
+    }
+    for (const def of parseTimedObjects(text)) {
+      timedCatalog.set(def.id, def);
     }
   }
 
@@ -40,7 +44,7 @@ export async function resolveMap(datUrl: string, base: string): Promise<MapDefin
     instances.push(...(await loadBinaryStreams(base, iplBasename(iplPath), manifest)));
   }
 
-  return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances };
+  return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances, timedCatalog };
 }
 
 async function fetchArrayBufferOrNull(url: string): Promise<ArrayBuffer | null> {

@@ -8,3 +8,6 @@
 - [Character physics plan](character-physics-plan.md) — plan 008; first char spawn at CJ home; bitECS + Rapier; Z-up physics
 - [World streaming plan](world-streaming-plan.md) — plan 009; SA sectioned grid + LOD rendering; dual draw distance
 - [Collision streaming plan](collision-streaming-plan.md) — plan 010; stream static COL per grid cell around the player
+- [Time-of-day objects TODO](render-time-of-day-objects-todo.md) — tobj kept in MapDefinitions.timedCatalog, not rendered yet (day/night gating later)
+- [Prelit darkness + model viewer](prelit-darkness-and-model-viewer.md) — "dark" models = data, not parser; standalone DFF viewer at /viewer.html
+- [IPL interior area-code](ipl-interior-area-code.md) — real id = value & 0xFF; exterior = id 0 or {13}; isInterior filter + per-code audit

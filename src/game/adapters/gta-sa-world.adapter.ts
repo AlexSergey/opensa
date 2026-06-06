@@ -2,6 +2,7 @@ import { Group, type Object3D } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
 import type { CellRequest, RegionRequest, WorldAdapter, WorldObjectInfo } from '../interfaces/world-adapter.interface';
+import type { CellCoord } from '../streaming/grid';
 
 // game/adapters/** is the only place allowed to import renderware.
 import {
@@ -55,6 +56,14 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return { modelName: data.def.modelName, position: instance.position, txdName: data.def.txdName };
+  }
+
+  listCells(): CellCoord[] {
+    if (!this.grid) {
+      return [];
+    }
+
+    return [...this.grid.values()].map((cell): CellCoord => [cell.cx, cell.cy]);
   }
 
   // eslint-disable-next-line

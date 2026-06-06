@@ -4,7 +4,7 @@ import type { ColModel } from '../parsers/binary/col-types';
 import type { IplInstance, MapDefinitions } from '../parsers/text';
 import type { CollisionIndex } from './collision-index';
 
-import { isLodModel } from '../parsers/text';
+import { isInterior, isLodModel } from '../parsers/text';
 import { getCollision } from './collision-index';
 
 export interface ColliderOptions {
@@ -56,7 +56,7 @@ export function bindColliders(index: CollisionIndex, groups: Map<string, IplInst
 
 /**
  * Bind collision to placed objects for a region (the static-world counterpart of
- * {@link buildRegion}). Filters to exterior (`interior === 0`), the radius and
+ * {@link buildRegion}). Filters to exterior ({@link isInterior}), the radius and
  * real (non-LOD) models — LODs have no collision — then groups instances by model
  * name, looks each up in the collision index, and emits one entry per model with
  * the per-placement world transforms. Models without collision are skipped.
@@ -78,7 +78,7 @@ export function buildColliders(
   const groups = new Map<string, IplInstance[]>();
   for (const instance of defs.instances) {
     const def = defs.catalog.get(instance.id);
-    if (!def || instance.interior !== 0 || isLodModel(def.modelName)) {
+    if (!def || isInterior(instance.interior) || isLodModel(def.modelName)) {
       continue;
     }
     const dx = instance.position[0] - center[0];

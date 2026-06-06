@@ -13,7 +13,7 @@ export interface GtaDat {
   ipl: string[];
 }
 
-/** One object definition from an IDE `objs`/`tobj` section. */
+/** One object definition from an IDE `objs`/`anim`/`tobj` section. */
 export interface IdeObjectDef {
   drawDistance: number;
   flags: number;
@@ -41,4 +41,10 @@ export interface MapDefinitions {
   /** IMG asset folder paths from the DAT, normalized. */
   imgDirs: string[];
   instances: IplInstance[];
+  /**
+   * Time-of-day (`tobj`) object definitions, kept separate from the render
+   * catalog — they are a distinct kind that should only show during a day/night
+   * window. Not rendered yet (TODO).
+   */
+  timedCatalog?: Map<number, IdeObjectDef>;
 }

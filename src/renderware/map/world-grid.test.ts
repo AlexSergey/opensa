@@ -34,13 +34,18 @@ describe('buildWorldGrid', () => {
       expect(grid.size).toBe(0);
     });
 
-    it('skips interior instances', () => {
-      const grid = buildWorldGrid(mapDefs([def(1, 'house')], [inst(1, [0, 0, 0], 13)]), 250);
+    it('skips hidden-interior instances', () => {
+      const grid = buildWorldGrid(mapDefs([def(1, 'house')], [inst(1, [0, 0, 0], 10)]), 250);
       expect(grid.size).toBe(0);
     });
   });
 
   describe('positive cases', () => {
+    it('includes exterior instances with a non-zero world area code (256-multiple or id 13)', () => {
+      const defs = mapDefs([def(1, 'house')], [inst(1, [0, 0, 0], 1024), inst(1, [10, 10, 0], 13)]);
+      expect(buildWorldGrid(defs, 250).get(cellKey(0, 0))?.hd).toHaveLength(2);
+    });
+
     it('buckets instances into cells by position', () => {
       const defs = mapDefs([def(1, 'house')], [inst(1, [10, 10, 0]), inst(1, [260, 10, 0]), inst(1, [20, 20, 0])]);
       const grid = buildWorldGrid(defs, 250);

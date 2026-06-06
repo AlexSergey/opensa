@@ -122,6 +122,15 @@ describe('parseDff (synthetic)', () => {
     expect(clump.geometries[0].normals).not.toBeNull();
   });
 
+  it('skips a leading UVAnimDict (0x2B) chunk before the Clump', () => {
+    // UV-animated models (waterfalls, scrolling signs) prepend a UVAnimDict.
+    const withUvAnim = toArrayBuffer(concat(chunk(0x2b, u8(1, 2, 3, 4)), new Uint8Array(buildSyntheticClump())));
+    const parsed = parseDff(withUvAnim);
+
+    expect(parsed.geometries).toHaveLength(1);
+    expect(parsed.atomics.length).toBeGreaterThan(0);
+  });
+
   it('rejects non-clump input', () => {
     expect(() => parseDff(toArrayBuffer(chunk(RwSection.TEXTURE_DICTIONARY, u32(0))))).toThrow(/Not a DFF/);
   });
