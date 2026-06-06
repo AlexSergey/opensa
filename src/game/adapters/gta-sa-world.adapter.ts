@@ -1,20 +1,31 @@
 import { Group, type Object3D } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
-import type { CellRequest, RegionRequest, WorldAdapter, WorldObjectInfo } from '../interfaces/world-adapter.interface';
+import type {
+  CellRequest,
+  CharacterModel,
+  RegionRequest,
+  WorldAdapter,
+  WorldObjectInfo,
+} from '../interfaces/world-adapter.interface';
 import type { CellCoord } from '../streaming/grid';
 
 // game/adapters/** is the only place allowed to import renderware.
 import {
   buildCell,
   buildCellColliders,
+  buildClump,
   buildColliders,
   buildCollisionIndex,
   buildCollisionWireframe,
+  buildSkinnedClump,
+  buildTextureMap,
   buildWorldGrid,
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
+  parseDff,
+  parseTxd,
   type RegionColliders,
   type RegionMeshData,
   resolveMap,
@@ -64,6 +75,26 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return [...this.grid.values()].map((cell): CellCoord => [cell.cx, cell.cy]);
+  }
+
+  /**
+   * Load a character DFF + TXD. Skinned models (peds) build a `SkinnedMesh` +
+   * `Skeleton` (bind pose) and expose the named bones; otherwise a static clump
+   * is returned with `skeleton: null`. The renderable is kept in **native** GTA
+   * model space (no Z-up→Y-up conversion) — the caller stands it up under the
+   * engine's `entityRoot`.
+   */
+  async loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel> {
+    const [dffBuffer, txdBuffer] = await Promise.all([fetchBuffer(dffUrl), fetchBuffer(txdUrl)]);
+    const textures = buildTextureMap(parseTxd(txdBuffer));
+    const clump = parseDff(dffBuffer);
+
+    const skinned = buildSkinnedClump(clump, textures);
+    if (skinned) {
+      return { bonesByName: skinned.bonesByName, object: skinned.root, skeleton: skinned.skeleton };
+    }
+
+    return { bonesByName: new Map(), object: buildClump(clump, textures, { convertToYUp: false }), skeleton: null };
   }
 
   // eslint-disable-next-line
@@ -144,4 +175,13 @@ export function toModelColliders({ col, name, transforms }: RegionColliders): Mo
     },
     transforms,
   };
+}
+
+async function fetchBuffer(url: string): Promise<ArrayBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  return response.arrayBuffer();
 }

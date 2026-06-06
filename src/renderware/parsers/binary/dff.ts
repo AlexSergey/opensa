@@ -1,5 +1,5 @@
 import type { ChunkHeader } from './chunks';
-import type { RWAtomic, RWClump, RWFrame, RWGeometry, RWMaterial, RWTriangle } from './types';
+import type { RWAtomic, RWClump, RWFrame, RWGeometry, RWMaterial, RWSkin, RWTriangle } from './types';
 
 import { BinaryStream } from './binary-stream';
 import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
@@ -13,9 +13,9 @@ const CHUNK_HEADER_BYTES = 12;
  *
  * Handles the canonical GTA SA structure: FrameList, GeometryList (positions,
  * prelit colors, UV layers, triangles, morph-target geometry, materials with
- * texture names) and Atomics. Skinning, multi-morph and BinMeshPLG splits are
- * intentionally out of scope (see plan); triangles carry per-face material
- * indices which the adapter groups by.
+ * texture names, and the Skin plugin for skinned character meshes) and Atomics.
+ * Multi-morph and BinMeshPLG splits are intentionally out of scope (see plan);
+ * triangles carry per-face material indices which the adapter groups by.
  */
 export function parseDff(buffer: ArrayBuffer): RWClump {
   const stream = new BinaryStream(buffer);
@@ -130,8 +130,9 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
 
   const matList = findChild(stream, header.dataStart, header.end, RwSection.MATERIAL_LIST);
   const materials = matList ? parseMaterialList(stream, matList) : [];
+  const skin = parseSkinExtension(stream, header, numVertices);
 
-  return { flags, materials, normals, numUVLayers, positions, prelitColors, triangles, uvLayers };
+  return { flags, materials, normals, numUVLayers, positions, prelitColors, skin, triangles, uvLayers };
 }
 
 function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
@@ -175,6 +176,34 @@ function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMateria
   });
 
   return materials;
+}
+
+/** Parse the Skin plugin from a geometry's Extension, or undefined if not skinned. */
+function parseSkinExtension(stream: BinaryStream, header: ChunkHeader, numVertices: number): RWSkin | undefined {
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  if (!extension) {
+    return undefined;
+  }
+  const skinChunk = findChild(stream, extension.dataStart, extension.end, RwSection.SKIN);
+  if (!skinChunk) {
+    return undefined;
+  }
+
+  stream.seek(skinChunk.dataStart);
+  const numBones = stream.u8();
+  const numUsedBones = stream.u8();
+  stream.u8(); // maxWeightsPerVertex (unused)
+  stream.u8(); // padding
+  const usedBones: number[] = [];
+  for (let i = 0; i < numUsedBones; i += 1) {
+    usedBones.push(stream.u8());
+  }
+  const boneIndices = stream.bytes(numVertices * 4);
+  const boneWeights = readFloat32Array(stream, numVertices * 4);
+  const inverseBindMatrices = readFloat32Array(stream, numBones * 16);
+  // A 12-byte split trailer (boneLimit, numMeshes, numRLE) follows; not needed here.
+
+  return { boneIndices, boneWeights, inverseBindMatrices, numBones, usedBones };
 }
 
 function parseTexture(stream: BinaryStream, header: ChunkHeader): { maskName: string; name: string } {

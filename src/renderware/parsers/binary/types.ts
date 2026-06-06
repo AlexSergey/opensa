@@ -35,6 +35,8 @@ export interface RWGeometry {
   positions: Float32Array;
   /** Prelit RGBA bytes if present, flattened (numVertices * 4), else null. */
   prelitColors: null | Uint8Array;
+  /** Skin (bone weights / inverse-bind matrices) if the geometry is skinned, else undefined. */
+  skin?: RWSkin;
   triangles: RWTriangle[];
   /** UV layers, each flattened (numVertices * 2). */
   uvLayers: Float32Array[];
@@ -50,6 +52,22 @@ export interface RWMipLevel {
   data: Uint8Array;
   height: number;
   width: number;
+}
+
+/** Skinning data from a geometry's Skin plugin (skinned character meshes). */
+export interface RWSkin {
+  /** Per-vertex bone indices (numVertices * 4), into the skin's bone list. */
+  boneIndices: Uint8Array;
+  /** Per-vertex bone weights (numVertices * 4), summing to ~1 per vertex. */
+  boneWeights: Float32Array;
+  /**
+   * Inverse-bind (bone → model space) matrices, flattened (numBones * 16) in raw
+   * RW layout: `right.xyz, 0, up.xyz, 0, at.xyz, 0, pos.xyz, 0` per matrix.
+   */
+  inverseBindMatrices: Float32Array;
+  numBones: number;
+  /** Bone-remap indices the skin actually uses (RW optimisation; length = numUsedBones). */
+  usedBones: number[];
 }
 
 export interface RWTexture {

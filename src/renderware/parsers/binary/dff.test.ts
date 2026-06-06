@@ -6,8 +6,9 @@ import { chunk, concat, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } fr
 import { GeometryFlag, RwSection } from './constants';
 import { parseDff } from './dff';
 
-/** Build a minimal but complete one-mesh clump exercising every attribute path. */
-function buildSyntheticClump(): ArrayBuffer {
+/** Build a minimal but complete one-mesh clump exercising every attribute path.
+ *  `geometryExt` is appended into the Geometry chunk (e.g. a Skin Extension). */
+function buildSyntheticClump(geometryExt?: Uint8Array): ArrayBuffer {
   const flags = GeometryFlag.POSITIONS | GeometryFlag.TEXTURED | GeometryFlag.PRELIT | GeometryFlag.NORMALS;
 
   const frameList = chunk(
@@ -71,13 +72,31 @@ function buildSyntheticClump(): ArrayBuffer {
     concat(chunk(RwSection.STRUCT, concat(u32(1), i32(-1))), material),
   );
 
-  const geometry = chunk(RwSection.GEOMETRY, concat(geometryStruct, materialList));
+  const geometry = chunk(
+    RwSection.GEOMETRY,
+    geometryExt ? concat(geometryStruct, materialList, geometryExt) : concat(geometryStruct, materialList),
+  );
   const geometryList = chunk(RwSection.GEOMETRY_LIST, concat(chunk(RwSection.STRUCT, u32(1)), geometry));
   const atomic = chunk(RwSection.ATOMIC, chunk(RwSection.STRUCT, concat(u32(0), u32(0), u32(0), u32(0))));
 
   return toArrayBuffer(
     chunk(RwSection.CLUMP, concat(chunk(RwSection.STRUCT, u32(1)), frameList, geometryList, atomic)),
   );
+}
+
+/** A Skin plugin Extension for the 3-vertex synthetic geometry (2 bones). */
+function skinExtension(): Uint8Array {
+  const skin = chunk(
+    RwSection.SKIN,
+    concat(
+      u8(2, 0, 1, 0), // numBones=2, numUsedBones=0, maxWeights=1, padding
+      u8(0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), // 3 vertices × 4 bone indices
+      f32a([1, 0, 0, 0, 0.5, 0.5, 0, 0, 1, 0, 0, 0]), // 3 vertices × 4 weights
+      f32a(Array.from({ length: 32 }, (_, i) => i)), // 2 × 16 inverse-bind matrices
+    ),
+  );
+
+  return chunk(RwSection.EXTENSION, skin);
 }
 
 describe('parseDff (synthetic)', () => {
@@ -120,6 +139,21 @@ describe('parseDff (synthetic)', () => {
     // Re-build without the NORMALS flag effect by checking the real asset below;
     // here assert the synthetic path produced normals as configured.
     expect(clump.geometries[0].normals).not.toBeNull();
+  });
+
+  it('leaves skin undefined for a non-skinned geometry', () => {
+    expect(clump.geometries[0].skin).toBeUndefined();
+  });
+
+  it('parses the Skin plugin (bone indices, weights, inverse-bind matrices) when present', () => {
+    const skin = parseDff(buildSyntheticClump(skinExtension())).geometries[0].skin;
+    expect(skin).toBeDefined();
+    expect(skin?.numBones).toBe(2);
+    expect(Array.from(skin?.boneIndices.slice(0, 4) ?? [])).toEqual([0, 1, 0, 0]);
+    expect(skin?.boneWeights.length).toBe(12);
+    expect(Array.from(skin?.boneWeights.slice(4, 6) ?? [])).toEqual([0.5, 0.5]);
+    expect(skin?.inverseBindMatrices.length).toBe(32);
+    expect(Array.from(skin?.inverseBindMatrices.slice(0, 3) ?? [])).toEqual([0, 1, 2]);
   });
 
   it('skips a leading UVAnimDict (0x2B) chunk before the Clump', () => {

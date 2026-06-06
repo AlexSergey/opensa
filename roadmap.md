@@ -18,12 +18,34 @@
 - [ ] When this is ready, review and fix the rendering of the remaining map
   - [✅] Empty spaces in the desert, etc.
   - [ ] Add the missing 7 files - see .claude memory/plans
-- [ ] Loading a character
+- [✅] Loading a character
+  - [ ] Generate collision for peds
 - [ ] Physics improvement - not lock in the steps
+- [ ] Animation controls - walking, running, etc.
 - [ ] Water rendering
 - [ ] Game time
+- [ ] Sky
+  - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
+  - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
+- [ ] UI Layer
+  - [ ] Show current time
+  - [ ] HUD
+    - [ ] Show current coords (press X)
+      - [ ] If user pressed X again the coords block will be hide and current coords will be copied to the buffer
 - [ ] Timecyc
+- [ ] Tobj and night objects
 - [ ] Volumetric cloud / Skybox
+- [ ] Fog
+  - [ ] Strimming fade objects
+  - [ ] The draw distance limit (1000)
+- [ ] Loading a car
+- [ ] Getting into a car
+  - [ ] Door opening animation
+- [ ] Basic car controls
+- [ ] Damage system
+- [ ] Weapons
+  - [ ] Animation
+  - [ ] Shooting
 - [ ] Optimizing game archives
   - [ ] Scripts for creating different archive types
   - [ ] Load at startup
@@ -34,14 +56,3 @@
     - [ ] Weapons
   - [ ] Load in background
     - [ ] Map parts
-- [ ] Loading a car
-- [ ] Animation controls - walking, running, etc.
-- [ ] Getting into a car
-  - [ ] Door opening animation
-- [ ] Basic car controls
-- [ ] Damage system
-- [ ] Weapons
-  - [ ] Animation
-  - [ ] Shooting
-- [ ] HUD
-- [ ] UI

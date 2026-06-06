@@ -1,8 +1,11 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 
+import type { CharacterPlacement } from '../game/character/orient-character';
+import type { Vec3 } from '../game/interfaces/world-adapter.interface';
+
 import { Game } from '../game';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
-import { loadPlayerMesh } from '../game/character/load-player';
+import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
 import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
@@ -14,6 +17,12 @@ import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 const BASE = import.meta.env.VITE_STATIC_URL;
 
 const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
+
+// Player collision box (half-extents) — a human, decoupled from the T-pose mesh bbox.
+const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
+// Stand Tommy up: the native model's "up" is +Y, so rotate +90° about X to point GTA +Z.
+// (scale ≈ 1; tune rotation/scale here if he sits/faces wrong.)
+const TOMMY_PLACEMENT: CharacterPlacement = { rotation: [Math.PI / 2, 0, 0], scale: 1 };
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
 // double-mount (dev) doesn't spin up a second renderer / archive download.
@@ -116,11 +125,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS });
 
-    // Spawn the player (TEMP: a 3ds cube) on CJ's parking lot, then look at it.
-    // ECS Transform drives its position via the render-sync system.
-    const player = await loadPlayerMesh(`${BASE}/player/player.3ds`);
-    player.scale.setScalar(0.8);
-    const character = await setupCharacter(game, player, PLAYER_SPAWN);
+    // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
+    // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
+    // stands it up in GTA Z-up under a wrapper the render-sync system positions.
+    const model = await adapter.loadCharacter(`${BASE}/player/tommy.dff`, `${BASE}/player/tommy.txd`);
+    const player = orientCharacter(model.object, TOMMY_PLACEMENT, PLAYER_HALF_EXTENTS[2]);
+    const character = await setupCharacter(game, player, PLAYER_SPAWN, {
+      bonesByName: model.bonesByName,
+      halfExtents: PLAYER_HALF_EXTENTS,
+      skeleton: model.skeleton,
+    });
     game.frameEntity(player, 12);
 
     // Stream map cells around the player (full models near, LODs ringing out).

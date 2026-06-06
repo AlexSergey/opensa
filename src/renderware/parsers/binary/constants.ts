@@ -13,6 +13,7 @@ export const RwSection = {
   GEOMETRY_LIST: 0x1a,
   MATERIAL: 0x07,
   MATERIAL_LIST: 0x08,
+  SKIN: 0x116,
   STRING: 0x02,
   STRUCT: 0x01,
   TEXTURE: 0x06,

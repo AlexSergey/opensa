@@ -1,4 +1,4 @@
-import type { Object3D } from 'three';
+import type { Bone, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
 import type { ModelColliders } from './collider.interface';
@@ -8,6 +8,14 @@ export interface CellRequest {
   cx: number;
   cy: number;
   lod: boolean;
+}
+
+/** A loaded character: the renderable plus its skeleton (null if the model isn't skinned). */
+export interface CharacterModel {
+  /** Bones keyed by name, for the animation manager. */
+  bonesByName: Map<string, Bone>;
+  object: Object3D;
+  skeleton: null | Skeleton;
 }
 
 export interface RegionRequest {
@@ -34,6 +42,8 @@ export interface WorldAdapter {
   loadCell(request: CellRequest): Promise<Object3D[]>;
   /** Build one grid cell's collision (its HD instances), for streaming the physics colliders. */
   loadCellColliders(cx: number, cy: number): Promise<ModelColliders[]>;
+  /** Load a character model (DFF + TXD) into a renderable object (native GTA Z-up). */
+  loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel>;
   /** Build a debug wireframe overlay of the region's collision (empty if unsupported). */
   loadCollisionDebug(request: RegionRequest): Promise<Object3D[]>;
   /** Download/parse everything needed; reports progress 0..1. */
