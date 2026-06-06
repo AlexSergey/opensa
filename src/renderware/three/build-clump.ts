@@ -120,41 +120,7 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
   return parts;
 }
 
-export function buildMaterial(
-  rw: RWMaterial,
-  geometry: RWGeometry,
-  textures?: Map<string, Texture>,
-): MeshStandardMaterial {
-  const map = rw.texture && textures ? (textures.get(rw.texture.name.toLowerCase()) ?? null) : null;
-  const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
-  const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
-
-  const material = new MeshStandardMaterial({
-    alphaTest: transparent ? 0.5 : 0,
-    color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
-    map,
-    metalness: 0,
-    roughness: 1,
-    side: transparent ? DoubleSide : FrontSide,
-    transparent,
-    vertexColors: hasVertexColors,
-  });
-  material.name = rw.texture?.name ?? 'material';
-
-  return material;
-}
-
-export function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount: number): RWTriangle[][] {
-  const groups: RWTriangle[][] = Array.from({ length: Math.max(1, materialCount) }, () => []);
-  for (const tri of triangles) {
-    const slot = tri.materialIndex < groups.length ? tri.materialIndex : 0;
-    groups[slot].push(tri);
-  }
-
-  return groups;
-}
-
-function buildGeometry(rw: RWGeometry): BufferGeometry {
+export function buildGeometry(rw: RWGeometry): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(rw.positions, 3));
 
@@ -199,13 +165,47 @@ function buildGeometry(rw: RWGeometry): BufferGeometry {
   return geometry;
 }
 
-function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
+export function buildMaterial(
+  rw: RWMaterial,
+  geometry: RWGeometry,
+  textures?: Map<string, Texture>,
+): MeshStandardMaterial {
+  const map = rw.texture && textures ? (textures.get(rw.texture.name.toLowerCase()) ?? null) : null;
+  const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
+  const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
+
+  const material = new MeshStandardMaterial({
+    alphaTest: transparent ? 0.5 : 0,
+    color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
+    map,
+    metalness: 0,
+    roughness: 1,
+    side: transparent ? DoubleSide : FrontSide,
+    transparent,
+    vertexColors: hasVertexColors,
+  });
+  material.name = rw.texture?.name ?? 'material';
+
+  return material;
+}
+
+export function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
   const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = rotation;
   const matrix = new Matrix4();
   // RW stores right/up/at basis vectors; lay them into column-major Matrix4.
   matrix.set(r0, r3, r6, position[0], r1, r4, r7, position[1], r2, r5, r8, position[2], 0, 0, 0, 1);
 
   return matrix;
+}
+
+export function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount: number): RWTriangle[][] {
+  const groups: RWTriangle[][] = Array.from({ length: Math.max(1, materialCount) }, () => []);
+  for (const tri of triangles) {
+    const slot = tri.materialIndex < groups.length ? tri.materialIndex : 0;
+    groups[slot].push(tri);
+  }
+
+  return groups;
 }
 
 function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {

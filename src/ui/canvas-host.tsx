@@ -26,6 +26,13 @@ const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
 const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
 
+// Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
+// admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
+const VEHICLE_PLACEMENTS: readonly { heading: number; model: string; position: Vec3 }[] = [
+  { heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
+  { heading: 0, model: 'camper', position: [2488, -1678, 13.4] },
+];
+
 // One bootstrap per page load, kept at module scope so React StrictMode's
 // double-mount (dev) doesn't spin up a second renderer / archive download.
 let bootstrapped: null | Promise<Game> = null;
@@ -153,6 +160,18 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
+
+    // Flat textured water surface (whole map; no shader). Parented to the −90°X streaming root.
+    const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
+    game.getStreamingRoot().add(water);
+
+    // Static painted cars parked near the spawn (native Z-up under the −90°X root).
+    for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
+      const vehicle = await adapter.loadVehicle(model);
+      vehicle.position.set(position[0], position[1], position[2]);
+      vehicle.rotation.z = heading;
+      game.getStreamingRoot().add(vehicle);
+    }
 
     return game;
   })();

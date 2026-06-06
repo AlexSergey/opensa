@@ -13,4 +13,6 @@
 - [IPL interior area-code](ipl-interior-area-code.md) — real id = value & 0xFF; exterior = id 0 or {13}; isInterior filter + per-code audit
 - [Character model plan](character-model-plan.md) — plan 011; replace cube with Tommy DFF/TXD; bind-pose + real skeleton (DONE)
 - [Animation manager plan](animation-manager-plan.md) — plan 012; walk/run/jump/idle from ped.ifp (ANP3) driving Tommy's skeleton (DONE)
-- [Player physics plan](player-physics-plan.md) — plan 013; kinematic capsule character controller (collision/inertia/steps/slopes)
+- [Player physics plan](player-physics-plan.md) — plan 013; kinematic capsule character controller (collision/inertia/steps/slopes) (DONE)
+- [Simple water plan](simple-water-plan.md) — plan 014; flat textured water surface from water.dat (no shader yet)
+- [Vehicle loading plan](vehicle-loading-plan.md) — plan 015 (DONE); parse vehicle data + static painted/wheeled cars; incl. BinMeshPLG material recovery for modded DFFs

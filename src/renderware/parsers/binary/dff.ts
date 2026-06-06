@@ -14,8 +14,9 @@ const CHUNK_HEADER_BYTES = 12;
  * Handles the canonical GTA SA structure: FrameList, GeometryList (positions,
  * prelit colors, UV layers, triangles, morph-target geometry, materials with
  * texture names, and the Skin plugin for skinned character meshes) and Atomics.
- * Multi-morph and BinMeshPLG splits are intentionally out of scope (see plan);
- * triangles carry per-face material indices which the adapter groups by.
+ * Triangles carry per-face material indices which the adapter groups by; when an
+ * exporter zeroes them, they are recovered from the BinMeshPLG split. (Multi-morph
+ * is still out of scope — see plan.)
  */
 export function parseDff(buffer: ArrayBuffer): RWClump {
   const stream = new BinaryStream(buffer);
@@ -51,6 +52,66 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
   });
 
   return { atomics, frames, geometries };
+}
+
+/**
+ * Recover per-face material indices from the geometry's BinMeshPLG split when the
+ * triangle list left them all zero. Each triangle is keyed by its (order-
+ * independent) vertex triple and assigned the material of the split it belongs to.
+ */
+function applyBinMeshMaterials(stream: BinaryStream, header: ChunkHeader, triangles: RWTriangle[]): void {
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  if (!extension) {
+    return;
+  }
+  const bin = findChild(stream, extension.dataStart, extension.end, RwSection.BIN_MESH_PLG);
+  if (!bin) {
+    return;
+  }
+
+  stream.seek(bin.dataStart);
+  const tristrip = (stream.u32() & 1) !== 0;
+  const numMeshes = stream.u32();
+  stream.u32(); // total index count (unused)
+
+  const materialByTriple = new Map<string, number>();
+  for (let mesh = 0; mesh < numMeshes; mesh += 1) {
+    const numIndices = stream.u32();
+    const materialIndex = stream.u32();
+    const indices: number[] = [];
+    for (let i = 0; i < numIndices; i += 1) {
+      indices.push(stream.u32());
+    }
+    forEachSplitTriangle(indices, tristrip, (a, b, c) => materialByTriple.set(tripleKey(a, b, c), materialIndex));
+  }
+
+  for (const tri of triangles) {
+    const material = materialByTriple.get(tripleKey(tri.a, tri.b, tri.c));
+    if (material !== undefined) {
+      tri.materialIndex = material;
+    }
+  }
+}
+
+/** Visit each triangle of one BinMesh split (trilist triples, or an unwound tristrip). */
+function forEachSplitTriangle(
+  indices: number[],
+  tristrip: boolean,
+  visit: (a: number, b: number, c: number) => void,
+): void {
+  if (!tristrip) {
+    for (let i = 0; i + 2 < indices.length; i += 3) {
+      visit(indices[i], indices[i + 1], indices[i + 2]);
+    }
+
+    return;
+  }
+  for (let i = 0; i + 2 < indices.length; i += 1) {
+    const [a, b, c] = [indices[i], indices[i + 1], indices[i + 2]];
+    if (a !== b && b !== c && a !== c) {
+      visit(a, b, c); // winding is irrelevant — we only key the triple
+    }
+  }
 }
 
 function parseAtomic(stream: BinaryStream, header: ChunkHeader): RWAtomic {
@@ -131,6 +192,12 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
   const matList = findChild(stream, header.dataStart, header.end, RwSection.MATERIAL_LIST);
   const materials = matList ? parseMaterialList(stream, matList) : [];
   const skin = parseSkinExtension(stream, header, numVertices);
+
+  // Some exporters leave every face's material index 0 and store the real
+  // per-material split in BinMeshPLG; recover the assignment from it.
+  if (materials.length > 1 && triangles.every((t) => t.materialIndex === 0)) {
+    applyBinMeshMaterials(stream, header, triangles);
+  }
 
   return { flags, materials, normals, numUVLayers, positions, prelitColors, skin, triangles, uvLayers };
 }
@@ -276,4 +343,9 @@ function readUVLayers(stream: BinaryStream, numUVLayers: number, numVertices: nu
   }
 
   return uvLayers;
+}
+
+/** Order-independent key for a triangle's vertex triple. */
+function tripleKey(a: number, b: number, c: number): string {
+  return [a, b, c].sort((x, y) => x - y).join(',');
 }

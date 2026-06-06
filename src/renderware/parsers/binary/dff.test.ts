@@ -170,6 +170,90 @@ describe('parseDff (synthetic)', () => {
   });
 });
 
+/**
+ * A two-material, two-triangle clump. Some exporters leave every face's material
+ * index 0 and store the real split in BinMeshPLG; `faceMaterials` sets the indices
+ * written into the triangle list, `binMesh` toggles the recovery plugin.
+ */
+function buildBinMeshClump(faceMaterials: [number, number], binMesh: boolean): ArrayBuffer {
+  const geometryStruct = chunk(
+    RwSection.STRUCT,
+    concat(
+      u16(GeometryFlag.POSITIONS | GeometryFlag.TEXTURED),
+      u8(0), // numUVLayers
+      u8(0), // native flag
+      u32(2), // numTriangles
+      u32(6), // numVertices
+      u32(1), // numMorphTargets
+      // two triangles packed [v2, v1, materialIndex, v3] — verts {0,1,2} and {3,4,5}
+      concat(u16(1), u16(0), u16(faceMaterials[0]), u16(2)),
+      concat(u16(4), u16(3), u16(faceMaterials[1]), u16(5)),
+      f32a([0, 0, 0, 1]), // morph bounding sphere
+      u32(1), // hasVertices
+      u32(0), // hasNormals
+      f32a([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1]), // 6 positions
+    ),
+  );
+
+  const oneMaterial = (r: number): Uint8Array =>
+    chunk(RwSection.MATERIAL, chunk(RwSection.STRUCT, concat(u32(0), u8(r, 0, 0, 255), u32(0), u32(0))));
+  const materialList = chunk(
+    RwSection.MATERIAL_LIST,
+    concat(chunk(RwSection.STRUCT, concat(u32(2), i32(-1), i32(-1))), oneMaterial(10), oneMaterial(20)),
+  );
+
+  // BinMeshPLG: trilist, split 0 → material 0 (verts 0,1,2), split 1 → material 1 (verts 3,4,5).
+  const binMeshExt = chunk(
+    RwSection.EXTENSION,
+    chunk(
+      RwSection.BIN_MESH_PLG,
+      concat(
+        u32(0), // flags (0 = trilist)
+        u32(2), // numMeshes
+        u32(6), // total indices
+        concat(u32(3), u32(0), u32(0), u32(1), u32(2)),
+        concat(u32(3), u32(1), u32(3), u32(4), u32(5)),
+      ),
+    ),
+  );
+
+  const parts = binMesh ? concat(geometryStruct, materialList, binMeshExt) : concat(geometryStruct, materialList);
+  const geometryList = chunk(
+    RwSection.GEOMETRY_LIST,
+    concat(chunk(RwSection.STRUCT, u32(1)), chunk(RwSection.GEOMETRY, parts)),
+  );
+  const frameList = chunk(
+    RwSection.FRAME_LIST,
+    chunk(RwSection.STRUCT, concat(u32(1), f32a([1, 0, 0, 0, 1, 0, 0, 0, 1]), f32a([0, 0, 0]), i32(-1), u32(0))),
+  );
+  const atomic = chunk(RwSection.ATOMIC, chunk(RwSection.STRUCT, concat(u32(0), u32(0), u32(0), u32(0))));
+
+  return toArrayBuffer(
+    chunk(RwSection.CLUMP, concat(chunk(RwSection.STRUCT, u32(1)), frameList, geometryList, atomic)),
+  );
+}
+
+describe('parseDff BinMeshPLG material recovery', () => {
+  describe('negative cases', () => {
+    it('keeps the triangle list material indices when they are already set', () => {
+      const tris = parseDff(buildBinMeshClump([1, 0], true)).geometries[0].triangles;
+      expect(tris.map((t) => t.materialIndex)).toEqual([1, 0]); // not overridden by the split
+    });
+
+    it('leaves indices at zero when there is no BinMeshPLG', () => {
+      const tris = parseDff(buildBinMeshClump([0, 0], false)).geometries[0].triangles;
+      expect(tris.map((t) => t.materialIndex)).toEqual([0, 0]);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('recovers per-face material from the split when the list is all zero', () => {
+      const tris = parseDff(buildBinMeshClump([0, 0], true)).geometries[0].triangles;
+      expect(tris.map((t) => t.materialIndex)).toEqual([0, 1]);
+    });
+  });
+});
+
 const dffPath = join(process.cwd(), 'tests', 'renderware', 'testground.dff');
 const dffExists = existsSync(dffPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection,

@@ -1,4 +1,4 @@
-import { type AnimationClip, Group, type Object3D } from 'three';
+import { type AnimationClip, Group, type Object3D, type Texture } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
 import type {
@@ -21,18 +21,32 @@ import {
   buildCollisionWireframe,
   buildSkinnedClump,
   buildTextureMap,
+  buildVehicle,
+  buildWater,
   buildWorldGrid,
+  type HandlingEntry,
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
+  parseCarcols,
   parseDff,
+  parseHandling,
   parseIfp,
   parseTxd,
+  parseVehicleDefs,
+  parseWater,
   type RegionColliders,
   type RegionMeshData,
   resolveMap,
+  type VehicleColours,
+  type VehicleDef,
+  type WaterQuad,
   type WorldGrid,
 } from '../../renderware';
+
+/** Sea level (Z) + a large background plane half-size so the ocean reaches the horizon. */
+const SEA_LEVEL = 0;
+const SEA_HALF = 16000;
 
 export interface GtaSaWorldConfig {
   archiveUrl: string;
@@ -54,7 +68,12 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private readonly colliderCache = new Map<string, ModelColliders[]>();
   private readonly config: GtaSaWorldConfig;
   private defs: MapDefinitions | null = null;
+  private genericVehicleTextures: Map<string, Texture> | null = null;
   private grid: null | WorldGrid = null;
+  /** Parsed `handling.cfg`, kept for the later vehicle-physics phase. */
+  private handling: Map<string, HandlingEntry> | null = null;
+  private vehicleColours: null | VehicleColours = null;
+  private vehicleDefs: Map<string, VehicleDef> | null = null;
 
   constructor(config: GtaSaWorldConfig) {
     this.config = config;
@@ -165,6 +184,58 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     return [root];
   }
 
+  /**
+   * Load a painted, wheeled vehicle by model name. Resolves its `vehicles.ide`
+   * definition (txd + wheel scale) and carcol colours, merges the generic
+   * `vehicle.txd` with the car's own TXD, and builds the mesh. Native Z-up — the
+   * caller parents it under the −90°X streaming root.
+   */
+  async loadVehicle(modelName: string): Promise<Object3D> {
+    await this.ensureVehicleData();
+    const name = modelName.toLowerCase();
+    const def = this.vehicleDefs?.get(name);
+    if (!def) {
+      throw new Error(`No vehicle definition for '${modelName}' in vehicles.ide`);
+    }
+
+    const base = this.config.base;
+    const [dffBuffer, carTxdBuffer, genericTextures] = await Promise.all([
+      fetchBuffer(`${base}/vehicles/${def.model}.dff`),
+      fetchBuffer(`${base}/vehicles/${def.txd}.txd`),
+      this.loadGenericVehicleTextures(),
+    ]);
+    const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
+    const { primary, secondary } = this.resolveVehicleColours(name);
+
+    return buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
+  }
+
+  /**
+   * Build the flat water surface from `water.dat`, textured with `waterclear256`.
+   * `water.dat` only covers the map, so the ocean is a single large sea-level plane
+   * (reaching the horizon); the file's non-sea-level polygons (lakes) are kept on
+   * top. (Sea-level file polygons are dropped — the big plane covers them.)
+   */
+  async loadWater(waterUrl: string, txdUrl: string): Promise<Object3D> {
+    const [waterText, txdBuffer] = await Promise.all([fetchText(waterUrl), fetchBuffer(txdUrl)]);
+    const texture = buildTextureMap(parseTxd(txdBuffer)).get('waterclear256');
+    if (!texture) {
+      throw new Error(`Water texture 'waterclear256' not found in ${txdUrl}`);
+    }
+
+    const lakes = parseWater(waterText).filter((q) => q.vertices.some((v) => Math.abs(v[2] - SEA_LEVEL) > 0.5));
+    const sea: WaterQuad = {
+      vertices: [
+        [-SEA_HALF, -SEA_HALF, SEA_LEVEL],
+        [SEA_HALF, -SEA_HALF, SEA_LEVEL],
+        [-SEA_HALF, SEA_HALF, SEA_LEVEL],
+        [SEA_HALF, SEA_HALF, SEA_LEVEL],
+      ],
+    };
+
+    return buildWater([sea, ...lakes], texture);
+  }
+
   async prepare(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.archive && this.defs) {
       onProgress?.(1); // already prepared (e.g. a debug reload) — skip the heavy work
@@ -175,6 +246,53 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     this.defs = await resolveMap(this.config.datUrl, this.config.base);
     this.grid = buildWorldGrid(this.defs, this.cellSize);
     onProgress?.(1);
+  }
+
+  /** Lazily fetch + parse vehicles.ide, carcols.dat and handling.cfg (cached). */
+  private async ensureVehicleData(): Promise<void> {
+    if (this.vehicleDefs && this.vehicleColours && this.handling) {
+      return;
+    }
+    const base = this.config.base;
+    const [ide, carcols, handling] = await Promise.all([
+      fetchText(`${base}/data/vehicles.ide`),
+      fetchText(`${base}/data/carcols.dat`),
+      fetchText(`${base}/data/handling.cfg`),
+    ]);
+    this.vehicleDefs = parseVehicleDefs(ide);
+    this.vehicleColours = parseCarcols(carcols);
+    this.handling = parseHandling(handling); // stored for the later vehicle-physics phase
+  }
+
+  /** The shared generic `vehicle.txd` texture map, parsed once. */
+  private async loadGenericVehicleTextures(): Promise<Map<string, Texture>> {
+    if (!this.genericVehicleTextures) {
+      const buffer = await fetchBuffer(`${this.config.base}/models/generic/vehicle.txd`);
+      this.genericVehicleTextures = buildTextureMap(parseTxd(buffer));
+    }
+
+    return this.genericVehicleTextures;
+  }
+
+  /** First carcol combo for a model → primary/secondary RGB (falls back to white). */
+  private resolveVehicleColours(name: string): {
+    primary: [number, number, number];
+    secondary: [number, number, number];
+  } {
+    const colours = this.vehicleColours;
+    const white: [number, number, number] = [255, 255, 255];
+    const rgb = (index: number): [number, number, number] => colours?.palette[index] ?? white;
+
+    const combo = colours?.cars.get(name)?.[0];
+    if (combo) {
+      return { primary: rgb(combo[0]), secondary: rgb(combo[1]) };
+    }
+    const combo4 = colours?.cars4.get(name)?.[0];
+    if (combo4) {
+      return { primary: rgb(combo4[0]), secondary: rgb(combo4[1]) };
+    }
+
+    return { primary: white, secondary: white };
   }
 }
 
@@ -206,4 +324,13 @@ async function fetchBuffer(url: string): Promise<ArrayBuffer> {
   }
 
   return response.arrayBuffer();
+}
+
+async function fetchText(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  return response.text();
 }

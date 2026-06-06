@@ -22,26 +22,32 @@
   - [✅] Generate collision for peds
 - [✅] Physics improvement - not lock in the steps
 - [✅] Animation controls - walking, running, etc.
-- [ ] Water rendering
-- [ ] Loading a car
-- [ ] Getting into a car
-  - [ ] Door opening animation
-- [ ] Basic car controls
-- [ ] Car damage system
-- [ ] Car reflections
+- [✅] Water rendering
+- [ ] Vehicle loader
+  - [ ] Car collision
+  - [ ] A full dummy framework (rotation/doors/headlights/seats)
+  - [ ] Getting into a car
+    - [ ] Door opening animation
+  - [ ] Car physic
+  - [ ] Basic car controls
+  - [ ] Car damage system
+  - [ ] Vehicle VLO
+  - [ ] Car reflections
+  - [ ] Extract parking places to configuration array
 - [ ] Game time
+- [ ] Timecyc
+- [ ] Tobj and night objects
+- [ ] Volumetric cloud / Skybox
 - [ ] Sky
   - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
   - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
+- [ ] Water shader
 - [ ] UI Layer
   - [ ] Find good fonts
   - [ ] Show current time
   - [ ] HUD
     - [ ] Show current coords (press X)
       - [ ] If user pressed X again the coords block will be hide and current coords will be copied to the buffer
-- [ ] Timecyc
-- [ ] Tobj and night objects
-- [ ] Volumetric cloud / Skybox
 - [ ] Fog
   - [ ] Strimming fade objects
   - [ ] The draw distance limit (1000)
@@ -61,3 +67,6 @@
     - [ ] Weapons
   - [ ] Load in background
     - [ ] Map parts
+- [ ] CI/CD
+- [ ] Release v 0.1.0
+- [ ] Advanced Water: floating/bouncing, underwater fog, flow from water.dat, clipping.

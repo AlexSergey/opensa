@@ -48,6 +48,10 @@ export interface WorldAdapter {
   loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel>;
   /** Build a debug wireframe overlay of the region's collision (empty if unsupported). */
   loadCollisionDebug(request: RegionRequest): Promise<Object3D[]>;
+  /** Load a painted, wheeled vehicle by model name (native Z-up; place under the streaming root). */
+  loadVehicle(modelName: string): Promise<Object3D>;
+  /** Build the flat water surface from `water.dat`, textured from the given TXD (native Z-up). */
+  loadWater(waterUrl: string, txdUrl: string): Promise<Object3D>;
   /** Download/parse everything needed; reports progress 0..1. */
   prepare(onProgress?: (fraction: number) => void): Promise<void>;
 }
