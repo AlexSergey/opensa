@@ -32,7 +32,11 @@ the browser, and we only carry what we need (dff+txd).
 
 ## Packing script (`scripts/pack-img.mjs`, npm `pack:img`)
 
-- Read `static/img/gta3`, take `.dff` + `.txd` (skip `.col`/`.dat` — renderer doesn't use them).
+- **Reads MULTIPLE source folders** (`IMG_SRC` comma-list, default `static/img/gta3,static/img/gta3additional`);
+  later folders override earlier by lowercased name. `gta3additional` supplies models missing from the
+  original gta3 dump (gym props `gym_mat1/gym_mat02/gym_bench1/gym_bike`, `cj_sweetie_tray_1`, + txds
+  `genintint_gym`/`rc_shop_figure`). Re-run `pack:img` after adding files. (`.col` kept too in `KEEP`.)
+- Read each folder, take `.dff` + `.txd` (+ `.col`) (skip `.dat`).
 - Pass 1: `statSync` each → build directory with cumulative `relativeOffset`.
 - Write header + JSON dir, then **stream** each file's bytes in directory order (600 MB → never hold
   in memory; `fs.createReadStream` → `createWriteStream`, `pipeline(..., { end:false })`).

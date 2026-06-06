@@ -15,9 +15,9 @@
 - [✅] Enable debug
   - [✅] Make zones load by checking a box, like in MapEditor
   - [✅] Enable FlyMode
-- [ ] When this is ready, review and fix the rendering of the remaining map
+- [✅] When this is ready, review and fix the rendering of the remaining map
   - [✅] Empty spaces in the desert, etc.
-  - [ ] Add the missing 7 files - see .claude memory/plans
+  - [✅] Add the missing 7 files - see .claude memory/plans
 - [✅] Loading a character
   - [ ] Generate collision for peds
 - [ ] Physics improvement - not lock in the steps
@@ -28,6 +28,7 @@
   - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
   - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
 - [ ] UI Layer
+  - [ ] Find good fonts
   - [ ] Show current time
   - [ ] HUD
     - [ ] Show current coords (press X)
