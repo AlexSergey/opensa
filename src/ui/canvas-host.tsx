@@ -112,7 +112,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
       debugMode: false,
       gameState: 'play',
-      movement: { jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 3 },
+      movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
       showCollision: false,
       staticUrl: BASE,
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
@@ -144,16 +144,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     const clips = await adapter.loadAnimations(`${BASE}/anim/animations.img`, 'ped.ifp');
     const animation = new AnimationController(player, clips, character.bonesByName);
     animation.play('idle_stance', 0);
-    game.addSystem(
-      new CharacterAnimationSystem(
-        animation,
-        character.physics,
-        character.bodyHandle,
-        character.halfExtents[2],
-        player,
-        game.getConfig(),
-      ),
-    );
+    game.addSystem(new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig()));
 
     // Stream map cells around the player (full models near, LODs ringing out).
     const streaming = new StreamingSystem(adapter, game.getStreamingRoot(), character.viewOf, game.getConfig());

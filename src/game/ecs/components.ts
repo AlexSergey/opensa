@@ -9,9 +9,18 @@
 /** Tag: the entity the local player controls. */
 export const PlayerControlled = {};
 
-/** Link to a Rapier rigid body, by its integer handle. */
+/** Link to a Rapier rigid body (+ its collider, for the kinematic character controller). */
 export const RigidBody = {
+  collider: [] as number[],
   handle: [] as number[],
+};
+
+/** Player velocity (Z-up, units/s) + grounded flag — owned by the character controller. */
+export const Velocity = {
+  grounded: [] as number[],
+  x: [] as number[],
+  y: [] as number[],
+  z: [] as number[],
 };
 
 /** World position (x,y,z) + orientation quaternion (qx,qy,qz,qw). */

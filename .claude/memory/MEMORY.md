@@ -12,4 +12,5 @@
 - [Prelit darkness + model viewer](prelit-darkness-and-model-viewer.md) — "dark" models = data, not parser; standalone DFF viewer at /viewer.html
 - [IPL interior area-code](ipl-interior-area-code.md) — real id = value & 0xFF; exterior = id 0 or {13}; isInterior filter + per-code audit
 - [Character model plan](character-model-plan.md) — plan 011; replace cube with Tommy DFF/TXD; bind-pose + real skeleton (DONE)
-- [Animation manager plan](animation-manager-plan.md) — plan 012; walk/run/jump/idle from ped.ifp (ANP3) driving Tommy's skeleton
+- [Animation manager plan](animation-manager-plan.md) — plan 012; walk/run/jump/idle from ped.ifp (ANP3) driving Tommy's skeleton (DONE)
+- [Player physics plan](player-physics-plan.md) — plan 013; kinematic capsule character controller (collision/inertia/steps/slopes)

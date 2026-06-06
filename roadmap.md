@@ -19,10 +19,16 @@
   - [✅] Empty spaces in the desert, etc.
   - [✅] Add the missing 7 files - see .claude memory/plans
 - [✅] Loading a character
-  - [ ] Generate collision for peds
-- [ ] Physics improvement - not lock in the steps
+  - [✅] Generate collision for peds
+- [✅] Physics improvement - not lock in the steps
 - [✅] Animation controls - walking, running, etc.
 - [ ] Water rendering
+- [ ] Loading a car
+- [ ] Getting into a car
+  - [ ] Door opening animation
+- [ ] Basic car controls
+- [ ] Car damage system
+- [ ] Car reflections
 - [ ] Game time
 - [ ] Sky
   - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
@@ -39,11 +45,6 @@
 - [ ] Fog
   - [ ] Strimming fade objects
   - [ ] The draw distance limit (1000)
-- [ ] Loading a car
-- [ ] Getting into a car
-  - [ ] Door opening animation
-- [ ] Basic car controls
-- [ ] Damage system
 - [ ] Weapons
   - [ ] Animation
   - [ ] Shooting

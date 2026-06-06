@@ -4,17 +4,25 @@ import { describe, expect, it } from 'vitest';
 
 import type { KeyboardInput } from '../input/keyboard';
 import type { Config } from '../interfaces/config.interface';
+import type { CharacterController } from '../physics/physics-world';
 
-import { PlayerControlled, RigidBody } from '../ecs/components';
+import { PlayerControlled, RigidBody, Velocity } from '../ecs/components';
 import { createEcsWorld } from '../ecs/world';
 import { PhysicsWorld } from '../physics/physics-world';
 import { initRapier } from '../physics/rapier';
 import { CharacterControllerSystem } from './character-controller.system';
 
-const HALF = 0.5;
+const STEP = 1 / 60;
 
 // A default camera looks down −Z, which maps to GTA +Y → "forward" is +Y (north).
 const CAMERA = new PerspectiveCamera();
+
+interface Player {
+  controller: CharacterController;
+  eid: number;
+  physics: PhysicsWorld;
+  world: ReturnType<typeof createEcsWorld>;
+}
 
 function config(gameState: Config['gameState']): Config {
   return {
@@ -22,32 +30,34 @@ function config(gameState: Config['gameState']): Config {
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
     debugMode: false,
     gameState,
-    movement: { jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
+    movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
   };
 }
 
-/** A character body resting on the ground, plus its ECS entity + handle. */
-async function groundedPlayer(): Promise<{
-  handle: number;
-  physics: PhysicsWorld;
-  world: ReturnType<typeof createEcsWorld>;
-}> {
+/** A kinematic capsule resting on a static ground, plus its ECS entity. */
+async function groundedPlayer(): Promise<Player> {
   const physics = new PhysicsWorld(await initRapier());
   physics.createStaticBox([0, 0, 0], [10, 10, 0.5]); // top at z = 0.5
-  const handle = physics.createCharacterBody([0, 0, 1], [HALF, HALF, HALF]); // rests with centre at 1.0
-  for (let i = 0; i < 30; i += 1) {
-    physics.step(1 / 60);
-  }
+  const controller = physics.createCharacterController();
+  const { body, collider } = physics.createKinematicCapsule([0, 0, 1.4], 0.3, 0.6); // rests on the ground
+
   const world = createEcsWorld();
   const eid = addEntity(world);
   addComponent(world, eid, PlayerControlled);
   addComponent(world, eid, RigidBody);
-  RigidBody.handle[eid] = handle;
+  addComponent(world, eid, Velocity);
+  RigidBody.handle[eid] = body;
+  RigidBody.collider[eid] = collider;
+  Velocity.x[eid] = 0;
+  Velocity.y[eid] = 0;
+  Velocity.z[eid] = 0;
+  Velocity.grounded[eid] = 0;
+  physics.step(STEP); // build the query pipeline so the controller sees the ground
 
-  return { handle, physics, world };
+  return { controller, eid, physics, world };
 }
 
 function keys(...codes: string[]): KeyboardInput {
@@ -56,50 +66,75 @@ function keys(...codes: string[]): KeyboardInput {
   return { isDown: (code) => down.has(code) };
 }
 
+function run(player: Player, cfg: Config, ...held: string[]): void {
+  new CharacterControllerSystem(
+    player.world,
+    player.physics,
+    keys(...held),
+    cfg,
+    player.controller,
+    CAMERA,
+  ).fixedUpdate(STEP);
+  player.physics.step(STEP); // mirror the controller → physics step order
+}
+
 describe('CharacterControllerSystem', () => {
   describe('negative cases', () => {
     it('applies no input while paused', async () => {
-      const { handle, physics, world } = await groundedPlayer();
-      physics.setLinvel(handle, [3, 0, 0]);
+      const player = await groundedPlayer();
+      Velocity.x[player.eid] = 3;
 
-      new CharacterControllerSystem(world, physics, keys('KeyW'), config('pause'), HALF, CAMERA).fixedUpdate();
+      run(player, config('pause'), 'KeyW');
 
-      expect(physics.getLinvel(handle)[0]).toBeCloseTo(3); // untouched
-      physics.dispose();
+      expect(Velocity.x[player.eid]).toBe(3); // untouched
+      player.physics.dispose();
     });
   });
 
   describe('positive cases', () => {
-    it('moves forward (+Y) on the forward key when grounded', async () => {
-      const { handle, physics, world } = await groundedPlayer();
+    it('accelerates forward (+Y) toward — but not instantly to — walk speed', async () => {
+      const player = await groundedPlayer();
 
-      new CharacterControllerSystem(world, physics, keys('KeyW'), config('play'), HALF, CAMERA).fixedUpdate();
+      run(player, config('play'), 'KeyW');
 
-      const velocity = physics.getLinvel(handle);
-      expect(velocity[1]).toBeGreaterThan(0);
-      expect(velocity[0]).toBe(0);
-      physics.dispose();
+      // one step: ramping up, not yet at walk speed (10), and no sideways drift
+      expect(Velocity.y[player.eid]).toBeGreaterThan(0);
+      expect(Velocity.y[player.eid]).toBeLessThan(10);
+      expect(Velocity.x[player.eid]).toBe(0);
+      player.physics.dispose();
     });
 
-    it('stops planar motion when grounded with no keys held', async () => {
-      const { handle, physics, world } = await groundedPlayer();
-      physics.setLinvel(handle, [5, 5, 0]);
+    it('reaches the target speed after sustained input', async () => {
+      const player = await groundedPlayer();
+      for (let i = 0; i < 120; i += 1) {
+        run(player, config('play'), 'KeyW');
+      }
+      expect(Velocity.y[player.eid]).toBeCloseTo(10, 1); // settled at walk speed
+      player.physics.dispose();
+    });
 
-      new CharacterControllerSystem(world, physics, keys(), config('play'), HALF, CAMERA).fixedUpdate();
+    it('decelerates toward rest (inertia) when keys are released', async () => {
+      const player = await groundedPlayer();
+      Velocity.x[player.eid] = 5;
+      Velocity.y[player.eid] = 5;
 
-      const velocity = physics.getLinvel(handle);
-      expect(velocity[0]).toBe(0);
-      expect(velocity[1]).toBe(0);
-      physics.dispose();
+      run(player, config('play')); // no keys held
+
+      // slowing toward 0 but not there in a single step
+      expect(Velocity.x[player.eid]).toBeLessThan(5);
+      expect(Velocity.x[player.eid]).toBeGreaterThan(0);
+      player.physics.dispose();
     });
 
     it('jumps (+Z velocity) on the jump key when grounded', async () => {
-      const { handle, physics, world } = await groundedPlayer();
+      const player = await groundedPlayer();
+      run(player, config('play')); // settle → grounded
+      expect(Velocity.grounded[player.eid]).toBe(1);
 
-      new CharacterControllerSystem(world, physics, keys('Space'), config('play'), HALF, CAMERA).fixedUpdate();
+      run(player, config('play'), 'Space');
 
-      expect(physics.getLinvel(handle)[2]).toBeGreaterThan(0);
-      physics.dispose();
+      expect(Velocity.z[player.eid]).toBeGreaterThan(0);
+      player.physics.dispose();
     });
   });
 });

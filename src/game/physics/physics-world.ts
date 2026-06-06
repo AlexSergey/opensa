@@ -10,10 +10,29 @@ const GRAVITY_Z = -9.81;
 /** Extra ray length below a body's half-height when testing for ground contact. */
 const GROUND_EPSILON = 0.15;
 
+/** Kinematic character-controller tuning. */
+const CONTROLLER_OFFSET = 0.02; // gap kept between the capsule and obstacles
+const STEP_HEIGHT = 0.4; // auto-climb kerbs/stairs up to this
+const STEP_MIN_WIDTH = 0.1; // minimum landing width to step onto
+const SNAP_DISTANCE = 0.4; // stay glued to ground within this (slopes/stairs going down)
+const MAX_SLOPE_CLIMB = (50 * Math.PI) / 180; // can't walk up steeper than this
+const MIN_SLOPE_SLIDE = (45 * Math.PI) / 180; // slides down slopes steeper than this
+/** Capsule is Y-aligned in Rapier; +90° about X stands it along GTA +Z (up). */
+const CAPSULE_UPRIGHT: Quat = [Math.SQRT1_2, 0, 0, Math.SQRT1_2];
+
 export interface BodyTransform {
   position: Vec3;
   quaternion: Quat;
 }
+
+/** Rapier's kinematic character controller (slide/autostep/snap/slope). */
+export type CharacterController = ReturnType<RapierWorld['createCharacterController']>;
+/** Result of advancing a kinematic character one step. */
+export interface CharacterMove {
+  grounded: boolean;
+  movement: Vec3;
+}
+
 type Quat = [number, number, number, number];
 
 type RapierBody = ReturnType<RapierWorld['createRigidBody']>;
@@ -51,6 +70,46 @@ export class PhysicsWorld {
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(...halfExtents).setFriction(1), body);
 
     return body.handle;
+  }
+
+  /**
+   * Create a kinematic character controller (Z-up) configured for sliding,
+   * auto-stepping kerbs/stairs, snapping to ground, and a climbable slope limit.
+   */
+  createCharacterController(offset = CONTROLLER_OFFSET): CharacterController {
+    const controller = this.world.createCharacterController(offset);
+    controller.setUp({ x: 0, y: 0, z: 1 }); // world is Z-up (default is Y-up)
+    controller.setSlideEnabled(true);
+    controller.enableAutostep(STEP_HEIGHT, STEP_MIN_WIDTH, true);
+    controller.enableSnapToGround(SNAP_DISTANCE);
+    controller.setMaxSlopeClimbAngle(MAX_SLOPE_CLIMB);
+    controller.setMinSlopeSlideAngle(MIN_SLOPE_SLIDE);
+    controller.setApplyImpulsesToDynamicBodies(true);
+
+    return controller;
+  }
+
+  /**
+   * A kinematic, position-based **capsule** body (Z-aligned) at a Z-up position —
+   * the player's movement collider. Returns the body + collider handles. Kinematic
+   * bodies ignore world gravity; the caller integrates it and drives the body via
+   * {@link moveCharacter}.
+   */
+  createKinematicCapsule(position: Vec3, radius: number, halfHeight: number): { body: number; collider: number } {
+    const body = this.world.createRigidBody(
+      this.rapier.RigidBodyDesc.kinematicPositionBased().setTranslation(...position),
+    );
+    const collider = this.world.createCollider(
+      this.rapier.ColliderDesc.capsule(halfHeight, radius).setRotation({
+        w: CAPSULE_UPRIGHT[3],
+        x: CAPSULE_UPRIGHT[0],
+        y: CAPSULE_UPRIGHT[1],
+        z: CAPSULE_UPRIGHT[2],
+      }),
+      body,
+    );
+
+    return { body: body.handle, collider: collider.handle };
   }
 
   /** A fixed (static) box, e.g. a temporary ground; returns its body handle. */
@@ -112,6 +171,26 @@ export class PhysicsWorld {
     const hit = this.world.castRay(ray, halfHeight + GROUND_EPSILON, true, undefined, undefined, undefined, body);
 
     return hit !== null;
+  }
+
+  /**
+   * Advance a kinematic capsule one step: ask the controller for the
+   * collision-corrected movement for `desired` (slides along obstacles, climbs
+   * steps, snaps to ground), queue it as the body's next translation, and return
+   * the applied movement + whether the character ended up grounded.
+   */
+  moveCharacter(controller: CharacterController, body: number, collider: number, desired: Vec3): CharacterMove {
+    const rigidBody = this.world.getRigidBody(body);
+    controller.computeColliderMovement(this.world.getCollider(collider), {
+      x: desired[0],
+      y: desired[1],
+      z: desired[2],
+    });
+    const m = controller.computedMovement();
+    const p = rigidBody.translation();
+    rigidBody.setNextKinematicTranslation({ x: p.x + m.x, y: p.y + m.y, z: p.z + m.z });
+
+    return { grounded: controller.computedGrounded(), movement: [m.x, m.y, m.z] };
   }
 
   readBody(handle: number): BodyTransform {

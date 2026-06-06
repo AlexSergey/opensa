@@ -61,6 +61,11 @@ export class AnimationController {
     this.currentName = key;
   }
 
+  /** Scale the current clip's playback rate (e.g. to match locomotion speed → no foot sliding). */
+  setSpeed(scale: number): void {
+    this.current?.setEffectiveTimeScale(scale);
+  }
+
   update(delta: number): void {
     this.mixer.update(delta);
   }

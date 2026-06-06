@@ -50,6 +50,45 @@ describe('PhysicsWorld', () => {
   });
 });
 
+describe('PhysicsWorld kinematic character controller', () => {
+  describe('positive cases', () => {
+    it('lands a kinematic capsule on a static ground and reports grounded', async () => {
+      const physics = await makeWorld();
+      physics.createStaticBox([0, 0, 0], [10, 10, 0.5]); // top surface at z = 0.5
+      const controller = physics.createCharacterController();
+      const { body, collider } = physics.createKinematicCapsule([0, 0, 3], 0.3, 0.6);
+
+      let grounded = false;
+      for (let i = 0; i < 240; i += 1) {
+        grounded = physics.moveCharacter(controller, body, collider, [0, 0, -0.05]).grounded;
+        physics.step(STEP);
+      }
+
+      expect(grounded).toBe(true);
+      // centre rests at ground-top (0.5) + capsule half-height (0.6 + radius 0.3) = 1.4
+      expect(physics.readBody(body).position[2]).toBeCloseTo(1.4, 1);
+      physics.dispose();
+    });
+
+    it('slides along a wall instead of penetrating it', async () => {
+      const physics = await makeWorld();
+      physics.createStaticBox([0, 0, 0], [10, 10, 0.5]); // ground
+      physics.createStaticBox([2, 0, 1.5], [0.5, 5, 2]); // wall, front face at x = 1.5
+      const controller = physics.createCharacterController();
+      const { body, collider } = physics.createKinematicCapsule([0, 0, 1.4], 0.3, 0.6);
+
+      for (let i = 0; i < 120; i += 1) {
+        physics.moveCharacter(controller, body, collider, [0.1, 0, -0.02]); // push into the wall
+        physics.step(STEP);
+      }
+
+      // stopped in front of the wall (front 1.5 − radius 0.3 − offset), never penetrating it
+      expect(physics.readBody(body).position[0]).toBeLessThan(1.25);
+      physics.dispose();
+    });
+  });
+});
+
 describe('PhysicsWorld.createStaticColliders / removeBodies', () => {
   describe('negative cases', () => {
     it('creates no bodies for no models', async () => {

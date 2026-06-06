@@ -37,8 +37,14 @@ export interface ControlsConfig {
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
 
-/** Player movement tuning (world units/second). */
+/** Player movement tuning (world units/second; rates in units/s²). */
 export interface MovementConfig {
+  /** Horizontal acceleration toward the input target (ramp-up + turn momentum). */
+  accel: number;
+  /** Fraction (0..1) of accel/deceleration applied while airborne (air control). */
+  airControl: number;
+  /** Horizontal deceleration toward rest when there is no input. */
+  deceleration: number;
   /** Upward launch velocity when jumping. */
   jumpSpeed: number;
   /** Planar speed while holding the run key. */

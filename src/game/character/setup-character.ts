@@ -5,7 +5,7 @@ import type { EcsWorld } from '../ecs/world';
 import type { Game } from '../game';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
 
-import { PlayerControlled, RigidBody, Transform } from '../ecs/components';
+import { PlayerControlled, RigidBody, Transform, Velocity } from '../ecs/components';
 import { createEcsWorld } from '../ecs/world';
 import { Keyboard } from '../input/keyboard';
 import { PhysicsWorld } from '../physics/physics-world';
@@ -46,11 +46,11 @@ export interface SetupCharacterOptions {
 }
 
 /**
- * Create the bitECS world + player entity, a Rapier dynamic box body (a human-sized
- * box via `options.halfExtents`, else the mesh bbox), and register the physics +
- * render systems. Everything is GTA Z-up; the mesh is added under the engine's
- * `entityRoot`. Returns the character handles (incl. the skeleton/named bones for
- * the animation manager).
+ * Create the bitECS world + player entity, a Rapier **kinematic capsule** + its
+ * character controller (sized from `options.halfExtents`, else the mesh bbox), and
+ * register the physics + render systems. Everything is GTA Z-up; the mesh is added
+ * under the engine's `entityRoot`. Returns the character handles (incl. the
+ * skeleton/named bones for the animation manager).
  */
 export async function setupCharacter(
   game: Game,
@@ -65,6 +65,7 @@ export async function setupCharacter(
   addComponent(world, playerEid, Transform);
   addComponent(world, playerEid, PlayerControlled);
   addComponent(world, playerEid, RigidBody);
+  addComponent(world, playerEid, Velocity);
   Transform.x[playerEid] = spawn[0];
   Transform.y[playerEid] = spawn[1];
   Transform.z[playerEid] = spawn[2];
@@ -72,14 +73,23 @@ export async function setupCharacter(
   Transform.qy[playerEid] = 0;
   Transform.qz[playerEid] = 0;
   Transform.qw[playerEid] = 1;
+  Velocity.x[playerEid] = 0;
+  Velocity.y[playerEid] = 0;
+  Velocity.z[playerEid] = 0;
+  Velocity.grounded[playerEid] = 0;
 
-  // Use the caller's human-sized box when given (a character mesh's bbox includes
-  // spread arms); otherwise size the box to the mesh (native Z-up, pre-parenting).
+  // Capsule from the human box: radius from the planar half-extent, half-height of
+  // the cylinder so the total (2·halfHeight + 2·radius) matches the box height.
   const extents = options.halfExtents ?? meshHalfExtents(player);
+  const radius = Math.max(Math.min(extents[0], extents[1]), MIN_HALF_EXTENT);
+  const halfHeight = Math.max(extents[2] - radius, MIN_HALF_EXTENT);
 
   const physics = new PhysicsWorld(await initRapier());
+  const controller = physics.createCharacterController();
   // Map collision is streamed per cell (CollisionStreamingSystem, wired in the bootstrap).
-  RigidBody.handle[playerEid] = physics.createCharacterBody(spawn, extents);
+  const capsule = physics.createKinematicCapsule(spawn, radius, halfHeight);
+  RigidBody.handle[playerEid] = capsule.body;
+  RigidBody.collider[playerEid] = capsule.collider;
 
   game.getEntityRoot().add(player);
   renderRefs.set(playerEid, player);
@@ -89,8 +99,8 @@ export async function setupCharacter(
 
   const config = game.getConfig();
   const renderSync = new RenderSyncSystem(world, renderRefs);
-  // Order matters: controller sets velocity → physics steps → render syncs.
-  game.addSystem(new CharacterControllerSystem(world, physics, keyboard, config, extents[2], game.getCamera()));
+  // Order matters: controller moves the capsule → physics steps → render syncs.
+  game.addSystem(new CharacterControllerSystem(world, physics, keyboard, config, controller, game.getCamera()));
   game.addSystem(new PhysicsSystem(world, physics, config));
   game.addSystem(renderSync);
   renderSync.update(); // place the mesh now so the immediate camera frame is correct

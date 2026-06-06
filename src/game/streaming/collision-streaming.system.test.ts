@@ -12,7 +12,7 @@ function config(collisionDrawDistance: number): Config {
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
     debugMode: false,
     gameState: 'play',
-    movement: { jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
+    movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance, hdDrawDistance: 300, lodDrawDistance: 1500 },

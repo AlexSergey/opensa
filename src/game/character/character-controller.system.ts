@@ -5,24 +5,29 @@ import type { System } from '../core/system';
 import type { EcsWorld } from '../ecs/world';
 import type { KeyboardInput } from '../input/keyboard';
 import type { Config } from '../interfaces/config.interface';
-import type { PhysicsWorld } from '../physics/physics-world';
+import type { CharacterController, PhysicsWorld } from '../physics/physics-world';
 
-import { PlayerControlled, RigidBody } from '../ecs/components';
+import { PlayerControlled, RigidBody, Velocity } from '../ecs/components';
+
+/** Gravity integrated into the kinematic body's vertical velocity (Z-up). */
+const GRAVITY = -9.81;
 
 /**
- * Drives player-controlled bodies from the keyboard while the game is playing.
- * Movement is **camera-relative** (W goes where the camera looks): the camera's
- * ground-plane direction is converted from scene Y-up into the GTA Z-up world.
- * Steering and jumping only apply while grounded ("once you touch the ground you
- * can move it"); in the air the body keeps its momentum and only gravity acts.
+ * Drives the player's **kinematic capsule** from the keyboard while playing.
+ * Movement is **camera-relative** (W goes where the camera looks). Each fixed
+ * step it builds a desired velocity — horizontal **accelerated** toward the input
+ * target (ramp-up, turn momentum, reduced air control), vertical from gravity +
+ * jump — asks the {@link CharacterController} for the collision-corrected move
+ * (slides along obstacles, climbs steps, snaps to ground), and writes the result
+ * + grounded state to the ECS {@link Velocity}.
  */
 export class CharacterControllerSystem implements System {
   readonly name = 'character-controller';
 
   private readonly camera: PerspectiveCamera;
   private readonly config: Readonly<Config>;
+  private readonly controller: CharacterController;
   private readonly forward = new Vector3();
-  private readonly halfHeight: number;
   private readonly keyboard: KeyboardInput;
   private readonly physics: PhysicsWorld;
   private readonly right = new Vector3();
@@ -33,37 +38,49 @@ export class CharacterControllerSystem implements System {
     physics: PhysicsWorld,
     keyboard: KeyboardInput,
     config: Readonly<Config>,
-    halfHeight: number,
+    controller: CharacterController,
     camera: PerspectiveCamera,
   ) {
     this.world = world;
     this.physics = physics;
     this.keyboard = keyboard;
     this.config = config;
-    this.halfHeight = halfHeight;
+    this.controller = controller;
     this.camera = camera;
   }
 
-  fixedUpdate(): void {
+  fixedUpdate(step: number): void {
     if (this.config.gameState !== 'play') {
       return;
     }
     const { controls, movement } = this.config;
-    const speed = controls.run && this.keyboard.isDown(controls.run) ? movement.runSpeed : movement.walkSpeed;
-    const move = this.cameraRelativeMove(
+    const running = Boolean(controls.run) && this.keyboard.isDown(controls.run as string);
+    const target = this.cameraRelativeMove(
       this.axis(controls.forward, controls.back),
       this.axis(controls.right, controls.left),
-      speed,
+      running ? movement.runSpeed : movement.walkSpeed,
     );
     const jump = this.keyboard.isDown(controls.jump);
 
-    for (const eid of query(this.world, [PlayerControlled, RigidBody])) {
-      const handle = RigidBody.handle[eid];
-      if (!this.physics.isGrounded(handle, this.halfHeight)) {
-        continue; // keep air momentum; steer only on the ground
-      }
-      const vz = jump ? movement.jumpSpeed : this.physics.getLinvel(handle)[2];
-      this.physics.setLinvel(handle, [move.x, move.y, vz]);
+    const moving = target.x !== 0 || target.y !== 0;
+
+    for (const eid of query(this.world, [PlayerControlled, RigidBody, Velocity])) {
+      const grounded = Velocity.grounded[eid] === 1;
+      // Horizontal: accelerate toward the target (decelerate toward rest with no input),
+      // at a reduced rate in the air → ramp-up, turn momentum, momentum into jumps.
+      const rate = (moving ? movement.accel : movement.deceleration) * (grounded ? 1 : movement.airControl) * step;
+      approach(eid, target.x, target.y, rate);
+      // Vertical: reset on the ground (jump impulse if requested), then integrate gravity.
+      let vz = grounded ? (jump ? movement.jumpSpeed : 0) : Velocity.z[eid];
+      vz += GRAVITY * step;
+
+      const move = this.physics.moveCharacter(this.controller, RigidBody.handle[eid], RigidBody.collider[eid], [
+        Velocity.x[eid] * step,
+        Velocity.y[eid] * step,
+        vz * step,
+      ]);
+      Velocity.grounded[eid] = move.grounded ? 1 : 0;
+      Velocity.z[eid] = move.grounded && vz < 0 ? 0 : vz; // landed → stop accumulating fall speed
     }
   }
 
@@ -93,4 +110,19 @@ export class CharacterControllerSystem implements System {
 
     return { x, y };
   }
+}
+
+/** Move an entity's horizontal velocity toward (tx, ty) by at most `maxDelta` (planar). */
+function approach(eid: number, tx: number, ty: number, maxDelta: number): void {
+  const dx = tx - Velocity.x[eid];
+  const dy = ty - Velocity.y[eid];
+  const distance = Math.hypot(dx, dy);
+  if (distance <= maxDelta || distance === 0) {
+    Velocity.x[eid] = tx;
+    Velocity.y[eid] = ty;
+
+    return;
+  }
+  Velocity.x[eid] += (dx / distance) * maxDelta;
+  Velocity.y[eid] += (dy / distance) * maxDelta;
 }
