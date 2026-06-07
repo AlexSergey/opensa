@@ -358,6 +358,19 @@ export class PhysicsWorld {
   }
 
   /**
+   * Remove a raycast vehicle's controller so it is no longer stepped — call this
+   * BEFORE removing its chassis body, or {@link step}'s `updateVehicle` panics on
+   * the orphaned controller.
+   */
+  removeVehicle(controller: VehicleController): void {
+    const index = this.vehicles.indexOf(controller);
+    if (index >= 0) {
+      this.vehicles.splice(index, 1);
+    }
+    this.world.removeVehicleController(controller);
+  }
+
+  /**
    * Seed a small backward planar velocity (along −forward of `heading`) so reverse
    * engages from a dead stop — the raycast controller won't start reverse from rest
    * on its own. Keeps the current vertical velocity.

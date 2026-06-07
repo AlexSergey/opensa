@@ -5,6 +5,7 @@ import type { Config } from '../interfaces/config.interface';
 import type { Vec3, WorldAdapter } from '../interfaces/world-adapter.interface';
 import type { CellCoord } from './grid';
 
+import { CellFader } from './fade';
 import { cellOf, cellsWithin } from './grid';
 
 interface ManualSelection {
@@ -32,6 +33,7 @@ export class StreamingSystem implements System {
   private readonly adapter: StreamAdapter;
   private readonly config: Readonly<Config>;
   private current = new Set<string>();
+  private readonly fader = new CellFader();
   private readonly loaded = new Map<string, Object3D[]>();
   private readonly loading = new Set<string>();
   private manual: ManualSelection | null = null;
@@ -50,10 +52,12 @@ export class StreamingSystem implements System {
     this.manual = cells ? { cells, lod } : null;
   }
 
-  update(): void {
+  update(delta = 0): void {
+    this.fader.update(delta);
     this.current = this.desiredKeys();
     for (const [key, objects] of this.loaded) {
       if (!this.current.has(key)) {
+        this.fader.cancel(key); // restore materials before the cell mesh goes back to the cache
         objects.forEach((object) => this.root.remove(object));
         this.loaded.delete(key);
       }
@@ -88,6 +92,9 @@ export class StreamingSystem implements System {
         if (this.current.has(key) && !this.loaded.has(key)) {
           objects.forEach((object) => this.root.add(object));
           this.loaded.set(key, objects);
+          if (!this.config.mapViewer) {
+            this.fader.start(key, objects); // fade streamed cells in; the map inspector shows instantly
+          }
         }
       })
       .catch(() => this.loading.delete(key));

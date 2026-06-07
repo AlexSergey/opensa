@@ -297,6 +297,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
           vehiclePhysics.remove(vehicle);
           enterVehicle.remove(vehicle);
           vehicleDamage.remove(body);
+          character.physics.removeVehicle(controller); // drop the raycast controller before its body
           character.physics.removeBodies([body]);
           game.getStreamingRoot().remove(object);
           disposeVehicle(object);

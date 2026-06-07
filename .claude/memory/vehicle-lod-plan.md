@@ -24,3 +24,8 @@ Plan 021 (`.claude/plans/021-vehicle-lod.md`), DONE — finishes the vehicles wi
 Notes: respawn resets a parked car's damage (GTA despawns distant cars too); respawn re-fetches the
 DFF/TXD (small) — caching the built model is a possible later optimisation. Related:
 [[vehicle-physics-plan]], [[diagnostics-logging]].
+
+**Despawn gotcha (fixed):** a raycast vehicle's `VehicleController` must be removed via
+`PhysicsWorld.removeVehicle(controller)` BEFORE `removeBodies([body])` — otherwise `step()`'s
+`updateVehicle` runs on the orphaned controller and Rapier panics (`unreachable`). The `despawn` closure
+does this; same applies to any future vehicle teardown.

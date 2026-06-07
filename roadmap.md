@@ -56,7 +56,7 @@
     - [✅] Show collision
     - [✅] Skeleton
 - [ ] Fog
-  - [ ] Streaming fade objects
+  - [✅] Streaming fade objects
   - [ ] Draw distance limit (1000)
   - [ ] Debugger "game" draw distance slider control
 - [ ] Game time
@@ -104,6 +104,7 @@
 - [ ] Release v 0.1.0
 
 Known issues:
+- [ ] Vehicle's widescreen alpha channel bug
 - [ ] If the camera directly above on the scene, then Tommy only moves forward
 - [ ] Rigging models bug
 - [ ] Water in whole map (flooded tunnels)
