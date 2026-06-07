@@ -27,9 +27,15 @@ No visual effect yet — just console output now; a HUD clock + timecyc come lat
   for the debugger and (later) timecyc consumers, which can read `getTime()` per frame or listen to
   `'time'`.
 
+## Amendment — stop the clock when paused (DONE)
+
+The clock **stops while the game is paused**: `Game` advances `gameClock` only while
+`config.gameState === 'play'` (a guard around the loop's `gameClock.advance(...)`), so any non-play
+state freezes the time of day and the HUD shows it frozen. Done with the HUD (plan 027).
+
 ## Status
 
-DONE (iterations 1–2). `Config.time.secondsPerGameMinute` (canvas-host 1.5), `GameClock`
+DONE (iterations 1–2 + pause amendment). `Config.time.secondsPerGameMinute` (canvas-host 1.5), `GameClock`
 (`src/game/time/game-clock.ts`, pure + tested), `Game` owns/advances it in the loop
 (`getTime`/`setTime`, `'time'` event, `'time'` log type → console via Logger on minute change),
 `loadGame({ startMinutes })` (canvas-host = 360 / 6:00). Debugger Game screen has a **Time** section:

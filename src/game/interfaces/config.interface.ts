@@ -15,7 +15,9 @@ export interface Config {
   camera: CameraConfig;
   controls: ControlsConfig;
   fog: FogConfig;
+  fonts: FontsConfig;
   gameState: GameState;
+  hud: HudConfig;
   /** Map-viewer mode: free-fly camera + manual cell render + click-to-pick (debug map inspector). */
   mapViewer: boolean;
   movement: MovementConfig;
@@ -46,8 +48,26 @@ export interface FogConfig {
   distance: number;
 }
 
+/** Font family names per HUD widget (registered by the font loader before the scene). */
+export interface FontsConfig {
+  hud: { clock: string };
+}
+
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
+
+/** HUD widget styling (the DOM overlay above the canvas; immune to post-processing). */
+export interface HudConfig {
+  clock: HudTextStyle;
+}
+
+/** Text style for a HUD widget: fill `color` + an outline (`borderColor`/`borderWidth` px). */
+export interface HudTextStyle {
+  borderColor: string;
+  borderWidth: number;
+  color: string;
+  fontSize: number;
+}
 
 /** Diagnostic severity, low → high. The configured `showLogs` value is the floor that is emitted. */
 export type LogLevel = 'debug' | 'error' | 'log' | 'warn';

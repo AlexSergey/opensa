@@ -22,6 +22,9 @@ import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { DebugOverlay } from './debug/debug-overlay';
+import { Hud } from './hud/hud';
+import { loadFonts } from './hud/load-fonts';
+import { Overlay } from './hud/overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
@@ -173,8 +176,13 @@ export function CanvasHost(): ReactElement {
   return (
     <>
       <canvas onClick={handleClick} ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
-      {phase === 'loading' && <Overlay text="Loading map…" />}
-      {phase === 'error' && <Overlay text={`Failed to load map: ${errorText}`} />}
+      {phase === 'loading' && <LoadOverlay text="Loading map…" />}
+      {phase === 'error' && <LoadOverlay text={`Failed to load map: ${errorText}`} />}
+      {game && (
+        <Overlay>
+          <Hud game={game} />
+        </Overlay>
+      )}
       {game && actions && <DebugOverlay actions={actions} game={game} />}
     </>
   );
@@ -186,7 +194,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
       fog: { distance: 800 },
+      fonts: { hud: { clock: 'SixCaps-Regular' } },
       gameState: 'play',
+      hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
       mapViewer: false,
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
       showCollision: false,
@@ -210,6 +220,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       .addPlugin(new DirectionalLightPlugin())
       .addPlugin(new FogPlugin());
 
+    await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360 }); // 6:00
 
@@ -400,7 +411,7 @@ function disposeVehicle(object: Object3D): void {
   });
 }
 
-function Overlay({ text }: { text: string }): ReactElement {
+function LoadOverlay({ text }: { text: string }): ReactElement {
   return (
     <div
       style={{

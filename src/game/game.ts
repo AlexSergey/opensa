@@ -246,6 +246,7 @@ export class Game {
   /** Detach the camera for free-fly screenshots (arrows move, mouse looks); off → resume follow. */
   setFlyCamera(enabled: boolean): void {
     this.cameraController.setMode(enabled ? 'fly' : 'follow');
+    this.events.emit('fly-camera', { enabled });
   }
 
   /** Change the distance fog range at runtime (world units to full fog). */
@@ -345,7 +346,8 @@ export class Game {
       }
       this.systems.update(delta);
       this.cameraController.update(delta);
-      if (this.gameClock.advance(delta, this.config.time.secondsPerGameMinute)) {
+      // The clock only ticks while playing — pausing the game freezes the time of day.
+      if (this.config.gameState === 'play' && this.gameClock.advance(delta, this.config.time.secondsPerGameMinute)) {
         this.emitTime();
       }
       if (this.context) {
