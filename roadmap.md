@@ -55,10 +55,10 @@
     - [✅] Press mouse to play animations
     - [✅] Show collision
     - [✅] Skeleton
-- [ ] Fog
+- [✅] Fog
   - [✅] Streaming fade objects
-  - [ ] Draw distance limit (1000)
-  - [ ] Debugger "game" draw distance slider control
+  - [✅] Draw distance limit (1000)
+  - [✅] Debugger "game" draw distance slider control
 - [ ] Game time
 - [ ] Timecyc (sunny weather only)
   - [ ] 2 strategies
@@ -104,7 +104,8 @@
 - [ ] Release v 0.1.0
 
 Known issues:
-- [ ] Vehicle's widescreen alpha channel bug
+- [ ] Vehicle's windscreen alpha channel bug [SilentPatch fix or SkyGFX]
+- [ ] Black roads on highway [SilentPatch fix or SkyGFX]
 - [ ] If the camera directly above on the scene, then Tommy only moves forward
 - [ ] Rigging models bug
 - [ ] Water in whole map (flooded tunnels)

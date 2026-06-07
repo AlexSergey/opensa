@@ -14,6 +14,7 @@ import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
 import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
 import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
+import { FogPlugin } from '../game/plugins/fog.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
@@ -181,6 +182,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     const game = Game.getInstance(canvas, {
       camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
+      fog: { distance: 800 },
       gameState: 'play',
       mapViewer: false,
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
@@ -198,7 +200,11 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
     });
-    game.setWorldAdapter(adapter).addPlugin(new AmbientLightPlugin()).addPlugin(new DirectionalLightPlugin());
+    game
+      .setWorldAdapter(adapter)
+      .addPlugin(new AmbientLightPlugin())
+      .addPlugin(new DirectionalLightPlugin())
+      .addPlugin(new FogPlugin());
 
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS });
@@ -330,11 +336,13 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     const debugActions: DebugActions = {
       flipVehicle,
+      fogDistance: () => game.getConfig().fog.distance,
       playerCoords: () => character.viewOf(),
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
       },
+      setFogDistance: (distance) => game.setFogDistance(distance),
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
         const from = character.viewOf();

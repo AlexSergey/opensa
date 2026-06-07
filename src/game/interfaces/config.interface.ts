@@ -14,6 +14,7 @@ export interface CameraConfig {
 export interface Config {
   camera: CameraConfig;
   controls: ControlsConfig;
+  fog: FogConfig;
   gameState: GameState;
   /** Map-viewer mode: free-fly camera + manual cell render + click-to-pick (debug map inspector). */
   mapViewer: boolean;
@@ -36,6 +37,12 @@ export interface ControlsConfig {
   right: string;
   /** Hold to run (faster); walk otherwise. Optional. */
   run?: string;
+}
+
+/** Distance fog tuning. */
+export interface FogConfig {
+  /** Distance (world units) at which the world is fully fogged (the horizon); fog ramps in before it. */
+  distance: number;
 }
 
 /** Whether the simulation is running (physics + control) or frozen. */

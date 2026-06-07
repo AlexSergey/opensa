@@ -9,10 +9,14 @@ import { MapInspector } from './map-inspector';
 export interface DebugActions {
   /** Flip the occupied car (on wheels → roof, on roof → wheels). No-op on foot. */
   flipVehicle(): void;
+  /** Current fog distance (world units to full fog). */
+  fogDistance(): number;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
   /** Re-drop Tommy at his current spot (to unstick). */
   respawnPlayer(): void;
+  /** Set the fog distance (world units to full fog). */
+  setFogDistance(distance: number): void;
   /** Spawn a car just in front of the player. */
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
   /** Teleport the player back to Ganton. */
@@ -39,6 +43,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [showCoords, setShowCoords] = useState(false);
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
   const [mapActive, setMapActive] = useState(false);
+  const [fog, setFog] = useState(() => actions.fogDistance());
 
   // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
   useEffect(() => {
@@ -153,6 +158,20 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   </button>
                 </>
               )}
+
+              <div style={styles.groupLabel}>FOG: {fog} m</div>
+              <input
+                max={2000}
+                min={10}
+                onChange={(e) => {
+                  const distance = Number(e.target.value);
+                  setFog(distance);
+                  actions.setFogDistance(distance);
+                }}
+                step={10}
+                type="range"
+                value={fog}
+              />
             </div>
           )}
 

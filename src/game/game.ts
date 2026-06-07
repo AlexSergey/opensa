@@ -238,6 +238,11 @@ export class Game {
     this.cameraController.setMode(enabled ? 'fly' : 'follow');
   }
 
+  /** Change the distance fog range at runtime (world units to full fog). */
+  setFogDistance(distance: number): void {
+    this.setConfig({ fog: { distance } });
+  }
+
   setFollowAzimuth(azimuth: number): void {
     this.cameraController.setAzimuth(azimuth);
   }

@@ -22,3 +22,4 @@
 - [Diagnostics logging](diagnostics-logging.md) — plan 020; gated log channel (Config.showLogs + Logger + 'log' event); use logger.debug at tricky spots, not console.log
 - [Vehicle LOD plan](vehicle-lod-plan.md) — plan 021 (DONE); _vlo low-detail + Config.vehicle distance thresholds (HD/vlo/cull/unload) via VehicleLodSystem
 - [In-game debugger](in-game-debugger.md) — plan 023 (DONE); F2 debug overlay (menu: player/vehicles/game/map), debugMode→mapViewer; old Ctrl+X overlay deleted
+- [Fog](fog.md) — plan 024 (DONE); distance fog (FogPlugin, Config.fog.distance default 800, Game.setFogDistance, debugger slider; off in mapViewer)
