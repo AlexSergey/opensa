@@ -17,6 +17,7 @@ function config(collisionDrawDistance: number): Config {
     showLogs: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance, hdDrawDistance: 300, lodDrawDistance: 1500 },
+    vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
   };
 }
 

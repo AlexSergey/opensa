@@ -54,6 +54,8 @@ export interface VehicleModel {
   halfExtents: [number, number, number];
   /** Driving feel from handling.cfg. */
   handling: VehicleHandling;
+  /** Low-detail LOD group (hidden `*_vlo` meshes under `object`), shown at distance, or null. */
+  lod: null | Object3D;
   object: Object3D;
   /** Damageable body parts (`_ok`/`_dam` panels + doors) for the collision-damage system. */
   parts: VehiclePart[];

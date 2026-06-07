@@ -230,6 +230,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       doors: built.doors,
       halfExtents,
       handling: this.vehicleHandling(def.handlingId),
+      lod: built.lod,
       object: built.root,
       parts: built.parts,
       rig: new VehicleRig(built.wheels),

@@ -23,6 +23,7 @@ export interface Config {
   showLogs: false | LogLevel;
   staticUrl: string;
   streaming: StreamingConfig;
+  vehicle: VehicleConfig;
 }
 
 /** Remappable keyboard bindings; values are `KeyboardEvent.code`. */
@@ -68,4 +69,14 @@ export interface StreamingConfig {
   hdDrawDistance: number;
   /** LODs are streamed within this distance (beyond the HD ring). */
   lodDrawDistance: number;
+}
+
+/** Vehicle distance-LOD thresholds (world units from the player view). */
+export interface VehicleConfig {
+  /** Within this distance the full HD model is shown. */
+  hdDistance: number;
+  /** Between `hdDistance` and this the low-detail `_vlo` is shown; beyond it the car is culled. */
+  lodDistance: number;
+  /** Beyond this the car is unloaded from memory; it respawns when back within `lodDistance`. */
+  unloadDistance: number;
 }

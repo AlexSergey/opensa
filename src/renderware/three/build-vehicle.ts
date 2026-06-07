@@ -34,6 +34,8 @@ export interface BuiltPart {
 export interface BuiltVehicle {
   /** Swinging doors (pivot at the hinge). */
   doors: BuiltDoor[];
+  /** Low-detail LOD: the hidden `*_vlo` meshes grouped under `root` (shown at distance), or null. */
+  lod: null | Object3D;
   /** Damageable panels/doors with `_ok`/`_dam` meshes (for the collision-damage system). */
   parts: BuiltPart[];
   root: Group;
@@ -112,6 +114,9 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
   };
   const doors: BuiltDoor[] = [];
   const parts: BuiltPart[] = [];
+  const lod = new Group();
+  lod.name = 'lod';
+  lod.visible = false; // shown only at distance by the LOD system
 
   let wheelGeometryIndex: null | number = null;
 
@@ -126,8 +131,12 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
       wheelGeometryIndex = atomic.geometryIndex; // placed separately at the dummies
       continue;
     }
-    if (name.endsWith('_dam') || name.endsWith('_vlo')) {
-      continue; // `_dam` is paired with its `_ok`; `_vlo` is the low-detail LOD
+    if (name.endsWith('_vlo')) {
+      addLodAtomic(build, lod, atomic, name);
+      continue; // low-detail LOD — hidden until far
+    }
+    if (name.endsWith('_dam')) {
+      continue; // paired with its `_ok` (see collectDamGeometry)
     }
     const built = addBodyAtomic(build, atomic, frame, name, geometry);
     if (built.door) {
@@ -136,6 +145,9 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     if (built.part) {
       parts.push(built.part);
     }
+  }
+  if (lod.children.length > 0) {
+    root.add(lod);
   }
 
   const { worldCache } = build;
@@ -146,7 +158,7 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
 
-  return { doors, parts, root, seats, wheels };
+  return { doors, lod: lod.children.length > 0 ? lod : null, parts, root, seats, wheels };
 }
 
 /** Build one body atomic: a swinging door, a damageable `_ok`/`_dam` panel, or a plain mesh. */
@@ -218,6 +230,15 @@ function addDoor(
   root.add(pivot);
 
   return { door: { closed: pivot.quaternion.clone(), pivot, side }, part };
+}
+
+/** Add one `*_vlo` atomic to the (hidden) LOD group, placed by its frame's world transform. */
+function addLodAtomic(build: BodyBuild, lod: Group, atomic: RWClump['atomics'][number], name: string): void {
+  const geometry = build.clump.geometries[atomic.geometryIndex];
+  const mesh = vehicleMesh(geometry, build.textures, build.options);
+  mesh.name = name;
+  mesh.applyMatrix4(worldMatrix(build.clump, atomic.frameIndex, build.worldCache));
+  lod.add(mesh);
 }
 
 /**

@@ -20,6 +20,7 @@ function config(gameState: Config['gameState']): Config {
     showLogs: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
+    vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
   };
 }
 

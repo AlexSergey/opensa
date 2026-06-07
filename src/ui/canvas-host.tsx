@@ -1,7 +1,9 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type Mesh, type Object3D } from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
+import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-lod.system';
 
 import { Game } from '../game';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
@@ -15,6 +17,7 @@ import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
+import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
@@ -31,7 +34,7 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 
 // Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
 // admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
-const VEHICLE_PLACEMENTS: readonly { heading: number; model: string; position: Vec3 }[] = [
+const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
   { heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
   // Camper next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
   { heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
@@ -138,6 +141,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       showLogs: false,
       staticUrl: BASE,
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
+      vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
     });
     const adapter = new GtaSaWorldAdapter({
       archiveUrl: `${BASE}/models/gta3.img`,
@@ -202,8 +206,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       game.getLogger(),
     );
     game.addSystem(enterVehicle);
-    for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
-      const { colliders, doors, halfExtents, handling, object, parts, rig, seats, wheels } =
+
+    // Spawn one parked car: load it, place it, make it a dynamic body, and register it with the
+    // vehicle systems. Returns how to despawn it (used by the LOD system to unload distant cars).
+    const spawnVehicle = async (placement: VehiclePlacement): Promise<SpawnedVehicle> => {
+      const { heading, model, position } = placement;
+      const { colliders, doors, halfExtents, handling, lod, object, parts, rig, seats, wheels } =
         await adapter.loadVehicle(model);
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
@@ -222,28 +230,50 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       );
       // The physics system keeps these live from the body; seed with the placement.
       const live: [number, number, number] = [position[0], position[1], position[2]];
-      const vehicle = {
-        body,
-        controller,
-        doors,
-        halfExtents,
-        handling,
-        heading,
-        object,
-        position: live,
-        rig,
-        seatLocal,
-        wheels,
-      };
+      const vehicle = { body, controller, doors, halfExtents, handling, heading, object, position: live, rig, seatLocal, wheels }; // eslint-disable-line prettier/prettier
       vehiclePhysics.add(vehicle);
       enterVehicle.add(vehicle);
       vehicleDamage.add({ body, object, parts });
+
+      return {
+        despawn: (): void => {
+          vehiclePhysics.remove(vehicle);
+          enterVehicle.remove(vehicle);
+          vehicleDamage.remove(body);
+          character.physics.removeBodies([body]);
+          game.getStreamingRoot().remove(object);
+          disposeVehicle(object);
+        },
+        lod,
+        object,
+        position: live,
+      };
+    };
+
+    const vehicleLod = new VehicleLodSystem(character.viewOf, game.getConfig(), spawnVehicle);
+    game.addSystem(vehicleLod);
+    for (const placement of VEHICLE_PLACEMENTS) {
+      vehicleLod.add(placement, await spawnVehicle(placement));
     }
 
     return game;
   })();
 
   return bootstrapped;
+}
+
+/** Free a despawned car's GPU buffers. Materials only — textures are shared (generic vehicle TXD). */
+function disposeVehicle(object: Object3D): void {
+  object.traverse((node) => {
+    const mesh = node as Partial<Mesh>;
+    mesh.geometry?.dispose();
+    const material = mesh.material;
+    if (Array.isArray(material)) {
+      material.forEach((entry) => entry.dispose());
+    } else {
+      material?.dispose();
+    }
+  });
 }
 
 function Overlay({ text }: { text: string }): ReactElement {

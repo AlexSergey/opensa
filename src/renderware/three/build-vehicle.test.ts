@@ -89,11 +89,11 @@ function wheelMesh(vehicle: ReturnType<typeof buildVehicle>, dummy: string): Mes
 
 describe('buildVehicle', () => {
   describe('negative cases', () => {
-    it('skips the damaged and LOD body atoms', () => {
+    it('does not render the damaged atom or the raw vlo as a top-level body mesh', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
       const names = group.root.children.map((child) => child.name);
       expect(names).not.toContain('chassis_dam');
-      expect(names).not.toContain('chassis_vlo');
+      expect(names).not.toContain('chassis_vlo'); // the vlo lives inside the `lod` group, not at root
     });
 
     it('does not render the bare wheel atomic as its own mesh', () => {
@@ -115,11 +115,19 @@ describe('buildVehicle', () => {
       expect(names).toEqual([
         'chassis', // _ok/_dam panel wrapped in a pivot
         'door_lf',
+        'lod', // hidden low-detail group
         'wheel_lb_dummy',
         'wheel_lf_dummy',
         'wheel_rb_dummy',
         'wheel_rf_dummy',
       ]);
+    });
+
+    it('groups the _vlo atoms into a hidden lod group', () => {
+      const { lod } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      expect(lod).not.toBeNull();
+      expect(lod?.visible).toBe(false);
+      expect((lod?.children[0] as Mesh).name).toBe('chassis_vlo');
     });
 
     it('exposes _ok/_dam panels as damageable parts (dam hidden)', () => {

@@ -17,6 +17,7 @@ function config(overrides: Partial<Config> = {}): Config {
     showLogs: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 100, lodDrawDistance: 300 },
+    vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
     ...overrides,
   };
 }

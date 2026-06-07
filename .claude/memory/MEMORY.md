@@ -20,3 +20,4 @@
 - [Vehicle driving plan](vehicle-driving-plan.md) — plan 017; arcade WSAD driving — SUPERSEDED by plan 018 (real physics)
 - [Vehicle physics plan](vehicle-physics-plan.md) — plan 018; real Rapier dynamic car (COL convex-hull collider + gravity + raycast wheels), replaces arcade; iter 1 DONE, iters 2–4 (engine/steer, get-in polish, damage) pending
 - [Diagnostics logging](diagnostics-logging.md) — plan 020; gated log channel (Config.showLogs + Logger + 'log' event); use logger.debug at tricky spots, not console.log
+- [Vehicle LOD plan](vehicle-lod-plan.md) — plan 021 (DONE); _vlo low-detail + Config.vehicle distance thresholds (HD/vlo/cull/unload) via VehicleLodSystem

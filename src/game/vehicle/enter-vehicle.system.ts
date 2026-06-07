@@ -179,6 +179,18 @@ export class EnterVehicleSystem implements System {
     }
   }
 
+  /** Drop a (parked, unoccupied) car when it is unloaded. No-op if it is the active car. */
+  remove(vehicle: EnterableVehicle): void {
+    if (this.active === vehicle) {
+      return;
+    }
+    const index = this.vehicles.indexOf(vehicle);
+    if (index >= 0) {
+      this.vehicles.splice(index, 1);
+    }
+    this.doors.delete(vehicle);
+  }
+
   update(delta: number): void {
     const pressed = this.keyboard.isDown(ENTER_KEY);
     const edge = pressed && !this.enterHeld;

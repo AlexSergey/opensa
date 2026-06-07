@@ -58,6 +58,13 @@ export class VehicleDamageSystem implements System {
     this.vehicles.push({ body: vehicle.body, damaged: new Set(), object: vehicle.object, parts: [...vehicle.parts] });
   }
 
+  remove(body: number): void {
+    const index = this.vehicles.findIndex((v) => v.body === body);
+    if (index >= 0) {
+      this.vehicles.splice(index, 1);
+    }
+  }
+
   update(delta: number): void {
     // One state change per part per frame: a multi-contact crash shouldn't deform AND
     // detach the same panel in the same instant.

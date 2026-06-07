@@ -36,6 +36,14 @@ export class VehiclePhysicsSystem implements System {
     this.lastPlanar.set(vehicle, [vehicle.position[0], vehicle.position[1]]);
   }
 
+  remove(vehicle: EnterableVehicle): void {
+    const index = this.vehicles.indexOf(vehicle);
+    if (index >= 0) {
+      this.vehicles.splice(index, 1);
+    }
+    this.lastPlanar.delete(vehicle);
+  }
+
   update(delta: number): void {
     for (const car of this.vehicles) {
       const { position, quaternion } = this.physics.readBody(car.body);
