@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vehicle Viewer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: monospace;
+      }
+      .panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #eee;
+        border-radius: 6px;
+        font-size: 13px;
+        width: 220px;
+      }
+      .panel select,
+      .panel button {
+        font-family: monospace;
+        font-size: 13px;
+        padding: 4px 6px;
+      }
+      .panel button {
+        cursor: pointer;
+      }
+      .panel label {
+        cursor: pointer;
+        user-select: none;
+      }
+      .panel hr {
+        width: 100%;
+        border: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        margin: 2px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/standalone/vehicle-viewer.ts"></script>
+  </body>
+</html>

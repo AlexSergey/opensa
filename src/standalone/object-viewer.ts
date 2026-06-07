@@ -1,5 +1,5 @@
 /**
- * Standalone DFF model viewer — a dev tool, isolated from the map/streaming/
+ * Standalone object viewer (map models) — a dev tool, isolated from the map/streaming/
  * instancing layers. It reuses the real asset path (TXDLoader -> parseTxd ->
  * build-texture, DFFLoader -> parseDff -> build-clump), so what you see here is
  * exactly what the parser + three build layer produce for one model.
@@ -9,9 +9,9 @@
  * main app). Toggles let you separate prelit vertex colours, MODULATE2X and the
  * lit/unlit shading model.
  *
- * Open at /viewer.html (run `npm run dev` + `npm run serve:static`).
+ * Open at /object-viewer.html (run `npm run dev` + `npm run serve:static`).
  */
-import type { BufferGeometry, Group, Material } from 'three';
+import type { BufferGeometry, Material } from 'three';
 
 import {
   AmbientLight,
@@ -19,9 +19,12 @@ import {
   Color,
   DirectionalLight,
   GridHelper,
+  Group,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  type Object3D,
   PerspectiveCamera,
   Scene,
   Vector3,
@@ -29,10 +32,15 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import type { ColModel } from '../renderware/parsers/binary/col-types';
 import type { TextureDictionary } from '../renderware/three/txd-loader';
 
+import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe';
 import { DFFLoader } from '../renderware/three/dff-loader';
 import { TXDLoader } from '../renderware/three/txd-loader';
+
+/** Serialised COL (from scripts/extract-viewer-collision.ts) — vertices as a plain array. */
+type ColJson = Omit<ColModel, 'vertices'> & { vertices: number[] };
 
 interface ModelEntry {
   dff: string;
@@ -73,6 +81,8 @@ directional.position.set(50, 100, 50);
 scene.add(ambient, directional, new GridHelper(200, 20, 0x888888, 0x444444));
 
 let current: Group | null = null;
+let collision: null | Object3D = null;
+let collisionOn = false;
 const txdCache = new Map<string, Promise<TextureDictionary>>();
 /** Each geometry's original prelit colour array, so ×2/restore is lossless. */
 const originalColors = new WeakMap<BufferGeometry, Float32Array>();
@@ -91,6 +101,12 @@ function animate(): void {
   requestAnimationFrame(animate);
   controls.update();
   renderer.render(scene, camera);
+}
+
+function applyCollision(): void {
+  if (collision) {
+    collision.visible = collisionOn;
+  }
 }
 
 function applyOptions(): void {
@@ -146,6 +162,10 @@ function buildControls(): void {
     options.modulate2x = on;
     applyOptions();
   });
+  addToggle(panel, 'Collision', collisionOn, (on) => {
+    collisionOn = on;
+    applyCollision();
+  });
 
   document.body.appendChild(panel);
 }
@@ -161,6 +181,27 @@ function frameObject(object: Group): void {
   camera.far = radius * 100;
   camera.updateProjectionMatrix();
   controls.update();
+}
+
+/** Show the model's COL (pre-extracted JSON), wrapped −90°X to match the DFFLoader's Y-up convert. */
+async function loadCollision(model: ModelEntry): Promise<void> {
+  if (collision) {
+    scene.remove(collision);
+    collision = null;
+  }
+  const base = model.dff.replace(/\.dff$/, '');
+  const response = await fetch(`${BASE}/viewer/${base}.col.json`);
+  if (!response.ok) {
+    return; // no extracted COL for this model — re-run scripts/extract-viewer-collision.ts
+  }
+  const json = (await response.json()) as ColJson;
+  const col: ColModel = { ...json, vertices: new Float32Array(json.vertices) };
+  const wrap = new Group();
+  wrap.rotation.x = -Math.PI / 2;
+  wrap.add(buildCollisionWireframe([{ col, name: col.name, transforms: [new Matrix4()] }]));
+  wrap.visible = collisionOn;
+  collision = wrap;
+  scene.add(wrap);
 }
 
 async function loadModel(model: ModelEntry): Promise<void> {
@@ -183,6 +224,7 @@ async function loadModel(model: ModelEntry): Promise<void> {
   scene.add(group);
   applyOptions();
   frameObject(group);
+  await loadCollision(model);
 }
 
 function loadTextures(txd: string): Promise<TextureDictionary> {

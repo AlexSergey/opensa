@@ -22,4 +22,4 @@ Implemented in `src/renderware/parsers/text/interior.ts` (`interiorId`, `isInter
 
 **Validated 2026-06:** with `id 0 or in {13}` the user swept the whole map via the debug section inspector and saw **no render holes** — the rule holds in practice, not just on paper. (Revisit only if a future model surfaces that should be exterior but is hidden.)
 
-History: started as `interior !== 0` (too strict, dropped ~9.5k exterior objects); then `value & 0xFF !== 0` (still wrongly hid id 13 = `lae2_ground08`); now `id 0 or in {13}`. The standalone viewer (`/viewer.html`, [[prelit-darkness-and-model-viewer]]) renders any model ignoring interior — use it to confirm a model's look independent of this filter.
+History: started as `interior !== 0` (too strict, dropped ~9.5k exterior objects); then `value & 0xFF !== 0` (still wrongly hid id 13 = `lae2_ground08`); now `id 0 or in {13}`. The standalone viewer (`/object-viewer.html`, [[prelit-darkness-and-model-viewer]]) renders any model ignoring interior — use it to confirm a model's look independent of this filter.

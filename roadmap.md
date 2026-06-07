@@ -45,14 +45,16 @@
   - [ ] Car spawning
   - [ ] Tommy respawn (if stuck in the map)
 - [✅] Add logger
-- [ ] Viewers
-  - [ ] Rename model-viewer to object-viewer
-  - [ ] Car viewer
-    - [ ] Select element press E to open
-    - [ ] Show collision
-  - [ ] Player viewer
-    - [ ] Press mouse to play animations
-    - [ ] Show collision
+- [✅] Viewers
+  - [✅] Rename model-viewer to object-viewer
+  - [✅] Car viewer
+    - [✅] Select element press E to open
+    - [✅] Show collision
+    - [✅] Damage / repair part + chassis_vlo LOD toggle
+  - [✅] Player viewer
+    - [✅] Press mouse to play animations
+    - [✅] Show collision
+    - [✅] Skeleton
 - [ ] Fog
   - [ ] Streaming fade objects
   - [ ] Draw distance limit (1000)

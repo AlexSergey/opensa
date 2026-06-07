@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Object Viewer</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: monospace;
+      }
+      .panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #eee;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .panel select {
+        margin-bottom: 4px;
+      }
+      .panel label {
+        cursor: pointer;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/standalone/object-viewer.ts"></script>
+  </body>
+</html>

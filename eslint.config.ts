@@ -213,7 +213,7 @@ const customJsConfig = {
 
 // Node build/pack scripts: Node globals (Buffer, process, …), allow console.
 const scriptsConfig = {
-  files: ['scripts/**/*.{js,mjs,cjs}'],
+  files: ['scripts/**/*.{js,mjs,cjs,ts}'],
   languageOptions: {
     globals: {
       ...globals.node,

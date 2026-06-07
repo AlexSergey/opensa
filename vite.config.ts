@@ -6,8 +6,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        characterViewer: resolve(__dirname, 'character-viewer.html'),
         main: resolve(__dirname, 'index.html'),
-        viewer: resolve(__dirname, 'viewer.html'),
+        objectViewer: resolve(__dirname, 'object-viewer.html'),
+        vehicleViewer: resolve(__dirname, 'vehicle-viewer.html'),
       },
     },
   },

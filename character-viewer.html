@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DFF Model Viewer</title>
+    <title>Character Viewer</title>
     <style>
       body {
         margin: 0;
@@ -22,17 +22,23 @@
         color: #eee;
         border-radius: 6px;
         font-size: 13px;
+        width: 220px;
       }
       .panel select {
-        margin-bottom: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        padding: 4px 6px;
       }
       .panel label {
         cursor: pointer;
         user-select: none;
       }
+      .hint {
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
-    <script type="module" src="/src/standalone/model-viewer.ts"></script>
+    <script type="module" src="/src/standalone/character-viewer.ts"></script>
   </body>
 </html>
