@@ -1,6 +1,6 @@
-import type { MeshStandardMaterial, Object3D, Quaternion, Texture } from 'three';
+import type { BufferGeometry, MeshStandardMaterial, Object3D, Quaternion, Side, Texture } from 'three';
 
-import { DoubleSide, Group, Matrix4, Mesh, Vector3 } from 'three';
+import { BackSide, DoubleSide, FrontSide, Group, Matrix4, Mesh, Vector3 } from 'three';
 
 import type { RWClump, RWFrame, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
@@ -78,6 +78,10 @@ const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
 
 /** Wheels read a touch small from the vehicles.ide scale alone; nudge them up in-engine. */
 const WHEEL_SCALE_BOOST = 1.25;
+
+/** Glass renders in two passes (after opaque): back faces first, then front faces. */
+const GLASS_BACK_ORDER = 1;
+const GLASS_FRONT_ORDER = 2;
 
 /** Shared inputs for building one body atomic (door / damageable panel / plain mesh). */
 interface BodyBuild {
@@ -377,6 +381,29 @@ function collectDamGeometry(clump: RWClump): Map<string, RWGeometry> {
   return damGeometry;
 }
 
+/** One glass render pass: the glass groups drawn single-sided (cloned materials) at a fixed order. */
+function glassPass(
+  geometry: BufferGeometry,
+  materials: MeshStandardMaterial[],
+  glass: Set<number>,
+  side: Side,
+  renderOrder: number,
+): Mesh {
+  const passMaterials = materials.map((material, index) => {
+    if (!glass.has(index)) {
+      return material; // slot not referenced by the glass geometry's groups
+    }
+    const clone = material.clone();
+    clone.side = side;
+
+    return clone;
+  });
+  const mesh = new Mesh(geometry, passMaterials);
+  mesh.renderOrder = renderOrder;
+
+  return mesh;
+}
+
 /** Map a material colour to the paint it represents, or null if it is not a marker. */
 function paintFor(
   color: readonly [number, number, number, number],
@@ -400,11 +427,31 @@ function seatMatrix(clump: RWClump, name: string, worldCache: Map<number, Matrix
 }
 
 /** A vehicle body mesh: geometry + painted/glass materials. */
-function vehicleMesh(geometry: RWGeometry, textures: Map<string, Texture>, options: VehicleOptions): Mesh {
-  return new Mesh(
-    buildGeometry(geometry),
-    geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
-  );
+/**
+ * A vehicle body node. With no glass it's a plain multi-material `Mesh`; when an
+ * atomic has translucent (glass) materials those triangles are split into their
+ * own geometry rendered in **two single-sided passes** (back faces, then front) so
+ * the windows don't vanish at angles — the RenderWare single-pass culled/mis-sorted
+ * alpha bug (the SilentPatch / SkyGFX two-sided two-pass fix). Returns one node so
+ * callers (panels/doors/`_vlo`/damage) keep treating it as a single `Object3D`.
+ */
+function vehicleMesh(geometry: RWGeometry, textures: Map<string, Texture>, options: VehicleOptions): Object3D {
+  const materials = geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options));
+  const glass = new Set(materials.flatMap((material, index) => (material.transparent ? [index] : [])));
+  if (glass.size === 0) {
+    return new Mesh(buildGeometry(geometry), materials);
+  }
+
+  const group = new Group();
+  const opaque = withTriangles(geometry, (index) => !glass.has(index));
+  if (opaque.triangles.length > 0) {
+    group.add(new Mesh(buildGeometry(opaque), materials));
+  }
+  const glassGeometry = buildGeometry(withTriangles(geometry, (index) => glass.has(index)));
+  group.add(glassPass(glassGeometry, materials, glass, BackSide, GLASS_BACK_ORDER));
+  group.add(glassPass(glassGeometry, materials, glass, FrontSide, GLASS_FRONT_ORDER));
+
+  return group;
 }
 
 /** Match `wheel_{lf|rf|lb|rb}_dummy` → side flags, or null if not a wheel dummy. */
@@ -416,6 +463,11 @@ function wheelPlacement(frameName: string): null | { rear: boolean; right: boole
   const [side, axle] = match[1];
 
   return { rear: axle === 'b', right: side === 'r' };
+}
+
+/** A copy of `rw` keeping only triangles whose material index passes `keep` (other arrays shared). */
+function withTriangles(rw: RWGeometry, keep: (materialIndex: number) => boolean): RWGeometry {
+  return { ...rw, triangles: rw.triangles.filter((triangle) => keep(triangle.materialIndex)) };
 }
 
 /** Compose a frame's world transform by walking its parent chain (cached). */

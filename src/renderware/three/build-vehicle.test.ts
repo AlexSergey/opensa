@@ -1,6 +1,6 @@
 import type { Mesh, MeshStandardMaterial } from 'three';
 
-import { Texture } from 'three';
+import { BackSide, FrontSide, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
@@ -31,20 +31,31 @@ function triangleGeometry(materials: RWMaterial[]): RWGeometry {
   };
 }
 
-/** Body geometry with primary + secondary paint markers and one plain material. */
-const bodyGeometry = triangleGeometry([
-  material({ color: [60, 255, 0, 255] }), // primary marker
-  material({ color: [255, 0, 175, 255] }), // secondary marker
-  material({ color: [10, 20, 30, 255] }), // plain
-  material({ color: [255, 255, 255, 128], texture: { maskName: '', name: 'glass' } }), // translucent glass
-]);
+/** Body geometry: primary + secondary paint markers, a plain material, and a glass material (used). */
+const bodyGeometry: RWGeometry = {
+  ...triangleGeometry([
+    material({ color: [60, 255, 0, 255] }), // primary marker
+    material({ color: [255, 0, 175, 255] }), // secondary marker
+    material({ color: [10, 20, 30, 255] }), // plain
+    material({ color: [255, 255, 255, 128], texture: { maskName: '', name: 'glass' } }), // translucent glass
+  ]),
+  triangles: [
+    { a: 0, b: 1, c: 2, materialIndex: 0 }, // opaque
+    { a: 0, b: 1, c: 2, materialIndex: 3 }, // glass
+  ],
+};
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
 
-/** Materials of the `chassis` damageable part's undamaged (`_ok`) mesh. */
+/** Materials of the `chassis` part's `_ok` mesh (full array — indices align with the geometry). */
 function bodyMaterials(vehicle: ReturnType<typeof buildVehicle>): MeshStandardMaterial[] {
+  return chassisOpaque(vehicle).material as MeshStandardMaterial[];
+}
+
+/** The `chassis` part's `_ok` opaque mesh (glass is split into its own two-pass sub-mesh). */
+function chassisOpaque(vehicle: ReturnType<typeof buildVehicle>): Mesh {
   const ok = vehicle.parts.find((p) => p.name === 'chassis')?.ok as unknown as Mesh;
 
-  return ok.material as MeshStandardMaterial[];
+  return (ok.children[0] ?? ok) as Mesh;
 }
 
 function meshByName(vehicle: ReturnType<typeof buildVehicle>, name: string): Mesh {
@@ -128,6 +139,18 @@ describe('buildVehicle', () => {
       expect(lod).not.toBeNull();
       expect(lod?.visible).toBe(false);
       expect((lod?.children[0] as Mesh).name).toBe('chassis_vlo');
+    });
+
+    it('splits glass into two single-sided passes (back then front) so windows survive all angles', () => {
+      const ok = buildVehicle(vehicleClump(), new Map(), OPTIONS).parts.find((p) => p.name === 'chassis')?.ok;
+      const glass = (ok?.children ?? []).filter((child) => (child as Mesh).renderOrder > 0) as Mesh[];
+      const glassSide = (m: Mesh): number => (m.material as MeshStandardMaterial[])[3].side; // index 3 = glass
+      expect(glass).toHaveLength(2);
+      expect(glass.map(glassSide).sort()).toEqual([FrontSide, BackSide].sort()); // single-sided, not DoubleSide
+      const back = glass.find((m) => glassSide(m) === BackSide)?.renderOrder ?? 0;
+      const front = glass.find((m) => glassSide(m) === FrontSide)?.renderOrder ?? 0;
+      expect(back).toBeLessThan(front); // back faces drawn before front
+      expect((glass[0].material as MeshStandardMaterial[])[3].depthWrite).toBe(false);
     });
 
     it('exposes _ok/_dam panels as damageable parts (dam hidden)', () => {
