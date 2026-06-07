@@ -231,6 +231,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       halfExtents,
       handling: this.vehicleHandling(def.handlingId),
       object: built.root,
+      parts: built.parts,
       rig: new VehicleRig(built.wheels),
       seats: built.seats,
       wheels: built.wheels.map((wheel) => ({

@@ -40,6 +40,13 @@ const bodyGeometry = triangleGeometry([
 ]);
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
 
+/** Materials of the `chassis` damageable part's undamaged (`_ok`) mesh. */
+function bodyMaterials(vehicle: ReturnType<typeof buildVehicle>): MeshStandardMaterial[] {
+  const ok = vehicle.parts.find((p) => p.name === 'chassis')?.ok as unknown as Mesh;
+
+  return ok.material as MeshStandardMaterial[];
+}
+
 function meshByName(vehicle: ReturnType<typeof buildVehicle>, name: string): Mesh {
   return vehicle.root.children.find((child) => child.name === name) as Mesh;
 }
@@ -106,13 +113,23 @@ describe('buildVehicle', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
       const names = group.root.children.map((child) => child.name).sort();
       expect(names).toEqual([
-        'chassis_ok',
+        'chassis', // _ok/_dam panel wrapped in a pivot
         'door_lf',
         'wheel_lb_dummy',
         'wheel_lf_dummy',
         'wheel_rb_dummy',
         'wheel_rf_dummy',
       ]);
+    });
+
+    it('exposes _ok/_dam panels as damageable parts (dam hidden)', () => {
+      const { parts } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      const chassis = parts.find((p) => p.name === 'chassis');
+      expect(chassis).toBeDefined();
+      expect(chassis?.ok.visible).toBe(true);
+      expect(chassis?.dam.visible).toBe(false);
+      // The door is damageable too (has door_lf_dam).
+      expect(parts.some((p) => p.name === 'door_lf')).toBe(true);
     });
 
     it('exposes the four wheels as rig handles (front pair flagged)', () => {
@@ -138,20 +155,18 @@ describe('buildVehicle', () => {
 
     it('places body parts by their frame world transform', () => {
       const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      const body = meshByName(group, 'chassis_ok');
-      expect([body.position.x, body.position.y, body.position.z]).toEqual([0, 0, 1]);
+      const chassis = group.parts.find((p) => p.name === 'chassis');
+      expect(chassis?.position).toEqual([0, 0, 1]);
     });
 
     it('replaces paint markers with the carcol primary/secondary', () => {
-      const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      const materials = meshByName(group, 'chassis_ok').material as MeshStandardMaterial[];
+      const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
       expect([materials[0].color.r, materials[0].color.g, materials[0].color.b]).toEqual([1, 0, 0]);
       expect([materials[1].color.r, materials[1].color.g, materials[1].color.b]).toEqual([0, 0, 1]);
     });
 
     it('keeps non-marker materials untinted', () => {
-      const group = buildVehicle(vehicleClump(), new Map(), OPTIONS);
-      const materials = meshByName(group, 'chassis_ok').material as MeshStandardMaterial[];
+      const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
       expect(materials[2].color.getHex()).toBe((10 << 16) | (20 << 8) | 30);
     });
 
@@ -163,7 +178,7 @@ describe('buildVehicle', () => {
 
     it('blends translucent (glass) materials from the colour alpha, even when textured', () => {
       const group = buildVehicle(vehicleClump(), new Map([['glass', new Texture()]]), OPTIONS);
-      const glass = (meshByName(group, 'chassis_ok').material as MeshStandardMaterial[])[3];
+      const glass = bodyMaterials(group)[3];
       expect(glass.transparent).toBe(true);
       expect(glass.opacity).toBeCloseTo(128 / 255);
       expect(glass.depthWrite).toBe(false);
@@ -174,8 +189,7 @@ describe('buildVehicle', () => {
       tex.name = 'carbody';
       const clump = vehicleClump();
       clump.geometries[0].materials[2].texture = { maskName: '', name: 'carbody' };
-      const group = buildVehicle(clump, new Map([['carbody', tex]]), OPTIONS);
-      const materials = meshByName(group, 'chassis_ok').material as MeshStandardMaterial[];
+      const materials = bodyMaterials(buildVehicle(clump, new Map([['carbody', tex]]), OPTIONS));
       expect(materials[2].map?.name).toBe('carbody');
     });
   });

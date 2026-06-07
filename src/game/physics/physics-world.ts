@@ -24,6 +24,8 @@ const PARKING_BRAKE = 80; // holds a parked car put (released by the driver when
 const CHASSIS_LINEAR_DAMPING = 0.1;
 const CHASSIS_ANGULAR_DAMPING = 2; // resist pitch-dive / roll-flip / over-sharp yaw (tuned in-browser)
 const CHASSIS_FRICTION = 0.4;
+const CHASSIS_RESTITUTION = 0.35; // bounce off walls a little instead of sticking dead
+const CONTACT_FORCE_THRESHOLD = 400; // min contact force (N) before an impact event is emitted
 /** GTA cars face +Y, are Z-up; axle is left-right (X). Indices for the raycast controller. */
 const FORWARD_AXIS = 1; // +Y
 const UP_AXIS = 2; // +Z
@@ -59,6 +61,13 @@ export interface CharacterMove {
   movement: Vec3;
 }
 
+/** A contact-force impact between two bodies in a step (for vehicle collision damage). */
+export interface Impact {
+  bodyA: null | number;
+  bodyB: null | number;
+  force: number; // max contact force magnitude (N)
+  point: null | Vec3; // world-space contact point (where the hit landed), if available
+}
 /** Rapier's raycast vehicle controller (engine/brake/steer, suspension, wheels). */
 export type VehicleController = ReturnType<RapierWorld['createVehicleController']>;
 /** One raycast wheel: its hub position in vehicle space + rolling radius. */
@@ -78,6 +87,9 @@ type RapierWorld = InstanceType<Rapier['World']>;
  * integer handle, which the `RigidBody` component stores per entity.
  */
 export class PhysicsWorld {
+  private readonly events: InstanceType<Rapier['EventQueue']>;
+  /** Contact-force impacts collected during the last {@link step} (drained by {@link takeImpacts}). */
+  private impacts: Impact[] = [];
   private readonly rapier: Rapier;
   /** Raycast vehicle controllers, advanced before each {@link step}. */
   private readonly vehicles: VehicleController[] = [];
@@ -86,6 +98,7 @@ export class PhysicsWorld {
   constructor(rapier: Rapier) {
     this.rapier = rapier;
     this.world = new rapier.World({ x: 0, y: 0, z: GRAVITY_Z });
+    this.events = new rapier.EventQueue(true);
   }
 
   /** A dynamic box (half-extents) at a Z-up position; returns its body handle. */
@@ -396,7 +409,32 @@ export class PhysicsWorld {
     for (const vehicle of this.vehicles) {
       vehicle.updateVehicle(dt); // writes the chassis velocity from suspension/engine before the step
     }
-    this.world.step();
+    this.world.step(this.events);
+    this.events.drainContactForceEvents((event) => {
+      const c1 = this.world.getCollider(event.collider1());
+      const c2 = this.world.getCollider(event.collider2());
+      let point: null | Vec3 = null;
+      this.world.contactPair(c1, c2, (manifold) => {
+        if (manifold.numSolverContacts() > 0) {
+          const p = manifold.solverContactPoint(0); // world-space contact point
+          point = [p.x, p.y, p.z];
+        }
+      });
+      this.impacts.push({
+        bodyA: c1.parent()?.handle ?? null,
+        bodyB: c2.parent()?.handle ?? null,
+        force: event.maxForceMagnitude(),
+        point,
+      });
+    });
+  }
+
+  /** Drain the impacts collected since the last call (vehicle collision damage reads these). */
+  takeImpacts(): readonly Impact[] {
+    const impacts = this.impacts;
+    this.impacts = [];
+
+    return impacts;
   }
 
   /** Immediately move a body to a world position (Z-up) — e.g. seating the player in a car. */
@@ -520,11 +558,21 @@ export class PhysicsWorld {
     return this.rapier.ColliderDesc.cuboid(hx, hy, hz);
   }
 
-  /** A chassis collider desc with the given mass + friction + vehicle collision group. */
+  /**
+   * A chassis collider desc: mass + friction + vehicle collision group, a little restitution
+   * (bounce off walls), and contact-force events (so collisions report impacts for damage).
+   */
   private vehicleCollider(
     desc: ReturnType<Rapier['ColliderDesc']['ball']>,
     mass: number,
   ): ReturnType<Rapier['ColliderDesc']['ball']> {
-    return desc.setMass(mass).setFriction(CHASSIS_FRICTION).setCollisionGroups(VEHICLE_GROUPS);
+    return desc
+      .setMass(mass)
+      .setFriction(CHASSIS_FRICTION)
+      .setCollisionGroups(VEHICLE_GROUPS)
+      .setRestitution(CHASSIS_RESTITUTION)
+      .setRestitutionCombineRule(this.rapier.CoefficientCombineRule.Max)
+      .setActiveEvents(this.rapier.ActiveEvents.CONTACT_FORCE_EVENTS)
+      .setContactForceEventThreshold(CONTACT_FORCE_THRESHOLD);
   }
 }

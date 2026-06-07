@@ -14,6 +14,7 @@ import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
+import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
@@ -174,6 +175,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     // (gravity rests it on its raycast wheels; the full COL is kept for later damage).
     const vehiclePhysics = new VehiclePhysicsSystem(character.physics);
     game.addSystem(vehiclePhysics);
+    const vehicleDamage = new VehicleDamageSystem(character.physics);
+    game.addSystem(vehicleDamage);
     const enterVehicle = new EnterVehicleSystem(
       character.keyboard,
       character.viewOf,
@@ -188,7 +191,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     );
     game.addSystem(enterVehicle);
     for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
-      const { colliders, doors, halfExtents, handling, object, rig, seats, wheels } = await adapter.loadVehicle(model);
+      const { colliders, doors, halfExtents, handling, object, parts, rig, seats, wheels } =
+        await adapter.loadVehicle(model);
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
@@ -221,6 +225,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       };
       vehiclePhysics.add(vehicle);
       enterVehicle.add(vehicle);
+      vehicleDamage.add({ body, object, parts });
     }
 
     return game;

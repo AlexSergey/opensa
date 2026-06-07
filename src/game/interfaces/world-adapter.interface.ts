@@ -2,6 +2,7 @@ import type { AnimationClip, Bone, Matrix4, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
 import type { VehicleDoor } from '../vehicle/vehicle-door';
+import type { VehiclePart } from '../vehicle/vehicle-part';
 import type { VehicleRig } from '../vehicle/vehicle-rig';
 import type { ModelColliders } from './collider.interface';
 
@@ -54,6 +55,8 @@ export interface VehicleModel {
   /** Driving feel from handling.cfg. */
   handling: VehicleHandling;
   object: Object3D;
+  /** Damageable body parts (`_ok`/`_dam` panels + doors) for the collision-damage system. */
+  parts: VehiclePart[];
   /** Animatable wheels (spin/steer); register with the vehicle system. */
   rig: VehicleRig;
   /** Seat dummy local transforms in vehicle space (null if absent). */

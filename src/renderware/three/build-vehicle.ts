@@ -1,5 +1,4 @@
-import type { Quaternion, Texture } from 'three';
-import type { MeshStandardMaterial } from 'three';
+import type { MeshStandardMaterial, Object3D, Quaternion, Texture } from 'three';
 
 import { DoubleSide, Group, Matrix4, Mesh, Vector3 } from 'three';
 
@@ -17,10 +16,26 @@ export interface BuiltDoor {
   side: string;
 }
 
+/** A damageable body part: an `_ok`/`_dam` mesh pair under a detachable pivot. */
+export interface BuiltPart {
+  /** The damaged mesh (hidden until damaged). */
+  dam: Object3D;
+  /** Part name without the `_ok`/`_dam` suffix (e.g. `bonnet`, `door_lf`). */
+  name: string;
+  /** The undamaged mesh (shown initially). */
+  ok: Object3D;
+  /** Group holding the part (positioned in vehicle space); detached when the part falls off. */
+  pivot: Group;
+  /** Part centre in vehicle space `[x, y, z]` (for mapping a hit location to the part). */
+  position: [number, number, number];
+}
+
 /** The renderable vehicle plus its addressable, animatable parts (the dummy rig). */
 export interface BuiltVehicle {
   /** Swinging doors (pivot at the hinge). */
   doors: BuiltDoor[];
+  /** Damageable panels/doors with `_ok`/`_dam` meshes (for the collision-damage system). */
+  parts: BuiltPart[];
   root: Group;
   /** Seat dummy local transforms in vehicle space (null if absent). */
   seats: { backseat: Matrix4 | null; frontseat: Matrix4 | null };
@@ -62,6 +77,17 @@ const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
 /** Wheels read a touch small from the vehicles.ide scale alone; nudge them up in-engine. */
 const WHEEL_SCALE_BOOST = 1.25;
 
+/** Shared inputs for building one body atomic (door / damageable panel / plain mesh). */
+interface BodyBuild {
+  clump: RWClump;
+  /** Damaged geometry by part name (e.g. `bonnet` → bonnet_dam geometry), paired with `_ok`. */
+  damGeometry: Map<string, RWGeometry>;
+  options: VehicleOptions;
+  root: Group;
+  textures: Map<string, Texture>;
+  worldCache: Map<number, Matrix4>;
+}
+
 /**
  * Build a renderable vehicle from its DFF clump. Renders the body (chassis +
  * each `*_ok` component atomic, placed by its frame's **world** transform),
@@ -76,8 +102,16 @@ const WHEEL_SCALE_BOOST = 1.25;
 export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, options: VehicleOptions): BuiltVehicle {
   const root = new Group();
   root.name = 'RWVehicle';
-  const worldCache = new Map<number, Matrix4>();
+  const build: BodyBuild = {
+    clump,
+    damGeometry: collectDamGeometry(clump),
+    options,
+    root,
+    textures,
+    worldCache: new Map(),
+  };
   const doors: BuiltDoor[] = [];
+  const parts: BuiltPart[] = [];
 
   let wheelGeometryIndex: null | number = null;
 
@@ -93,24 +127,18 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
       continue;
     }
     if (name.endsWith('_dam') || name.endsWith('_vlo')) {
-      continue;
+      continue; // `_dam` is paired with its `_ok`; `_vlo` is the low-detail LOD
     }
-
-    const doorSide = frame ? DOOR_RE.exec(name)?.[1] : undefined;
-    if (doorSide && frame) {
-      doors.push(addDoor(root, clump, geometry, frame, doorSide, textures, options, worldCache));
-      continue;
+    const built = addBodyAtomic(build, atomic, frame, name, geometry);
+    if (built.door) {
+      doors.push(built.door);
     }
-
-    const mesh = new Mesh(
-      buildGeometry(geometry),
-      geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
-    );
-    mesh.name = name || `atomic_${atomic.geometryIndex}`;
-    mesh.applyMatrix4(worldMatrix(clump, atomic.frameIndex, worldCache));
-    root.add(mesh);
+    if (built.part) {
+      parts.push(built.part);
+    }
   }
 
+  const { worldCache } = build;
   const wheels =
     wheelGeometryIndex === null ? [] : addWheels(root, clump, wheelGeometryIndex, textures, options, worldCache);
   const seats = {
@@ -118,38 +146,112 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
 
-  return { doors, root, seats, wheels };
+  return { doors, parts, root, seats, wheels };
+}
+
+/** Build one body atomic: a swinging door, a damageable `_ok`/`_dam` panel, or a plain mesh. */
+function addBodyAtomic(
+  build: BodyBuild,
+  atomic: RWClump['atomics'][number],
+  frame: RWFrame | undefined,
+  name: string,
+  geometry: RWGeometry,
+): { door?: BuiltDoor; part?: BuiltPart } {
+  const { clump, damGeometry, options, root, textures, worldCache } = build;
+
+  const doorSide = frame ? DOOR_RE.exec(name)?.[1] : undefined;
+  if (doorSide && frame) {
+    const built = addDoor(root, clump, geometry, frame, doorSide, damGeometry.get(`door_${doorSide}`), textures, options, worldCache); // eslint-disable-line prettier/prettier
+
+    return { door: built.door, part: built.part ?? undefined };
+  }
+
+  const dam = name.endsWith('_ok') ? damGeometry.get(name.slice(0, -3)) : undefined;
+  if (dam) {
+    return { part: addPanel(root, clump, name.slice(0, -3), geometry, dam, atomic.frameIndex, textures, options, worldCache) }; // eslint-disable-line prettier/prettier
+  }
+
+  const mesh = vehicleMesh(geometry, textures, options);
+  mesh.name = name || `atomic_${atomic.geometryIndex}`;
+  mesh.applyMatrix4(worldMatrix(clump, atomic.frameIndex, worldCache));
+  root.add(mesh);
+
+  return {};
 }
 
 /**
- * Wrap a `door_*_ok` atomic in a pivot at its hinge (`door_*_dummy`) so the door
- * can swing. The mesh is placed hinge-relative; rotating the pivot about its
- * local Z (up) opens it. Returns the door's rig handle.
+ * Wrap a `door_*_ok` atomic (+ optional `_dam`) in a pivot at its hinge
+ * (`door_*_dummy`) so the door can swing and be damaged. Meshes are hinge-relative;
+ * rotating the pivot about its local Z (up) opens it. Returns the door rig + part.
  */
 function addDoor(
   root: Group,
   clump: RWClump,
-  geometry: RWGeometry,
+  okGeometry: RWGeometry,
   frame: RWFrame,
   side: string,
+  damGeometry: RWGeometry | undefined,
   textures: Map<string, Texture>,
   options: VehicleOptions,
   worldCache: Map<number, Matrix4>,
-): BuiltDoor {
+): { door: BuiltDoor; part: BuiltPart | null } {
   const pivot = new Group();
   pivot.name = `door_${side}`;
   pivot.applyMatrix4(frame.parentIndex >= 0 ? worldMatrix(clump, frame.parentIndex, worldCache) : new Matrix4());
 
-  const mesh = new Mesh(
-    buildGeometry(geometry),
-    geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
-  );
-  mesh.name = `door_${side}_ok`;
-  mesh.applyMatrix4(frameMatrix(frame.rotation, frame.position)); // door is hinge-relative
-  pivot.add(mesh);
+  const local = frameMatrix(frame.rotation, frame.position); // door is hinge-relative
+  const ok = vehicleMesh(okGeometry, textures, options);
+  ok.name = `door_${side}_ok`;
+  ok.applyMatrix4(local);
+  pivot.add(ok);
+
+  let part: BuiltPart | null = null;
+  if (damGeometry) {
+    const dam = vehicleMesh(damGeometry, textures, options);
+    dam.name = `door_${side}_dam`;
+    dam.applyMatrix4(local);
+    dam.visible = false;
+    pivot.add(dam);
+    const position = new Vector3().setFromMatrixPosition(pivot.matrix);
+    part = { dam, name: `door_${side}`, ok, pivot, position: [position.x, position.y, position.z] };
+  }
   root.add(pivot);
 
-  return { closed: pivot.quaternion.clone(), pivot, side };
+  return { door: { closed: pivot.quaternion.clone(), pivot, side }, part };
+}
+
+/**
+ * Build a damageable panel: its `_ok` (shown) and `_dam` (hidden) meshes under a
+ * pivot placed at the part's world transform, so it can swap on damage and detach
+ * (fall off) on a second hit. Returns the part handle.
+ */
+function addPanel(
+  root: Group,
+  clump: RWClump,
+  name: string,
+  okGeometry: RWGeometry,
+  damGeometry: RWGeometry,
+  frameIndex: number,
+  textures: Map<string, Texture>,
+  options: VehicleOptions,
+  worldCache: Map<number, Matrix4>,
+): BuiltPart {
+  const world = worldMatrix(clump, frameIndex, worldCache);
+  const pivot = new Group();
+  pivot.name = name;
+  pivot.applyMatrix4(world);
+
+  const ok = vehicleMesh(okGeometry, textures, options);
+  ok.name = `${name}_ok`;
+  const dam = vehicleMesh(damGeometry, textures, options);
+  dam.name = `${name}_dam`;
+  dam.visible = false;
+  pivot.add(ok, dam);
+  root.add(pivot);
+
+  const position = new Vector3().setFromMatrixPosition(world);
+
+  return { dam, name, ok, pivot, position: [position.x, position.y, position.z] };
 }
 
 /**
@@ -240,6 +342,20 @@ function buildVehicleMaterial(
   return material;
 }
 
+/** Index every `_dam` atomic's geometry by its part name (the prefix before `_dam`). */
+function collectDamGeometry(clump: RWClump): Map<string, RWGeometry> {
+  const damGeometry = new Map<string, RWGeometry>();
+  for (const atomic of clump.atomics) {
+    const name = clump.frames[atomic.frameIndex]?.name.toLowerCase() ?? '';
+    const geometry = clump.geometries[atomic.geometryIndex];
+    if (geometry && name.endsWith('_dam')) {
+      damGeometry.set(name.slice(0, -4), geometry);
+    }
+  }
+
+  return damGeometry;
+}
+
 /** Map a material colour to the paint it represents, or null if it is not a marker. */
 function paintFor(
   color: readonly [number, number, number, number],
@@ -260,6 +376,14 @@ function seatMatrix(clump: RWClump, name: string, worldCache: Map<number, Matrix
   const index = clump.frames.findIndex((f) => f.name.toLowerCase() === name);
 
   return index >= 0 ? worldMatrix(clump, index, worldCache).clone() : null;
+}
+
+/** A vehicle body mesh: geometry + painted/glass materials. */
+function vehicleMesh(geometry: RWGeometry, textures: Map<string, Texture>, options: VehicleOptions): Mesh {
+  return new Mesh(
+    buildGeometry(geometry),
+    geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options)),
+  );
 }
 
 /** Match `wheel_{lf|rf|lb|rb}_dummy` → side flags, or null if not a wheel dummy. */
