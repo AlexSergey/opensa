@@ -60,8 +60,12 @@ export interface BuiltWheel {
 export interface VehicleOptions {
   /** Primary paint RGB (0-255), replaces the `(60,255,0)` marker. */
   primary: [number, number, number];
+  /** 4th-colour paint RGB, replaces the `(255,255,0)` marker (falls back to secondary). */
+  quaternary?: [number, number, number];
   /** Secondary paint RGB (0-255), replaces the `(255,0,175)` marker. */
   secondary: [number, number, number];
+  /** 3rd-colour paint RGB, replaces the `(0,255,255)` marker (falls back to primary). */
+  tertiary?: [number, number, number];
   /** Wheel scale `[front, rear]` from vehicles.ide. */
   wheelScale: [number, number];
 }
@@ -69,6 +73,8 @@ export interface VehicleOptions {
 /** Material marker colours that the carcol paint replaces. */
 const PRIMARY_MARKER: [number, number, number] = [60, 255, 0];
 const SECONDARY_MARKER: [number, number, number] = [255, 0, 175];
+const TERTIARY_MARKER: [number, number, number] = [0, 255, 255];
+const QUATERNARY_MARKER: [number, number, number] = [255, 255, 0];
 
 /** The single wheel atomic, instanced at each `wheel_*_dummy`. */
 const WHEEL_FRAME = 'wheel';
@@ -350,7 +356,8 @@ function buildVehicleMaterial(
   const material = buildMaterial(rw, geometry, textures);
   const paint = paintFor(rw.color, options);
   if (paint) {
-    material.color.setRGB(paint[0] / 255, paint[1] / 255, paint[2] / 255);
+    // setHex (sRGB), matching buildMaterial — setRGB would treat it as linear and wash the paint out.
+    material.color.setHex((paint[0] << 16) | (paint[1] << 8) | paint[2]);
   }
 
   // Glass/translucent parts encode their opacity in the material colour's alpha,
@@ -409,11 +416,17 @@ function paintFor(
   color: readonly [number, number, number, number],
   options: VehicleOptions,
 ): [number, number, number] | null {
-  if (color[0] === PRIMARY_MARKER[0] && color[1] === PRIMARY_MARKER[1] && color[2] === PRIMARY_MARKER[2]) {
-    return options.primary;
-  }
-  if (color[0] === SECONDARY_MARKER[0] && color[1] === SECONDARY_MARKER[1] && color[2] === SECONDARY_MARKER[2]) {
-    return options.secondary;
+  // The four GTA SA carcol paint markers, in order; 3rd/4th fall back to 1st/2nd if not supplied.
+  const slots: { marker: [number, number, number]; pick: () => [number, number, number] }[] = [
+    { marker: PRIMARY_MARKER, pick: () => options.primary },
+    { marker: SECONDARY_MARKER, pick: () => options.secondary },
+    { marker: TERTIARY_MARKER, pick: () => options.tertiary ?? options.primary },
+    { marker: QUATERNARY_MARKER, pick: () => options.quaternary ?? options.secondary },
+  ];
+  for (const { marker, pick } of slots) {
+    if (color[0] === marker[0] && color[1] === marker[1] && color[2] === marker[2]) {
+      return pick();
+    }
   }
 
   return null;

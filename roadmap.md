@@ -34,6 +34,7 @@
     - [✅] Car ramming
     - [✅] Striked car damage
   - [✅] Vehicle VLO
+  - [✅] Car2 / Car4 carcols
   - [✅] Extract parking places to configuration array
 - [✅] Debugger Improvements
   - [✅] Flymode rename to map-viewer
@@ -79,7 +80,6 @@
   - [ ] The Ui layer should not be involved in post processing.
   - [ ] Find good fonts
   - [ ] Show current time
-  - [ ] HUD
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Gzip
@@ -138,3 +138,7 @@ Next iterations:
     get in.
   - [ ] Entry animation interrupted.
 - [ ] Interiors
+- [ ] Health for User
+- [ ] Health for Peds
+- [ ] Health for vehs
+- [ ] HUD

@@ -37,3 +37,10 @@ Plan: `.claude/plans/015-vehicle-loading.md`. Parse vehicle data + place two car
 only 2 paint markers, so extra indices are ignored). `resolveVehicleColours(name, indices?)` resolves them
 via the carcols palette, else falls back to the car's default combo. `VehiclePlacement.colour` threads it
 through `spawnVehicle`/LOD-respawn; canvas-host `CAR_COLORS` map sets parked + debug-spawned cars.
+
+**4-colour paint:** `buildVehicle` now supports all four GTA SA carcol paint markers — primary
+`(60,255,0)`, secondary `(255,0,175)`, tertiary `(0,255,255)`, quaternary `(255,255,0)` (3rd/4th
+fall back to 1st/2nd if not supplied). `VehicleOptions` gained optional `tertiary`/`quaternary`;
+`resolveVehicleColours` returns all four (`VehiclePaint`) from a car4 combo or explicit indices
+(e.g. camper `'0,6,3,0'`). Also fixed: paint is set with `color.setHex(...)` (sRGB, like buildMaterial),
+not `setRGB(.../255)` (linear) — the old way rendered paint washed-out/too light.

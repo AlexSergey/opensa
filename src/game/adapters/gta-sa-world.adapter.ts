@@ -59,6 +59,14 @@ export interface GtaSaWorldConfig {
   datUrl: string;
 }
 
+/** Resolved carcol paint (RGB per slot); 3rd/4th present only for 4-colour cars. */
+interface VehiclePaint {
+  primary: [number, number, number];
+  quaternary?: [number, number, number];
+  secondary: [number, number, number];
+  tertiary?: [number, number, number];
+}
+
 /**
  * Bridges the generic engine to GTA SA / renderware. Downloads the WIMG archive
  * and resolves the map, then builds instanced regions and reports picked objects.
@@ -216,9 +224,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
           .map((cell) => Number(cell.trim()))
           .filter((value) => Number.isFinite(value))
       : undefined;
-    const { primary, secondary } = this.resolveVehicleColours(name, indices);
+    const paint = this.resolveVehicleColours(name, indices);
 
-    const built = buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
+    const built = buildVehicle(parseDff(dffBuffer), textures, { ...paint, wheelScale: def.wheelScale });
     const col = parseDffCollision(dffBuffer);
     const colliders = col ? toModelColliders({ col, name: col.name, transforms: [] }) : null;
     // Half-extents from the collision bounds — robust to stray vertices in modded DFFs
@@ -308,29 +316,28 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   /** First carcol combo for a model → primary/secondary RGB (falls back to white). */
-  private resolveVehicleColours(
-    name: string,
-    indices?: number[],
-  ): {
-    primary: [number, number, number];
-    secondary: [number, number, number];
-  } {
+  private resolveVehicleColours(name: string, indices?: number[]): VehiclePaint {
     const colours = this.vehicleColours;
     const white: [number, number, number] = [255, 255, 255];
     const rgb = (index: number): [number, number, number] => colours?.palette[index] ?? white;
+    const paint = (combo: readonly number[]): VehiclePaint => ({
+      primary: rgb(combo[0]),
+      quaternary: combo[3] === undefined ? undefined : rgb(combo[3]),
+      secondary: rgb(combo[1] ?? combo[0]),
+      tertiary: combo[2] === undefined ? undefined : rgb(combo[2]),
+    });
 
-    // Explicit carcols indices (e.g. '34,34' / '1,31,1,0') win — first two are primary/secondary.
+    // Explicit carcols indices (e.g. '37,37' / '0,6,3,0') win.
     if (indices && indices.length > 0) {
-      return { primary: rgb(indices[0]), secondary: rgb(indices[1] ?? indices[0]) };
+      return paint(indices);
     }
-
     const combo = colours?.cars.get(name)?.[0];
     if (combo) {
-      return { primary: rgb(combo[0]), secondary: rgb(combo[1]) };
+      return paint(combo);
     }
     const combo4 = colours?.cars4.get(name)?.[0];
     if (combo4) {
-      return { primary: rgb(combo4[0]), secondary: rgb(combo4[1]) };
+      return paint(combo4);
     }
 
     return { primary: white, secondary: white };

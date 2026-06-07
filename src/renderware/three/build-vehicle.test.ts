@@ -10,7 +10,9 @@ import { buildVehicle, type VehicleOptions } from './build-vehicle';
 
 const OPTIONS: VehicleOptions = {
   primary: [255, 0, 0],
+  quaternary: [44, 55, 66],
   secondary: [0, 0, 255],
+  tertiary: [11, 22, 33],
   wheelScale: [0.5, 0.25],
 };
 
@@ -38,10 +40,12 @@ const bodyGeometry: RWGeometry = {
     material({ color: [255, 0, 175, 255] }), // secondary marker
     material({ color: [10, 20, 30, 255] }), // plain
     material({ color: [255, 255, 255, 128], texture: { maskName: '', name: 'glass' } }), // translucent glass
+    material({ color: [0, 255, 255, 255] }), // tertiary (3rd-colour) marker
   ]),
   triangles: [
     { a: 0, b: 1, c: 2, materialIndex: 0 }, // opaque
     { a: 0, b: 1, c: 2, materialIndex: 3 }, // glass
+    { a: 0, b: 1, c: 2, materialIndex: 4 }, // tertiary
   ],
 };
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
@@ -199,6 +203,11 @@ describe('buildVehicle', () => {
     it('keeps non-marker materials untinted', () => {
       const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
       expect(materials[2].color.getHex()).toBe((10 << 16) | (20 << 8) | 30);
+    });
+
+    it('replaces the 3rd-colour (cyan) marker with the tertiary paint', () => {
+      const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
+      expect(materials[4].color.getHex()).toBe((11 << 16) | (22 << 8) | 33);
     });
 
     it('scales wheels per front/rear (with the in-engine size boost)', () => {
