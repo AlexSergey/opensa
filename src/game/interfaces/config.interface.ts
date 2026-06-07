@@ -25,6 +25,7 @@ export interface Config {
   showLogs: false | LogLevel;
   staticUrl: string;
   streaming: StreamingConfig;
+  time: TimeConfig;
   vehicle: VehicleConfig;
 }
 
@@ -77,6 +78,12 @@ export interface StreamingConfig {
   hdDrawDistance: number;
   /** LODs are streamed within this distance (beyond the HD ring). */
   lodDrawDistance: number;
+}
+
+/** Game-clock tuning. */
+export interface TimeConfig {
+  /** Real seconds per in-game minute (e.g. 1.5 → a full day is 36 real minutes). */
+  secondsPerGameMinute: number;
 }
 
 /** Vehicle distance-LOD thresholds (world units from the player view). */

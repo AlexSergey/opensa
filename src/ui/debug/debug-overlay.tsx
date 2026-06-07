@@ -2,8 +2,18 @@ import { type ReactElement, useEffect, useState } from 'react';
 
 import type { Game, Vec3 } from '../../game';
 
+import { GameClock } from '../../game/time/game-clock';
 import { styles } from './debug-styles';
 import { MapInspector } from './map-inspector';
+
+/** Quick time-of-day presets for the debugger (label → minutes since midnight). */
+const TIME_PRESETS: [string, number][] = [
+  ['00:00', 0],
+  ['06:00', 360],
+  ['12:00', 720],
+  ['18:00', 1080],
+  ['21:00', 1260],
+];
 
 /** Gameplay debug actions (GTA-specific) the F2 panel triggers; wired in canvas-host. */
 export interface DebugActions {
@@ -11,12 +21,16 @@ export interface DebugActions {
   flipVehicle(): void;
   /** Current fog distance (world units to full fog). */
   fogDistance(): number;
+  /** Current in-game time (minutes since midnight). */
+  gameTime(): number;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
   /** Re-drop Tommy at his current spot (to unstick). */
   respawnPlayer(): void;
   /** Set the fog distance (world units to full fog). */
   setFogDistance(distance: number): void;
+  /** Set the in-game time (minutes since midnight). */
+  setGameTime(minutes: number): void;
   /** Spawn a car just in front of the player. */
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
   /** Teleport the player back to Ganton. */
@@ -44,6 +58,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
   const [mapActive, setMapActive] = useState(false);
   const [fog, setFog] = useState(() => actions.fogDistance());
+  const [time, setTime] = useState(() => actions.gameTime());
 
   // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
   useEffect(() => {
@@ -70,6 +85,16 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
     return (): void => clearInterval(id);
   }, [actions, visible, screen, showCoords]);
+
+  // Keep the live clock label ticking while the Game screen is open.
+  useEffect(() => {
+    if (!visible || screen !== 'game') {
+      return;
+    }
+    const id = setInterval(() => setTime(actions.gameTime()), 500);
+
+    return (): void => clearInterval(id);
+  }, [actions, visible, screen]);
 
   function resetTo(next: Screen): void {
     setScreen(next);
@@ -171,6 +196,35 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={10}
                 type="range"
                 value={fog}
+              />
+
+              <div style={styles.groupLabel}>TIME: {GameClock.format(time)}</div>
+              <div style={styles.presetRow}>
+                {TIME_PRESETS.map(([label, minutes]) => (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      setTime(minutes);
+                      actions.setGameTime(minutes);
+                    }}
+                    style={styles.actionButton}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <input
+                max={1439}
+                min={0}
+                onChange={(e) => {
+                  const minutes = Number(e.target.value);
+                  setTime(minutes);
+                  actions.setGameTime(minutes);
+                }}
+                step={15}
+                type="range"
+                value={time}
               />
             </div>
           )}

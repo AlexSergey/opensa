@@ -11,4 +11,6 @@ export interface GameEvents {
   'map-viewer': { enabled: boolean };
   ready: void;
   select: null | WorldObjectInfo;
+  /** In-game clock ticked to a new whole minute (minutes since midnight). */
+  time: { minutes: number };
 }

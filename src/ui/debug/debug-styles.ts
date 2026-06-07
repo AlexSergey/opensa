@@ -152,6 +152,11 @@ export const styles: Record<string, CSSProperties> = {
     width: 300,
     zIndex: 1000,
   },
+  presetRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
   radio: {
     accentColor: NEON,
     cursor: 'pointer',

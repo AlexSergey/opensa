@@ -24,12 +24,15 @@ import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/w
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
 import { type CellCoord } from './streaming/grid';
+import { GameClock } from './time/game-clock';
 
 const FIXED_STEP = 1 / 60;
 
 interface LoadOptions {
   /** Radius (world units) the collision zone is built for; streaming handles render. */
   radius?: number;
+  /** Start time of day in minutes since midnight (e.g. 360 = 6:00); defaults to noon. */
+  startMinutes?: number;
 }
 
 /**
@@ -54,6 +57,7 @@ export class Game {
   private readonly config: Config;
   private context: null | PluginContext = null;
   private readonly entityRoot = new Group();
+  private readonly gameClock = new GameClock();
   private lastRequest: null | RegionRequest = null;
   private readonly logger: Logger;
   private pipeline!: RenderPipeline;
@@ -147,6 +151,11 @@ export class Game {
     return this.streamingRoot;
   }
 
+  /** Current in-game time, minutes since midnight (0–1439). */
+  getTime(): number {
+    return this.gameClock.minutes;
+  }
+
   /** The grid cell the streaming view is in (null until streaming is wired). */
   getViewCell(): CellCoord | null {
     return this.streamingSystem?.viewCell() ?? null;
@@ -191,6 +200,7 @@ export class Game {
     if (!this.adapter) {
       throw new Error('Game.loadGame requires a world adapter (setWorldAdapter)');
     }
+    this.gameClock.set(options.startMinutes ?? 720); // default noon
     this.events.emit('loading', { fraction: 0 });
     await this.adapter.prepare((fraction) => this.events.emit('loading', { fraction }));
 
@@ -280,10 +290,23 @@ export class Game {
     this.streamingSystem = system;
   }
 
+  /** Jump the in-game clock to a time (minutes since midnight); emits `'time'`. */
+  setTime(minutes: number): void {
+    this.gameClock.set(minutes);
+    this.emitTime();
+  }
+
   setWorldAdapter(adapter: WorldAdapter): this {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Broadcast the current clock minute (event for UI/timecyc, console log for now). */
+  private emitTime(): void {
+    const minutes = this.gameClock.minutes;
+    this.events.emit('time', { minutes });
+    this.logger.log('time', GameClock.format(minutes));
   }
 
   /** Rebuild the collision overlay for the current region (or clear it when off). */
@@ -322,6 +345,9 @@ export class Game {
       }
       this.systems.update(delta);
       this.cameraController.update(delta);
+      if (this.gameClock.advance(delta, this.config.time.secondsPerGameMinute)) {
+        this.emitTime();
+      }
       if (this.context) {
         for (const plugin of this.plugins) {
           plugin.update?.(this.context);

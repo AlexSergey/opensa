@@ -60,7 +60,7 @@
   - [✅] Streaming fade objects
   - [✅] Draw distance limit (1000)
   - [✅] Debugger "game" draw distance slider control
-- [ ] Game time
+- [✅] Game time
 - [ ] Timecyc (sunny weather only)
   - [ ] 2 strategies
     - [ ] If you run a regular timecyc Python algorithm in 24h format

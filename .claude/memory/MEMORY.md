@@ -24,3 +24,4 @@
 - [In-game debugger](in-game-debugger.md) — plan 023 (DONE); F2 debug overlay (menu: player/vehicles/game/map), debugMode→mapViewer; old Ctrl+X overlay deleted
 - [Fog](fog.md) — plan 024 (DONE); distance fog (FogPlugin, Config.fog.distance default 800, Game.setFogDistance, debugger slider; off in mapViewer)
 - [Vehicle glass](vehicle-glass.md) — plan 025 (DONE); two-pass back/front glass in build-vehicle (SilentPatch/SkyGFX fix); windows no longer vanish at angles
+- [Game time](game-time.md) — plan 026 (DONE); in-game clock (GameClock, Config.time, Game.getTime/setTime, 'time' event, debugger Time tab); foundation for timecyc

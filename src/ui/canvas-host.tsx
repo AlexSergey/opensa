@@ -195,6 +195,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       showLogs: false,
       staticUrl: BASE,
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
+      time: { secondsPerGameMinute: 1.5 },
       vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
     });
     const adapter = new GtaSaWorldAdapter({
@@ -210,7 +211,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       .addPlugin(new FogPlugin());
 
     await game.init();
-    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS });
+    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360 }); // 6:00
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
@@ -277,7 +278,11 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         await adapter.loadVehicle(model, placement.colour);
       const gap = halfExtents[1] + 2; // car half-length (COL bounds) + clearance, so it clears the player
       const position: Vec3 = anchor
-        ? [anchor.from[0] - Math.sin(anchor.facing) * gap, anchor.from[1] + Math.cos(anchor.facing) * gap, anchor.from[2] + 0.5] // eslint-disable-line prettier/prettier
+        ? [
+            anchor.from[0] - Math.sin(anchor.facing) * gap,
+            anchor.from[1] + Math.cos(anchor.facing) * gap,
+            anchor.from[2] + 0.5,
+          ]
         : placement.position;
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
@@ -296,7 +301,19 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       );
       // The physics system keeps these live from the body; seed with the placement.
       const live: [number, number, number] = [position[0], position[1], position[2]];
-      const vehicle = { body, controller, doors, halfExtents, handling, heading, object, position: live, rig, seatLocal, wheels }; // eslint-disable-line prettier/prettier
+      const vehicle = {
+        body,
+        controller,
+        doors,
+        halfExtents,
+        handling,
+        heading,
+        object,
+        position: live,
+        rig,
+        seatLocal,
+        wheels,
+      };
       vehiclePhysics.add(vehicle);
       enterVehicle.add(vehicle);
       vehicleDamage.add({ body, object, parts });
@@ -334,18 +351,24 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       const q = new Quaternion(quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
       const forward = new Vector3(0, 1, 0).applyQuaternion(q); // car forward in world space
       const flipped = new Quaternion().setFromAxisAngle(forward, Math.PI).multiply(q);
-      character.physics.holdBody(active.body, [position[0], position[1], position[2] + 1.5], [flipped.x, flipped.y, flipped.z, flipped.w]); // eslint-disable-line prettier/prettier
+      character.physics.holdBody(
+        active.body,
+        [position[0], position[1], position[2] + 1.5],
+        [flipped.x, flipped.y, flipped.z, flipped.w],
+      );
     };
 
     const debugActions: DebugActions = {
       flipVehicle,
       fogDistance: () => game.getConfig().fog.distance,
+      gameTime: () => game.getTime(),
       playerCoords: () => character.viewOf(),
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
       },
       setFogDistance: (distance) => game.setFogDistance(distance),
+      setGameTime: (minutes) => game.setTime(minutes),
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
         const from = character.viewOf();
