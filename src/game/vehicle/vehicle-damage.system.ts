@@ -3,6 +3,7 @@ import type { Object3D } from 'three';
 import { Quaternion, Vector3 } from 'three';
 
 import type { System } from '../core/system';
+import type { Logger } from '../diagnostics/logger';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
 import type { Impact, PhysicsWorld } from '../physics/physics-world';
 import type { VehiclePart } from './vehicle-part';
@@ -43,12 +44,14 @@ export class VehicleDamageSystem implements System {
 
   private readonly dir = new Vector3();
   private readonly falling: FallingPart[] = [];
+  private readonly logger: Logger;
   private readonly physics: PhysicsWorld;
   private readonly quat = new Quaternion();
   private readonly vehicles: DamageVehicle[] = [];
 
-  constructor(physics: PhysicsWorld) {
+  constructor(physics: PhysicsWorld, logger: Logger) {
     this.physics = physics;
+    this.logger = logger;
   }
 
   add(vehicle: { body: number; object: Object3D; parts: VehiclePart[] }): void {
@@ -96,6 +99,8 @@ export class VehicleDamageSystem implements System {
   }
 
   private handleImpact(impact: Impact, touched: Set<VehiclePart>): void {
+    // Every contact force, gated to `debug` — turn on `showLogs: 'debug'` to recalibrate STRONG_HIT.
+    this.logger.debug('damage', `impact force=${impact.force.toFixed(0)}`, impact);
     if (impact.force < STRONG_HIT || !impact.point) {
       return;
     }
@@ -110,10 +115,12 @@ export class VehicleDamageSystem implements System {
     touched.add(part);
     if (car.damaged.has(part)) {
       this.detach(car, part); // already damaged → second hit knocks it off
+      this.logger.log('damage', `detach ${part.name}`, { force: impact.force, part: part.name });
     } else {
       part.ok.visible = false;
       part.dam.visible = true;
       car.damaged.add(part);
+      this.logger.log('damage', `deform ${part.name}`, { force: impact.force, part: part.name });
     }
   }
 

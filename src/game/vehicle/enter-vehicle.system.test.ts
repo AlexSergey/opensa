@@ -9,9 +9,13 @@ import type { PhysicsWorld, VehicleController } from '../physics/physics-world';
 import type { EnterableVehicle } from './enter-vehicle.system';
 import type { VehicleRig } from './vehicle-rig';
 
+import { Logger } from '../diagnostics/logger';
 import { EnterVehicleSystem } from './enter-vehicle.system';
 
 const CONTROLS = { back: 'KeyS', forward: 'KeyW', left: 'KeyA', right: 'KeyD' };
+
+/** Silent logger (showLogs off → never emits) for systems under test. */
+const SILENT_LOGGER = new Logger({ emit: (): undefined => undefined }, { showLogs: false });
 
 interface Harness {
   anim: { cameraAzimuth: number; clip: null | string; facing: number; loop: boolean };
@@ -107,6 +111,7 @@ function setup(player: Vec3 = [0, 0, 0]): Harness {
     { controls: CONTROLS } as unknown as Readonly<Config>,
     physics,
     9,
+    SILENT_LOGGER,
   );
 
   const hold = (code: string, down: boolean): void => {

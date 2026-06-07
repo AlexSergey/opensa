@@ -89,10 +89,18 @@ export function CanvasHost(): ReactElement {
     const observer = new ResizeObserver(() => game.resize(canvas.clientWidth, canvas.clientHeight));
     observer.observe(canvas);
     const off = game.events.on('debug-mode', ({ enabled }) => (debugEnabledRef.current = enabled));
+    // Single sink for gated diagnostics (silent unless `showLogs` is set). Already
+    // level-filtered by the Logger; filter further by `type` here when debugging a
+    // specific area, e.g. `if (type !== 'enter-vehicle') return;`.
+    const offLog = game.events.on('log', ({ data, level, message, type }) => {
+      // eslint-disable-next-line no-console -- this is the single intentional diagnostics sink
+      console[level](`[${type}] ${message}`, data ?? '');
+    });
 
     return (): void => {
       observer.disconnect();
       off();
+      offLog();
     };
   }, [game]);
 
@@ -125,6 +133,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       gameState: 'play',
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
       showCollision: false,
+      // Diagnostics off by default. Flip to 'debug' | 'log' | 'warn' | 'error' here to stream
+      // gated `log` events to the console; filter by `type` in the subscriber below.
+      showLogs: false,
       staticUrl: BASE,
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
     });
@@ -175,7 +186,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     // (gravity rests it on its raycast wheels; the full COL is kept for later damage).
     const vehiclePhysics = new VehiclePhysicsSystem(character.physics);
     game.addSystem(vehiclePhysics);
-    const vehicleDamage = new VehicleDamageSystem(character.physics);
+    const vehicleDamage = new VehicleDamageSystem(character.physics, game.getLogger());
     game.addSystem(vehicleDamage);
     const enterVehicle = new EnterVehicleSystem(
       character.keyboard,
@@ -188,6 +199,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       game.getConfig(),
       character.physics,
       character.playerCollider,
+      game.getLogger(),
     );
     game.addSystem(enterVehicle);
     for (const { heading, model, position } of VEHICLE_PLACEMENTS) {

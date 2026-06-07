@@ -1,3 +1,4 @@
+import type { LogEntry } from '../diagnostics/logger';
 import type { GameState } from '../interfaces/config.interface';
 import type { WorldObjectInfo } from '../interfaces/world-adapter.interface';
 
@@ -7,6 +8,7 @@ export interface GameEvents {
   'game-state': { state: GameState };
   loaded: void;
   loading: { fraction: number };
+  log: LogEntry;
   ready: void;
   select: null | WorldObjectInfo;
 }

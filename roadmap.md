@@ -23,7 +23,7 @@
 - [✅] Physics improvement - not lock in the steps
 - [✅] Animation controls - walking, running, etc.
 - [✅] Water rendering
-- [ ] Vehicle loader
+- [✅] Vehicle loader
   - [✅] Car collision
   - [✅] A full dummy framework (rotation/doors/headlights/seats)
   - [✅] Getting into a car
@@ -33,7 +33,7 @@
   - [✅] Car damage system
     - [✅] Car ramming
     - [✅] Striked car damage
-  - [ ] Vehicle VLO
+  - [✅] Vehicle VLO
   - [✅] Extract parking places to configuration array
 - [ ] Debugger Improvements
   - [ ] Flymode rename to map-viewer

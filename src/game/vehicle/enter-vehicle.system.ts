@@ -5,6 +5,7 @@ import { Quaternion, Vector3 } from 'three';
 import type { CharacterAnimationSystem } from '../character/character-animation.system';
 import type { CharacterControllerSystem } from '../character/character-controller.system';
 import type { System } from '../core/system';
+import type { Logger } from '../diagnostics/logger';
 import type { KeyboardInput } from '../input/keyboard';
 import type { Config } from '../interfaces/config.interface';
 import type { Vec3, VehicleHandling, VehicleWheelPlacement } from '../interfaces/world-adapter.interface';
@@ -116,6 +117,7 @@ export class EnterVehicleSystem implements System {
   private holdPos: Vec3 = [0, 0, 0]; // parked car pose, held still while the player slides in/out
   private holdQuat: [number, number, number, number] = [0, 0, 0, 1];
   private readonly keyboard: KeyboardInput;
+  private readonly logger: Logger;
   private phase: Phase = 'idle';
   private readonly physics: PhysicsWorld;
   private readonly placePlayer: (position: Vec3, moveBody?: boolean) => void;
@@ -139,6 +141,7 @@ export class EnterVehicleSystem implements System {
     config: Readonly<Config>,
     physics: PhysicsWorld,
     playerCollider: number,
+    logger: Logger,
   ) {
     this.keyboard = keyboard;
     this.playerPosition = playerPosition;
@@ -150,6 +153,7 @@ export class EnterVehicleSystem implements System {
     this.config = config;
     this.physics = physics;
     this.playerCollider = playerCollider;
+    this.logger = logger;
   }
 
   add(vehicle: EnterableVehicle): void {
@@ -293,6 +297,7 @@ export class EnterVehicleSystem implements System {
     this.physics.ignoreVehicles(this.playerCollider, true);
     this.restoreWhenClear = false; // entering again — keep ignoring cars
     this.controller.runPath(this.driverDoorPath(nearest));
+    this.logger.debug('enter-vehicle', 'approach', { distance: Math.sqrt(nearestDistance) });
   }
 
   private doorAngleOf(vehicle: EnterableVehicle | null): number {
@@ -428,6 +433,7 @@ export class EnterVehicleSystem implements System {
     this.controller.setEnabled(true);
     this.doorTarget = 0;
     this.phase = 'idle';
+    this.logger.log('enter-vehicle', 'exited');
   }
 
   /** True if the car is roughly the right way up (its local +Z still points mostly up). */
@@ -516,6 +522,7 @@ export class EnterVehicleSystem implements System {
     this.followTarget(this.active.object); // track the car (smooth) — not the per-frame-teleported rider
     this.aimCamera(this.active.heading); // centre behind the rear once; free to orbit while driving
     this.doorTarget = 0; // pull the door shut from inside
+    this.logger.log('enter-vehicle', 'seated');
   }
 
   /** Door is open → walk the player tight into the open doorway (aligned with the seat). */

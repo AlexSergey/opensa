@@ -19,6 +19,8 @@ export interface Config {
   movement: MovementConfig;
   /** Overlay collision (COL) wireframes on the current region (debug). */
   showCollision: boolean;
+  /** Diagnostic log floor: `false` = silent (default); otherwise emit `'log'` events at this level or higher. */
+  showLogs: false | LogLevel;
   staticUrl: string;
   streaming: StreamingConfig;
 }
@@ -36,6 +38,9 @@ export interface ControlsConfig {
 
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
+
+/** Diagnostic severity, low → high. The configured `showLogs` value is the floor that is emitted. */
+export type LogLevel = 'debug' | 'error' | 'log' | 'warn';
 
 /** Player movement tuning (world units/second; rates in units/s²). */
 export interface MovementConfig {

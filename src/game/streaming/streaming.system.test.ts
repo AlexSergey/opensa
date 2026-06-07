@@ -14,6 +14,7 @@ function config(overrides: Partial<Config> = {}): Config {
     gameState: 'play',
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
+    showLogs: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 100, lodDrawDistance: 300 },
     ...overrides,

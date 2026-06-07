@@ -16,6 +16,7 @@ import { CameraController } from './core/camera-controller';
 import { Clock } from './core/clock';
 import { createRenderContext } from './core/renderer';
 import { type System, SystemRegistry } from './core/system';
+import { Logger } from './diagnostics/logger';
 import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
 import { type Config, type GameState } from './interfaces/config.interface';
@@ -54,6 +55,7 @@ export class Game {
   private context: null | PluginContext = null;
   private readonly entityRoot = new Group();
   private lastRequest: null | RegionRequest = null;
+  private readonly logger: Logger;
   private pipeline!: RenderPipeline;
   private readonly plugins: Plugin[] = [];
   private readonly raycaster = new Raycaster();
@@ -67,6 +69,7 @@ export class Game {
   private constructor(canvas: HTMLCanvasElement, config: Config) {
     this.canvas = canvas;
     this.config = config;
+    this.logger = new Logger(this.events, this.config);
     // Dynamic entities (the player, later NPCs/vehicles) live in GTA Z-up; the
     // −90°X here is display-only, matching the region group. Physics stays Z-up.
     this.entityRoot.name = 'EntityRoot';
@@ -132,6 +135,11 @@ export class Game {
   /** Root group for dynamic entity meshes (player, NPCs). Native GTA Z-up content. */
   getEntityRoot(): Group {
     return this.entityRoot;
+  }
+
+  /** Shared diagnostics logger; pass to systems so they can emit gated `'log'` events. */
+  getLogger(): Logger {
+    return this.logger;
   }
 
   /** Root group the streaming system adds/removes map cells under (native GTA Z-up). */

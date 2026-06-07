@@ -14,6 +14,7 @@ function config(collisionDrawDistance: number): Config {
     gameState: 'play',
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
+    showLogs: false,
     staticUrl: '',
     streaming: { cellSize: 250, collisionDrawDistance, hdDrawDistance: 300, lodDrawDistance: 1500 },
   };
