@@ -90,6 +90,11 @@ export class CameraController {
     this.controls.target.copy(center);
   }
 
+  /** Set the follow-orbit azimuth (yaw about world up) — e.g. to swing behind the player on car exit. */
+  setAzimuth(azimuth: number): void {
+    this.azimuth = azimuth;
+  }
+
   /** Switch camera behaviour (follow ⇄ debug). */
   setMode(mode: CameraMode): void {
     if (mode === this.mode) {
@@ -101,11 +106,6 @@ export class CameraController {
     } else {
       this.controls.enabled = false;
     }
-  }
-
-  /** Set the follow-orbit azimuth (yaw about world up) — e.g. to swing behind the player on car exit. */
-  setAzimuth(azimuth: number): void {
-    this.azimuth = azimuth;
   }
 
   setTarget(object: null | Object3D): void {

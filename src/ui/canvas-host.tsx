@@ -1,5 +1,4 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
@@ -15,7 +14,7 @@ import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
-import { VehicleSystem } from '../game/vehicle/vehicle.system';
+import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { DebugOverlay } from './debug/debug-overlay';
 import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 
@@ -33,7 +32,8 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 // admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
 const VEHICLE_PLACEMENTS: readonly { heading: number; model: string; position: Vec3 }[] = [
   { heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
-  { heading: 0, model: 'camper', position: [2488, -1678, 13.4] },
+  // Camper next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
+  { heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
 ];
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
@@ -169,42 +169,58 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
     game.getStreamingRoot().add(water);
 
-    // Static painted cars parked near the spawn (native Z-up under the −90°X root),
-    // each with a fixed collider from the COL embedded in its DFF and a wheel rig
-    // (spin/steer; idle until vehicle physics drives it).
-    const vehicles = new VehicleSystem();
-    game.addSystem(vehicles);
+    // Painted cars parked near the spawn (native Z-up under the −90°X root). Each is a
+    // dynamic physics body whose chassis collider is the convex hull of its embedded COL
+    // (gravity rests it on its raycast wheels; the full COL is kept for later damage).
+    const vehiclePhysics = new VehiclePhysicsSystem(character.physics);
+    game.addSystem(vehiclePhysics);
     const enterVehicle = new EnterVehicleSystem(
       character.keyboard,
       character.viewOf,
       character.controllerSystem,
-      character.physics,
-      character.bodyHandle,
+      character.placePlayer,
       animationSystem,
       (azimuth) => game.setFollowAzimuth(azimuth),
+      (object) => game.setFollowTarget(object ?? player), // follow the car while seated, else the player
+      game.getConfig(),
+      character.physics,
+      character.playerCollider,
     );
     game.addSystem(enterVehicle);
     for (const { heading, model, position } of VEHICLE_PLACEMENTS) {
-      const { colliders, doors, halfExtents, object, rig, seats } = await adapter.loadVehicle(model);
+      const { colliders, doors, halfExtents, handling, object, rig, seats, wheels } = await adapter.loadVehicle(model);
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
-      vehicles.add(rig);
       // Driver seat = the front-seat dummy mirrored to the −X (driver) side.
       const seat = seats.frontseat;
       const seatLocal: [number, number, number] = seat
         ? [-Math.abs(seat.elements[12]), seat.elements[13], seat.elements[14]]
         : [-0.4, 0, 0];
-      enterVehicle.add({ doors, halfExtents, heading, position, seatLocal });
-
-      if (colliders) {
-        const placement = new Matrix4().compose(
-          new Vector3(position[0], position[1], position[2]),
-          new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), heading),
-          new Vector3(1, 1, 1),
-        );
-        character.physics.createStaticColliders([{ ...colliders, transforms: [placement] }]);
-      }
+      const { body, controller } = character.physics.createDynamicVehicle(
+        position,
+        heading,
+        colliders?.shape ?? null,
+        handling.mass,
+        wheels,
+      );
+      // The physics system keeps these live from the body; seed with the placement.
+      const live: [number, number, number] = [position[0], position[1], position[2]];
+      const vehicle = {
+        body,
+        controller,
+        doors,
+        halfExtents,
+        handling,
+        heading,
+        object,
+        position: live,
+        rig,
+        seatLocal,
+        wheels,
+      };
+      vehiclePhysics.add(vehicle);
+      enterVehicle.add(vehicle);
     }
 
     return game;

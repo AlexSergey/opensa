@@ -16,4 +16,6 @@
 - [Player physics plan](player-physics-plan.md) — plan 013; kinematic capsule character controller (collision/inertia/steps/slopes) (DONE)
 - [Simple water plan](simple-water-plan.md) — plan 014; flat textured water surface from water.dat (no shader yet)
 - [Vehicle loading plan](vehicle-loading-plan.md) — plan 015 (DONE); parse vehicle data + static painted/wheeled cars; incl. BinMeshPLG material recovery for modded DFFs; + COL + wheel rig (dummy)
-- [Enter vehicle plan](enter-vehicle-plan.md) — plan 016; Enter near a car → CJ aligns/opens door/gets in/sits (driver side); anims + door dummy
+- [Enter vehicle plan](enter-vehicle-plan.md) — plan 016 (DONE); Enter near a car → CJ aligns/opens door/gets in/sits, exit + camera (driver side)
+- [Vehicle driving plan](vehicle-driving-plan.md) — plan 017; arcade WSAD driving — SUPERSEDED by plan 018 (real physics)
+- [Vehicle physics plan](vehicle-physics-plan.md) — plan 018; real Rapier dynamic car (COL convex-hull collider + gravity + raycast wheels), replaces arcade; iter 1 DONE, iters 2–4 (engine/steer, get-in polish, damage) pending

@@ -28,19 +28,48 @@ export interface RegionRequest {
 
 export type Vec3 = [number, number, number];
 
+/** Raw driving feel from `handling.cfg` (the gameplay layer scales these into its model). */
+export interface VehicleHandling {
+  /** Braking deceleration. */
+  brakeDecel: number;
+  /** Engine acceleration. */
+  engineAccel: number;
+  /** Mass (kg) — heavier = less agile. */
+  mass: number;
+  /** Top speed (GTA units). */
+  maxVelocity: number;
+  /** Steering lock, degrees. */
+  steeringLock: number;
+}
+
 /** A loaded vehicle: the renderable, its model-space collision, wheel rig, doors and seats. */
 export interface VehicleModel {
-  /** Collision in model space (`transforms` empty — the caller sets the placement). */
+  /** Collision in model space (`transforms` empty — the caller sets the placement). The convex
+   * hull of its vertices is the dynamic chassis collider; the full COL is kept for damage. */
   colliders: ModelColliders | null;
   /** Swinging doors (open/close about the hinge). */
   doors: VehicleDoor[];
-  /** Planar half-extents `[hx, hy]` (vehicle space) from the collision bounds, for routing. */
-  halfExtents: [number, number];
+  /** Half-extents `[hx, hy, hz]` (vehicle space) from the collision bounds (door/seat routing). */
+  halfExtents: [number, number, number];
+  /** Driving feel from handling.cfg. */
+  handling: VehicleHandling;
   object: Object3D;
   /** Animatable wheels (spin/steer); register with the vehicle system. */
   rig: VehicleRig;
   /** Seat dummy local transforms in vehicle space (null if absent). */
   seats: { backseat: Matrix4 | null; frontseat: Matrix4 | null };
+  /** Raycast-wheel placements (hub position, radius, front/rear) for the physics vehicle. */
+  wheels: VehicleWheelPlacement[];
+}
+
+/** One raycast wheel for the physics vehicle: hub position in vehicle space, radius, axle. */
+export interface VehicleWheelPlacement {
+  /** Wheel hub position in vehicle space `[x, y, z]`. */
+  connection: [number, number, number];
+  /** Front wheels steer; all wheels are powered/braked per the drive type. */
+  front: boolean;
+  /** Rolling radius (world units). */
+  radius: number;
 }
 
 /**

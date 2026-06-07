@@ -5,6 +5,7 @@ import type {
   CellRequest,
   CharacterModel,
   RegionRequest,
+  VehicleHandling,
   VehicleModel,
   WorldAdapter,
   WorldObjectInfo,
@@ -216,20 +217,27 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     const colliders = col ? toModelColliders({ col, name: col.name, transforms: [] }) : null;
     // Half-extents from the collision bounds — robust to stray vertices in modded DFFs
     // (a mesh bbox can blow up); the COL is authored clean.
-    const halfExtents: [number, number] = col
+    const halfExtents: [number, number, number] = col
       ? [
           Math.max(Math.abs(col.bounds.min[0]), Math.abs(col.bounds.max[0])),
           Math.max(Math.abs(col.bounds.min[1]), Math.abs(col.bounds.max[1])),
+          Math.max(Math.abs(col.bounds.min[2]), Math.abs(col.bounds.max[2])),
         ]
-      : [1.2, 2.5];
+      : [1.2, 2.5, 0.7];
 
     return {
       colliders,
       doors: built.doors,
       halfExtents,
+      handling: this.vehicleHandling(def.handlingId),
       object: built.root,
       rig: new VehicleRig(built.wheels),
       seats: built.seats,
+      wheels: built.wheels.map((wheel) => ({
+        connection: wheel.connection,
+        front: wheel.front,
+        radius: wheel.radius,
+      })),
     };
   }
 
@@ -316,6 +324,24 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return { primary: white, secondary: white };
+  }
+
+  /** Driving feel for a handling id (handling.cfg columns), with sane fallbacks. */
+  private vehicleHandling(handlingId: string): VehicleHandling {
+    const fields = this.handling?.get(handlingId)?.fields;
+    const num = (index: number, fallback: number): number => {
+      const value = Number(fields?.[index]);
+
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    return {
+      brakeDecel: num(16, 8.5),
+      engineAccel: num(12, 22),
+      mass: num(0, 1500),
+      maxVelocity: num(11, 160),
+      steeringLock: num(19, 30),
+    };
   }
 }
 

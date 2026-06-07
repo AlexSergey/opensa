@@ -28,15 +28,37 @@
   - [✅] A full dummy framework (rotation/doors/headlights/seats)
   - [✅] Getting into a car
     - [✅] Door opening animation
-  - [ ] Car physic
-  - [ ] Basic car controls
+  - [✅] Car physic
+  - [✅] Basic car controls
   - [ ] Car damage system
+    - [ ] Car ramming
+    - [ ] Striked car damage
   - [ ] Vehicle VLO
-  - [ ] Extract parking places to configuration array
-- [ ] Character rigging bug
+  - [✅] Extract parking places to configuration array
+- [ ] Debugger Improvements
+  - [ ] Flymode rename to map-viewer
+  - [ ] Multi menu
+  - [ ] Map-viewer will be activated by checkbox (all map zones will be available after that)
+  - [ ] Camera fly mode for screenshots (without UI layer) K+M
+  - [ ] Show current coords - button to past coords to console or by X
+  - [ ] Flip vehicle
+  - [ ] Car spawning
+  - [ ] Tommy respawn (if stuck in the map)
+- [ ] Add logger
+- [ ] Viewers
+  - [ ] Rename model-viewer to object-viewer
+  - [ ] Car viewer
+    - [ ] Select element press E to open
+  - [ ] Player viewer
+    - [ ] Press mouse to play animations
+- [ ] Fog
+  - [ ] Streaming fade objects
+  - [ ] Draw distance limit (1000)
 - [ ] Game time
-- [ ] Timecyc
-- [ ] Tobj and night objects
+- [ ] Timecyc (sunny weather only)
+  - [ ] 2 strategies
+    - [ ] If you run a regular timecyc Python algorithm in 24h format
+    - [ ] If 24h, then as is
 - [ ] Graphics
   - [ ] Light
   - [ ] Shadows
@@ -46,18 +68,15 @@
     - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
     - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [ ] Water shader
+  - [ ] Night objects (Tobj)
+  - [ ] 2dfx (maybe)
 - [ ] UI Layer
+  - [ ] The Ui layer should not be involved in post processing.
   - [ ] Find good fonts
   - [ ] Show current time
   - [ ] HUD
     - [ ] Show current coords (press X)
       - [ ] If user pressed X again the coords block will be hide and current coords will be copied to the buffer
-- [ ] Fog
-  - [ ] Strimming fade objects
-  - [ ] The draw distance limit (1000)
-- [ ] Weapons
-  - [ ] Animation
-  - [ ] Shooting
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Gzip
@@ -71,6 +90,46 @@
     - [ ] Weapons
   - [ ] Load in background
     - [ ] Map parts
+- [ ] Google Analytics
+- [ ] Version in cache file names (reset user caches when update)
+- [ ] Browser caching
+- [ ] Buy domain name
+- [ ] Rename project
 - [ ] CI/CD
 - [ ] Release v 0.1.0
+
+Known issues:
+- [ ] If the camera directly above on the scene, then Tommy only moves forward
+- [ ] Rigging models bug
+- [ ] Water in whole map (flooded tunnels)
+- [ ] Exiting a car that's flipped over while already in it—Tommy emerges from the wrong side (the door calculation only takes into account yaw). We'll come back when you decide.
+
+Next iterations:
+- [ ] Particles
+  - [ ] Smoke from wheels
+  - [ ] Fire
+  - [ ] Car scratches
+- [ ] Weapons
+  - [ ] All types of weapons
+    - [ ] Animation
+    - [ ] Shooting
+    - [ ] Damage
+- [ ] Peds spawning system
+- [ ] Veh paths
+- [ ] Destroyable objects
+- [ ] Birds
+- [ ] Rest timecyc
+  - [ ] Weather
+    - [ ] Rain
+    - [ ] Sand storm
 - [ ] Advanced Water: floating/bouncing, underwater fog, flow from water.dat, clipping.
+- [ ] Car damage
+- [ ] Car explosion
+- [ ] Car physic improvements
+  - [ ] Boarding through the passenger door
+  - [ ] Jumping out of the car while it's moving
+    - [ ] Jumping and rolling animations
+  - [ ] If the driver's door is blocked by a wall or another car, get in from the passenger side. If both are blocked, don't
+    get in.
+  - [ ] Entry animation interrupted.
+- [ ] Interiors

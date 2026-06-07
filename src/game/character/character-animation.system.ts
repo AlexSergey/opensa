@@ -64,6 +64,8 @@ export class CharacterAnimationSystem implements System {
   private scriptedClip: null | string = null;
   private scriptedFacing: null | number = null;
   private scriptedLoop = true;
+  /** Full body orientation `[x, y, z, w]` while scripted (e.g. tilt/flip with a car); overrides facing. */
+  private scriptedOrientation: null | readonly [number, number, number, number] = null;
   private state: LocoState = 'ground';
   private stateTime = 0;
   /** Facing the body is turning toward (movement direction); `facing` eases to it. */
@@ -94,10 +96,14 @@ export class CharacterAnimationSystem implements System {
    * Override locomotion with a scripted clip (car entry/sit, …) and optional held
    * facing (yaw about +Z). Pass `null` to return to keyboard-driven locomotion.
    */
-  setScripted(clip: null | string, options: { facing?: number; loop?: boolean } = {}): void {
+  setScripted(
+    clip: null | string,
+    options: { facing?: number; loop?: boolean; orientation?: readonly [number, number, number, number] } = {},
+  ): void {
     this.scriptedClip = clip;
     this.scriptedLoop = options.loop ?? true;
     this.scriptedFacing = options.facing ?? null;
+    this.scriptedOrientation = options.orientation ?? null;
   }
 
   update(delta: number): void {
@@ -194,7 +200,10 @@ export class CharacterAnimationSystem implements System {
 
   /** Play the scripted clip (held facing, no locomotion bob) instead of walk/run/idle. */
   private playScripted(delta: number): void {
-    if (this.scriptedFacing !== null) {
+    if (this.scriptedOrientation) {
+      const [x, y, z, w] = this.scriptedOrientation;
+      this.character.quaternion.set(x, y, z, w); // full tilt/flip with the car
+    } else if (this.scriptedFacing !== null) {
       this.character.rotation.z = this.scriptedFacing;
     }
     this.controller.setSpeed(1);

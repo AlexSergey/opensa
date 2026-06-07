@@ -28,6 +28,14 @@ export interface CharacterContext {
   halfExtents: Vec3;
   keyboard: Keyboard;
   physics: PhysicsWorld;
+  /**
+   * Place the player at a world point (Z-up) + sync its Transform this frame (no render lag).
+   * `moveBody` (default true) also teleports the physics body; pass false to move only the
+   * rendered Transform (e.g. while riding in a car, so the kinematic body doesn't shove the car).
+   */
+  placePlayer: (position: Vec3, moveBody?: boolean) => void;
+  /** The player's collider handle (e.g. to disable it while seated in a car). */
+  playerCollider: number;
   playerEid: number;
   renderRefs: Map<number, Object3D>;
   /** The player mesh's skeleton (null if not skinned). */
@@ -118,6 +126,18 @@ export async function setupCharacter(
 
   const viewOf = (): Vec3 => [Transform.x[playerEid], Transform.y[playerEid], Transform.z[playerEid]];
 
+  // Place the player at a world point and write its Transform now, so the rendered mesh/camera
+  // match this frame (no one-tick lag). `moveBody` also teleports the kinematic body; while
+  // riding in a car we pass false so the body never enters the car and shoves it.
+  const placePlayer = (position: Vec3, moveBody = true): void => {
+    if (moveBody) {
+      physics.teleport(RigidBody.handle[playerEid], position);
+    }
+    Transform.x[playerEid] = position[0];
+    Transform.y[playerEid] = position[1];
+    Transform.z[playerEid] = position[2];
+  };
+
   return {
     bodyHandle: RigidBody.handle[playerEid],
     bonesByName: options.bonesByName ?? new Map<string, Bone>(),
@@ -125,6 +145,8 @@ export async function setupCharacter(
     halfExtents: extents,
     keyboard,
     physics,
+    placePlayer,
+    playerCollider: RigidBody.collider[playerEid],
     playerEid,
     renderRefs,
     skeleton: options.skeleton ?? null,

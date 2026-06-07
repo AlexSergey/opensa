@@ -3,16 +3,21 @@ import { describe, expect, it } from 'vitest';
 
 import type { CharacterAnimationSystem } from '../character/character-animation.system';
 import type { CharacterControllerSystem } from '../character/character-controller.system';
+import type { Config } from '../interfaces/config.interface';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
-import type { PhysicsWorld } from '../physics/physics-world';
+import type { PhysicsWorld, VehicleController } from '../physics/physics-world';
 import type { EnterableVehicle } from './enter-vehicle.system';
+import type { VehicleRig } from './vehicle-rig';
 
 import { EnterVehicleSystem } from './enter-vehicle.system';
+
+const CONTROLS = { back: 'KeyS', forward: 'KeyW', left: 'KeyA', right: 'KeyD' };
 
 interface Harness {
   anim: { cameraAzimuth: number; clip: null | string; facing: number; loop: boolean };
   ctrl: { arrived: boolean; enabled: boolean; path: null | Vec3[] };
-  phys: { teleports: Vec3[] };
+  hold: (code: string, down: boolean) => void;
+  phys: { brake: number; engine: number; parked: number; speed: number; steer: number; teleports: Vec3[] };
   press: (down: boolean) => void;
   system: EnterVehicleSystem;
 }
@@ -22,9 +27,22 @@ function doorAngle(vehicle: EnterableVehicle): number {
   return vehicle.doors[0].pivot.quaternion.angleTo(new Quaternion());
 }
 
+/** Run the full enter sequence so the system ends seated (Enter released, ready to drive). */
+function seatPlayer(h: Harness, car: EnterableVehicle): void {
+  h.system.add(car);
+  h.press(true);
+  h.system.update(0.016); // approaching
+  h.ctrl.arrived = true;
+  h.system.update(1); // arrived → open → step into the doorway
+  h.system.update(0.016); // doorway → climb in (phase 'getin')
+  h.system.fixedUpdate(2); // getin slide elapses (fixed step) → seated
+  h.press(false);
+  h.system.update(0.016); // release Enter so driving runs (no exit edge)
+}
+
 function setup(player: Vec3 = [0, 0, 0]): Harness {
-  const kb = { down: false };
-  const keyboard = { isDown: (code: string): boolean => code === 'Enter' && kb.down };
+  const held = new Set<string>();
+  const keyboard = { isDown: (code: string): boolean => held.has(code) };
 
   const ctrl = { arrived: false, enabled: true, path: null as null | Vec3[] };
   const controller = {
@@ -39,9 +57,29 @@ function setup(player: Vec3 = [0, 0, 0]): Harness {
     },
   } as unknown as CharacterControllerSystem;
 
-  const phys = { teleports: [] as Vec3[] };
+  const phys = { brake: 0, engine: 0, parked: 0, speed: 0, steer: 0, teleports: [] as Vec3[] };
+  const placePlayer = (position: Vec3): void => {
+    phys.teleports.push(position);
+  };
   const physics = {
-    teleport: (_handle: number, position: Vec3) => phys.teleports.push(position),
+    getLinvel: (): Vec3 => [0, phys.speed, 0], // heading 0 → forward speed = vy
+    holdBody: (): undefined => undefined,
+    ignoreVehicles: (): undefined => undefined,
+    parkVehicle: (): void => {
+      phys.parked += 1;
+    },
+    readBody: (): { position: Vec3; quaternion: [number, number, number, number] } => ({
+      position: [0, 0, 0],
+      quaternion: [0, 0, 0, 1],
+    }),
+    seedReverse: (): undefined => undefined,
+    setColliderSensor: (): undefined => undefined,
+    setVehicleControls: (_c: VehicleController, _w: unknown, engine: number, brake: number, steer: number): void => {
+      phys.engine = engine;
+      phys.brake = brake;
+      phys.steer = steer;
+    },
+    vehicleSpeed: (): number => phys.speed,
   } as unknown as PhysicsWorld;
 
   const anim = { cameraAzimuth: 0, clip: null as null | string, facing: 0, loop: true };
@@ -55,37 +93,54 @@ function setup(player: Vec3 = [0, 0, 0]): Harness {
     },
   } as unknown as CharacterAnimationSystem;
 
+  const aimCamera = (yaw: number): void => {
+    anim.cameraAzimuth = yaw;
+  };
   const system = new EnterVehicleSystem(
     keyboard,
     () => player,
     controller,
-    physics,
-    7,
+    placePlayer,
     animation,
-    (yaw) => {
-      anim.cameraAzimuth = yaw;
-    },
+    aimCamera,
+    () => undefined, // followTarget (camera) — unused in tests
+    { controls: CONTROLS } as unknown as Readonly<Config>,
+    physics,
+    9,
   );
 
-  return {
-    anim,
-    ctrl,
-    phys,
-    press: (down): void => {
-      kb.down = down;
-    },
-    system,
+  const hold = (code: string, down: boolean): void => {
+    if (down) {
+      held.add(code);
+    } else {
+      held.delete(code);
+    }
   };
+
+  return { anim, ctrl, hold, phys, press: (down): void => hold('Enter', down), system };
 }
 
 /** Car with hinge at the body origin, half-extents [1, 2], driver seat at [-0.4, 0, -0.16]. */
 function vehicleAt(position: Vec3): EnterableVehicle {
+  const rig = { setSpeed: (): undefined => undefined, setSteer: (): undefined => undefined } as unknown as VehicleRig;
+
   return {
+    body: 0,
+    controller: {} as unknown as VehicleController,
     doors: [{ closed: new Quaternion(), pivot: new Object3D(), side: 'lf' }],
-    halfExtents: [1, 2],
+    halfExtents: [1, 2, 0.7],
+    handling: { brakeDecel: 9, engineAccel: 20, mass: 1500, maxVelocity: 160, steeringLock: 30 },
     heading: 0,
+    object: new Object3D(),
     position,
+    rig,
     seatLocal: [-0.4, 0, -0.16],
+    wheels: [
+      { connection: [0.8, 1.5, -0.4], front: true, radius: 0.4 },
+      { connection: [-0.8, 1.5, -0.4], front: true, radius: 0.4 },
+      { connection: [-0.8, -1.5, -0.4], front: false, radius: 0.4 },
+      { connection: [0.8, -1.5, -0.4], front: false, radius: 0.4 },
+    ],
   };
 }
 
@@ -113,6 +168,22 @@ describe('EnterVehicleSystem', () => {
       h.press(true);
       h.system.update(1); // approaching, not arrived
       expect(doorAngle(car)).toBeCloseTo(0);
+    });
+
+    it('does not drive while not seated', () => {
+      const h = setup();
+      h.system.add(vehicleAt([2, 0, 0]));
+      h.hold('KeyW', true);
+      h.system.fixedUpdate(0.1); // idle, not in the car
+      expect(h.phys.engine).toBe(0);
+    });
+
+    it('applies no engine force when seated off-throttle (coast brake only)', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.system.fixedUpdate(0.1); // seated, no keys
+      expect(h.phys.engine).toBe(0);
+      expect(h.phys.brake).toBeGreaterThan(0); // light idle brake
     });
   });
 
@@ -157,7 +228,7 @@ describe('EnterVehicleSystem', () => {
       expect(h.ctrl.enabled).toBe(false);
       expect(h.anim.clip).toBe('car_getin_lhs');
 
-      h.system.update(2); // getin elapses → seated
+      h.system.fixedUpdate(2); // getin slide elapses (fixed step) → seated
       expect(h.anim.clip).toBe('car_sit');
       expect(h.phys.teleports.length).toBeGreaterThan(0);
       expect(h.anim.cameraAzimuth).toBeCloseTo(0); // heading 0 → camera behind the car's rear
@@ -175,7 +246,7 @@ describe('EnterVehicleSystem', () => {
       h.ctrl.arrived = true;
       h.system.update(1);
       h.system.update(0.016);
-      h.system.update(2); // seated
+      h.system.fixedUpdate(2); // seated
       expect(h.anim.facing).toBeCloseTo(0); // faces car forward (+Y at heading 0)
 
       h.system.update(1); // door pulled shut
@@ -192,19 +263,20 @@ describe('EnterVehicleSystem', () => {
       h.ctrl.arrived = true;
       h.system.update(1); // open → stepin
       h.system.update(0.016); // doorway → getin
-      h.system.update(2); // → seated
+      h.system.fixedUpdate(2); // getin slide (fixed step) → seated
       expect(h.anim.clip).toBe('car_sit');
 
-      // Now exit.
+      // Now exit (stationary → coast-to-stop completes immediately on the fixed step).
       h.press(false);
       h.system.update(0.016); // release Enter
       h.press(true);
-      h.system.update(0.016); // seated + Enter → reopen the door
-      h.system.update(1); // door open → climb out
+      h.system.update(0.016); // seated + Enter → 'stopping'
+      h.system.fixedUpdate(0.016); // already stopped → begin exit (open the door)
+      h.system.update(1); // door open → climb out (phase 'exiting')
       expect(h.anim.clip).toBe('car_getout_lhs');
       expect(h.ctrl.enabled).toBe(false); // still gated mid-exit
 
-      h.system.update(2); // climb-out elapses → control restored
+      h.system.fixedUpdate(2); // climb-out slide (fixed step) → control restored
       expect(h.ctrl.enabled).toBe(true);
       expect(h.anim.clip).toBeNull();
       expect(h.anim.facing).toBeCloseTo(Math.PI / 2); // heading 0 → faces −X, away from the car body
@@ -212,6 +284,66 @@ describe('EnterVehicleSystem', () => {
 
       h.system.update(1); // door shut behind
       expect(doorAngle(car)).toBeCloseTo(0);
+    });
+
+    it('drives forward on throttle', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.hold('KeyW', true);
+      h.system.fixedUpdate(0.1);
+      expect(h.phys.engine).toBeGreaterThan(0);
+      expect(h.phys.brake).toBe(0);
+    });
+
+    it('brakes when reversing key is held while moving forward', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.phys.speed = 5; // already rolling forward
+      h.hold('KeyS', true);
+      h.system.fixedUpdate(0.1);
+      expect(h.phys.brake).toBeGreaterThan(0);
+      expect(h.phys.engine).toBe(0);
+    });
+
+    it('reverses when back is held at rest', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.phys.speed = 0;
+      h.hold('KeyS', true);
+      h.system.fixedUpdate(0.1);
+      expect(h.phys.engine).toBeLessThan(0);
+    });
+
+    it('steers the front wheels toward the input', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.hold('KeyD', true);
+      h.system.fixedUpdate(0.2);
+      h.system.fixedUpdate(0.2);
+      expect(h.phys.steer).not.toBe(0);
+    });
+
+    it('parks the car (brakes to a stop) when the player begins exiting', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.press(true);
+      h.system.update(0.016); // seated + Enter → 'stopping'
+      h.system.fixedUpdate(0.016); // stationary → startExit parks the car
+      expect(h.phys.parked).toBeGreaterThan(0);
+    });
+
+    it('coasts to a stop before exiting when moving (does not exit a moving car)', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.phys.speed = 10; // moving forward
+      h.press(true);
+      h.system.update(0.016); // → 'stopping'
+      h.system.fixedUpdate(0.016); // still moving → brakes, stays in the car
+      expect(h.phys.brake).toBeGreaterThan(0);
+      expect(h.phys.parked).toBe(0); // not exited yet
+      h.phys.speed = 0; // now stopped
+      h.system.fixedUpdate(0.016); // → startExit
+      expect(h.phys.parked).toBeGreaterThan(0);
     });
   });
 });

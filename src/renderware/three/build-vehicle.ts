@@ -29,6 +29,8 @@ export interface BuiltVehicle {
 
 /** One placed wheel: the group a rig spins (about the axle) and steers (front, about up). */
 export interface BuiltWheel {
+  /** Wheel hub position in vehicle space `[x, y, z]` (the raycast-vehicle connection point). */
+  connection: [number, number, number];
   /** Front wheels steer; all wheels spin. */
   front: boolean;
   /** Wheel radius in world units (roll = distance / radius). */
@@ -177,9 +179,10 @@ function addWheels(
     }
     const scale = (placement.rear ? options.wheelScale[1] : options.wheelScale[0]) * WHEEL_SCALE_BOOST;
 
+    const world = worldMatrix(clump, index, worldCache);
     const pivot = new Group();
     pivot.name = frame.name;
-    pivot.applyMatrix4(worldMatrix(clump, index, worldCache)); // dummy position + orientation
+    pivot.applyMatrix4(world); // dummy position + orientation
 
     const spinner = new Group();
     spinner.name = `${frame.name}_spin`;
@@ -198,7 +201,13 @@ function addWheels(
     spinner.add(mesh);
 
     root.add(pivot);
-    wheels.push({ front: !placement.rear, radius: baseRadius * scale, spinner });
+    const hub = new Vector3().setFromMatrixPosition(world);
+    wheels.push({
+      connection: [hub.x, hub.y, hub.z],
+      front: !placement.rear,
+      radius: baseRadius * scale,
+      spinner,
+    });
   });
 
   return wheels;
