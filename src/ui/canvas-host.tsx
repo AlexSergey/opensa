@@ -34,12 +34,15 @@ const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
 const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
 
+// Initial paint per model — carcols.dat palette indices (first two = primary/secondary).
+const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
+
 // Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
 // admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
 const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
-  { heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
+  { colour: CAR_COLORS.admiral, heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
   // Camper next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
-  { heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
+  { colour: CAR_COLORS.camper, heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
 ];
 
 interface Bootstrap {
@@ -271,7 +274,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     ): Promise<SpawnedVehicle> => {
       const { heading, model } = placement;
       const { colliders, doors, halfExtents, handling, lod, object, parts, rig, seats, wheels } =
-        await adapter.loadVehicle(model);
+        await adapter.loadVehicle(model, placement.colour);
       const gap = halfExtents[1] + 2; // car half-length (COL bounds) + clearance, so it clears the player
       const position: Vec3 = anchor
         ? [anchor.from[0] - Math.sin(anchor.facing) * gap, anchor.from[1] + Math.cos(anchor.facing) * gap, anchor.from[2] + 0.5] // eslint-disable-line prettier/prettier
@@ -346,9 +349,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
         const from = character.viewOf();
-        const spawned = await spawnVehicle({ heading: facing, model, position: from }, { facing, from });
+        const colour = CAR_COLORS[model];
+        const spawned = await spawnVehicle({ colour, heading: facing, model, position: from }, { facing, from });
         const at: Vec3 = [spawned.position[0], spawned.position[1], spawned.position[2]];
-        vehicleLod.add({ heading: facing, model, position: at }, spawned);
+        vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);
       },
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
     };

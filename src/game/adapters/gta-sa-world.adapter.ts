@@ -195,7 +195,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    * collision embedded in the DFF (model space — the caller sets the placement).
    * Native Z-up — the caller parents it under the −90°X streaming root.
    */
-  async loadVehicle(modelName: string): Promise<VehicleModel> {
+  async loadVehicle(modelName: string, colour?: string): Promise<VehicleModel> {
     await this.ensureVehicleData();
     const name = modelName.toLowerCase();
     const def = this.vehicleDefs?.get(name);
@@ -210,7 +210,13 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       this.loadGenericVehicleTextures(),
     ]);
     const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
-    const { primary, secondary } = this.resolveVehicleColours(name);
+    const indices = colour
+      ? colour
+          .split(',')
+          .map((cell) => Number(cell.trim()))
+          .filter((value) => Number.isFinite(value))
+      : undefined;
+    const { primary, secondary } = this.resolveVehicleColours(name, indices);
 
     const built = buildVehicle(parseDff(dffBuffer), textures, { primary, secondary, wheelScale: def.wheelScale });
     const col = parseDffCollision(dffBuffer);
@@ -302,13 +308,21 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   /** First carcol combo for a model → primary/secondary RGB (falls back to white). */
-  private resolveVehicleColours(name: string): {
+  private resolveVehicleColours(
+    name: string,
+    indices?: number[],
+  ): {
     primary: [number, number, number];
     secondary: [number, number, number];
   } {
     const colours = this.vehicleColours;
     const white: [number, number, number] = [255, 255, 255];
     const rgb = (index: number): [number, number, number] => colours?.palette[index] ?? white;
+
+    // Explicit carcols indices (e.g. '34,34' / '1,31,1,0') win — first two are primary/secondary.
+    if (indices && indices.length > 0) {
+      return { primary: rgb(indices[0]), secondary: rgb(indices[1] ?? indices[0]) };
+    }
 
     const combo = colours?.cars.get(name)?.[0];
     if (combo) {

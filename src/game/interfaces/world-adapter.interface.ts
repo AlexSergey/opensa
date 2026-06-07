@@ -99,8 +99,12 @@ export interface WorldAdapter {
   loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel>;
   /** Build a debug wireframe overlay of the region's collision (empty if unsupported). */
   loadCollisionDebug(request: RegionRequest): Promise<Object3D[]>;
-  /** Load a painted, wheeled vehicle by model name (native Z-up; place under the streaming root). */
-  loadVehicle(modelName: string): Promise<VehicleModel>;
+  /**
+   * Load a painted, wheeled vehicle by model name (native Z-up; place under the streaming root).
+   * `colour` overrides the paint with carcols palette indices (e.g. `'34,34'` or `'1,31,1,0'`); the
+   * first two indices become the primary/secondary paint. Omit to use the car's default carcol combo.
+   */
+  loadVehicle(modelName: string, colour?: string): Promise<VehicleModel>;
   /** Build the flat water surface from `water.dat`, textured from the given TXD (native Z-up). */
   loadWater(waterUrl: string, txdUrl: string): Promise<Object3D>;
   /** Download/parse everything needed; reports progress 0..1. */

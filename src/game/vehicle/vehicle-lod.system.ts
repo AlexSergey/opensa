@@ -17,6 +17,8 @@ export interface SpawnedVehicle {
 
 /** A parked-car placement (what {@link VehicleLodSystem} respawns from). */
 export interface VehiclePlacement {
+  /** Optional carcols palette indices for the paint (e.g. `'34,34'`); omit for the car's default. */
+  colour?: string;
   heading: number;
   model: string;
   position: Vec3;
