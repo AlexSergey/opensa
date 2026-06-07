@@ -1,9 +1,10 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { type Mesh, type Object3D } from 'three';
+import { type Mesh, type Object3D, Quaternion, Vector3 } from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
 import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-lod.system';
+import type { DebugActions } from './debug/debug-overlay';
 
 import { Game } from '../game';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
@@ -40,9 +41,14 @@ const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
   { heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
 ];
 
+interface Bootstrap {
+  debugActions: DebugActions;
+  game: Game;
+}
+
 // One bootstrap per page load, kept at module scope so React StrictMode's
 // double-mount (dev) doesn't spin up a second renderer / archive download.
-let bootstrapped: null | Promise<Game> = null;
+let bootstrapped: null | Promise<Bootstrap> = null;
 
 /**
  * The single React surface: mounts the canvas the {@link Game} renders into and
@@ -52,6 +58,7 @@ let bootstrapped: null | Promise<Game> = null;
 export function CanvasHost(): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [game, setGame] = useState<Game | null>(null);
+  const [actions, setActions] = useState<DebugActions | null>(null);
   const [phase, setPhase] = useState<'error' | 'loading' | 'ready'>('loading');
   const [errorText, setErrorText] = useState('');
   const debugEnabledRef = useRef(false);
@@ -66,7 +73,8 @@ export function CanvasHost(): ReactElement {
     bootstrap(canvas)
       .then((ready) => {
         if (!disposed) {
-          setGame(ready);
+          setGame(ready.game);
+          setActions(ready.debugActions);
           setPhase('ready');
         }
       })
@@ -91,7 +99,7 @@ export function CanvasHost(): ReactElement {
     }
     const observer = new ResizeObserver(() => game.resize(canvas.clientWidth, canvas.clientHeight));
     observer.observe(canvas);
-    const off = game.events.on('debug-mode', ({ enabled }) => (debugEnabledRef.current = enabled));
+    const off = game.events.on('map-viewer', ({ enabled }) => (debugEnabledRef.current = enabled));
     // Single sink for gated diagnostics (silent unless `showLogs` is set). Already
     // level-filtered by the Logger; filter further by `type` here when debugging a
     // specific area, e.g. `if (type !== 'enter-vehicle') return;`.
@@ -122,18 +130,18 @@ export function CanvasHost(): ReactElement {
       <canvas onClick={handleClick} ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
       {phase === 'loading' && <Overlay text="Loading map…" />}
       {phase === 'error' && <Overlay text={`Failed to load map: ${errorText}`} />}
-      {game && <DebugOverlay game={game} />}
+      {game && actions && <DebugOverlay actions={actions} game={game} />}
     </>
   );
 }
 
-function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
-  bootstrapped ??= (async (): Promise<Game> => {
+function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
+  bootstrapped ??= (async (): Promise<Bootstrap> => {
     const game = Game.getInstance(canvas, {
       camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
-      debugMode: false,
       gameState: 'play',
+      mapViewer: false,
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
       showCollision: false,
       // Diagnostics off by default. Flip to 'debug' | 'log' | 'warn' | 'error' here to stream
@@ -207,12 +215,20 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
     );
     game.addSystem(enterVehicle);
 
-    // Spawn one parked car: load it, place it, make it a dynamic body, and register it with the
-    // vehicle systems. Returns how to despawn it (used by the LOD system to unload distant cars).
-    const spawnVehicle = async (placement: VehiclePlacement): Promise<SpawnedVehicle> => {
-      const { heading, model, position } = placement;
+    // Spawn one car: load it, place it, make it a dynamic body, and register it with the vehicle
+    // systems. With `anchor`, the position is computed just in front of it (clear of its body, sized
+    // from the car's COL bounds). Returns how to despawn it (used by the LOD system / debug menu).
+    const spawnVehicle = async (
+      placement: VehiclePlacement,
+      anchor?: { facing: number; from: Vec3 },
+    ): Promise<SpawnedVehicle> => {
+      const { heading, model } = placement;
       const { colliders, doors, halfExtents, handling, lod, object, parts, rig, seats, wheels } =
         await adapter.loadVehicle(model);
+      const gap = halfExtents[1] + 2; // car half-length (COL bounds) + clearance, so it clears the player
+      const position: Vec3 = anchor
+        ? [anchor.from[0] - Math.sin(anchor.facing) * gap, anchor.from[1] + Math.cos(anchor.facing) * gap, anchor.from[2] + 0.5] // eslint-disable-line prettier/prettier
+        : placement.position;
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
@@ -256,7 +272,38 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Game> {
       vehicleLod.add(placement, await spawnVehicle(placement));
     }
 
-    return game;
+    // Flip the occupied car: a 180° roll about its forward axis (wheels ↔ roof), lifted clear of
+    // the ground, via holdBody (one-shot teleport that also zeroes velocity).
+    const flipVehicle = (): void => {
+      const active = enterVehicle.getActive();
+      if (!active) {
+        return;
+      }
+      const { position, quaternion } = character.physics.readBody(active.body);
+      const q = new Quaternion(quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
+      const forward = new Vector3(0, 1, 0).applyQuaternion(q); // car forward in world space
+      const flipped = new Quaternion().setFromAxisAngle(forward, Math.PI).multiply(q);
+      character.physics.holdBody(active.body, [position[0], position[1], position[2] + 1.5], [flipped.x, flipped.y, flipped.z, flipped.w]); // eslint-disable-line prettier/prettier
+    };
+
+    const debugActions: DebugActions = {
+      flipVehicle,
+      playerCoords: () => character.viewOf(),
+      respawnPlayer: () => {
+        const [x, y, z] = character.viewOf();
+        character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
+      },
+      spawnVehicle: async (model) => {
+        const facing = animationSystem.getFacing();
+        const from = character.viewOf();
+        const spawned = await spawnVehicle({ heading: facing, model, position: from }, { facing, from });
+        const at: Vec3 = [spawned.position[0], spawned.position[1], spawned.position[2]];
+        vehicleLod.add({ heading: facing, model, position: at }, spawned);
+      },
+      teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
+    };
+
+    return { debugActions, game };
   })();
 
   return bootstrapped;

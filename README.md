@@ -8,6 +8,20 @@ npm run dev           # Vite dev server (the game at /)
 npm run serve:static  # serve the static/ asset tree (required by dev)
 ```
 
+## In-game debugger
+
+Press **F2** in the game for the debug menu. Opening it alone changes nothing in the world — it's a
+multi-level menu:
+
+- **Player** — Respawn (unstick on the spot), To Ganton.
+- **Vehicles** — spawn Admiral/Camper in front of you; Flip the car you're in (wheels ↔ roof).
+- **Game** — Show / Copy current coords.
+- **Map** — Activate **Map Viewer**: free-fly camera, click to pick objects, and render chosen map
+  sections (HD/LOD) + collision. Leaving the screen, closing (×), or pressing F2 exits it cleanly.
+
+Diagnostics logging is off by default; set `showLogs` in the `canvas-host.tsx` config to
+`'debug' | 'log' | 'warn' | 'error'` to stream gated, typed `log` events to the console.
+
 ## Development viewers
 
 Standalone debug tools, isolated from the game/streaming layers — each reuses the **real**

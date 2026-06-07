@@ -232,12 +232,6 @@ export class Game {
     }
   }
 
-  setDebugMode(enabled: boolean): void {
-    this.setConfig({ debugMode: enabled });
-    this.cameraController.setMode(enabled ? 'debug' : 'follow');
-    this.events.emit('debug-mode', { enabled });
-  }
-
   /** Swing the follow camera to a given orbit azimuth (yaw about world up). */
   setFollowAzimuth(azimuth: number): void {
     this.cameraController.setAzimuth(azimuth);
@@ -257,6 +251,12 @@ export class Game {
   /** Debug: render an explicit set of cells at one detail level (null resumes streaming). */
   setManualCells(cells: CellCoord[] | null, lod = false): void {
     this.streamingSystem?.setManualCells(cells, lod);
+  }
+
+  setMapViewer(enabled: boolean): void {
+    this.setConfig({ mapViewer: enabled });
+    this.cameraController.setMode(enabled ? 'debug' : 'follow');
+    this.events.emit('map-viewer', { enabled });
   }
 
   /** Toggle the collision wireframe overlay for the current region (debug). */

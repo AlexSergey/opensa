@@ -1,7 +1,6 @@
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
 - [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers + region builder, now under src/renderware/map
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading
-- [Debug panel (TEMPORARY)](debug-panel-temporary.md) — Ctrl+D overlay in src/ui/debug; remove before shipping
 - [Engine refactor status](engine-refactor-status.md) — plan 006; game/renderware split; phases 0–5 DONE (R3F gone); CURRENT src layout
 - [COL collision plan](col-collision-plan.md) — plan 007; COL parse/bind; 215 col libs / 8061 models in gta3.img (COL2+COL3, 100% bind)
 - [Player cube placeholder](player-cube-placeholder.md) — HISTORICAL: cube removed, player is now the Tommy DFF skinned mesh (plan 011)
@@ -22,3 +21,4 @@
 - [Vehicle physics plan](vehicle-physics-plan.md) — plan 018; real Rapier dynamic car (COL convex-hull collider + gravity + raycast wheels), replaces arcade; iter 1 DONE, iters 2–4 (engine/steer, get-in polish, damage) pending
 - [Diagnostics logging](diagnostics-logging.md) — plan 020; gated log channel (Config.showLogs + Logger + 'log' event); use logger.debug at tricky spots, not console.log
 - [Vehicle LOD plan](vehicle-lod-plan.md) — plan 021 (DONE); _vlo low-detail + Config.vehicle distance thresholds (HD/vlo/cull/unload) via VehicleLodSystem
+- [In-game debugger](in-game-debugger.md) — plan 023 (DONE); F2 debug overlay (menu: player/vehicles/game/map), debugMode→mapViewer; old Ctrl+X overlay deleted

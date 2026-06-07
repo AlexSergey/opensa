@@ -35,15 +35,15 @@
     - [✅] Striked car damage
   - [✅] Vehicle VLO
   - [✅] Extract parking places to configuration array
-- [ ] Debugger Improvements
-  - [ ] Flymode rename to map-viewer
-  - [ ] Multi menu
-  - [ ] Map-viewer will be activated by checkbox (all map zones will be available after that)
-  - [ ] Camera fly mode for screenshots (without UI layer) K+M
-  - [ ] Show current coords - button to past coords to console or by X
-  - [ ] Flip vehicle
-  - [ ] Car spawning
-  - [ ] Tommy respawn (if stuck in the map)
+- [✅] Debugger Improvements
+  - [✅] Flymode rename to map-viewer
+  - [✅] Multi menu
+  - [✅] Map-viewer will be activated by checkbox (all map zones will be available after that)
+  - [✅] Show current coords - button to past coords to console or by X
+  - [✅] Flip vehicle
+  - [✅] Car spawning
+  - [✅] Tommy respawn (if stuck in the map)
+- [✅] Camera fly mode for screenshots (without UI layer) K+M
 - [✅] Add logger
 - [✅] Viewers
   - [✅] Rename model-viewer to object-viewer
@@ -58,6 +58,7 @@
 - [ ] Fog
   - [ ] Streaming fade objects
   - [ ] Draw distance limit (1000)
+  - [ ] Debugger "game" draw distance slider control
 - [ ] Game time
 - [ ] Timecyc (sunny weather only)
   - [ ] 2 strategies

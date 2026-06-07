@@ -179,6 +179,11 @@ export class EnterVehicleSystem implements System {
     }
   }
 
+  /** The car the player is currently in/entering (for debug actions like flip), or null on foot. */
+  getActive(): EnterableVehicle | null {
+    return this.active;
+  }
+
   /** Drop a (parked, unoccupied) car when it is unloaded. No-op if it is the active car. */
   remove(vehicle: EnterableVehicle): void {
     if (this.active === vehicle) {

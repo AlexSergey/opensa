@@ -28,8 +28,8 @@ function config(gameState: Config['gameState']): Config {
   return {
     camera: { followDistance: 12, followMaxPolar: 1.5, followMinPolar: 0.25, followZoom: true },
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
-    debugMode: false,
     gameState,
+    mapViewer: false,
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
     showLogs: false,

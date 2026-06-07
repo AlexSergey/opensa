@@ -10,8 +10,8 @@ function config(overrides: Partial<Config> = {}): Config {
   return {
     camera: { followDistance: 12, followMaxPolar: 1.5, followMinPolar: 0.25, followZoom: true },
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
-    debugMode: false,
     gameState: 'play',
+    mapViewer: false,
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
     showLogs: false,
@@ -87,7 +87,7 @@ describe('StreamingSystem', () => {
     it('renders only the manual cells while in debug mode', async () => {
       const adapter = stubAdapter();
       const root = new Object3D();
-      const system = new StreamingSystem(adapter, root, () => [0, 0, 0] as Vec3, config({ debugMode: true }));
+      const system = new StreamingSystem(adapter, root, () => [0, 0, 0] as Vec3, config({ mapViewer: true }));
       system.setManualCells(
         [
           [5, 5],

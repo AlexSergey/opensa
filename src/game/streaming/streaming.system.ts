@@ -20,7 +20,7 @@ type StreamAdapter = Pick<WorldAdapter, 'cellSize' | 'loadCell'>;
  * - **stream** (default): cells within `hdDrawDistance` render HD, cells within
  *   `lodDrawDistance` (beyond the HD ring) render LOD — the sectioned grid.
  * - **manual** (debug): renders only the cells set via {@link setManualCells} at
- *   one detail level. Active while `config.debugMode` is on and a selection is set.
+ *   one detail level. Active while `config.mapViewer` is on and a selection is set.
  *
  * Cells are loaded asynchronously via the adapter (which caches them) and added
  * under the streaming root (Z-up; the root applies the −90°X). Unloading just
@@ -71,7 +71,7 @@ export class StreamingSystem implements System {
   }
 
   private desiredKeys(): Set<string> {
-    if (this.config.debugMode && this.manual) {
+    if (this.config.mapViewer && this.manual) {
       return new Set(this.manual.cells.map(([cx, cy]) => streamKey(cx, cy, this.manual!.lod)));
     }
 

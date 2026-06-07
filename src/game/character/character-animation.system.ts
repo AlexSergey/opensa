@@ -92,6 +92,11 @@ export class CharacterAnimationSystem implements System {
     this.targetFacing = yaw;
   }
 
+  /** Current locomotion facing (yaw about GTA +Z) — e.g. to spawn something in front of the player. */
+  getFacing(): number {
+    return this.facing;
+  }
+
   /**
    * Override locomotion with a scripted clip (car entry/sit, …) and optional held
    * facing (yaw about +Z). Pass `null` to return to keyboard-driven locomotion.

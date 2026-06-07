@@ -14,8 +14,9 @@ export interface CameraConfig {
 export interface Config {
   camera: CameraConfig;
   controls: ControlsConfig;
-  debugMode: boolean;
   gameState: GameState;
+  /** Map-viewer mode: free-fly camera + manual cell render + click-to-pick (debug map inspector). */
+  mapViewer: boolean;
   movement: MovementConfig;
   /** Overlay collision (COL) wireframes on the current region (debug). */
   showCollision: boolean;
