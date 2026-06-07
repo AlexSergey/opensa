@@ -18,3 +18,11 @@ Plan: `.claude/plans/014-simple-water.md`. Render water from `static/data/water.
 **Iter 3 DONE (code; browser pending):** `WorldAdapter.loadWater(waterUrl, txdUrl)` + GtaSaWorldAdapter impl (`fetchText` water.dat + `fetchBuffer` particle.txd → `parseWater` + `buildTextureMap(parseTxd).get('waterclear256')` [keys lowercased, verified] → `buildWater`). Bootstrap adds it under `game.getStreamingRoot()` (−90°X). 201 tests green. **Note:** spawn (Ganton) is inland/above sea (z=0) — go to coast/lake to see water. Tunables: `TILE` (UV), opacity/tint, `depthWrite:false`.
 
 **Horizon fix:** `water.dat` only covers the map, so `loadWater` now builds the **ocean as one big sea-level plane** (`SEA_LEVEL 0`, `SEA_HALF 16000`) reaching the horizon, and keeps only the file's **non-sea-level lakes** (|z|>0.5) on top (sea-level file polys dropped to avoid double-blend). Remaining caveat: with no fog/skybox the ocean clips at the camera far plane (~8000) as a hard circle — fix later with fog/skybox (atmosphere task), not part of simple water. Tunables: `TILE` (UV scale ~16), opacity/tint. Out of scope: the water shader (waves/reflection/scroll), swimming/buoyancy, underwater tint, flow params, culling.
+
+**Tunnel-flood fix (DONE, plan 014 iter 4):** the first version replaced ALL sea-level water.dat polys with
+one 32000² plane at z=0 → it covered low ground/tunnels-under-land that the real data doesn't, so those
+tunnels looked flooded. Now `loadWater` renders the **real** water.dat quads (all of them) + an **ocean
+frame**: `oceanFrame(quads, SEA_HALF=16000, SEA_LEVEL=0)` in `build-water.ts` returns up to 4 sea-level
+border quads = the big plane minus a hole cut to the data's bounding box (degenerate strips skipped). Real
+water fills the map (correct coverage), the frame is open ocean to the horizon. `oceanFrame` barrel-exported;
+`build-water.test.ts` covers it (4 strips / degenerate-skip / empty→full-plane).

@@ -30,6 +30,7 @@ import {
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
+  oceanFrame,
   parseCarcols,
   parseDff,
   parseDffCollision,
@@ -43,7 +44,6 @@ import {
   resolveMap,
   type VehicleColours,
   type VehicleDef,
-  type WaterQuad,
   type WorldGrid,
 } from '../../renderware';
 import { VehicleRig } from '../vehicle/vehicle-rig';
@@ -256,17 +256,11 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       throw new Error(`Water texture 'waterclear256' not found in ${txdUrl}`);
     }
 
-    const lakes = parseWater(waterText).filter((q) => q.vertices.some((v) => Math.abs(v[2] - SEA_LEVEL) > 0.5));
-    const sea: WaterQuad = {
-      vertices: [
-        [-SEA_HALF, -SEA_HALF, SEA_LEVEL],
-        [SEA_HALF, -SEA_HALF, SEA_LEVEL],
-        [-SEA_HALF, SEA_HALF, SEA_LEVEL],
-        [SEA_HALF, SEA_HALF, SEA_LEVEL],
-      ],
-    };
+    // Real water.dat polygons (correct coverage — tunnels under land stay dry), plus an open-ocean
+    // frame filling out to the horizon around the data's bounds (a full plane would flood tunnels).
+    const quads = parseWater(waterText);
 
-    return buildWater([sea, ...lakes], texture);
+    return buildWater([...quads, ...oceanFrame(quads, SEA_HALF, SEA_LEVEL)], texture);
   }
 
   async prepare(onProgress?: (fraction: number) => void): Promise<void> {

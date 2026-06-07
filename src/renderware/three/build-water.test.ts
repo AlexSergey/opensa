@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { WaterQuad } from '../parsers/text/water.parser';
 
-import { buildWater } from './build-water';
+import { buildWater, oceanFrame } from './build-water';
 
 function quad(): WaterQuad {
   return {
@@ -45,6 +45,39 @@ describe('buildWater', () => {
       expect(material.map).toBe(texture);
       expect(texture.wrapS).toBe(RepeatWrapping);
       expect(texture.wrapT).toBe(RepeatWrapping);
+    });
+  });
+});
+
+describe('oceanFrame', () => {
+  describe('negative cases', () => {
+    it('skips strips where the data already reaches the half extent', () => {
+      // Data spans the full width (x = ±100), so the left/right strips are degenerate.
+      const full: WaterQuad = {
+        vertices: [
+          [-100, -20, 0],
+          [100, -20, 0],
+          [-100, 20, 0],
+          [100, 20, 0],
+        ],
+      };
+      const frame = oceanFrame([full], 100, 0);
+      expect(frame).toHaveLength(2); // only bottom + top
+    });
+
+    it('falls back to a single full plane when there are no quads', () => {
+      expect(oceanFrame([], 100, 0)).toHaveLength(1);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('frames the data bounds with four sea-level border quads', () => {
+      const frame = oceanFrame([quad()], 100, 0); // quad bounds: x[-10,10] y[-20,20]
+      expect(frame).toHaveLength(4);
+      expect(frame.every((q) => q.vertices.every((v) => v[2] === 0))).toBe(true);
+      // The left strip fills from -half to the data's minX.
+      expect(frame[0].vertices[0][0]).toBe(-100);
+      expect(frame[0].vertices[1][0]).toBe(-10);
     });
   });
 });

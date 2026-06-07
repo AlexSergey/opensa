@@ -31,6 +31,6 @@ export {
   type BuiltWheel,
   type VehicleOptions,
 } from './three/build-vehicle';
-export { buildWater } from './three/build-water';
+export { buildWater, oceanFrame } from './three/build-water';
 export { DFFLoader } from './three/dff-loader';
 export { type TextureDictionary, TXDLoader } from './three/txd-loader';

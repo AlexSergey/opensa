@@ -68,6 +68,16 @@ src/ui/canvas-host.tsx                          # load water, add under getStrea
    is **inland/above sea level**, so the sea (z=0) is below the terrain there; travel to the coast/beach or a
    lake to see the surface.
 
+4. ✅ **Ocean frame (tunnel-flood fix) — DONE.** The original wire-in replaced **all** sea-level water.dat
+   polygons with one giant 32000×32000 plane at z=0 so the ocean reached the horizon — but that plane covers
+   areas the real data does not (low ground / tunnels under land), so tunnels that dip below sea level looked
+   **flooded**. Fix: render the **real** water.dat quads (all of them, at their authored heights — correct
+   coverage, no flood) and replace the full plane with an **ocean frame**: the big plane with a rectangular
+   **hole cut to the water.dat bounds**. `buildWater`'s caller now passes `[...quads, ...oceanFrame(quads,
+   SEA_HALF, SEA_LEVEL)]`. `oceanFrame` (in `build-water.ts`) = 4 sea-level border quads filling
+   `[-SEA_HALF..SEA_HALF]` minus the data's bounding box (degenerate strips skipped). Real water fills the map;
+   the frame is open ocean out to the horizon.
+
 ## Decisions / open questions
 
 - **No shader now** (explicit): `MeshBasicMaterial` + texture; opacity/tint tuned in-browser. Animated UV

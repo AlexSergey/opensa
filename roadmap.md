@@ -80,8 +80,6 @@
   - [ ] Find good fonts
   - [ ] Show current time
   - [ ] HUD
-    - [ ] Show current coords (press X)
-      - [ ] If user pressed X again the coords block will be hide and current coords will be copied to the buffer
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Gzip
