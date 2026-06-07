@@ -115,6 +115,47 @@ export function CanvasHost(): ReactElement {
     };
   }, [game]);
 
+  // Screenshot camera: K+M toggles free-fly (detached camera, arrows + mouse). Opening the
+  // debugger (F2) drops it. Camera-only — nothing else in the game is affected.
+  useEffect(() => {
+    if (!game) {
+      return;
+    }
+    let kDown = false;
+    let mDown = false;
+    let fly = false;
+    let chordFired = false;
+    const setFly = (on: boolean): void => {
+      fly = on;
+      game.setFlyCamera(on);
+    };
+    function onKeyDown(e: KeyboardEvent): void {
+      kDown ||= e.code === 'KeyK';
+      mDown ||= e.code === 'KeyM';
+      if (kDown && mDown && !chordFired) {
+        chordFired = true;
+        setFly(!fly);
+      }
+      if (e.key === 'F2' && fly) {
+        setFly(false); // entering the debugger leaves fly mode
+      }
+    }
+    function onKeyUp(e: KeyboardEvent): void {
+      if (e.code === 'KeyK' || e.code === 'KeyM') {
+        kDown = kDown && e.code !== 'KeyK';
+        mDown = mDown && e.code !== 'KeyM';
+        chordFired = false;
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
+    return (): void => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [game]);
+
   function handleClick(event: React.MouseEvent<HTMLCanvasElement>): void {
     if (!game || !debugEnabledRef.current) {
       return;

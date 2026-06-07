@@ -19,6 +19,10 @@ multi-level menu:
 - **Map** — Activate **Map Viewer**: free-fly camera, click to pick objects, and render chosen map
   sections (HD/LOD) + collision. Leaving the screen, closing (×), or pressing F2 exits it cleanly.
 
+**Screenshot camera** — press **K+M** to toggle a free-fly camera: it detaches from the player/car
+and flies with the **arrow keys** + **mouse** look. It only moves the camera (rendering and the rest of
+the game are untouched). Opening the debugger (F2) leaves fly mode.
+
 Diagnostics logging is off by default; set `showLogs` in the `canvas-host.tsx` config to
 `'debug' | 'log' | 'warn' | 'error'` to stream gated, typed `log` events to the console.
 

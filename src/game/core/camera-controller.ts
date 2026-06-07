@@ -3,10 +3,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import type { Config } from '../interfaces/config.interface';
 
-type CameraMode = 'debug' | 'follow';
+type CameraMode = 'debug' | 'fly' | 'follow';
 
 /** Camera offset direction from its target for one-shot framing (normalised). */
 const VIEW_DIR = new Vector3(0.5, 0.6, 1).normalize();
+const UP = new Vector3(0, 1, 0);
 
 const LOOK_SENSITIVITY = 0.004; // radians per pixel of mouse movement
 const ZOOM_SENSITIVITY = 0.02; // world units per wheel notch
@@ -14,13 +15,20 @@ const MIN_FOLLOW_DISTANCE = 4;
 const MAX_FOLLOW_DISTANCE = 80;
 const DEBUG_HEIGHT = 250; // how high above the district the debug camera sits
 
+const FLY_SPEED = 18; // free-fly translation (world units/second)
+const FLY_LOOK_SENSITIVITY = 0.0025; // radians per pixel of mouse movement in fly mode
+const MAX_FLY_PITCH = Math.PI / 2 - 0.05; // keep the fly camera off the exact vertical
+const FLY_CODES = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp']);
+
 /**
- * Two camera modes:
+ * Three camera modes:
  * - **follow** (play): orbits the target via plain mouse movement (no button),
  *   clamped to a hemisphere above it (never below the floor); wheel zoom is
  *   optional. Distance / clamps / zoom come from {@link Config.camera}.
  * - **debug**: detached, top-down over the district; drag (held button) pans X/Y,
  *   wheel dollies down. Built on OrbitControls.
+ * - **fly**: detached free-fly for screenshots — arrow keys translate along the
+ *   view direction, mouse looks around. Affects nothing but the camera.
  */
 export class CameraController {
   private azimuth = Math.PI;
@@ -29,6 +37,9 @@ export class CameraController {
   private readonly controls: OrbitControls;
   private distance: number;
   private readonly domElement: HTMLElement;
+  private readonly flyKeys = new Set<string>();
+  private flyPitch = 0;
+  private flyYaw = 0;
   private mode: CameraMode = 'follow';
   private polar: number;
   private target: null | Object3D = null;
@@ -49,11 +60,15 @@ export class CameraController {
 
     domElement.addEventListener('pointermove', this.onPointerMove);
     domElement.addEventListener('wheel', this.onWheel, { passive: false });
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
   }
 
   dispose(): void {
     this.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.domElement.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
     this.controls.dispose();
   }
 
@@ -95,16 +110,19 @@ export class CameraController {
     this.azimuth = azimuth;
   }
 
-  /** Switch camera behaviour (follow ⇄ debug). */
+  /** Switch camera behaviour (follow ⇄ debug ⇄ fly). */
   setMode(mode: CameraMode): void {
     if (mode === this.mode) {
       return;
     }
     this.mode = mode;
+    this.controls.enabled = mode === 'debug';
     if (mode === 'debug') {
       this.enterDebug();
+    } else if (mode === 'fly') {
+      this.enterFly();
     } else {
-      this.controls.enabled = false;
+      this.flyKeys.clear();
     }
   }
 
@@ -112,9 +130,14 @@ export class CameraController {
     this.target = object;
   }
 
-  update(): void {
+  update(delta: number): void {
     if (this.mode === 'debug') {
       this.controls.update();
+
+      return;
+    }
+    if (this.mode === 'fly') {
+      this.flyUpdate(delta);
 
       return;
     }
@@ -146,7 +169,58 @@ export class CameraController {
     this.controls.update();
   }
 
+  /** Seed the free-fly yaw/pitch from where the camera currently looks (no jump on entry). */
+  private enterFly(): void {
+    this.flyKeys.clear();
+    const dir = this.camera.getWorldDirection(new Vector3());
+    this.flyPitch = Math.asin(clamp(dir.y, -1, 1));
+    this.flyYaw = Math.atan2(dir.x, dir.z);
+  }
+
+  /** Free-fly: translate along the view direction by the held arrow keys, then look along it. */
+  private flyUpdate(delta: number): void {
+    const cosPitch = Math.cos(this.flyPitch);
+    const forward = new Vector3(Math.sin(this.flyYaw) * cosPitch, Math.sin(this.flyPitch), Math.cos(this.flyYaw) * cosPitch); // eslint-disable-line prettier/prettier
+    const right = new Vector3().crossVectors(UP, forward).normalize();
+    const step = FLY_SPEED * delta;
+    if (this.flyKeys.has('ArrowUp')) {
+      this.camera.position.addScaledVector(forward, step);
+    }
+    if (this.flyKeys.has('ArrowDown')) {
+      this.camera.position.addScaledVector(forward, -step);
+    }
+    if (this.flyKeys.has('ArrowRight')) {
+      this.camera.position.addScaledVector(right, step);
+    }
+    if (this.flyKeys.has('ArrowLeft')) {
+      this.camera.position.addScaledVector(right, -step);
+    }
+    this.camera.lookAt(
+      this.camera.position.x + forward.x,
+      this.camera.position.y + forward.y,
+      this.camera.position.z + forward.z,
+    );
+  }
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.mode !== 'fly' || !FLY_CODES.has(event.code)) {
+      return;
+    }
+    event.preventDefault();
+    this.flyKeys.add(event.code);
+  };
+
+  private readonly onKeyUp = (event: KeyboardEvent): void => {
+    this.flyKeys.delete(event.code);
+  };
+
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.mode === 'fly') {
+      this.flyYaw -= event.movementX * FLY_LOOK_SENSITIVITY;
+      this.flyPitch = clamp(this.flyPitch - event.movementY * FLY_LOOK_SENSITIVITY, -MAX_FLY_PITCH, MAX_FLY_PITCH);
+
+      return;
+    }
     if (this.mode !== 'follow') {
       return;
     }

@@ -233,6 +233,11 @@ export class Game {
   }
 
   /** Swing the follow camera to a given orbit azimuth (yaw about world up). */
+  /** Detach the camera for free-fly screenshots (arrows move, mouse looks); off → resume follow. */
+  setFlyCamera(enabled: boolean): void {
+    this.cameraController.setMode(enabled ? 'fly' : 'follow');
+  }
+
   setFollowAzimuth(azimuth: number): void {
     this.cameraController.setAzimuth(azimuth);
   }
@@ -311,7 +316,7 @@ export class Game {
         this.accumulator -= FIXED_STEP;
       }
       this.systems.update(delta);
-      this.cameraController.update();
+      this.cameraController.update(delta);
       if (this.context) {
         for (const plugin of this.plugins) {
           plugin.update?.(this.context);

@@ -26,5 +26,10 @@ F2), `map-inspector.tsx`, `debug-styles.ts`. No `debug2`/Ctrl+X anymore.
   `EnterVehicleSystem.getActive()`. Styles in `debug2-styles.ts`.
 
 Dropped from the old overlay: GAME Play/Pause (not in the new spec) — re-add to a screen if needed.
-**Not done yet** (separate mini-feature): "Camera fly mode for screenshots (no UI) K+M". Related:
-[[standalone-viewers]].
+
+**Screenshot fly camera** (separate mini-feature, DONE): `CameraController` gained a third mode
+`'fly'` (arrow keys translate along the view dir, mouse looks; seeded from the current view so no jump).
+`Game.setFlyCamera(enabled)` switches `'fly'`⇄`'follow'`; `CameraController.update(delta)` now takes
+delta. Toggled by the **K+M** chord in canvas-host (a keydown/keyup effect); pressing **F2** (open
+debugger) drops fly. Camera-only — streaming still follows the player (`viewOf`), nothing else changes.
+Related: [[standalone-viewers]].
