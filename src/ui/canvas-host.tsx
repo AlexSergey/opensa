@@ -17,10 +17,12 @@ import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin
 import { FogPlugin } from '../game/plugins/fog.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { GameClock } from '../game/time/game-clock';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
+import { sampleTimecyc } from '../renderware';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
@@ -39,6 +41,9 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 
 // Initial paint per model — carcols.dat palette indices (first two = primary/secondary).
 const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
+
+// Default timecyc weather (index into WEATHER_NAMES; 0 = EXTRASUNNY_LA) until weather is selectable.
+const DEFAULT_WEATHER = 0;
 
 // Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
 // admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
@@ -223,6 +228,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360 }); // 6:00
+
+    // Timecyc (sky/sun/light table) — loaded for the upcoming day/night work. Verify by logging the
+    // sampled entry at the current time (gated by showLogs); the sky/sun plugins will consume it next.
+    const timecyc = await adapter.loadTimecyc();
+    const logger = game.getLogger();
+    logger.log('time', `timecyc ready (${timecyc.weathers.length} weathers)`);
+    game.events.on('time', ({ minutes }) => {
+      const sky = sampleTimecyc(timecyc, DEFAULT_WEATHER, minutes / 60);
+      logger.debug('time', GameClock.format(minutes), { amb: sky.amb, fogStart: sky.fogStart, skyTop: sky.skyTop });
+    });
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`

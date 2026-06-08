@@ -23,9 +23,11 @@ import {
   buildCollisionWireframe,
   buildSkinnedClump,
   buildTextureMap,
+  buildTimecyc,
   buildVehicle,
   buildWater,
   buildWorldGrid,
+  convertTo24h,
   type HandlingEntry,
   type ImgArchive,
   loadArchive,
@@ -36,12 +38,14 @@ import {
   parseDffCollision,
   parseHandling,
   parseIfp,
+  parseTimecyc,
   parseTxd,
   parseVehicleDefs,
   parseWater,
   type RegionColliders,
   type RegionMeshData,
   resolveMap,
+  type Timecyc,
   type VehicleColours,
   type VehicleDef,
   type WorldGrid,
@@ -194,6 +198,22 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     root.add(buildCollisionWireframe(colliders));
 
     return [root];
+  }
+
+  /**
+   * Load the timecyc (per-weather, per-hour colour/lighting table), always as 24h.
+   * Uses the optional `timecyc_24h.dat` as-is when present, else converts the
+   * mandatory vanilla `timecyc.dat` (8 keyframes/weather) to 24h.
+   */
+  async loadTimecyc(): Promise<Timecyc> {
+    const base = this.config.base;
+    const text24 = await tryFetchText(`${base}/data/timecyc_24h.dat`);
+    if (text24 !== null) {
+      return buildTimecyc(parseTimecyc(text24));
+    }
+    const baseText = await fetchText(`${base}/data/timecyc.dat`);
+
+    return buildTimecyc(convertTo24h(parseTimecyc(baseText)));
   }
 
   /**
@@ -399,4 +419,11 @@ async function fetchText(url: string): Promise<string> {
   }
 
   return response.text();
+}
+
+/** Fetch text, or null when the file is absent (for optional assets like `timecyc_24h.dat`). */
+async function tryFetchText(url: string): Promise<null | string> {
+  const response = await fetch(url);
+
+  return response.ok ? response.text() : null;
 }
