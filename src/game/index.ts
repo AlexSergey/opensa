@@ -9,6 +9,7 @@ export type { ColliderBox, ColliderShape, ColliderSphere, ModelColliders } from 
 export type {
   BloomConfig,
   Config,
+  ShadowsConfig,
   SkyConfig,
   SsaoConfig,
   VehicleReflectionConfig,

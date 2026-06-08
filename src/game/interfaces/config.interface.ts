@@ -71,6 +71,8 @@ export type GameState = 'pause' | 'play';
 export interface GraphicsConfig {
   /** Bloom (bright-area glow) tuning. */
   bloom: BloomConfig;
+  /** Sun shadows (directional shadow map). */
+  shadows: ShadowsConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */
   sky: SkyConfig;
   /** Screen-space ambient occlusion (contact shadows in corners/under objects). */
@@ -115,6 +117,12 @@ export interface MovementConfig {
   runSpeed: number;
   /** Planar speed when walking (default). */
   walkSpeed: number;
+}
+
+/** Sun shadow (directional shadow map) tuning. */
+export interface ShadowsConfig {
+  /** Master toggle (off = the sun stops casting → no shadow-map render, materials drop shadow code). */
+  enabled: boolean;
 }
 
 /** God-rays shader tuning (pmndrs GodRaysEffect); higher = denser/brighter shafts. */

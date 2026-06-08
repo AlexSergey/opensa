@@ -46,6 +46,8 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
 
   const materials = rw.materials.map((m) => buildMaterial(m, rw, textures));
   const mesh = new SkinnedMesh(buildSkinnedGeometry(rw, skin), materials.length > 1 ? materials : materials[0]);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   mesh.add(rootBone);
   mesh.updateMatrixWorld(true);
 

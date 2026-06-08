@@ -23,6 +23,7 @@ import {
   type BloomConfig,
   type Config,
   type GameState,
+  type ShadowsConfig,
   type SkyConfig,
   type SsaoConfig,
   type SunConfig,
@@ -307,6 +308,11 @@ export class Game {
     this.setConfig({ mapViewer: enabled });
     this.cameraController.setMode(enabled ? 'debug' : 'follow');
     this.events.emit('map-viewer', { enabled });
+  }
+
+  /** Toggle sun shadows at runtime; merges into `graphics.shadows`. */
+  setShadows(patch: Partial<ShadowsConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, shadows: { ...this.config.graphics.shadows, ...patch } } });
   }
 
   /** Toggle the collision wireframe overlay for the current region (debug). */

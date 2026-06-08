@@ -15,6 +15,7 @@ function config(overrides: Partial<Config> = {}): Config {
     gameState: 'play',
     graphics: {
       bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+      shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
       sun: { godrays: true, godraysSize: 30, sunSize: 15 },

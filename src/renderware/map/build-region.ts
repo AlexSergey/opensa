@@ -46,6 +46,10 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
     const parts = buildClumpParts(getClump(archive, group.def.modelName), getTextures(archive, group.def.txdName));
     for (const part of parts) {
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
+      // Opaque geometry casts; alpha-tested detail (foliage/fences/wires) doesn't — its 1-bit cutout
+      // shimmers badly in the shadow map. It still receives shadows.
+      mesh.castShadow = !part.material.transparent;
+      mesh.receiveShadow = true;
       group.instances.forEach((instance, index) => {
         position.set(instance.position[0], instance.position[1], instance.position[2]);
         // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate.

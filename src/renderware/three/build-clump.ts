@@ -52,6 +52,8 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>, opti
     const geometry = buildGeometry(rwGeometry);
     const materials = rwGeometry.materials.map((m) => buildMaterial(m, rwGeometry, textures));
     const mesh = new Mesh(geometry, materials.length > 0 ? materials : undefined);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     mesh.name = frame?.name ?? `atomic_${atomic.geometryIndex}`;
 
     if (frame) {

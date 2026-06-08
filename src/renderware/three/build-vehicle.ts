@@ -170,6 +170,11 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
 
+  root.traverse((object) => {
+    object.castShadow = true; // body/wheels/parts cast + receive sun shadows
+    object.receiveShadow = true;
+  });
+
   return {
     doors,
     lod: lod.children.length > 0 ? lod : null,

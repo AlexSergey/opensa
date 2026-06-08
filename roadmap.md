@@ -109,6 +109,7 @@ Known issues:
 - [✅] Water in whole map (flooded tunnels)
 - [ ] Exiting a car that's flipped over while already in it—Tommy emerges from the wrong side (the door calculation only takes into account yaw). We'll come back when you decide.
 - [ ] Ugly water foam
+- [ ] Shadow acne on small objects (temporal solution: disable shadows for smal objects)
 
 Next iterations:
 - [ ] Particles

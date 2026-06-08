@@ -8,6 +8,8 @@ import {
   MathUtils,
   Mesh,
   MeshBasicMaterial,
+  PCFSoftShadowMap,
+  type PerspectiveCamera,
   ShaderMaterial,
   SphereGeometry,
   Sprite,
@@ -39,6 +41,20 @@ const SUN_DISTANCE = 3500;
 
 /** Render layer the sky (dome + sun) is *also* on, so a reflection cube probe can render sky-only. */
 export const SKY_PROBE_LAYER = 1;
+
+/** Sun shadow map: resolution, ortho half-extent (world units around the view), light distance + far plane. */
+const SHADOW_MAP = 2048;
+const SHADOW_SIZE = 140;
+const SHADOW_DISTANCE = 400;
+const SHADOW_FAR = 900;
+
+/** Reusable vectors for the shadow-frustum texel snapping (light-space basis). */
+const WORLD_UP = new Vector3(0, 1, 0);
+const WORLD_X = new Vector3(1, 0, 0);
+const shadowForward = new Vector3();
+const shadowRight = new Vector3();
+const shadowUp = new Vector3();
+const shadowFocus = new Vector3();
 
 /** Day window (hours): the sun is above the horizon between these, peaking at midday. */
 const SUNRISE = 6;
@@ -153,12 +169,31 @@ export class SkyPlugin implements Plugin {
 
   install(context: PluginContext): void {
     context.scene.add(this.dome, this.ambient, this.sun, this.sun.target, this.sunSource, this.corona);
+
+    // Directional sun shadows: a view-following orthographic shadow map. shadowMap.enabled stays on; the
+    // runtime toggle is `sun.castShadow` (three recompiles materials when the shadow-light count changes).
+    context.renderer.shadowMap.enabled = true;
+    context.renderer.shadowMap.type = PCFSoftShadowMap;
+    const shadowCam = this.sun.shadow.camera;
+    shadowCam.left = -SHADOW_SIZE;
+    shadowCam.right = SHADOW_SIZE;
+    shadowCam.top = SHADOW_SIZE;
+    shadowCam.bottom = -SHADOW_SIZE;
+    shadowCam.near = 1;
+    shadowCam.far = SHADOW_FAR;
+    shadowCam.updateProjectionMatrix(); // apply the ortho extents (else it stays the default ±5 box)
+    this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.6; // small — high values bloat thin objects' shadows
+
     this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize);
+    this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
   update(context: PluginContext): void {
     this.dome.position.copy(context.camera.position); // keep the sky centred on the view
     this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize);
+    this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
   /** Push the current time-of-day sky/sun state into the dome, lights and sun sprites. */
@@ -212,6 +247,34 @@ export class SkyPlugin implements Plugin {
     this.sunDir.set(Math.cos(azimuth) * cosE, Math.sin(elevation), Math.sin(azimuth) * cosE);
 
     return elevation;
+  }
+
+  /** Aim the sun's shadow map at the view: centre the ortho frustum on the camera, light up-sun from it.
+   *  The focus is **snapped to texel increments** so the shadows don't crawl/shimmer as the camera moves. */
+  private updateShadow(camera: PerspectiveCamera, enabled: boolean): void {
+    const cast = enabled && this.sun.intensity > 0; // no shadows at night / when disabled
+    this.sun.castShadow = cast;
+    if (!cast) {
+      return;
+    }
+    // Snap the focus to the shadow-map texel grid **in the light's right/up basis** (world-axis snapping
+    // doesn't match the rotated texel grid, so the shadows kept crawling). This stops the shimmer.
+    shadowForward.copy(this.sunDir).negate(); // the shadow camera looks along −sunDir toward the scene
+    shadowRight.crossVectors(shadowForward, Math.abs(shadowForward.y) > 0.99 ? WORLD_X : WORLD_UP).normalize();
+    shadowUp.crossVectors(shadowRight, shadowForward).normalize();
+    const texel = (2 * SHADOW_SIZE) / SHADOW_MAP; // world units per shadow-map texel
+    shadowFocus.copy(camera.position);
+    const r = Math.round(shadowFocus.dot(shadowRight) / texel) * texel;
+    const u = Math.round(shadowFocus.dot(shadowUp) / texel) * texel;
+    const f = shadowFocus.dot(shadowForward); // depth along the light — no need to snap
+    shadowFocus
+      .set(0, 0, 0)
+      .addScaledVector(shadowRight, r)
+      .addScaledVector(shadowUp, u)
+      .addScaledVector(shadowForward, f);
+    this.sun.target.position.copy(shadowFocus);
+    this.sun.position.copy(shadowFocus).addScaledVector(this.sunDir, SHADOW_DISTANCE);
+    this.sun.target.updateMatrixWorld();
   }
 }
 

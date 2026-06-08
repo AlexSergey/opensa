@@ -111,6 +111,28 @@ target, no `water.foam` config/slider; `WaterConfig` is back to `{ glint, reflec
 real foam **texture** scrolled along the shore; thinner band + distance-fade; inward wave-wash animation;
 **reuse an existing depth source** instead of a dedicated pre-pass (so no second scene render).
 
+**Sun shadows (added 2026-06-08):** directional shadow map on the SkyPlugin sun. `install` sets
+`renderer.shadowMap.enabled = true` + PCFSoft, configures the ortho shadow camera (`±SHADOW_SIZE` 140,
+near 1 / far 900, `mapSize` 2048, `bias -0.0004`, `normalBias 1`). Per frame `updateShadow(camera, enabled)`
+**follows the view**: `sun.target = camera.position`, `sun.position = camera + sunDir × 400` (so the ortho
+frustum tracks the player; lighting direction unchanged). `sun.castShadow = enabled && sun.intensity > 0`
+(off at night / when disabled — three auto-recompiles materials when the shadow-light count changes, so the
+toggle works without manual needsUpdate). Meshes set `castShadow`+`receiveShadow`: map InstancedMesh
+(`build-region`), generic clump (`build-clump`), player SkinnedMesh (`build-skinned-clump`), vehicles
+(traverse root in `build-vehicle`). The sky dome/sun/water do NOT cast (default false). `Config.graphics.shadows
+{ enabled }` (default on, +4 fixtures), `Game.setShadows`, debug "Sun shadows" checkbox.
+
+**Hard-won tuning (all user-verified):** (1) `shadowCam.updateProjectionMatrix()` is **mandatory** after
+setting the ortho extents — without it the shadow camera keeps the default ±5 box, so only tiny details near
+the player cast and **buildings don't** (the original "no building shadows" bug). (2) **Texel snapping must be
+in the light's right/up basis**, not world axes — world-axis snapping doesn't match the rotated texel grid, so
+shadows kept crawling/shimmering (`shadowForward = −sunDir`, snap focus's right/up dot-products to the texel).
+(3) Keep `normalBias` **small (0.6)** — high values (2.5) bloat thin objects' shadows. (4) **Alpha-tested map
+geometry (foliage/fences/wires) has `castShadow = false`** (`build-region`: `!part.material.transparent`) — its
+1-bit cutout shimmers unfixably in the shadow map; it still *receives* shadows. (map InstancedMeshes are
+single-material, so this is per-material clean.) Tunables: SHADOW_SIZE 140 (frustum reach), SHADOW_MAP 2048
+(quality vs cost — an extra in-frustum scene render each frame).
+
 **SSAO (added 2026-06-08):** `PostFxPlugin` now also hosts ambient occlusion — a `NormalPass` (scene normals)
 feeds an `SSAOEffect` (MULTIPLY blend, half-res, `worldDistanceThreshold` ~300 for the big GTA coords),
 placed right after the RenderPass (darkens corners/contacts before god-rays/bloom). `Config.graphics.ssao

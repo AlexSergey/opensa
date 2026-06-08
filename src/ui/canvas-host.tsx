@@ -204,11 +204,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       gameState: 'play',
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+        shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: false,
-        vehicleReflection: { intensity: 1, preset: 'enhanced' },
+        vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
         water: { glint: 1.5, reflection: 0.6 },
       },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
@@ -442,12 +443,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),
       setGodraysSize: (size) => game.setGodraysSize(size),
+      setShadows: (patch) => game.setShadows(patch),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),
       setSunSize: (size) => game.setSunSize(size),
       setToneMapping: (enabled) => game.setToneMapping(enabled),
       setVehicleReflection: (patch) => game.setVehicleReflection(patch),
       setWater: (patch) => game.setWater(patch),
+      shadows: () => game.getConfig().graphics.shadows,
       sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();

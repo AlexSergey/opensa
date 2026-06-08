@@ -1,6 +1,15 @@
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { BloomConfig, Game, SkyConfig, SsaoConfig, Vec3, VehicleReflectionConfig, WaterConfig } from '../../game';
+import type {
+  BloomConfig,
+  Game,
+  ShadowsConfig,
+  SkyConfig,
+  SsaoConfig,
+  Vec3,
+  VehicleReflectionConfig,
+  WaterConfig,
+} from '../../game';
 
 import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
 import { GameClock } from '../../game/time/game-clock';
@@ -45,6 +54,8 @@ export interface DebugActions {
   setGodrays(enabled: boolean): void;
   /** Set the god-rays light-source size (shaft strength). */
   setGodraysSize(size: number): void;
+  /** Toggle sun shadows. */
+  setShadows(patch: Partial<ShadowsConfig>): void;
   /** Tune the god-rays shader (density/exposure/weight). */
   setSky(patch: Partial<SkyConfig>): void;
   /** Tune SSAO (enabled/intensity/radius). */
@@ -57,6 +68,8 @@ export interface DebugActions {
   setVehicleReflection(patch: Partial<VehicleReflectionConfig>): void;
   /** Tune the water shader (glint/reflection). */
   setWater(patch: Partial<WaterConfig>): void;
+  /** Whether sun shadows are on. */
+  shadows(): ShadowsConfig;
   /** Current god-rays shader tuning. */
   sky(): SkyConfig;
   /** Spawn a car just in front of the player. */
@@ -116,6 +129,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [water, setWater] = useState<WaterConfig>(() => actions.water());
   const [reflectionCfg, setReflectionCfg] = useState<VehicleReflectionConfig>(() => actions.vehicleReflection());
   const [ssao, setSsao] = useState<SsaoConfig>(() => actions.ssao());
+  const [shadows, setShadows] = useState<ShadowsConfig>(() => actions.shadows());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
 
@@ -439,6 +453,19 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={ssao.radius}
               />
+              <label style={styles.label}>
+                <input
+                  checked={shadows.enabled}
+                  onChange={() => {
+                    const enabled = !shadows.enabled;
+                    setShadows({ enabled });
+                    actions.setShadows({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={shadows.enabled ? styles.optionActive : styles.option}>Sun shadows</span>
+              </label>
               <label style={styles.label}>
                 <input
                   checked={toneMapping}
