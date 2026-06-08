@@ -61,18 +61,18 @@
   - [✅] Draw distance limit (1000)
   - [✅] Debugger "game" draw distance slider control
 - [✅] Game time
-- [ ] Timecyc (sunny weather only)
-  - [ ] 2 strategies
-    - [ ] If you run a regular timecyc Python algorithm in 24h format
-    - [ ] If 24h, then as is
+- [✅] Timecyc (sunny weather only)
+  - [✅] 2 strategies
+    - [✅] If you run a regular timecyc Python algorithm in 24h format
+    - [✅] If 24h, then as is
 - [ ] Graphics
   - [ ] Light
   - [ ] Shadows
   - [ ] Volumetric cloud / Skybox
   - [ ] Car reflections
-  - [ ] Sky
-    - [ ] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
-    - [ ] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
+  - [✅] Sky
+    - [✅] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
+    - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [ ] Water shader
   - [ ] Night objects (Tobj)
   - [ ] 2dfx (maybe)

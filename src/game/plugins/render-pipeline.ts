@@ -23,6 +23,13 @@ export class BasicRenderPipeline implements RenderPipeline {
     this.passes.push(pass);
   }
 
+  removePass(pass: RenderPass): void {
+    const index = this.passes.indexOf(pass);
+    if (index >= 0) {
+      this.passes.splice(index, 1);
+    }
+  }
+
   render(): void {
     if (this.passes.length === 0) {
       this.renderer.render(this.scene, this.camera);

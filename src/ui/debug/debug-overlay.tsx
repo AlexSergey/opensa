@@ -1,6 +1,6 @@
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { Game, Vec3 } from '../../game';
+import type { BloomConfig, Game, SkyConfig, Vec3 } from '../../game';
 
 import { GameClock } from '../../game/time/game-clock';
 import { styles } from './debug-styles';
@@ -17,24 +17,48 @@ const TIME_PRESETS: [string, number][] = [
 
 /** Gameplay debug actions (GTA-specific) the F2 panel triggers; wired in canvas-host. */
 export interface DebugActions {
+  /** Current bloom tuning. */
+  bloom(): BloomConfig;
   /** Flip the occupied car (on wheels → roof, on roof → wheels). No-op on foot. */
   flipVehicle(): void;
   /** Current fog distance (world units to full fog). */
   fogDistance(): number;
   /** Current in-game time (minutes since midnight). */
   gameTime(): number;
+  /** Whether the god-rays post-effect is on. */
+  godrays(): boolean;
+  /** Current god-rays light-source size (shaft strength). */
+  godraysSize(): number;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
   /** Re-drop Tommy at his current spot (to unstick). */
   respawnPlayer(): void;
+  /** Tune bloom (enabled/intensity/threshold). */
+  setBloom(patch: Partial<BloomConfig>): void;
   /** Set the fog distance (world units to full fog). */
   setFogDistance(distance: number): void;
   /** Set the in-game time (minutes since midnight). */
   setGameTime(minutes: number): void;
+  /** Toggle the god-rays post-effect. */
+  setGodrays(enabled: boolean): void;
+  /** Set the god-rays light-source size (shaft strength). */
+  setGodraysSize(size: number): void;
+  /** Tune the god-rays shader (density/exposure/weight). */
+  setSky(patch: Partial<SkyConfig>): void;
+  /** Set the sun disc base size (world units). */
+  setSunSize(size: number): void;
+  /** Toggle ACES tone mapping. */
+  setToneMapping(enabled: boolean): void;
+  /** Current god-rays shader tuning. */
+  sky(): SkyConfig;
   /** Spawn a car just in front of the player. */
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
+  /** Current sun disc base size (world units). */
+  sunSize(): number;
   /** Teleport the player back to Ganton. */
   teleportToGanton(): void;
+  /** Whether ACES tone mapping is on. */
+  toneMapping(): boolean;
 }
 
 type Screen = 'game' | 'map' | 'player' | 'root' | 'vehicles';
@@ -59,6 +83,12 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [mapActive, setMapActive] = useState(false);
   const [fog, setFog] = useState(() => actions.fogDistance());
   const [time, setTime] = useState(() => actions.gameTime());
+  const [godrays, setGodrays] = useState(() => actions.godrays());
+  const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
+  const [bloom, setBloom] = useState<BloomConfig>(() => actions.bloom());
+  const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
+  const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
+  const [sunSize, setSunSize] = useState(() => actions.sunSize());
 
   // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
   useEffect(() => {
@@ -226,6 +256,118 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={time}
               />
+
+              <div style={styles.groupLabel}>GRAPHICS</div>
+              <label style={styles.label}>
+                <input
+                  checked={godrays}
+                  onChange={() => {
+                    const next = !godrays;
+                    setGodrays(next);
+                    actions.setGodrays(next);
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={godrays ? styles.optionActive : styles.option}>God rays</span>
+              </label>
+              <div style={styles.groupLabel}>RAYS SIZE: {godraysSize}</div>
+              <input
+                max={120}
+                min={5}
+                onChange={(e) => {
+                  const size = Number(e.target.value);
+                  setGodraysSize(size);
+                  actions.setGodraysSize(size);
+                }}
+                step={1}
+                type="range"
+                value={godraysSize}
+              />
+              <div style={styles.groupLabel}>SUN SIZE: {sunSize}</div>
+              <input
+                max={120}
+                min={5}
+                onChange={(e) => {
+                  const size = Number(e.target.value);
+                  setSunSize(size);
+                  actions.setSunSize(size);
+                }}
+                step={1}
+                type="range"
+                value={sunSize}
+              />
+              {(['density', 'exposure', 'weight'] as const).map((key) => (
+                <div key={key}>
+                  <div style={styles.groupLabel}>
+                    {key.toUpperCase()}: {sky[key].toFixed(2)}
+                  </div>
+                  <input
+                    max={1}
+                    min={0}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setSky((prev) => ({ ...prev, [key]: value }));
+                      actions.setSky({ [key]: value });
+                    }}
+                    step={0.01}
+                    type="range"
+                    value={sky[key]}
+                  />
+                </div>
+              ))}
+              <label style={styles.label}>
+                <input
+                  checked={bloom.enabled}
+                  onChange={() => {
+                    const enabled = !bloom.enabled;
+                    setBloom((prev) => ({ ...prev, enabled }));
+                    actions.setBloom({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={bloom.enabled ? styles.optionActive : styles.option}>Bloom</span>
+              </label>
+              <div style={styles.groupLabel}>INTENSITY: {bloom.intensity.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const intensity = Number(e.target.value);
+                  setBloom((prev) => ({ ...prev, intensity }));
+                  actions.setBloom({ intensity });
+                }}
+                step={0.05}
+                type="range"
+                value={bloom.intensity}
+              />
+              <div style={styles.groupLabel}>THRESHOLD: {bloom.threshold.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const threshold = Number(e.target.value);
+                  setBloom((prev) => ({ ...prev, threshold }));
+                  actions.setBloom({ threshold });
+                }}
+                step={0.01}
+                type="range"
+                value={bloom.threshold}
+              />
+              <label style={styles.label}>
+                <input
+                  checked={toneMapping}
+                  onChange={() => {
+                    const next = !toneMapping;
+                    setToneMapping(next);
+                    actions.setToneMapping(next);
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={toneMapping ? styles.optionActive : styles.option}>Tone map (ACES)</span>
+              </label>
             </div>
           )}
 

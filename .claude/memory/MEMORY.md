@@ -27,3 +27,4 @@
 - [Game time](game-time.md) — plan 026 (DONE); in-game clock (GameClock, Config.time, Game.getTime/setTime, 'time' event, debugger Time tab); foundation for timecyc
 - [HUD layer](hud-layer.md) — plan 027 (DONE); DOM overlay over canvas (src/ui/hud), clock top-right, font/colors from config; hidden in map-viewer + fly; UI/menu layer reserved above
 - [Timecyc](timecyc.md) — plan 028 (DONE); parse/convert(8→24h)/sample timecyc colour-lighting table (renderware/parsers/text); data layer for sky/sun/light
+- [Graphics](graphics.md) — plan 029; timecyc-driven sky/sun/fog (+godrays next); SkyPlugin gradient dome DONE (phase 1)

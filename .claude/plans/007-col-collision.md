@@ -143,7 +143,7 @@ Section data (seek to `storedOffset − 4`):
 6. **Name field** is 22 bytes, NUL-terminated — cut at the first `\0` (don't keep the full 22 bytes;
    verified: doing so drags in `modelId`/bounds bytes and breaks the name key).
 
-## Binding to objects (the actual "привязка")
+## Binding to objects (the actual "binding")
 
 Mirror `build-region.ts`:
 - Inputs: the collision index (`Map<name, ColModel>`) + `MapDefinitions` + the same `RegionRequest`

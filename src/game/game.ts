@@ -19,7 +19,13 @@ import { type System, SystemRegistry } from './core/system';
 import { Logger } from './diagnostics/logger';
 import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
-import { type Config, type GameState } from './interfaces/config.interface';
+import {
+  type BloomConfig,
+  type Config,
+  type GameState,
+  type SkyConfig,
+  type SunConfig,
+} from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
@@ -141,6 +147,11 @@ export class Game {
     return this.entityRoot;
   }
 
+  /** Continuous in-game time of day in hours (0–24, fractional) — for smooth consumers (sun/sky). */
+  getHours(): number {
+    return this.gameClock.exactMinutes / 60;
+  }
+
   /** Shared diagnostics logger; pass to systems so they can emit gated `'log'` events. */
   getLogger(): Logger {
     return this.logger;
@@ -235,6 +246,11 @@ export class Game {
     }
   }
 
+  /** Tune bloom (enabled/intensity/threshold) at runtime; merges into `graphics.bloom`. */
+  setBloom(patch: Partial<BloomConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, bloom: { ...this.config.graphics.bloom, ...patch } } });
+  }
+
   setConfig(patch: Partial<Config>): void {
     Object.assign(this.config, patch); // mutate in place so PluginContext.config stays live
     for (const plugin of this.plugins) {
@@ -269,6 +285,16 @@ export class Game {
     this.events.emit('game-state', { state });
   }
 
+  /** Toggle the god-rays post-effect at runtime. */
+  setGodrays(enabled: boolean): void {
+    this.setSun({ godrays: enabled });
+  }
+
+  /** Change the god-rays light-source size at runtime (shaft strength; independent of the disc). */
+  setGodraysSize(godraysSize: number): void {
+    this.setSun({ godraysSize });
+  }
+
   /** Debug: render an explicit set of cells at one detail level (null resumes streaming). */
   setManualCells(cells: CellCoord[] | null, lod = false): void {
     this.streamingSystem?.setManualCells(cells, lod);
@@ -286,15 +312,35 @@ export class Game {
     void this.refreshCollision();
   }
 
+  /** Tune the god-rays shader (density/exposure/weight) at runtime; merges into `graphics.sky`. */
+  setSky(patch: Partial<SkyConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, sky: { ...this.config.graphics.sky, ...patch } } });
+  }
+
   /** Register the streaming system so the engine can drive it (view cell, manual cells). */
   setStreamingSystem(system: StreamingSystem): void {
     this.streamingSystem = system;
+  }
+
+  /** Tune the sun disc + god-rays source at runtime; merges into `graphics.sun`. */
+  setSun(patch: Partial<SunConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, sun: { ...this.config.graphics.sun, ...patch } } });
+  }
+
+  /** Change the sun disc base size at runtime (world units; timecyc scales it per hour). */
+  setSunSize(sunSize: number): void {
+    this.setSun({ sunSize });
   }
 
   /** Jump the in-game clock to a time (minutes since midnight); emits `'time'`. */
   setTime(minutes: number): void {
     this.gameClock.set(minutes);
     this.emitTime();
+  }
+
+  /** Toggle ACES tone mapping at runtime. */
+  setToneMapping(enabled: boolean): void {
+    this.setConfig({ graphics: { ...this.config.graphics, toneMapping: enabled } });
   }
 
   setWorldAdapter(adapter: WorldAdapter): this {

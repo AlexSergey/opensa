@@ -1,3 +1,13 @@
+/** Bloom (glow on bright areas) tuning. */
+export interface BloomConfig {
+  /** Master toggle (off = the bloom pass is skipped). */
+  enabled: boolean;
+  /** Glow strength. */
+  intensity: number;
+  /** Luminance above which pixels bloom (lower = more of the scene glows). */
+  threshold: number;
+}
+
 /** Follow/play camera tuning (the debug overview camera is fixed top-down). */
 export interface CameraConfig {
   /** Distance from the player in follow mode (GTA/world units). */
@@ -17,6 +27,7 @@ export interface Config {
   fog: FogConfig;
   fonts: FontsConfig;
   gameState: GameState;
+  graphics: GraphicsConfig;
   hud: HudConfig;
   /** Map-viewer mode: free-fly camera + manual cell render + click-to-pick (debug map inspector). */
   mapViewer: boolean;
@@ -56,6 +67,18 @@ export interface FontsConfig {
 /** Whether the simulation is running (physics + control) or frozen. */
 export type GameState = 'pause' | 'play';
 
+/** Post-processing / graphics-effect toggles (cost-sensitive; off-able on weak machines). */
+export interface GraphicsConfig {
+  /** Bloom (bright-area glow) tuning. */
+  bloom: BloomConfig;
+  /** Sky/sun god-rays shader tuning (shaft look). */
+  sky: SkyConfig;
+  /** Sun disc + god-rays source/toggle. */
+  sun: SunConfig;
+  /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
+  toneMapping: boolean;
+}
+
 /** HUD widget styling (the DOM overlay above the canvas; immune to post-processing). */
 export interface HudConfig {
   clock: HudTextStyle;
@@ -88,6 +111,16 @@ export interface MovementConfig {
   walkSpeed: number;
 }
 
+/** God-rays shader tuning (pmndrs GodRaysEffect); higher = denser/brighter shafts. */
+export interface SkyConfig {
+  /** Density of the light rays along the sample march. */
+  density: number;
+  /** Constant attenuation coefficient (overall brightness). */
+  exposure: number;
+  /** Per-sample light weight. */
+  weight: number;
+}
+
 /** World streaming / LOD tuning (sectioned grid render). */
 export interface StreamingConfig {
   /** Grid cell edge in world units (must match the adapter's grid). */
@@ -98,6 +131,16 @@ export interface StreamingConfig {
   hdDrawDistance: number;
   /** LODs are streamed within this distance (beyond the HD ring). */
   lodDrawDistance: number;
+}
+
+/** Sun disc + god-rays source tuning. */
+export interface SunConfig {
+  /** Volumetric light shafts from the sun (post-FX). */
+  godrays: boolean;
+  /** Base size of the god-rays light source (world units), independent of the visible disc — bigger = stronger shafts. */
+  godraysSize: number;
+  /** Visible sun disc base size (world units); the timecyc per-hour size scales this. */
+  sunSize: number;
 }
 
 /** Game-clock tuning. */

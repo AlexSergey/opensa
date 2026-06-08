@@ -8,7 +8,12 @@ const DAY_MINUTES = 1440;
  * so callers only emit/log/render on a real change.
  */
 export class GameClock {
-  /** Whole minutes since midnight (0–1439). */
+  /** Continuous minutes since midnight (fractional) — for smooth consumers (sun, sky). */
+  get exactMinutes(): number {
+    return this.current;
+  }
+
+  /** Whole minutes since midnight (0–1439) — for the clock display / `'time'` event. */
   get minutes(): number {
     return Math.floor(this.current);
   }

@@ -12,12 +12,11 @@ import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
-import { AmbientLightPlugin } from '../game/plugins/ambient-light.plugin';
-import { DirectionalLightPlugin } from '../game/plugins/directional-light.plugin';
 import { FogPlugin } from '../game/plugins/fog.plugin';
+import { PostFxPlugin } from '../game/plugins/postfx.plugin';
+import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
-import { GameClock } from '../game/time/game-clock';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
@@ -201,6 +200,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       fog: { distance: 800 },
       fonts: { hud: { clock: 'SixCaps-Regular' } },
       gameState: 'play',
+      graphics: {
+        bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+        sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
+        sun: { godrays: true, godraysSize: 30, sunSize: 15 },
+        toneMapping: false,
+      },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
       mapViewer: false,
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
@@ -209,7 +214,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       // gated `log` events to the console; filter by `type` in the subscriber below.
       showLogs: false,
       staticUrl: BASE,
-      streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
+      // lodDrawDistance kept just past fog.distance (800): geometry is culled shortly after it's fully
+      // fogged, so the distant skyline isn't rendered as pale ghosts (and it's cheaper).
+      streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1000 },
       time: { secondsPerGameMinute: 1.5 },
       vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
     });
@@ -219,25 +226,35 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
     });
+
+    // Timecyc (sky/sun/light table by time of day) — loaded before the scene so the sky plugin has it.
+    // Phase 1: a gradient sky dome from the EXTRASUNNY_LA skyTop/skyBot colours; sun/fog come next.
+    const timecyc = await adapter.loadTimecyc();
+    const skySample = (hour: number): SkySample => {
+      const e = sampleTimecyc(timecyc, DEFAULT_WEATHER, hour);
+
+      return {
+        amb: e.amb,
+        dir: e.dir,
+        skyBot: e.skyBot,
+        skyTop: e.skyTop,
+        spriteBright: e.spriteBright,
+        spriteSize: e.spriteSize,
+        sunCore: e.sunCore,
+        sunCorona: e.sunCorona,
+        sunSize: e.sunSize,
+      };
+    };
+    const sky = new SkyPlugin(skySample, () => game.getHours()); // sky dome + sun + lights from timecyc (smooth)
     game
       .setWorldAdapter(adapter)
-      .addPlugin(new AmbientLightPlugin())
-      .addPlugin(new DirectionalLightPlugin())
-      .addPlugin(new FogPlugin());
+      .addPlugin(new FogPlugin(() => skySample(game.getHours()).skyBot)) // fog fades into the sky horizon
+      .addPlugin(sky)
+      .addPlugin(new PostFxPlugin(sky.godraysSource)); // post-FX host: god rays + bloom + tone mapping
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360 }); // 6:00
-
-    // Timecyc (sky/sun/light table) — loaded for the upcoming day/night work. Verify by logging the
-    // sampled entry at the current time (gated by showLogs); the sky/sun plugins will consume it next.
-    const timecyc = await adapter.loadTimecyc();
-    const logger = game.getLogger();
-    logger.log('time', `timecyc ready (${timecyc.weathers.length} weathers)`);
-    game.events.on('time', ({ minutes }) => {
-      const sky = sampleTimecyc(timecyc, DEFAULT_WEATHER, minutes / 60);
-      logger.debug('time', GameClock.format(minutes), { amb: sky.amb, fogStart: sky.fogStart, skyTop: sky.skyTop });
-    });
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
@@ -385,16 +402,26 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     };
 
     const debugActions: DebugActions = {
+      bloom: () => game.getConfig().graphics.bloom,
       flipVehicle,
       fogDistance: () => game.getConfig().fog.distance,
       gameTime: () => game.getTime(),
+      godrays: () => game.getConfig().graphics.sun.godrays,
+      godraysSize: () => game.getConfig().graphics.sun.godraysSize,
       playerCoords: () => character.viewOf(),
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
       },
+      setBloom: (patch) => game.setBloom(patch),
       setFogDistance: (distance) => game.setFogDistance(distance),
       setGameTime: (minutes) => game.setTime(minutes),
+      setGodrays: (enabled) => game.setGodrays(enabled),
+      setGodraysSize: (size) => game.setGodraysSize(size),
+      setSky: (patch) => game.setSky(patch),
+      setSunSize: (size) => game.setSunSize(size),
+      setToneMapping: (enabled) => game.setToneMapping(enabled),
+      sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
         const from = character.viewOf();
@@ -403,7 +430,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         const at: Vec3 = [spawned.position[0], spawned.position[1], spawned.position[2]];
         vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);
       },
+      sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
+      toneMapping: () => game.getConfig().graphics.toneMapping,
     };
 
     return { debugActions, game };

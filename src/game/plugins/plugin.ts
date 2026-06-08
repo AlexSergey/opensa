@@ -36,5 +36,6 @@ export interface RenderPass {
 /** Owns how the frame is presented; plugins add passes for custom shaders / post-fx. */
 export interface RenderPipeline {
   addPass(pass: RenderPass): void;
+  removePass(pass: RenderPass): void;
   render(): void;
 }

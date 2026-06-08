@@ -13,6 +13,12 @@ function config(collisionDrawDistance: number): Config {
     fog: { distance: 800 },
     fonts: { hud: { clock: 'SixCaps-Regular' } },
     gameState: 'play',
+    graphics: {
+      bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+      sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
+      sun: { godrays: true, godraysSize: 30, sunSize: 15 },
+      toneMapping: false,
+    },
     hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
     mapViewer: false,
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },

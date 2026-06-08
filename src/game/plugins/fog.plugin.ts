@@ -1,24 +1,36 @@
-import { Color, Fog } from 'three';
+import { Color, FogExp2, SRGBColorSpace } from 'three';
 
 import type { Config } from '../interfaces/config.interface';
 import type { Plugin, PluginContext } from './plugin';
 
-/** Horizon colour the world fades into (also the scene background, since there's no sky yet). */
+/** Fallback horizon colour before a `horizon` sampler is supplied. */
 const FOG_COLOR = 0x9fb4c8;
-/** Fog starts ramping in at this fraction of the configured distance (full at the distance). */
-const NEAR_RATIO = 0.4;
+/**
+ * Exponential-fog steepness: `density = FOG_K / config.fog.distance`. With `FOG_K = 2`,
+ * geometry is ~63% fogged at 0.5×distance, ~90% at 0.75×, ~98% at the configured distance —
+ * a natural haze that actually dissolves the far world (vs linear fog only tinting it).
+ */
+const FOG_K = 2;
 
 /**
- * Distance fog: fades the far map into the horizon colour (hiding the streaming /
- * LOD edge and pop-in). The fully-fogged distance is `config.fog.distance`
- * (changed live via {@link Config.fog}); fog is removed while `config.mapViewer`
- * is on so the whole district is visible in the inspector.
+ * Distance fog (exponential): fades the far map into the **horizon colour** (hiding the
+ * streaming / LOD edge and pop-in). The colour tracks the sky horizon each frame (via the
+ * `horizon` sampler) so fully-fogged geometry blends seamlessly into the sky dome; the
+ * background matches it too. The fade is driven by `config.fog.distance` (live via
+ * {@link Config.fog}); fog is removed while `config.mapViewer` is on.
  */
 export class FogPlugin implements Plugin {
   readonly name = 'fog';
 
-  private readonly fog = new Fog(FOG_COLOR);
+  private readonly background = new Color(FOG_COLOR);
+  private readonly fog = new FogExp2(FOG_COLOR);
+  private readonly horizon?: () => readonly [number, number, number];
   private scene: null | PluginContext['scene'] = null;
+
+  /** `horizon` returns the current sky-horizon RGB (0–255) the fog/background fade into. */
+  constructor(horizon?: () => readonly [number, number, number]) {
+    this.horizon = horizon;
+  }
 
   configChanged(config: Readonly<Config>): void {
     this.apply(config);
@@ -32,17 +44,26 @@ export class FogPlugin implements Plugin {
 
   install(context: PluginContext): void {
     this.scene = context.scene;
-    context.scene.background = new Color(FOG_COLOR);
+    context.scene.background = this.background;
     this.apply(context.config);
   }
 
-  /** Set the fog range from the config, and drop it entirely while in map-viewer mode. */
+  update(): void {
+    if (!this.horizon) {
+      return;
+    }
+    const [r, g, b] = this.horizon();
+    // sRGB → linear (fog is mixed in linear space) so fully-fogged geometry matches the sky's sRGB output.
+    this.fog.color.setRGB(r / 255, g / 255, b / 255, SRGBColorSpace);
+    this.background.setRGB(r / 255, g / 255, b / 255, SRGBColorSpace);
+  }
+
+  /** Set the fog density from the config, and drop it entirely while in map-viewer mode. */
   private apply(config: Readonly<Config>): void {
     if (!this.scene) {
       return;
     }
-    this.fog.far = config.fog.distance;
-    this.fog.near = config.fog.distance * NEAR_RATIO;
+    this.fog.density = FOG_K / config.fog.distance;
     this.scene.fog = config.mapViewer ? null : this.fog;
   }
 }
