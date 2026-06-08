@@ -19,6 +19,8 @@ export interface IdeObjectDef {
   flags: number;
   id: number;
   modelName: string;
+  /** For `tobj` (time-of-day) objects: the hour window `[on, off)` it's visible in (wraps midnight). */
+  time?: { off: number; on: number };
   txdName: string;
 }
 
@@ -43,8 +45,8 @@ export interface MapDefinitions {
   instances: IplInstance[];
   /**
    * Time-of-day (`tobj`) object definitions, kept separate from the render
-   * catalog — they are a distinct kind that should only show during a day/night
-   * window. Not rendered yet (TODO).
+   * catalog. Their instances render but carry a `time` window; a system toggles
+   * their visibility by the game hour (see {@link IdeObjectDef.time}).
    */
   timedCatalog?: Map<number, IdeObjectDef>;
 }

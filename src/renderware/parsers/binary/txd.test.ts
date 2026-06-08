@@ -119,6 +119,29 @@ describe('parseTxd (synthetic)', () => {
     expect(tex.mipmaps[0].data.length).toBe(16);
   });
 
+  it('skips trailing zero-size mip levels (WebGL rejects empty compressed data)', () => {
+    const header = concat(
+      u32(9),
+      u32(0x1101),
+      fixedString('mips', 32),
+      fixedString('', 32),
+      u32(RasterFormat.C8888),
+      u32(D3dCompression.DXT1),
+      u16(4),
+      u16(4),
+      u8(8),
+      u8(2), // numLevels = 2, but the second is empty
+      u8(4),
+      u8(0x00),
+    );
+    const level0 = concat(u32(8), new Uint8Array(8)); // one 4x4 DXT1 block
+    const level1 = u32(0); // declared mip with zero bytes
+    const native = chunk(RwSection.TEXTURE_NATIVE, chunk(RwSection.STRUCT, concat(header, level0, level1)));
+    const tex = parseTxd(buildSyntheticTxd([native])).textures.find((t) => t.name === 'mips')!;
+    expect(tex.mipmaps).toHaveLength(1);
+    expect(tex.mipmaps[0].data.length).toBe(8);
+  });
+
   it('swizzles uncompressed BGRA pixels to RGBA', () => {
     const tex = dict.textures.find((t) => t.name === 'raw32')!;
     expect(tex.format).toBe('rgba8888');

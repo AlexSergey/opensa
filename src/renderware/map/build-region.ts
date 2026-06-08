@@ -63,6 +63,10 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
       mesh.userData.region = group;
+      if (group.def.time) {
+        mesh.userData.timed = group.def.time; // { on, off } hour window — gated by TimedObjectSystem
+        mesh.visible = false; // hidden until the system applies the current hour (avoids a wrong-time flash)
+      }
       meshes.push(mesh);
     }
   }

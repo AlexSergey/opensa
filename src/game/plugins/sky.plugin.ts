@@ -72,7 +72,9 @@ const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
 /** Light tuning (timecyc dir/dirMult are ~constant for EXTRASUNNY, so day/night rides the sun height). */
 const SUN_INTENSITY = 2.2; // directional at peak
 const AMBIENT_DAY = 1.0;
-const AMBIENT_NIGHT = 0.35;
+const AMBIENT_NIGHT = 0.5; // moonlight floor: keeps map objects clearly visible (lamps/coronas add accents)
+/** Night ambient tint — a soft moonlight blue, lerped in from white as the sun sets. */
+const NIGHT_TINT = new Color(0.6, 0.66, 0.85);
 /** Heavy overcast: how much the direct sun is dimmed, and the ambient lift that fills in for it. */
 const OVERCAST_DIM = 0.8;
 const AMBIENT_OVERCAST = 0.35;
@@ -96,9 +98,27 @@ const FRAGMENT = `
   uniform float uCloudCoverage;
   uniform float uCloudOpacity;
   uniform float uCloudDark;
+  uniform float uNight;  // 0 day → 1 deep night (drives the star fade)
+  uniform float uStars;  // master toggle (0 = off, skip)
   varying vec3 vDir;
 
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+  // Procedural stars on the upper hemisphere: a gnomonic projection of the view direction tiled into
+  // cells, ~one star per lit cell with a random brightness + gentle twinkle. Tapers toward the horizon.
+  vec3 starField(vec3 dir) {
+    if (dir.y <= 0.02) return vec3(0.0);
+    vec2 uv = dir.xz / dir.y * 6.0; // project the dome; density scale
+    vec2 cell = floor(uv), f = fract(uv);
+    float present = step(0.90, hash(cell)); // ~10% of cells hold a star
+    vec2 star = vec2(hash(cell + 1.7), hash(cell + 4.3)); // its position within the cell
+    float d = length(f - star);
+    float dot_ = smoothstep(0.06, 0.0, d) * present; // tight point
+    float bright = 0.35 + 0.65 * hash(cell + 8.1);
+    float twinkle = 0.6 + 0.4 * sin(uTime * 2.5 + hash(cell) * 90.0);
+    float taper = smoothstep(0.02, 0.35, dir.y); // fade out near the horizon haze
+    return vec3(dot_ * bright * twinkle * taper);
+  }
   float vnoise(vec2 p) {
     vec2 i = floor(p), f = fract(p);
     vec2 u = f * f * (3.0 - 2.0 * f);
@@ -115,6 +135,11 @@ const FRAGMENT = `
     vec3 dir = normalize(vDir);
     float t = smoothstep(0.0, 1.0, clamp(dir.y, 0.0, 1.0)); // horizon→zenith; below horizon = bottom
     vec3 col = mix(uBottom, uTop, t);
+
+    // Stars sit behind the clouds (added before the cloud blend so overcast hides them), night-gated.
+    if (uStars > 0.5 && uNight > 0.0) {
+      col += starField(dir) * uNight;
+    }
 
     if (uCloudOpacity > 0.0 && dir.y > 0.0) {
       // Project the view direction onto a flat cloud ceiling (clouds converge toward the horizon),
@@ -166,6 +191,7 @@ export class SkyPlugin implements Plugin {
   private readonly dome: Mesh;
   private readonly getHour: () => number;
   private readonly material: ShaderMaterial;
+  private night = 0; // 0 day → 1 deep night (sun height); drives stars + the cool ambient tint
   private readonly sample: (hour: number) => SkySample;
   private readonly sun = new DirectionalLight(0xffffff, 1);
   private readonly sunDir = new Vector3();
@@ -184,6 +210,8 @@ export class SkyPlugin implements Plugin {
         uCloudDark: { value: 0 },
         uCloudOpacity: { value: 0.8 },
         uCloudTop: { value: new Color() },
+        uNight: { value: 0 },
+        uStars: { value: 1 },
         uTime: { value: 0 },
         uTop: { value: new Color() },
       },
@@ -257,12 +285,14 @@ export class SkyPlugin implements Plugin {
 
   update(context: PluginContext): void {
     this.dome.position.copy(context.camera.position); // keep the sky centred on the view
-    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize); // sets cloudCover
+    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize); // sets cloudCover/night
     const clouds = context.config.graphics.clouds;
     this.material.uniforms.uTime.value = context.clock.elapsed;
     this.material.uniforms.uCloudOpacity.value = clouds.opacity;
     // Cover = weather's cloudAlpha × the user multiplier (slider 0.5 = weather as-authored).
     this.material.uniforms.uCloudCoverage.value = Math.min(1, this.cloudCover * clouds.coverage * 2);
+    this.material.uniforms.uNight.value = this.night;
+    this.material.uniforms.uStars.value = context.config.graphics.stars.enabled ? 1 : 0;
     this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
@@ -279,6 +309,9 @@ export class SkyPlugin implements Plugin {
     const elevation = this.sunElevation(this.getHour()); // radians; ≤0 → below horizon
     const above = elevation > 0;
     const height = Math.max(0, Math.sin(elevation));
+    // Night factor (0 day → 1 deep night), ramping as the sun nears/passes the horizon — drives the star
+    // fade and the cool ambient tint. Based on sun height so dusk/dawn cross-fade smoothly.
+    this.night = 1 - MathUtils.smoothstep(height, 0, 0.22);
     // Overcast factor: 0 (clear) → 1 (heavy cloud). Direct light dims and shadows soften toward flat,
     // diffuse light, with a little ambient lift so the scene stays bright (an overcast sky is a big soft light).
     const overcast = MathUtils.smoothstep(this.cloudCover, 0.3, 0.95);
@@ -289,6 +322,7 @@ export class SkyPlugin implements Plugin {
     this.sun.shadow.intensity = 1 - overcast; // shadows fade out under cloud (no harsh shadow when overcast)
     const ambientDay = AMBIENT_DAY + AMBIENT_OVERCAST * overcast;
     this.ambient.intensity = AMBIENT_NIGHT + (ambientDay - AMBIENT_NIGHT) * (above ? Math.min(1, height + 0.25) : 0);
+    this.ambient.color.setRGB(1, 1, 1).lerp(NIGHT_TINT, this.night); // white by day → cool blue at night
 
     // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
     const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);

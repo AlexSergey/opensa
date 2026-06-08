@@ -145,13 +145,17 @@ function readMipmaps(
   for (let level = 0; level < numLevels; level += 1) {
     const size = stream.u32();
     const raw = stream.bytes(size);
-    let data = raw;
-    if (palette) {
-      data = expandPalette(raw, palette);
-    } else if (format === 'rgba8888') {
-      data = swizzleBgraToRgba(raw);
+    // SA TXDs often declare more mip levels than they store data for — the extra levels have size 0.
+    // Skip empty levels: an empty compressed mip is rejected by WebGL ("Pixel data cannot be null").
+    if (raw.length > 0) {
+      let data = raw;
+      if (palette) {
+        data = expandPalette(raw, palette);
+      } else if (format === 'rgba8888') {
+        data = swizzleBgraToRgba(raw);
+      }
+      mipmaps.push({ data, height: Math.max(1, h), width: Math.max(1, w) });
     }
-    mipmaps.push({ data, height: Math.max(1, h), width: Math.max(1, w) });
     w = Math.max(1, w >> 1);
     h = Math.max(1, h >> 1);
   }

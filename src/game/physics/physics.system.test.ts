@@ -22,6 +22,7 @@ function config(gameState: Config['gameState']): Config {
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
+      stars: { enabled: true },
       sun: { godrays: true, godraysSize: 30, sunSize: 15 },
       toneMapping: false,
       vehicleReflection: { intensity: 1, preset: 'enhanced' },

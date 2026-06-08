@@ -20,6 +20,7 @@ import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehi
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
@@ -216,6 +217,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
+        stars: { enabled: true },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: true,
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
@@ -331,6 +333,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     const streaming = new StreamingSystem(adapter, game.getStreamingRoot(), character.viewOf, game.getConfig());
     game.addSystem(streaming);
     game.setStreamingSystem(streaming);
+
+    // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.
+    game.addSystem(new TimedObjectSystem(game.getStreamingRoot(), () => game.getHours()));
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
@@ -473,6 +478,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setShadows: (patch) => game.setShadows(patch),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),
+      setStars: (patch) => game.setStars(patch),
       setSunSize: (size) => game.setSunSize(size),
       setToneMapping: (enabled) => game.setToneMapping(enabled),
       setVehicleReflection: (patch) => game.setVehicleReflection(patch),
@@ -489,6 +495,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);
       },
       ssao: () => game.getConfig().graphics.ssao,
+      stars: () => game.getConfig().graphics.stars,
       sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleport: (coords) => character.placePlayer(coords, true),
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),

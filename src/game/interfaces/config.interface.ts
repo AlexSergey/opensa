@@ -89,6 +89,8 @@ export interface GraphicsConfig {
   sky: SkyConfig;
   /** Screen-space ambient occlusion (contact shadows in corners/under objects). */
   ssao: SsaoConfig;
+  /** Procedural night stars on the sky dome. */
+  stars: StarsConfig;
   /** Sun disc + god-rays source/toggle. */
   sun: SunConfig;
   /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
@@ -155,6 +157,12 @@ export interface SsaoConfig {
   intensity: number;
   /** Sampling radius (relative to resolution; larger = wider, softer occlusion). */
   radius: number;
+}
+
+/** Procedural night-stars tuning. */
+export interface StarsConfig {
+  /** Master toggle (off = the dome shader skips the star branch). */
+  enabled: boolean;
 }
 
 /** World streaming / LOD tuning (sectioned grid render). */

@@ -66,9 +66,16 @@ describe('parseIde', () => {
 });
 
 describe('parseTimedObjects', () => {
-  it('parses tobj rows, stripping the trailing time-on/time-off pair', () => {
+  it('parses tobj rows, capturing the trailing time-on/time-off pair as the time window', () => {
     const defs = parseTimedObjects(['tobj', '1, neon_sign, lvneon, 100, 0, 6, 20', 'end'].join('\n'));
-    expect(defs[0]).toEqual({ drawDistance: 100, flags: 0, id: 1, modelName: 'neon_sign', txdName: 'lvneon' });
+    expect(defs[0]).toEqual({
+      drawDistance: 100,
+      flags: 0,
+      id: 1,
+      modelName: 'neon_sign',
+      time: { off: 20, on: 6 },
+      txdName: 'lvneon',
+    });
   });
 
   it('ignores objs / anim sections', () => {

@@ -25,7 +25,7 @@ export type WorldGrid = Map<string, GridCell>;
 export function buildWorldGrid(defs: MapDefinitions, cellSize: number): WorldGrid {
   const grid: WorldGrid = new Map();
   for (const instance of defs.instances) {
-    const def = defs.catalog.get(instance.id);
+    const def = defs.catalog.get(instance.id) ?? defs.timedCatalog?.get(instance.id);
     if (!def || isInterior(instance.interior)) {
       continue;
     }

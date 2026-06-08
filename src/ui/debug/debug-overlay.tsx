@@ -7,6 +7,7 @@ import type {
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,
+  StarsConfig,
   Vec3,
   VehicleReflectionConfig,
   WaterConfig,
@@ -65,6 +66,8 @@ export interface DebugActions {
   setSky(patch: Partial<SkyConfig>): void;
   /** Tune SSAO (enabled/intensity/radius). */
   setSsao(patch: Partial<SsaoConfig>): void;
+  /** Toggle night stars. */
+  setStars(patch: Partial<StarsConfig>): void;
   /** Set the sun disc base size (world units). */
   setSunSize(size: number): void;
   /** Toggle ACES tone mapping. */
@@ -83,6 +86,8 @@ export interface DebugActions {
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
   /** Current SSAO tuning. */
   ssao(): SsaoConfig;
+  /** Whether night stars are on. */
+  stars(): StarsConfig;
   /** Current sun disc base size (world units). */
   sunSize(): number;
   /** Teleport the player to a world position (native Z-up). */
@@ -144,6 +149,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [reflectionCfg, setReflectionCfg] = useState<VehicleReflectionConfig>(() => actions.vehicleReflection());
   const [ssao, setSsao] = useState<SsaoConfig>(() => actions.ssao());
   const [shadows, setShadows] = useState<ShadowsConfig>(() => actions.shadows());
+  const [stars, setStars] = useState<StarsConfig>(() => actions.stars());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -511,6 +517,19 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   type="checkbox"
                 />
                 <span style={shadows.enabled ? styles.optionActive : styles.option}>Sun shadows</span>
+              </label>
+              <label style={styles.label}>
+                <input
+                  checked={stars.enabled}
+                  onChange={() => {
+                    const enabled = !stars.enabled;
+                    setStars({ enabled });
+                    actions.setStars({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={stars.enabled ? styles.optionActive : styles.option}>Night stars</span>
               </label>
               <label style={styles.label}>
                 <input

@@ -22,21 +22,28 @@ export function parseIde(text: string): IdeObjectDef[] {
 }
 
 /**
- * Parse an IDE file's `tobj` (time-of-day) object definitions. These are a
- * separate kind — they only appear during a time-of-day window in the game — so
- * they are kept out of the render catalog for now. Same columns as `objs` plus a
- * trailing `timeOn, timeOff` pair, which is stripped.
- *
- * TODO: render time-of-day objects with proper day/night gating (see memory).
+ * Parse an IDE file's `tobj` (time-of-day) object definitions. Same columns as
+ * `objs` plus a trailing `timeOn, timeOff` (hours) pair, captured onto `def.time`
+ * so a system can gate visibility by the game hour. Kept separate from the plain
+ * render catalog (their model often overlaps a daytime variant).
  */
 export function parseTimedObjects(text: string): IdeObjectDef[] {
   const objects: IdeObjectDef[] = [];
   sectionedParse(cleanLines(text), {
     tobj: (row) => {
-      const def = parseObjsRow(row.length >= 7 ? row.slice(0, -2) : row);
-      if (def) {
-        objects.push(def);
+      const timed = row.length >= 7;
+      const def = parseObjsRow(timed ? row.slice(0, -2) : row);
+      if (!def) {
+        return;
       }
+      if (timed) {
+        const on = Number(row[row.length - 2]);
+        const off = Number(row[row.length - 1]);
+        if (!Number.isNaN(on) && !Number.isNaN(off)) {
+          def.time = { off, on };
+        }
+      }
+      objects.push(def);
     },
   });
 

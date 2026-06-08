@@ -13,6 +13,7 @@ export type {
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,
+  StarsConfig,
   VehicleReflectionConfig,
   WaterConfig,
 } from './interfaces/config.interface';

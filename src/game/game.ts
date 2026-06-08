@@ -27,6 +27,7 @@ import {
   type ShadowsConfig,
   type SkyConfig,
   type SsaoConfig,
+  type StarsConfig,
   type SunConfig,
   type VehicleReflectionConfig,
   type WaterConfig,
@@ -351,6 +352,11 @@ export class Game {
   /** Tune SSAO (enabled/intensity/radius) at runtime; merges into `graphics.ssao`. */
   setSsao(patch: Partial<SsaoConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, ssao: { ...this.config.graphics.ssao, ...patch } } });
+  }
+
+  /** Toggle night stars at runtime; merges into `graphics.stars`. */
+  setStars(patch: Partial<StarsConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, stars: { ...this.config.graphics.stars, ...patch } } });
   }
 
   /** Register the streaming system so the engine can drive it (view cell, manual cells). */

@@ -33,7 +33,7 @@ export function buildCell(
 export function cellGroups(defs: MapDefinitions, cell: GridCell, lod: boolean): Map<string, RegionMeshData> {
   const groups = new Map<string, RegionMeshData>();
   for (const instance of lod ? cell.lod : cell.hd) {
-    const def = defs.catalog.get(instance.id);
+    const def = defs.catalog.get(instance.id) ?? defs.timedCatalog?.get(instance.id);
     if (def) {
       addToGroup(groups, def, instance);
     }
