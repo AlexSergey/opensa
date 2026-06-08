@@ -205,6 +205,8 @@ export interface VehicleReflectionConfig {
 
 /** Water surface shader tuning. */
 export interface WaterConfig {
+  /** How much to darken the deep (top-down) water tint, 0 (raw timecyc) → 1 (black). */
+  darkness: number;
   /** Sun specular glint strength (sparkle along the sun direction). */
   glint: number;
   /** How much the sky horizon reflects at grazing angles (0–1). */

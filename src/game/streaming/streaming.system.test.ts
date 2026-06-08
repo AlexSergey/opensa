@@ -22,7 +22,7 @@ function config(overrides: Partial<Config> = {}): Config {
       sun: { godrays: true, godraysSize: 30, sunSize: 15 },
       toneMapping: false,
       vehicleReflection: { intensity: 1, preset: 'enhanced' },
-      water: { glint: 1.5, reflection: 0.6 },
+      water: { darkness: 0.55, glint: 1.5, reflection: 0.6 },
     },
     hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
     mapViewer: false,

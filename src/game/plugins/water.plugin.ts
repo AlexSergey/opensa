@@ -36,6 +36,7 @@ const FRAGMENT = `
   uniform float uGlint;
   uniform float uReflection;
   uniform float uWaterAlpha;
+  uniform float uDarkness;
   varying vec3 vWorldPos;
   varying vec2 vUv;
 
@@ -62,9 +63,10 @@ const FRAGMENT = `
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
     vec3 n = waterNormal(vWorldPos.xz, uTime);
 
-    // Fresnel: grazing angles reflect the sky horizon, top-down shows the water tint.
+    // Fresnel: grazing angles reflect the sky horizon, top-down shows the (darkened) deep-water tint.
     float fres = pow(1.0 - max(dot(viewDir, n), 0.0), 5.0);
-    vec3 base = mix(uWaterColor, uHorizonColor, clamp(fres * uReflection, 0.0, 1.0));
+    vec3 deep = uWaterColor * (1.0 - uDarkness); // deepen the body; the horizon reflection stays bright
+    vec3 base = mix(deep, uHorizonColor, clamp(fres * uReflection, 0.0, 1.0));
     float tex = texture2D(uMap, vUv).r; // a hint of the original water texture (caustic detail)
     base *= 0.5 + 0.4 * tex; // darken-only detail (≤1) — the timecyc water tint shouldn't be brightened
 
@@ -114,6 +116,7 @@ export class WaterPlugin implements Plugin {
       side: DoubleSide,
       transparent: true,
       uniforms: {
+        uDarkness: { value: context.config.graphics.water.darkness },
         uGlint: { value: context.config.graphics.water.glint },
         uHorizonColor: { value: new Color() },
         uMap: { value: map },
@@ -137,6 +140,7 @@ export class WaterPlugin implements Plugin {
     const sky = this.sample(this.getHour());
     const u = this.material.uniforms;
     u.uTime.value = context.clock.elapsed;
+    u.uDarkness.value = context.config.graphics.water.darkness;
     u.uGlint.value = context.config.graphics.water.glint;
     u.uReflection.value = context.config.graphics.water.reflection;
     u.uWaterAlpha.value = sky.waterAlpha;

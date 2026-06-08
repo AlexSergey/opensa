@@ -79,6 +79,10 @@ sun, lights, shadows, fog, water, reflections) and switchable from a debug **Wea
    `water.reflection` 0.6 → 0.4, and the dropped **alpha is now used as opacity** — `WaterSample.waterAlpha`
    (= `WaterRGBA.a / 255`) replaces the fixed `BASE_ALPHA`; final `alpha = mix(uWaterAlpha, 1, fres)`. High
    timecyc alpha (~0.95 by day) keeps the dark tint dominant instead of letting the background bleed through.
+   Still read too light (raw-sRGB shader output is brightened by the composer encoding, same as the sky dome —
+   which is tuned to look good, so left alone), so added **`WaterConfig.darkness`** (0 = raw timecyc tint →
+   1 = black): the shader darkens only the **deep/top-down** body (`deep = uWaterColor·(1-darkness)`), leaving
+   the grazing horizon reflection bright. Default 0.55, live **WATER DARKNESS** debug slider.
 
 7. ✅ **Smooth transitions** — a weather change now eases over ~6s instead of switching instantly.
    - **`sampleTimecycBlend(timecyc, from, to, hour, t)`** (renderware): blends two weathers at an hour by

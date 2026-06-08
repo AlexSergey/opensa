@@ -219,7 +219,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: true,
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
-        water: { glint: 1.5, reflection: 0.4 },
+        water: { darkness: 0.75, glint: 0.9, reflection: 0.35 },
       },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
       mapViewer: false,

@@ -551,6 +551,19 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={water.reflection}
               />
+              <div style={styles.groupLabel}>WATER DARKNESS: {water.darkness.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const darkness = Number(e.target.value);
+                  setWater((prev) => ({ ...prev, darkness }));
+                  actions.setWater({ darkness });
+                }}
+                step={0.01}
+                type="range"
+                value={water.darkness}
+              />
               <button
                 onClick={() => {
                   const next =
