@@ -24,6 +24,7 @@ import {
   type Config,
   type GameState,
   type SkyConfig,
+  type SsaoConfig,
   type SunConfig,
   type VehicleReflectionConfig,
   type WaterConfig,
@@ -317,6 +318,11 @@ export class Game {
   /** Tune the god-rays shader (density/exposure/weight) at runtime; merges into `graphics.sky`. */
   setSky(patch: Partial<SkyConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, sky: { ...this.config.graphics.sky, ...patch } } });
+  }
+
+  /** Tune SSAO (enabled/intensity/radius) at runtime; merges into `graphics.ssao`. */
+  setSsao(patch: Partial<SsaoConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, ssao: { ...this.config.graphics.ssao, ...patch } } });
   }
 
   /** Register the streaming system so the engine can drive it (view cell, manual cells). */

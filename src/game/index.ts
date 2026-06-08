@@ -10,6 +10,7 @@ export type {
   BloomConfig,
   Config,
   SkyConfig,
+  SsaoConfig,
   VehicleReflectionConfig,
   WaterConfig,
 } from './interfaces/config.interface';

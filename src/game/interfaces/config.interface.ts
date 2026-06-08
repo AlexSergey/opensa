@@ -73,6 +73,8 @@ export interface GraphicsConfig {
   bloom: BloomConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */
   sky: SkyConfig;
+  /** Screen-space ambient occlusion (contact shadows in corners/under objects). */
+  ssao: SsaoConfig;
   /** Sun disc + god-rays source/toggle. */
   sun: SunConfig;
   /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
@@ -123,6 +125,16 @@ export interface SkyConfig {
   exposure: number;
   /** Per-sample light weight. */
   weight: number;
+}
+
+/** Screen-space ambient occlusion (SSAO) tuning. */
+export interface SsaoConfig {
+  /** Master toggle (off = the normal pass + SSAO pass are skipped, zero cost). */
+  enabled: boolean;
+  /** Occlusion strength. */
+  intensity: number;
+  /** Sampling radius (relative to resolution; larger = wider, softer occlusion). */
+  radius: number;
 }
 
 /** World streaming / LOD tuning (sectioned grid render). */

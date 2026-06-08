@@ -111,6 +111,14 @@ target, no `water.foam` config/slider; `WaterConfig` is back to `{ glint, reflec
 real foam **texture** scrolled along the shore; thinner band + distance-fade; inward wave-wash animation;
 **reuse an existing depth source** instead of a dedicated pre-pass (so no second scene render).
 
+**SSAO (added 2026-06-08):** `PostFxPlugin` now also hosts ambient occlusion — a `NormalPass` (scene normals)
+feeds an `SSAOEffect` (MULTIPLY blend, half-res, `worldDistanceThreshold` ~300 for the big GTA coords),
+placed right after the RenderPass (darkens corners/contacts before god-rays/bloom). `Config.graphics.ssao
+{ enabled, intensity, radius }` (default on, intensity 1.5, radius 0.2; +4 fixtures), `Game.setSsao`, debug
+SSAO checkbox + AO INTENSITY / AO RADIUS sliders. **enabled=false skips the NormalPass + SSAO pass entirely
+(zero cost — the NormalPass is an extra full-scene normal render).** Shadows (directional shadow map) chosen
+as the *later* big step; SSAO first (user 2026-06-08).
+
 **Gotcha — composer MSAA crashed the scene (`glBlitFramebuffer: Depth/stencil buffer format combination
 not allowed for blit`, scene wouldn't load):** `EffectComposer({ multisampling: 4 })` can't resolve a
 multisampled depth/stencil blit alongside the GodRaysEffect depth texture. Fix: **no MSAA on the composer**

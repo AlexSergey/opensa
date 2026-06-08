@@ -6,13 +6,15 @@ import {
   EffectComposer,
   EffectPass,
   GodRaysEffect,
+  NormalPass,
   RenderPass as PpRenderPass,
   SMAAEffect,
+  SSAOEffect,
   ToneMappingEffect,
   ToneMappingMode,
 } from 'postprocessing';
 
-import type { BloomConfig, SkyConfig } from '../interfaces/config.interface';
+import type { BloomConfig, SkyConfig, SsaoConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext, RenderPass, RenderPipeline } from './plugin';
 
 /** Bloom blur radius (mipmap blur) and luminance smoothing — fixed; intensity/threshold are config. */
@@ -35,9 +37,12 @@ export class PostFxPlugin implements Plugin {
   private composer: EffectComposer | null = null;
   private godRays: GodRaysEffect | null = null;
   private godraysPass: EffectPass | null = null;
+  private normalPass: NormalPass | null = null;
   private pass: null | RenderPass = null;
   private pipeline: null | RenderPipeline = null;
   private present = false;
+  private ssao: null | SSAOEffect = null;
+  private ssaoPass: EffectPass | null = null;
   private readonly sunSource: Mesh;
   private tonePass: EffectPass | null = null;
 
@@ -46,7 +51,7 @@ export class PostFxPlugin implements Plugin {
   }
 
   configChanged(config: PluginContext['config']): void {
-    this.applyParams(config.graphics.sky, config.graphics.bloom);
+    this.applyParams(config.graphics.sky, config.graphics.bloom, config.graphics.ssao);
   }
 
   dispose(): void {
@@ -55,11 +60,30 @@ export class PostFxPlugin implements Plugin {
   }
 
   install(context: PluginContext): void {
-    const { bloom: bloomCfg, sky } = context.config.graphics;
+    const { bloom: bloomCfg, sky, ssao: ssaoCfg } = context.config.graphics;
     // No MSAA on the composer: a multisampled depth/stencil resolve can't be blitted alongside the
     // god-rays depth texture (GL_INVALID_OPERATION). Antialiasing is done by an SMAAEffect instead.
     const composer = new EffectComposer(context.renderer);
     composer.addPass(new PpRenderPass(context.scene, context.camera));
+
+    // Ambient occlusion: a scene-normals pass feeds an SSAO effect that multiply-darkens corners/contacts.
+    const normalPass = new NormalPass(context.scene, context.camera);
+    const ssao = new SSAOEffect(context.camera, normalPass.texture, {
+      blendFunction: BlendFunction.MULTIPLY,
+      fade: 0.02,
+      intensity: ssaoCfg.intensity,
+      luminanceInfluence: 0.6,
+      radius: ssaoCfg.radius,
+      resolutionScale: 0.5, // half-res AO — the cost saver
+      samples: 9,
+      worldDistanceFalloff: 100,
+      worldDistanceThreshold: 300,
+      worldProximityFalloff: 2,
+      worldProximityThreshold: 6,
+    });
+    const ssaoPass = new EffectPass(context.camera, ssao);
+    composer.addPass(normalPass);
+    composer.addPass(ssaoPass);
 
     const godRays = new GodRaysEffect(context.camera, this.sunSource, {
       blendFunction: BlendFunction.SCREEN,
@@ -94,6 +118,9 @@ export class PostFxPlugin implements Plugin {
     this.bloom = bloom;
     this.bloomPass = bloomPass;
     this.tonePass = tonePass;
+    this.normalPass = normalPass;
+    this.ssao = ssao;
+    this.ssaoPass = ssaoPass;
     this.pipeline = context.pipeline;
     this.pass = { render: (): void => composer.render() };
     this.ensurePass(!context.config.mapViewer);
@@ -104,12 +131,16 @@ export class PostFxPlugin implements Plugin {
   }
 
   update(context: PluginContext): void {
-    const { bloom, sun, toneMapping } = context.config.graphics;
+    const { bloom, ssao, sun, toneMapping } = context.config.graphics;
     if (this.godraysPass) {
       this.godraysPass.enabled = sun.godrays && this.sunSource.visible; // shafts only when sun is up
     }
     if (this.bloomPass) {
       this.bloomPass.enabled = bloom.enabled;
+    }
+    if (this.normalPass && this.ssaoPass) {
+      this.normalPass.enabled = ssao.enabled; // disabled = the extra normal render is skipped (zero cost)
+      this.ssaoPass.enabled = ssao.enabled;
     }
     if (this.tonePass) {
       this.tonePass.enabled = toneMapping;
@@ -117,8 +148,8 @@ export class PostFxPlugin implements Plugin {
     this.ensurePass(!context.config.mapViewer); // plain render in the map inspector
   }
 
-  /** Push the configurable tuning into the live god-rays + bloom materials. */
-  private applyParams(sky: SkyConfig, bloom: BloomConfig): void {
+  /** Push the configurable tuning into the live god-rays + bloom + SSAO materials. */
+  private applyParams(sky: SkyConfig, bloom: BloomConfig, ssao: SsaoConfig): void {
     if (this.godRays) {
       const material = this.godRays.godRaysMaterial;
       material.density = sky.density;
@@ -128,6 +159,10 @@ export class PostFxPlugin implements Plugin {
     if (this.bloom) {
       this.bloom.intensity = bloom.intensity;
       this.bloom.luminanceMaterial.threshold = bloom.threshold;
+    }
+    if (this.ssao) {
+      this.ssao.ssaoMaterial.intensity = ssao.intensity;
+      this.ssao.ssaoMaterial.radius = ssao.radius;
     }
   }
 

@@ -1,6 +1,6 @@
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { BloomConfig, Game, SkyConfig, Vec3, VehicleReflectionConfig, WaterConfig } from '../../game';
+import type { BloomConfig, Game, SkyConfig, SsaoConfig, Vec3, VehicleReflectionConfig, WaterConfig } from '../../game';
 
 import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
 import { GameClock } from '../../game/time/game-clock';
@@ -47,6 +47,8 @@ export interface DebugActions {
   setGodraysSize(size: number): void;
   /** Tune the god-rays shader (density/exposure/weight). */
   setSky(patch: Partial<SkyConfig>): void;
+  /** Tune SSAO (enabled/intensity/radius). */
+  setSsao(patch: Partial<SsaoConfig>): void;
   /** Set the sun disc base size (world units). */
   setSunSize(size: number): void;
   /** Toggle ACES tone mapping. */
@@ -59,6 +61,8 @@ export interface DebugActions {
   sky(): SkyConfig;
   /** Spawn a car just in front of the player. */
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
+  /** Current SSAO tuning. */
+  ssao(): SsaoConfig;
   /** Current sun disc base size (world units). */
   sunSize(): number;
   /** Teleport the player to a world position (native Z-up). */
@@ -111,6 +115,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
   const [water, setWater] = useState<WaterConfig>(() => actions.water());
   const [reflectionCfg, setReflectionCfg] = useState<VehicleReflectionConfig>(() => actions.vehicleReflection());
+  const [ssao, setSsao] = useState<SsaoConfig>(() => actions.ssao());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
 
@@ -394,6 +399,45 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={0.01}
                 type="range"
                 value={bloom.threshold}
+              />
+              <label style={styles.label}>
+                <input
+                  checked={ssao.enabled}
+                  onChange={() => {
+                    const enabled = !ssao.enabled;
+                    setSsao((prev) => ({ ...prev, enabled }));
+                    actions.setSsao({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={ssao.enabled ? styles.optionActive : styles.option}>SSAO</span>
+              </label>
+              <div style={styles.groupLabel}>AO INTENSITY: {ssao.intensity.toFixed(2)}</div>
+              <input
+                max={4}
+                min={0}
+                onChange={(e) => {
+                  const intensity = Number(e.target.value);
+                  setSsao((prev) => ({ ...prev, intensity }));
+                  actions.setSsao({ intensity });
+                }}
+                step={0.1}
+                type="range"
+                value={ssao.intensity}
+              />
+              <div style={styles.groupLabel}>AO RADIUS: {ssao.radius.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0.01}
+                onChange={(e) => {
+                  const radius = Number(e.target.value);
+                  setSsao((prev) => ({ ...prev, radius }));
+                  actions.setSsao({ radius });
+                }}
+                step={0.01}
+                type="range"
+                value={ssao.radius}
               />
               <label style={styles.label}>
                 <input

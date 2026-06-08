@@ -205,6 +205,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
+        ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: false,
         vehicleReflection: { intensity: 1, preset: 'enhanced' },
@@ -442,6 +443,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setGodrays: (enabled) => game.setGodrays(enabled),
       setGodraysSize: (size) => game.setGodraysSize(size),
       setSky: (patch) => game.setSky(patch),
+      setSsao: (patch) => game.setSsao(patch),
       setSunSize: (size) => game.setSunSize(size),
       setToneMapping: (enabled) => game.setToneMapping(enabled),
       setVehicleReflection: (patch) => game.setVehicleReflection(patch),
@@ -455,6 +457,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         const at: Vec3 = [spawned.position[0], spawned.position[1], spawned.position[2]];
         vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);
       },
+      ssao: () => game.getConfig().graphics.ssao,
       sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleport: (coords) => character.placePlayer(coords, true),
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
