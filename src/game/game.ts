@@ -25,6 +25,7 @@ import {
   type GameState,
   type SkyConfig,
   type SunConfig,
+  type WaterConfig,
 } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
@@ -341,6 +342,11 @@ export class Game {
   /** Toggle ACES tone mapping at runtime. */
   setToneMapping(enabled: boolean): void {
     this.setConfig({ graphics: { ...this.config.graphics, toneMapping: enabled } });
+  }
+
+  /** Tune the water shader (glint/reflection) at runtime; merges into `graphics.water`. */
+  setWater(patch: Partial<WaterConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, water: { ...this.config.graphics.water, ...patch } } });
   }
 
   setWorldAdapter(adapter: WorldAdapter): this {

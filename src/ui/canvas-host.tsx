@@ -15,6 +15,7 @@ import { setupCharacter } from '../game/character/setup-character';
 import { FogPlugin } from '../game/plugins/fog.plugin';
 import { PostFxPlugin } from '../game/plugins/postfx.plugin';
 import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
+import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
@@ -205,6 +206,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: false,
+        water: { glint: 1.5, reflection: 0.6 },
       },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
       mapViewer: false,
@@ -245,11 +247,30 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         sunSize: e.sunSize,
       };
     };
+    const waterSample = (hour: number): WaterSample => {
+      const e = sampleTimecyc(timecyc, DEFAULT_WEATHER, hour);
+
+      return { horizon: e.skyBot, sun: e.sunCore, water: [e.water[0], e.water[1], e.water[2]] };
+    };
     const sky = new SkyPlugin(skySample, () => game.getHours()); // sky dome + sun + lights from timecyc (smooth)
+
+    // Water mesh (geometry from the adapter) loaded up front so the WaterPlugin can own its material;
+    // parented under the −90°X streaming root (which `game.init` adds to the scene).
+    const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
+    game.getStreamingRoot().add(water);
+
     game
       .setWorldAdapter(adapter)
       .addPlugin(new FogPlugin(() => skySample(game.getHours()).skyBot)) // fog fades into the sky horizon
       .addPlugin(sky)
+      .addPlugin(
+        new WaterPlugin(
+          water as Mesh,
+          waterSample,
+          () => game.getHours(),
+          () => sky.getSunDirection(),
+        ),
+      )
       .addPlugin(new PostFxPlugin(sky.godraysSource)); // post-FX host: god rays + bloom + tone mapping
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
@@ -282,10 +303,6 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
-
-    // Flat textured water surface (whole map; no shader). Parented to the −90°X streaming root.
-    const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
-    game.getStreamingRoot().add(water);
 
     // Painted cars parked near the spawn (native Z-up under the −90°X root). Each is a
     // dynamic physics body whose chassis collider is the convex hull of its embedded COL
@@ -421,6 +438,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setSky: (patch) => game.setSky(patch),
       setSunSize: (size) => game.setSunSize(size),
       setToneMapping: (enabled) => game.setToneMapping(enabled),
+      setWater: (patch) => game.setWater(patch),
       sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
@@ -433,6 +451,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
+      water: () => game.getConfig().graphics.water,
     };
 
     return { debugActions, game };

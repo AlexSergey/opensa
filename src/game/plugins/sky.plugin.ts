@@ -139,6 +139,11 @@ export class SkyPlugin implements Plugin {
     this.corona.material.map?.dispose();
   }
 
+  /** Current sun direction in three world space (unit; points toward the sun). For water glints etc. */
+  getSunDirection(): Vector3 {
+    return this.sunDir;
+  }
+
   install(context: PluginContext): void {
     context.scene.add(this.dome, this.ambient, this.sun, this.sun.target, this.sunSource, this.corona);
     this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize);

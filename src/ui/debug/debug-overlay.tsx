@@ -1,6 +1,6 @@
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { BloomConfig, Game, SkyConfig, Vec3 } from '../../game';
+import type { BloomConfig, Game, SkyConfig, Vec3, WaterConfig } from '../../game';
 
 import { GameClock } from '../../game/time/game-clock';
 import { styles } from './debug-styles';
@@ -49,6 +49,8 @@ export interface DebugActions {
   setSunSize(size: number): void;
   /** Toggle ACES tone mapping. */
   setToneMapping(enabled: boolean): void;
+  /** Tune the water shader (glint/reflection). */
+  setWater(patch: Partial<WaterConfig>): void;
   /** Current god-rays shader tuning. */
   sky(): SkyConfig;
   /** Spawn a car just in front of the player. */
@@ -59,6 +61,8 @@ export interface DebugActions {
   teleportToGanton(): void;
   /** Whether ACES tone mapping is on. */
   toneMapping(): boolean;
+  /** Current water shader tuning. */
+  water(): WaterConfig;
 }
 
 type Screen = 'game' | 'map' | 'player' | 'root' | 'vehicles';
@@ -87,6 +91,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
   const [bloom, setBloom] = useState<BloomConfig>(() => actions.bloom());
   const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
+  const [water, setWater] = useState<WaterConfig>(() => actions.water());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
 
@@ -368,6 +373,32 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 />
                 <span style={toneMapping ? styles.optionActive : styles.option}>Tone map (ACES)</span>
               </label>
+              <div style={styles.groupLabel}>WATER GLINT: {water.glint.toFixed(2)}</div>
+              <input
+                max={5}
+                min={0}
+                onChange={(e) => {
+                  const glint = Number(e.target.value);
+                  setWater((prev) => ({ ...prev, glint }));
+                  actions.setWater({ glint });
+                }}
+                step={0.1}
+                type="range"
+                value={water.glint}
+              />
+              <div style={styles.groupLabel}>WATER REFLECTION: {water.reflection.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const reflection = Number(e.target.value);
+                  setWater((prev) => ({ ...prev, reflection }));
+                  actions.setWater({ reflection });
+                }}
+                step={0.01}
+                type="range"
+                value={water.reflection}
+              />
             </div>
           )}
 

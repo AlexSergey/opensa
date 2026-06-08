@@ -103,6 +103,20 @@ Post-FX library = **pmndrs `postprocessing`** (added when godrays lands). **Godr
    threshold }` (+4 fixtures, default on), `Game.setBloom`, debug Bloom checkbox + INTENSITY/THRESHOLD
    sliders. renderer.toneMapping stays NoToneMapping so ACES isn't double-applied.
 
+6. ✅ **Water + sun glints — DONE.** A renderware-free **`WaterPlugin`** (`game/plugins/water.plugin.ts`,
+   mirrors `SkyPlugin`) swaps the flat `MeshBasicMaterial` water (built in the adapter, plan 014) for a
+   `ShaderMaterial`: animated ripple normals (procedural sine waves over world XZ + time), a **fresnel sky
+   reflection** (deep `water` tint top-down → `skyBot` horizon at grazing angles) and a **specular sun
+   glint** (`reflect(-sunDir)`, ripples shatter it into sparkles → pairs with bloom). Colours come from
+   timecyc each frame (`water`/`skyBot`/`sunCore`), output **raw sRGB** like the sky dome. Sun direction via
+   new `SkyPlugin.getSunDirection()`. The water mesh is loaded up front in canvas-host and passed to the
+   plugin (added to the streaming root before `init`). `Config.graphics.water { glint, reflection }` (+4
+   fixtures), `Game.setWater`, debug WATER GLINT (0–5) + WATER REFLECTION (0–1) sliders. Ripple
+   freq/amp/shininess hardcoded in the shader. Later added: slow swell (rolling-highlight movement). A
+   **depth-based shoreline foam** was built then **REMOVED** (depth pre-pass overhead + mediocre look) — see
+   [[graphics]] memory; `WaterConfig` is `{ glint, reflection }`. Foam is a future redo (real foam texture /
+   inward wave wash / reuse an existing depth source instead of a second scene render).
+
 ## Performance strategy
 
 Single dome draw; effect passes at 0.5× res with capped samples; godrays gated on sun visibility; effects
@@ -121,7 +135,7 @@ ambient light; no shadow maps yet. Profile each phase in-browser before moving o
 
 ## Reserved for later phases (this plan will grow)
 
-Water shader + **sun glints/specular on water**, clouds (`lowClouds`/`bottomClouds` + cloud meshes),
-**car reflections** (env map / SSR), **shadows** (directional shadow map from the sun), moon + stars at
-night, **darker nights** (modulate prelit vertex colours by timecyc), other weathers + smooth weather
-transitions, `ambObj` for peds/vehicles. (bloom/tone-mapping — DONE, phase 5.)
+Clouds (`lowClouds`/`bottomClouds` + cloud meshes), **car reflections** (env map / SSR), **shadows**
+(directional shadow map from the sun), moon + stars at night, **darker nights** (modulate prelit vertex
+colours by timecyc), other weathers + smooth weather transitions, `ambObj` for peds/vehicles.
+(bloom/tone-mapping — DONE, phase 5; water + sun glints — DONE, phase 6.)

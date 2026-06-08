@@ -73,7 +73,7 @@
   - [✅] Sky
     - [✅] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
     - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
-  - [ ] Water shader
+  - [✅] Water shader
   - [ ] Night objects (Tobj)
   - [ ] 2dfx (maybe)
 - [ ] UI Layer
@@ -108,6 +108,7 @@ Known issues:
 - [ ] Rigging models bug
 - [✅] Water in whole map (flooded tunnels)
 - [ ] Exiting a car that's flipped over while already in it—Tommy emerges from the wrong side (the door calculation only takes into account yaw). We'll come back when you decide.
+- [ ] Ugly water foam
 
 Next iterations:
 - [ ] Particles

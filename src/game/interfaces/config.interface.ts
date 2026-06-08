@@ -77,6 +77,8 @@ export interface GraphicsConfig {
   sun: SunConfig;
   /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
   toneMapping: boolean;
+  /** Water surface shader tuning (reflection + sun glint). */
+  water: WaterConfig;
 }
 
 /** HUD widget styling (the DOM overlay above the canvas; immune to post-processing). */
@@ -157,4 +159,12 @@ export interface VehicleConfig {
   lodDistance: number;
   /** Beyond this the car is unloaded from memory; it respawns when back within `lodDistance`. */
   unloadDistance: number;
+}
+
+/** Water surface shader tuning. */
+export interface WaterConfig {
+  /** Sun specular glint strength (sparkle along the sun direction). */
+  glint: number;
+  /** How much the sky horizon reflects at grazing angles (0–1). */
+  reflection: number;
 }

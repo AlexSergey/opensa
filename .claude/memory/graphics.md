@@ -64,7 +64,7 @@ weight 0.4 }` (+4 fixtures), exported as `SkyConfig` from the game barrel. `Game
 weight setters). Debug Game-screen sliders DENSITY/EXPOSURE/WEIGHT (0–1). (decay/samples/resolutionScale stay
 hardcoded in the plugin.)
 
-**Config shape (current):** `Config.graphics = { bloom: BloomConfig, sky: SkyConfig, sun: SunConfig, toneMapping: boolean }`.
+**Config shape (current):** `Config.graphics = { bloom: BloomConfig, sky: SkyConfig, sun: SunConfig, toneMapping: boolean, water: WaterConfig }`.
 `SkyConfig` = { density, exposure, weight } (god-rays shader). `SunConfig` = { godrays: boolean, godraysSize,
 sunSize }. `BloomConfig` = { enabled, intensity, threshold }. (`SkyConfig`/`BloomConfig` exported from the game
 barrel — `ui` debug imports them.) `Game.setSky`/`setSun`/`setBloom(patch)` do the nested merge (`setConfig` is
@@ -87,6 +87,29 @@ contrast/saturation and lifts blacks → milky, and it compressed the additive g
 mapping is **off by default** (`Game.setToneMapping` / debug checkbox to try it). Proper ACES would need an
 actual HDR pipeline (lights/sun emitting >1 + exposure) — future. Bloom stayed on (subtle highlight glow;
 threshold compared in linear, so the ~0.6-linear sky doesn't bloom, only the bright sun/horizon).
+
+**Phase 6 DONE (water + sun glints):** `WaterPlugin` (`game/plugins/water.plugin.ts`, renderware-free, mirrors
+SkyPlugin) **replaces the flat water mesh's `MeshBasicMaterial`** (built in the adapter, plan 014) with a
+`ShaderMaterial` — animated ripple normals (procedural sines over world XZ + `clock.elapsed`), fresnel sky
+reflection (`water` tint → `skyBot` at grazing angles), specular **sun glint** (`reflect(-sunDir)`, sparkles
+→ bloom). Colours per-frame from a `WaterSample` (timecyc `water`/`skyBot`/`sunCore`) set as **raw sRGB** (no
+colorspace) to match the sky dome. Sun dir via new **`SkyPlugin.getSunDirection()`**. The water mesh is loaded
+**up front** in canvas-host (before `init`) and passed to the plugin (it needs to own the material at install);
+added to the streaming root before init. `Config.graphics.water { glint, reflection }` (+4 fixtures),
+`Game.setWater`, debug WATER GLINT/REFLECTION sliders. Ripple freq/amp/shininess hardcoded in the shader.
+Glint must be a **noisy multi-directional ripple** (4 crossing octaves) or it reflects as one coherent
+**line** instead of a shimmering sparkle path (user feedback). Also added: a slow **swell** (low-freq sines)
+whose slope tilts the normal → drifting/rolling highlights so the surface isn't dead-flat.
+
+⚠️ **Shoreline foam — BUILT then REMOVED (user 2026-06-08: noticeable overhead, dropped for the demo; REDO
+later).** It was real **depth-based** foam: each frame `WaterPlugin` did a depth pre-pass (hide water,
+`scene.overrideMaterial = MeshDepthMaterial`, render to a `WebGLRenderTarget` + 24-bit `DepthTexture`), and the
+water fragment compared scene depth (`perspectiveDepthToViewZ` from `#include <packing>`) to its own viewdist
+→ small gap = foam, FBM-noise-textured. Two problems: the extra depth-only **full-scene render** is real
+overhead, and the *look* was mediocre (too wide on gentle beaches, blotchy). **Fully reverted** — no depth
+target, no `water.foam` config/slider; `WaterConfig` is back to `{ glint, reflection }`. Future redo ideas:
+real foam **texture** scrolled along the shore; thinner band + distance-fade; inward wave-wash animation;
+**reuse an existing depth source** instead of a dedicated pre-pass (so no second scene render).
 
 **Gotcha — composer MSAA crashed the scene (`glBlitFramebuffer: Depth/stencil buffer format combination
 not allowed for blit`, scene wouldn't load):** `EffectComposer({ multisampling: 4 })` can't resolve a
