@@ -347,17 +347,17 @@ describe.skipIf(!dffExists)('parseDff (real asset testground.dff)', () => {
   });
 });
 
-const admiralPath = join(process.cwd(), 'static', 'vehicles', 'admiral.dff');
+const admiralPath = join(process.cwd(), 'tests', 'vehicles', 'admiral.dff');
 const admiralExists = existsSync(admiralPath);
 const admiral = admiralExists ? parseDff(toArrayBuffer(new Uint8Array(readFileSync(admiralPath)))) : null;
 
 describe.skipIf(!admiralExists)('parseDff (real vehicle admiral.dff) reflection plugins', () => {
   it('reads MatFX env maps, reflection + specular off the body materials', () => {
     const materials = admiral!.geometries.flatMap((g) => g.materials);
-    const reflective = materials.filter((m) => m.effects?.envMap);
+    // Truly-reflective body materials: a MatFX env map with a positive coefficient (model-agnostic —
+    // stock cars use coefficient 1 + the generic env textures, custom mods may use 0.5 + their own).
+    const reflective = materials.filter((m) => m.effects?.envMap && m.effects.envMap.coefficient > 0);
     expect(reflective.length).toBeGreaterThan(0);
-    // admiral's reflective body materials use coefficient 0.5 + a named env texture.
-    expect(reflective.some((m) => m.effects!.envMap!.coefficient === 0.5)).toBe(true);
     expect(reflective.every((m) => (m.effects!.envMap!.texture?.length ?? 0) > 0)).toBe(true);
     expect(materials.some((m) => m.effects?.specular?.texture === 'vehiclespecdot64')).toBe(true);
     expect(materials.some((m) => m.effects?.reflection)).toBe(true);

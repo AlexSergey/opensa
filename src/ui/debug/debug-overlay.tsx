@@ -93,12 +93,13 @@ export interface DebugActions {
 /** Reflection preset cycle order for the debug selector (Off + the registry keys). */
 const REFLECTION_PRESETS = ['off', ...Object.keys(PRESETS)];
 
-type Screen = 'game' | 'map' | 'player' | 'position' | 'root' | 'vehicles';
+type Screen = 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Game', screen: 'game' },
+  { label: 'Graphics', screen: 'graphics' },
   { label: 'Position', screen: 'position' },
   { label: 'Map', screen: 'map' },
 ];
@@ -273,20 +274,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
           {screen === 'game' && (
             <div style={styles.group}>
-              <div style={styles.groupLabel}>FOG: {fog} m</div>
-              <input
-                max={2000}
-                min={10}
-                onChange={(e) => {
-                  const distance = Number(e.target.value);
-                  setFog(distance);
-                  actions.setFogDistance(distance);
-                }}
-                step={10}
-                type="range"
-                value={fog}
-              />
-
               <div style={styles.groupLabel}>TIME: {GameClock.format(time)}</div>
               <div style={styles.presetRow}>
                 {TIME_PRESETS.map(([label, minutes]) => (
@@ -314,6 +301,24 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={15}
                 type="range"
                 value={time}
+              />
+            </div>
+          )}
+
+          {screen === 'graphics' && (
+            <div style={styles.group}>
+              <div style={styles.groupLabel}>FOG: {fog} m</div>
+              <input
+                max={2000}
+                min={10}
+                onChange={(e) => {
+                  const distance = Number(e.target.value);
+                  setFog(distance);
+                  actions.setFogDistance(distance);
+                }}
+                step={10}
+                type="range"
+                value={fog}
               />
 
               <div style={styles.groupLabel}>GRAPHICS</div>

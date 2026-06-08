@@ -1,3 +1,4 @@
+- [Test fixtures](test-fixtures.md) — tests read assets from repo-root tests/ (committed), NOT static/ (live mutable game data)
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
 - [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers + region builder, now under src/renderware/map
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading

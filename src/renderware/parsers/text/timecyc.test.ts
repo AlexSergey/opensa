@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildTimecyc, sampleTimecyc } from './timecyc';
 import { convertTo24h, parseTimecyc, TIME_WEATHERS } from './timecyc.parser';
 
-const timecyc = buildTimecyc(convertTo24h(parseTimecyc(readFileSync('static/data/timecyc.dat', 'utf8'))));
+const timecyc = buildTimecyc(convertTo24h(parseTimecyc(readFileSync('tests/data/timecyc.dat', 'utf8'))));
 
 describe('buildTimecyc', () => {
   describe('positive cases', () => {

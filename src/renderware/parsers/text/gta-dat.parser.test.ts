@@ -34,9 +34,9 @@ describe('parseGtaDat', () => {
   });
 });
 
-const datPath = join(process.cwd(), 'static', 'data', 'gta.dat');
+const datPath = join(process.cwd(), 'tests', 'data', 'gta.dat');
 
-// Map-agnostic: asserts structure for whatever gta.dat currently lives in static/.
+// Map-agnostic: asserts structure for whatever gta.dat currently lives in tests/data.
 describe.skipIf(!existsSync(datPath))('parseGtaDat (real gta.dat)', () => {
   it('references at least one IMG, IDE and IPL', () => {
     const dat = parseGtaDat(readFileSync(datPath, 'utf8'));

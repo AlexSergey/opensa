@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { convertTo24h, FIELDS, HOURS, parseTimecyc, TIME_WEATHERS } from './timecyc.parser';
 
 const ROW_SIZE = FIELDS.reduce((n, f) => n + (f.kind === 'rgb' ? 3 : f.kind === 'rgba' ? 4 : 1), 0);
-const base = readFileSync('static/data/timecyc.dat', 'utf8');
-const day24 = readFileSync('static/data/timecyc_24h.dat', 'utf8');
+const base = readFileSync('tests/data/timecyc.dat', 'utf8');
+const day24 = readFileSync('tests/data/timecyc_24h.dat', 'utf8');
 
 describe('parseTimecyc', () => {
   describe('negative cases', () => {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseHandling } from './handling.parser';
 
-const handlingPath = join(process.cwd(), 'static', 'data', 'handling.cfg');
+const handlingPath = join(process.cwd(), 'tests', 'data', 'handling.cfg');
 
 describe('parseHandling', () => {
   describe('negative cases', () => {
