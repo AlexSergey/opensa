@@ -77,6 +77,8 @@ export interface GraphicsConfig {
   sun: SunConfig;
   /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
   toneMapping: boolean;
+  /** Vehicle env-map reflections (preset-driven; see plan 030). */
+  vehicleReflection: VehicleReflectionConfig;
   /** Water surface shader tuning (reflection + sun glint). */
   water: WaterConfig;
 }
@@ -159,6 +161,14 @@ export interface VehicleConfig {
   lodDistance: number;
   /** Beyond this the car is unloaded from memory; it respawns when back within `lodDistance`. */
   unloadDistance: number;
+}
+
+/** Vehicle env-map reflection tuning (plan 030). */
+export interface VehicleReflectionConfig {
+  /** Global reflection-intensity multiplier over the preset/DFF values. */
+  intensity: number;
+  /** Preset key into the reflection PRESETS registry; `'off'` (or unknown) = matte, no reflections. */
+  preset: string;
 }
 
 /** Water surface shader tuning. */

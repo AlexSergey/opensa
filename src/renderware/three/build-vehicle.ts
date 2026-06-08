@@ -38,6 +38,8 @@ export interface BuiltVehicle {
   lod: null | Object3D;
   /** Damageable panels/doors with `_ok`/`_dam` meshes (for the collision-damage system). */
   parts: BuiltPart[];
+  /** Env-map-reflective materials (tagged `userData.reflection`) for the vehicle-reflection plugin. */
+  reflectiveMaterials: MeshStandardMaterial[];
   root: Group;
   /** Seat dummy local transforms in vehicle space (null if absent). */
   seats: { backseat: Matrix4 | null; frontseat: Matrix4 | null };
@@ -168,7 +170,15 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
 
-  return { doors, lod: lod.children.length > 0 ? lod : null, parts, root, seats, wheels };
+  return {
+    doors,
+    lod: lod.children.length > 0 ? lod : null,
+    parts,
+    reflectiveMaterials: collectReflectiveMaterials(root),
+    root,
+    seats,
+    wheels,
+  };
 }
 
 /** Build one body atomic: a swinging door, a damageable `_ok`/`_dam` panel, or a plain mesh. */
@@ -386,6 +396,25 @@ function collectDamGeometry(clump: RWClump): Map<string, RWGeometry> {
   }
 
   return damGeometry;
+}
+
+/** Gather the vehicle's env-map-reflective materials (tagged in `buildMaterial`), deduped. */
+function collectReflectiveMaterials(root: Object3D): MeshStandardMaterial[] {
+  const found = new Set<MeshStandardMaterial>();
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (material.userData.reflection) {
+        found.add(material as MeshStandardMaterial);
+      }
+    }
+  });
+
+  return [...found];
 }
 
 /** One glass render pass: the glass groups drawn single-sided (cloned materials) at a fixed order. */

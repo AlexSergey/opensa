@@ -1,4 +1,4 @@
-import type { AnimationClip, Bone, Matrix4, Object3D, Skeleton } from 'three';
+import type { AnimationClip, Bone, Matrix4, MeshStandardMaterial, Object3D, Skeleton } from 'three';
 
 import type { CellCoord } from '../streaming/grid';
 import type { VehicleDoor } from '../vehicle/vehicle-door';
@@ -59,6 +59,8 @@ export interface VehicleModel {
   object: Object3D;
   /** Damageable body parts (`_ok`/`_dam` panels + doors) for the collision-damage system. */
   parts: VehiclePart[];
+  /** Env-map-reflective materials (for the vehicle-reflection plugin to apply the active preset). */
+  reflectiveMaterials: MeshStandardMaterial[];
   /** Animatable wheels (spin/steer); register with the vehicle system. */
   rig: VehicleRig;
   /** Seat dummy local transforms in vehicle space (null if absent). */

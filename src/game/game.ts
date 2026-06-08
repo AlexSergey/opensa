@@ -25,6 +25,7 @@ import {
   type GameState,
   type SkyConfig,
   type SunConfig,
+  type VehicleReflectionConfig,
   type WaterConfig,
 } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
@@ -342,6 +343,12 @@ export class Game {
   /** Toggle ACES tone mapping at runtime. */
   setToneMapping(enabled: boolean): void {
     this.setConfig({ graphics: { ...this.config.graphics, toneMapping: enabled } });
+  }
+
+  /** Tune vehicle reflections (preset/intensity) at runtime; merges into `graphics.vehicleReflection`. */
+  setVehicleReflection(patch: Partial<VehicleReflectionConfig>): void {
+    const vehicleReflection = { ...this.config.graphics.vehicleReflection, ...patch };
+    this.setConfig({ graphics: { ...this.config.graphics, vehicleReflection } });
   }
 
   /** Tune the water shader (glint/reflection) at runtime; merges into `graphics.water`. */

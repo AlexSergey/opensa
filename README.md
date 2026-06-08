@@ -48,3 +48,25 @@ npm run viewer:collision
 ```
 
 See `.claude/plans/022-debug-viewers.md` for details.
+
+# License
+
+**CC BY-NC 4.0**
+
+Commercial Use Restriction
+
+This project is provided for personal, educational,
+research, and non-commercial use only.
+
+Commercial use, including but not limited to:
+
+- selling copies,
+- paid hosting,
+- SaaS offerings,
+- commercial redistribution,
+- bundling into commercial products,
+
+is prohibited without explicit written permission
+from the copyright holder.
+
+[LICENSE](./LICENSE.md)

@@ -37,6 +37,9 @@ type Rgb = readonly [number, number, number];
 const RADIUS = 4000;
 const SUN_DISTANCE = 3500;
 
+/** Render layer the sky (dome + sun) is *also* on, so a reflection cube probe can render sky-only. */
+export const SKY_PROBE_LAYER = 1;
+
 /** Day window (hours): the sun is above the horizon between these, peaking at midday. */
 const SUNRISE = 6;
 const SUNSET = 20;
@@ -124,6 +127,10 @@ export class SkyPlugin implements Plugin {
     );
     this.godraysSource.name = 'SunGodrays';
     this.corona = sunSprite(radialTexture());
+    // Also expose the sky on the probe layer so the vehicle-reflection cube probe can render sky-only.
+    for (const object of [this.dome, this.sunSource, this.corona]) {
+      object.layers.enable(SKY_PROBE_LAYER);
+    }
   }
 
   dispose(): void {

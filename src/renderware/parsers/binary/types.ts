@@ -44,8 +44,35 @@ export interface RWGeometry {
 
 export interface RWMaterial {
   color: [number, number, number, number];
+  /** SA reflection/specular material-effect plugins (from the material's Extension), if present. */
+  effects?: RWMaterialEffects;
   texture: null | RWTextureRef;
   textured: boolean;
+}
+
+/** Material-effect plugins SA vehicles carry for env-map reflections + specular (parsed from the
+ *  material's Extension chunk). Absent on non-vehicle / non-reflective materials. */
+export interface RWMaterialEffects {
+  /** RpMatFX env-map effect — marks the material reflective. */
+  envMap?: {
+    /** Reflection strength coefficient (0..1; 0 = effectively off). */
+    coefficient: number;
+    /** Env-map texture name (resolved against the merged vehicle texture map; may be custom per car). */
+    texture: null | string;
+    /** Whether the env map uses the frame-buffer alpha (RW flag). */
+    useFrameBufferAlpha: boolean;
+  };
+  /** SA reflection-material plugin (0x253f2fc): env-map UV scale/offset + per-material intensity. */
+  reflection?: {
+    intensity: number;
+    offset: [number, number];
+    scale: [number, number];
+  };
+  /** SA specular-material plugin (0x253f2f6): highlight level + specular texture name. */
+  specular?: {
+    level: number;
+    texture: string;
+  };
 }
 
 export interface RWMipLevel {

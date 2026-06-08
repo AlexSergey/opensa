@@ -1,9 +1,18 @@
 import type { ChunkHeader } from './chunks';
-import type { RWAtomic, RWClump, RWFrame, RWGeometry, RWMaterial, RWSkin, RWTriangle } from './types';
+import type {
+  RWAtomic,
+  RWClump,
+  RWFrame,
+  RWGeometry,
+  RWMaterial,
+  RWMaterialEffects,
+  RWSkin,
+  RWTriangle,
+} from './types';
 
 import { BinaryStream } from './binary-stream';
 import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
-import { GeometryFlag, RwSection } from './constants';
+import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 
 /** RenderWare chunk header size (type + size + libraryVersion, 3 × u32). */
 const CHUNK_HEADER_BYTES = 12;
@@ -231,7 +240,45 @@ function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {
     texture = parseTexture(stream, texChunk);
   }
 
-  return { color, texture, textured };
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  const effects = extension ? parseMaterialEffects(stream, extension) : undefined;
+
+  return { color, effects, texture, textured };
+}
+
+/** Parse the SA reflection/specular material-effect plugins from a material's Extension chunk
+ *  (MatFX env-map `0x120`, reflection `0x253f2fc`, specular `0x253f2f6`). Undefined if none present. */
+function parseMaterialEffects(stream: BinaryStream, ext: ChunkHeader): RWMaterialEffects | undefined {
+  const effects: RWMaterialEffects = {};
+
+  const matfx = findChild(stream, ext.dataStart, ext.end, RwSection.MATFX);
+  if (matfx) {
+    const envMap = parseMatFxEnvMap(stream, matfx);
+    if (envMap) {
+      effects.envMap = envMap;
+    }
+  }
+
+  const refl = findChild(stream, ext.dataStart, ext.end, RwSection.REFLECTION_MAT);
+  if (refl) {
+    stream.seek(refl.dataStart);
+    const scaleX = stream.f32();
+    const scaleY = stream.f32();
+    const offsetX = stream.f32();
+    const offsetY = stream.f32();
+    const intensity = stream.f32();
+    effects.reflection = { intensity, offset: [offsetX, offsetY], scale: [scaleX, scaleY] };
+  }
+
+  const spec = findChild(stream, ext.dataStart, ext.end, RwSection.SPECULAR_MAT);
+  if (spec) {
+    stream.seek(spec.dataStart);
+    const level = stream.f32();
+    const texture = stream.string(spec.end - spec.dataStart - 4); // remaining = char[24] texture name
+    effects.specular = { level, texture };
+  }
+
+  return (effects.envMap ?? effects.reflection ?? effects.specular) ? effects : undefined;
 }
 
 function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMaterial[] {
@@ -243,6 +290,30 @@ function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMateria
   });
 
   return materials;
+}
+
+/** Parse the env-map effect from a material's RpMatFX (`0x120`) plugin; undefined if it isn't an env map.
+ *  Layout: effectType, slotType, coefficient(f32), useFrameBufferAlpha(u32), hasTexture(u32), [Texture chunk]. */
+function parseMatFxEnvMap(stream: BinaryStream, header: ChunkHeader): RWMaterialEffects['envMap'] {
+  stream.seek(header.dataStart);
+  const effectType = stream.u32();
+  const slotType = stream.u32();
+  if (effectType !== MatFxEffect.ENVMAP || slotType !== MatFxEffect.ENVMAP) {
+    return undefined; // only env-map effects mark a reflective material (bump/uv-transform ignored)
+  }
+  const coefficient = stream.f32();
+  const useFrameBufferAlpha = stream.u32() !== 0;
+  const hasTexture = stream.u32() !== 0;
+
+  let texture: null | string = null;
+  if (hasTexture) {
+    const texChunk = findChild(stream, header.dataStart + 20, header.end, RwSection.TEXTURE);
+    if (texChunk) {
+      texture = parseTexture(stream, texChunk).name || null;
+    }
+  }
+
+  return { coefficient, texture, useFrameBufferAlpha };
 }
 
 /** Parse the Skin plugin from a geometry's Extension, or undefined if not skinned. */

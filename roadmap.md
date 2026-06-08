@@ -69,13 +69,13 @@
   - [ ] Light
   - [ ] Shadows
   - [ ] Volumetric cloud / Skybox
-  - [ ] Car reflections
   - [✅] Sky
     - [✅] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
     - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [✅] Water shader
   - [ ] Night objects (Tobj)
   - [ ] 2dfx (maybe)
+- [ ] Car reflections
 - [ ] UI Layer
   - [ ] The Ui layer should not be involved in post processing.
   - [ ] Find good fonts

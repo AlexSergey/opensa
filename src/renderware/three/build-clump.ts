@@ -8,6 +8,7 @@ import {
   Group,
   Matrix4,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
 } from 'three';
 
@@ -174,7 +175,7 @@ export function buildMaterial(
   const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
   const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
 
-  const material = new MeshStandardMaterial({
+  const params = {
     alphaTest: transparent ? 0.5 : 0,
     color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
     map,
@@ -183,8 +184,35 @@ export function buildMaterial(
     side: transparent ? DoubleSide : FrontSide,
     transparent,
     vertexColors: hasVertexColors,
-  });
+  };
+
+  // Env-map-reflective materials are built as MeshPhysicalMaterial so the vehicle-reflection plugin can
+  // add a reflective **clearcoat** (glossy lacquer over the saturated paint) per the active preset.
+  const env = rw.effects?.envMap;
+  const reflective = env !== undefined && env.coefficient > 0;
+  const material = reflective
+    ? new MeshPhysicalMaterial({ ...params, clearcoat: 0 })
+    : new MeshStandardMaterial(params);
   material.name = rw.texture?.name ?? 'material';
+
+  // Carry the SA reflection-plugin data (preset-independent; shape matches `VehicleReflectionData` in
+  // game/**) as plain userData so renderware stays free of game-layer types.
+  if (env && env.coefficient > 0) {
+    material.userData.reflection = {
+      coefficient: env.coefficient,
+      envTexture: env.texture,
+      intensity: rw.effects?.reflection?.intensity ?? 0,
+      offset: rw.effects?.reflection?.offset ?? [0, 0],
+      scale: rw.effects?.reflection?.scale ?? [1, 1],
+      specularLevel: rw.effects?.specular?.level ?? 0,
+    };
+    // Resolve the DFF-named env texture (vehicleenvmap128 / custom) and wire the SA sphere-map shader
+    // so the PC/PS2 presets can reflect it the authentic way (toggled by a uniform from the game plugin).
+    const saEnvMap = env.texture && textures ? (textures.get(env.texture.toLowerCase()) ?? null) : null;
+    if (saEnvMap) {
+      installSaReflection(material as MeshPhysicalMaterial, saEnvMap);
+    }
+  }
 
   return material;
 }
@@ -206,6 +234,33 @@ export function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount:
   }
 
   return groups;
+}
+
+/**
+ * Wire the GTA-SA env-map reflection (PC/PS2) into a reflective material via `onBeforeCompile`: an additive
+ * **sphere/matcap** reflection of `saEnvMap`, sampled by the **camera-space normal** (so it's screen-locked
+ * like the original `CCustomCarEnvMapPipeline`). Gated by a `saStrength` uniform the vehicle-reflection plugin
+ * drives per preset (0 for non-SA presets). The uniform holders live in `userData.saReflect`.
+ */
+function installSaReflection(material: MeshPhysicalMaterial, saEnvMap: Texture): void {
+  const saReflect = { saEnvMap: { value: saEnvMap }, saStrength: { value: 0 } };
+  material.userData.saReflect = saReflect;
+  material.onBeforeCompile = (shader): void => {
+    shader.uniforms.saEnvMap = saReflect.saEnvMap;
+    shader.uniforms.saStrength = saReflect.saStrength;
+    shader.fragmentShader = `uniform sampler2D saEnvMap;\nuniform float saStrength;\n${shader.fragmentShader}`.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      {
+        vec3 saV = normalize( vViewPosition );
+        vec3 saXx = normalize( vec3( saV.z, 0.0, -saV.x ) );
+        vec3 saYy = cross( saV, saXx );
+        vec2 saUV = vec2( dot( saXx, normal ), dot( saYy, normal ) ) * 0.495 + 0.5;
+        totalEmissiveRadiance += texture2D( saEnvMap, saUV ).rgb * saStrength;
+      }`,
+    );
+  };
+  material.needsUpdate = true;
 }
 
 function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {

@@ -28,3 +28,4 @@
 - [HUD layer](hud-layer.md) — plan 027 (DONE); DOM overlay over canvas (src/ui/hud), clock top-right, font/colors from config; hidden in map-viewer + fly; UI/menu layer reserved above
 - [Timecyc](timecyc.md) — plan 028 (DONE); parse/convert(8→24h)/sample timecyc colour-lighting table (renderware/parsers/text); data layer for sky/sun/light
 - [Graphics](graphics.md) — plan 029; timecyc-driven sky/sun/fog (+godrays next); SkyPlugin gradient dome DONE (phase 1)
+- [Vehicle reflections plan](vehicle-reflections-plan.md) — plan 030 (researched, NOT built); SA env-map via DFF MatFX/reflection/specular plugins + vehicleenvmap128; sky-cube probe approach

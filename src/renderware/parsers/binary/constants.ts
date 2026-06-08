@@ -15,12 +15,29 @@ export const RwSection = {
   GEOMETRY_LIST: 0x1a,
   MATERIAL: 0x07,
   MATERIAL_LIST: 0x08,
+  // Material Effects plugin (RpMatFX) — env-map / bump effect on a material
+  MATFX: 0x120,
+  // SA custom reflection-material plugin (env-map UV scale/offset + intensity)
+  REFLECTION_MAT: 0x253f2fc,
   SKIN: 0x116,
+  // SA custom specular-material plugin (level + specular texture name)
+  SPECULAR_MAT: 0x253f2f6,
   STRING: 0x02,
   STRUCT: 0x01,
   TEXTURE: 0x06,
   TEXTURE_DICTIONARY: 0x16,
   TEXTURE_NATIVE: 0x15,
+} as const;
+
+/** RpMatFX material effect type (the env-map effect is what SA vehicles use for reflections). */
+export const MatFxEffect = {
+  BUMPENVMAP: 3,
+  BUMPMAP: 1,
+  DUAL: 4,
+  DUALUVTRANSFORM: 6,
+  ENVMAP: 2,
+  NULL: 0,
+  UVTRANSFORM: 5,
 } as const;
 
 /** Geometry format flags (RpGeometryFlag). */

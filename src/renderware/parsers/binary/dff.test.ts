@@ -2,13 +2,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { chunk, concat, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
-import { GeometryFlag, RwSection } from './constants';
+import { chunk, concat, f32, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
+import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 import { parseDff } from './dff';
 
 /** Build a minimal but complete one-mesh clump exercising every attribute path.
- *  `geometryExt` is appended into the Geometry chunk (e.g. a Skin Extension). */
-function buildSyntheticClump(geometryExt?: Uint8Array): ArrayBuffer {
+ *  `geometryExt` is appended into the Geometry chunk (e.g. a Skin Extension);
+ *  `materialExt` is appended into the Material chunk (e.g. an Extension with reflection plugins). */
+function buildSyntheticClump(geometryExt?: Uint8Array, materialExt?: Uint8Array): ArrayBuffer {
   const flags = GeometryFlag.POSITIONS | GeometryFlag.TEXTURED | GeometryFlag.PRELIT | GeometryFlag.NORMALS;
 
   const frameList = chunk(
@@ -64,6 +65,7 @@ function buildSyntheticClump(geometryExt?: Uint8Array): ArrayBuffer {
           chunk(RwSection.STRING, fixedString('', 4)),
         ),
       ),
+      materialExt ?? new Uint8Array(0),
     ),
   );
 
@@ -98,6 +100,68 @@ function skinExtension(): Uint8Array {
 
   return chunk(RwSection.EXTENSION, skin);
 }
+
+/** A material Extension with the SA reflection plugins (MatFX env-map + reflection + specular). */
+function vehicleMaterialExtension(): Uint8Array {
+  const envTexture = chunk(
+    RwSection.TEXTURE,
+    concat(
+      chunk(RwSection.STRUCT, u32(0)),
+      chunk(RwSection.STRING, fixedString('vehicleenvmap128', 20)),
+      chunk(RwSection.STRING, fixedString('', 4)),
+    ),
+  );
+  const matfx = chunk(
+    RwSection.MATFX,
+    concat(
+      u32(MatFxEffect.ENVMAP), // effectType
+      u32(MatFxEffect.ENVMAP), // slot type
+      f32(0.5), // coefficient
+      u32(0), // useFrameBufferAlpha
+      u32(1), // hasTexture
+      envTexture,
+      u32(MatFxEffect.NULL), // slot 2 (none)
+    ),
+  );
+  const reflection = chunk(
+    RwSection.REFLECTION_MAT,
+    concat(f32(1), f32(1), f32(0.25), f32(0.5), f32(0.03), u32(0)), // scaleXY, offsetXY, intensity, pad
+  );
+  const specular = chunk(RwSection.SPECULAR_MAT, concat(f32(0.12), fixedString('vehiclespecdot64', 24)));
+
+  return chunk(RwSection.EXTENSION, concat(matfx, reflection, specular));
+}
+
+describe('parseDff material effects (SA reflection plugins)', () => {
+  describe('negative cases', () => {
+    it('leaves effects undefined when the material has no effect plugins', () => {
+      const material = parseDff(buildSyntheticClump()).geometries[0].materials[0];
+      expect(material.effects).toBeUndefined();
+    });
+  });
+
+  describe('positive cases', () => {
+    const material = parseDff(buildSyntheticClump(undefined, vehicleMaterialExtension())).geometries[0].materials[0];
+
+    it('parses the MatFX env-map (coefficient + embedded texture name)', () => {
+      expect(material.effects?.envMap?.texture).toBe('vehicleenvmap128');
+      expect(material.effects?.envMap?.coefficient).toBeCloseTo(0.5);
+      expect(material.effects?.envMap?.useFrameBufferAlpha).toBe(false);
+    });
+
+    it('parses the SA reflection-material plugin', () => {
+      expect(material.effects?.reflection?.intensity).toBeCloseTo(0.03);
+      expect(material.effects?.reflection?.scale).toEqual([1, 1]);
+      expect(material.effects?.reflection?.offset[0]).toBeCloseTo(0.25);
+      expect(material.effects?.reflection?.offset[1]).toBeCloseTo(0.5);
+    });
+
+    it('parses the SA specular-material plugin', () => {
+      expect(material.effects?.specular?.level).toBeCloseTo(0.12);
+      expect(material.effects?.specular?.texture).toBe('vehiclespecdot64');
+    });
+  });
+});
 
 describe('parseDff (synthetic)', () => {
   const clump = parseDff(buildSyntheticClump());
@@ -280,5 +344,22 @@ describe.skipIf(!dffExists)('parseDff (real asset testground.dff)', () => {
     const geo = realClump!.geometries[0];
     expect(geo.materials).toHaveLength(2);
     expect(geo.materials.map((m) => m.texture?.name)).toEqual(['sam_camo', 'bonyrd_skin2']);
+  });
+});
+
+const admiralPath = join(process.cwd(), 'static', 'vehicles', 'admiral.dff');
+const admiralExists = existsSync(admiralPath);
+const admiral = admiralExists ? parseDff(toArrayBuffer(new Uint8Array(readFileSync(admiralPath)))) : null;
+
+describe.skipIf(!admiralExists)('parseDff (real vehicle admiral.dff) reflection plugins', () => {
+  it('reads MatFX env maps, reflection + specular off the body materials', () => {
+    const materials = admiral!.geometries.flatMap((g) => g.materials);
+    const reflective = materials.filter((m) => m.effects?.envMap);
+    expect(reflective.length).toBeGreaterThan(0);
+    // admiral's reflective body materials use coefficient 0.5 + a named env texture.
+    expect(reflective.some((m) => m.effects!.envMap!.coefficient === 0.5)).toBe(true);
+    expect(reflective.every((m) => (m.effects!.envMap!.texture?.length ?? 0) > 0)).toBe(true);
+    expect(materials.some((m) => m.effects?.specular?.texture === 'vehiclespecdot64')).toBe(true);
+    expect(materials.some((m) => m.effects?.reflection)).toBe(true);
   });
 });

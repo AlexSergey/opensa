@@ -1,8 +1,10 @@
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { BloomConfig, Game, SkyConfig, Vec3, WaterConfig } from '../../game';
+import type { BloomConfig, Game, SkyConfig, Vec3, VehicleReflectionConfig, WaterConfig } from '../../game';
 
+import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
 import { GameClock } from '../../game/time/game-clock';
+import { PLAYER_SPAWN } from '../locations';
 import { styles } from './debug-styles';
 import { MapInspector } from './map-inspector';
 
@@ -49,6 +51,8 @@ export interface DebugActions {
   setSunSize(size: number): void;
   /** Toggle ACES tone mapping. */
   setToneMapping(enabled: boolean): void;
+  /** Tune vehicle reflections (preset/intensity). */
+  setVehicleReflection(patch: Partial<VehicleReflectionConfig>): void;
   /** Tune the water shader (glint/reflection). */
   setWater(patch: Partial<WaterConfig>): void;
   /** Current god-rays shader tuning. */
@@ -57,21 +61,35 @@ export interface DebugActions {
   spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
   /** Current sun disc base size (world units). */
   sunSize(): number;
+  /** Teleport the player to a world position (native Z-up). */
+  teleport(coords: Vec3): void;
   /** Teleport the player back to Ganton. */
   teleportToGanton(): void;
   /** Whether ACES tone mapping is on. */
   toneMapping(): boolean;
+  /** Current vehicle-reflection tuning (preset + intensity). */
+  vehicleReflection(): VehicleReflectionConfig;
   /** Current water shader tuning. */
   water(): WaterConfig;
 }
 
-type Screen = 'game' | 'map' | 'player' | 'root' | 'vehicles';
+/** Reflection preset cycle order for the debug selector (Off + the registry keys). */
+const REFLECTION_PRESETS = ['off', ...Object.keys(PRESETS)];
+
+type Screen = 'game' | 'map' | 'player' | 'position' | 'root' | 'vehicles';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Game', screen: 'game' },
+  { label: 'Position', screen: 'position' },
   { label: 'Map', screen: 'map' },
+];
+
+/** Quick teleport destinations (native GTA Z-up world coords). */
+const TELEPORTS: { coords: Vec3; label: string }[] = [
+  { coords: PLAYER_SPAWN, label: 'Ganton' },
+  { coords: [2860.28, -1887.01, 10.86], label: 'Pier' },
 ];
 
 /**
@@ -92,6 +110,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [bloom, setBloom] = useState<BloomConfig>(() => actions.bloom());
   const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
   const [water, setWater] = useState<WaterConfig>(() => actions.water());
+  const [reflectionCfg, setReflectionCfg] = useState<VehicleReflectionConfig>(() => actions.vehicleReflection());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
 
@@ -111,9 +130,9 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
     return (): void => window.removeEventListener('keydown', handleKeyDown);
   }, [visible]);
 
-  // Keep the shown coords live while the Game screen displays them.
+  // Keep the shown coords live while the Position screen displays them.
   useEffect(() => {
-    if (!visible || screen !== 'game' || !showCoords) {
+    if (!visible || screen !== 'position' || !showCoords) {
       return;
     }
     const id = setInterval(() => setCoords(actions.playerCoords()), 200);
@@ -194,7 +213,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
             </div>
           )}
 
-          {screen === 'game' && (
+          {screen === 'position' && (
             <div style={styles.group}>
               <button
                 onClick={() => {
@@ -219,6 +238,22 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 </>
               )}
 
+              <div style={styles.groupLabel}>TELEPORT</div>
+              {TELEPORTS.map((t) => (
+                <button
+                  key={t.label}
+                  onClick={() => actions.teleport(t.coords)}
+                  style={styles.actionButton}
+                  type="button"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {screen === 'game' && (
+            <div style={styles.group}>
               <div style={styles.groupLabel}>FOG: {fog} m</div>
               <input
                 max={2000}
@@ -398,6 +433,33 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={0.01}
                 type="range"
                 value={water.reflection}
+              />
+              <button
+                onClick={() => {
+                  const next =
+                    REFLECTION_PRESETS[
+                      (REFLECTION_PRESETS.indexOf(reflectionCfg.preset) + 1) % REFLECTION_PRESETS.length
+                    ];
+                  setReflectionCfg((prev) => ({ ...prev, preset: next }));
+                  actions.setVehicleReflection({ preset: next });
+                }}
+                style={styles.actionButton}
+                type="button"
+              >
+                Car reflect: {PRESETS[reflectionCfg.preset]?.label ?? 'Off'}
+              </button>
+              <div style={styles.groupLabel}>REFLECT INTENSITY: {reflectionCfg.intensity.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const intensity = Number(e.target.value);
+                  setReflectionCfg((prev) => ({ ...prev, intensity }));
+                  actions.setVehicleReflection({ intensity });
+                }}
+                step={0.05}
+                type="range"
+                value={reflectionCfg.intensity}
               />
             </div>
           )}

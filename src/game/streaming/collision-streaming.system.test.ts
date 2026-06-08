@@ -18,6 +18,7 @@ function config(collisionDrawDistance: number): Config {
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       sun: { godrays: true, godraysSize: 30, sunSize: 15 },
       toneMapping: false,
+      vehicleReflection: { intensity: 1, preset: 'enhanced' },
       water: { glint: 1.5, reflection: 0.6 },
     },
     hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },

@@ -15,6 +15,7 @@ import { setupCharacter } from '../game/character/setup-character';
 import { FogPlugin } from '../game/plugins/fog.plugin';
 import { PostFxPlugin } from '../game/plugins/postfx.plugin';
 import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
+import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehicle-reflection.plugin';
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
@@ -206,6 +207,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: false,
+        vehicleReflection: { intensity: 1, preset: 'enhanced' },
         water: { glint: 1.5, reflection: 0.6 },
       },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
@@ -253,6 +255,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       return { horizon: e.skyBot, sun: e.sunCore, water: [e.water[0], e.water[1], e.water[2]] };
     };
     const sky = new SkyPlugin(skySample, () => game.getHours()); // sky dome + sun + lights from timecyc (smooth)
+    const reflection = new VehicleReflectionPlugin(() => game.getHours()); // sky-probe reflections on spawned cars
 
     // Water mesh (geometry from the adapter) loaded up front so the WaterPlugin can own its material;
     // parented under the −90°X streaming root (which `game.init` adds to the scene).
@@ -271,6 +274,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
           () => sky.getSunDirection(),
         ),
       )
+      .addPlugin(reflection) // vehicle env-map reflections (preset-driven)
       .addPlugin(new PostFxPlugin(sky.godraysSource)); // post-FX host: god rays + bloom + tone mapping
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
@@ -334,7 +338,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       anchor?: { facing: number; from: Vec3 },
     ): Promise<SpawnedVehicle> => {
       const { heading, model } = placement;
-      const { colliders, doors, halfExtents, handling, lod, object, parts, rig, seats, wheels } =
+      const { colliders, doors, halfExtents, handling, lod, object, parts, reflectiveMaterials, rig, seats, wheels } =
         await adapter.loadVehicle(model, placement.colour);
       const gap = halfExtents[1] + 2; // car half-length (COL bounds) + clearance, so it clears the player
       const position: Vec3 = anchor
@@ -347,6 +351,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
+      reflection.register(reflectiveMaterials); // apply the active reflection preset to this car
       // Driver seat = the front-seat dummy mirrored to the −X (driver) side.
       const seat = seats.frontseat;
       const seatLocal: [number, number, number] = seat
@@ -385,6 +390,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
           vehicleDamage.remove(body);
           character.physics.removeVehicle(controller); // drop the raycast controller before its body
           character.physics.removeBodies([body]);
+          reflection.unregister(reflectiveMaterials);
           game.getStreamingRoot().remove(object);
           disposeVehicle(object);
         },
@@ -438,6 +444,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setSky: (patch) => game.setSky(patch),
       setSunSize: (size) => game.setSunSize(size),
       setToneMapping: (enabled) => game.setToneMapping(enabled),
+      setVehicleReflection: (patch) => game.setVehicleReflection(patch),
       setWater: (patch) => game.setWater(patch),
       sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
@@ -449,8 +456,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);
       },
       sunSize: () => game.getConfig().graphics.sun.sunSize,
+      teleport: (coords) => character.placePlayer(coords, true),
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
+      vehicleReflection: () => game.getConfig().graphics.vehicleReflection,
       water: () => game.getConfig().graphics.water,
     };
 

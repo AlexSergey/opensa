@@ -267,6 +267,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       lod: built.lod,
       object: built.root,
       parts: built.parts,
+      reflectiveMaterials: built.reflectiveMaterials,
       rig: new VehicleRig(built.wheels),
       seats: built.seats,
       wheels: built.wheels.map((wheel) => ({
