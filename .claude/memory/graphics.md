@@ -111,6 +111,17 @@ target, no `water.foam` config/slider; `WaterConfig` is back to `{ glint, reflec
 real foam **texture** scrolled along the shore; thinner band + distance-fade; inward wave-wash animation;
 **reuse an existing depth source** instead of a dedicated pre-pass (so no second scene render).
 
+**Clouds + anti-banding (added 2026-06-08):** procedural FBM clouds **in the sky-dome fragment shader** (not
+a separate plugin/mesh — kept in `SkyPlugin`'s dome ShaderMaterial so it stays timecyc-driven and integrated).
+The view direction is projected onto a flat cloud "ceiling" (`dir.xz / dir.y`, converges toward the horizon),
+FBM value-noise (5 octaves) drifts over `clock.elapsed`, faded out near the horizon; colour mixes timecyc
+`bottomClouds`(underside)→`lowClouds`(lit tops) by density — added to SkySample as `cloudBottom`/`cloudTop`
+(raw sRGB, like the gradient). A `gl_FragCoord` hash **dither** (`±0.5/255`) breaks gradient banding. Branch
+gated on `uCloudOpacity > 0 && dir.y > 0` (clear sky = skip). `Config.graphics.clouds { coverage, opacity }`
+(default 0.5/0.85, +4 fixtures), `Game.setClouds`, debug CLOUD COVER/OPACITY sliders (in the Graphics tab).
+Chose this over the three.js `Sky` scattering addon / HDR panorama to **keep the GTA timecyc palette** that
+fog/water/probe all sample. (We're plain three, not R3F — drei `<Sky>/<Cloud>` not usable.)
+
 **Sun shadows (added 2026-06-08):** directional shadow map on the SkyPlugin sun. `install` sets
 `renderer.shadowMap.enabled = true` + PCFSoft, configures the ortho shadow camera (`±SHADOW_SIZE` 140,
 near 1 / far 900, `mapSize` 2048, `bias -0.0004`, `normalBias 1`). Per frame `updateShadow(camera, enabled)`

@@ -21,6 +21,7 @@ import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
 import {
   type BloomConfig,
+  type CloudsConfig,
   type Config,
   type GameState,
   type ShadowsConfig,
@@ -35,14 +36,19 @@ import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/
 import { BasicRenderPipeline } from './plugins/render-pipeline';
 import { type CellCoord } from './streaming/grid';
 import { GameClock } from './time/game-clock';
+import { type WeatherBlend, WeatherTransition } from './weather/weather-transition';
 
 const FIXED_STEP = 1 / 60;
+/** Engine default weather before a world is loaded (loadGame seeds the real one). */
+const DEFAULT_WEATHER = 0;
 
 interface LoadOptions {
   /** Radius (world units) the collision zone is built for; streaming handles render. */
   radius?: number;
   /** Start time of day in minutes since midnight (e.g. 360 = 6:00); defaults to noon. */
   startMinutes?: number;
+  /** Initial timecyc weather index (into WEATHER_NAMES); defaults to {@link DEFAULT_WEATHER}. */
+  weather?: number;
 }
 
 /**
@@ -79,10 +85,12 @@ export class Game {
   private readonly streamingRoot = new Group();
   private streamingSystem: null | StreamingSystem = null;
   private readonly systems = new SystemRegistry();
+  private readonly weatherTransition: WeatherTransition;
 
   private constructor(canvas: HTMLCanvasElement, config: Config) {
     this.canvas = canvas;
     this.config = config;
+    this.weatherTransition = new WeatherTransition(DEFAULT_WEATHER);
     this.logger = new Logger(this.events, this.config);
     // Dynamic entities (the player, later NPCs/vehicles) live in GTA Z-up; the
     // −90°X here is display-only, matching the region group. Physics stays Z-up.
@@ -176,6 +184,16 @@ export class Game {
     return this.streamingSystem?.viewCell() ?? null;
   }
 
+  /** Active timecyc weather index (the committed target; the UI shows this as selected). */
+  getWeather(): number {
+    return this.weatherTransition.target;
+  }
+
+  /** Live weather blend (from/to indices + eased `t`) for the samplers — drives smooth transitions. */
+  getWeatherBlend(): WeatherBlend {
+    return this.weatherTransition.blend();
+  }
+
   async init(): Promise<void> {
     if (this.context) {
       return; // already initialized
@@ -216,6 +234,7 @@ export class Game {
       throw new Error('Game.loadGame requires a world adapter (setWorldAdapter)');
     }
     this.gameClock.set(options.startMinutes ?? 720); // default noon
+    this.weatherTransition.begin(options.weather ?? DEFAULT_WEATHER, 0); // seed weather instantly (no ease)
     this.events.emit('loading', { fraction: 0 });
     await this.adapter.prepare((fraction) => this.events.emit('loading', { fraction }));
 
@@ -255,11 +274,14 @@ export class Game {
     this.setConfig({ graphics: { ...this.config.graphics, bloom: { ...this.config.graphics.bloom, ...patch } } });
   }
 
+  /** Tune procedural sky clouds (coverage/opacity) at runtime; merges into `graphics.clouds`. */
+  setClouds(patch: Partial<CloudsConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, clouds: { ...this.config.graphics.clouds, ...patch } } });
+  }
+
   setConfig(patch: Partial<Config>): void {
     Object.assign(this.config, patch); // mutate in place so PluginContext.config stays live
-    for (const plugin of this.plugins) {
-      plugin.configChanged?.(this.config);
-    }
+    this.broadcastConfigChanged();
   }
 
   /** Swing the follow camera to a given orbit azimuth (yaw about world up). */
@@ -368,10 +390,23 @@ export class Game {
     this.setConfig({ graphics: { ...this.config.graphics, water: { ...this.config.graphics.water, ...patch } } });
   }
 
+  /** Switch the active timecyc weather (index into WEATHER_NAMES); eases over `weatherTransitionSeconds`. */
+  setWeather(weather: number): void {
+    this.weatherTransition.begin(weather, this.config.weatherTransitionSeconds);
+    this.broadcastConfigChanged(); // refresh weather-dependent plugins (e.g. the reflection sky probe)
+  }
+
   setWorldAdapter(adapter: WorldAdapter): this {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Notify every plugin that config (or weather) changed, so they can refresh derived state. */
+  private broadcastConfigChanged(): void {
+    for (const plugin of this.plugins) {
+      plugin.configChanged?.(this.config);
+    }
   }
 
   /** Broadcast the current clock minute (event for UI/timecyc, console log for now). */
@@ -417,6 +452,7 @@ export class Game {
       }
       this.systems.update(delta);
       this.cameraController.update(delta);
+      this.weatherTransition.tick(delta); // ease an in-progress weather change (real-time, runs while paused)
       // The clock only ticks while playing — pausing the game freezes the time of day.
       if (this.config.gameState === 'play' && this.gameClock.advance(delta, this.config.time.secondsPerGameMinute)) {
         this.emitTime();

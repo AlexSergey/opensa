@@ -10,6 +10,8 @@ export interface WaterSample {
   sun: Rgb;
   /** Deep-water tint seen looking straight down. */
   water: Rgb;
+  /** Water opacity 0–1 (timecyc WaterRGBA alpha): high = opaque, the dark tint dominates. */
+  waterAlpha: number;
 }
 
 type Rgb = readonly [number, number, number];
@@ -33,13 +35,13 @@ const FRAGMENT = `
   uniform sampler2D uMap;
   uniform float uGlint;
   uniform float uReflection;
+  uniform float uWaterAlpha;
   varying vec3 vWorldPos;
   varying vec2 vUv;
 
   const float RIPPLE_AMP = 0.28;
   const float SWELL_SLOPE = 6.0;
   const float SHININESS = 120.0;
-  const float BASE_ALPHA = 0.72;
 
   // Surface normal: fine fast sparkle waves (break the sun glint into a shimmering path) plus the
   // slope of a slow swell (visible drifting highlights so the water isn't dead-flat).
@@ -64,14 +66,14 @@ const FRAGMENT = `
     float fres = pow(1.0 - max(dot(viewDir, n), 0.0), 5.0);
     vec3 base = mix(uWaterColor, uHorizonColor, clamp(fres * uReflection, 0.0, 1.0));
     float tex = texture2D(uMap, vUv).r; // a hint of the original water texture (caustic detail)
-    base *= 0.75 + 0.5 * tex;
+    base *= 0.5 + 0.4 * tex; // darken-only detail (≤1) — the timecyc water tint shouldn't be brightened
 
     // Sun specular glint (reflected sun toward the eye); the ripples shatter it into sparkles.
     vec3 refl = reflect(-uSunDir, n);
     float spec = pow(max(dot(refl, viewDir), 0.0), SHININESS);
     vec3 col = base + uSunColor * spec * uGlint;
 
-    gl_FragColor = vec4(col, mix(BASE_ALPHA, 1.0, fres));
+    gl_FragColor = vec4(col, mix(uWaterAlpha, 1.0, fres)); // timecyc opacity, fully opaque at the horizon
   }
 `;
 
@@ -119,6 +121,7 @@ export class WaterPlugin implements Plugin {
         uSunColor: { value: new Color() },
         uSunDir: { value: this.getSunDir().clone() },
         uTime: { value: 0 },
+        uWaterAlpha: { value: 0.9 },
         uWaterColor: { value: new Color() },
       },
       vertexShader: VERTEX,
@@ -136,6 +139,7 @@ export class WaterPlugin implements Plugin {
     u.uTime.value = context.clock.elapsed;
     u.uGlint.value = context.config.graphics.water.glint;
     u.uReflection.value = context.config.graphics.water.reflection;
+    u.uWaterAlpha.value = sky.waterAlpha;
     (u.uSunDir.value as Vector3).copy(this.getSunDir());
     // Raw sRGB (ShaderMaterial output isn't colorspace-converted) so the water matches the sky dome.
     (u.uWaterColor.value as Color).setRGB(sky.water[0] / 255, sky.water[1] / 255, sky.water[2] / 255);

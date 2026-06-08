@@ -60,6 +60,34 @@ export function buildTimecyc(rows24: number[][]): Timecyc {
  * each frame with `game.getTime() / 60`.
  */
 export function sampleTimecyc(timecyc: Timecyc, weatherIndex: number, hour: number): TimecycHour {
+  return toHour(sampleRow(timecyc, weatherIndex, hour));
+}
+
+/**
+ * Blend two weathers at the same `hour` by `t` (0 = `fromWeather`, 1 = `toWeather`): the basis for
+ * smooth weather transitions. Lerps the flat rows (every field) like {@link sampleTimecyc} does for hours.
+ */
+export function sampleTimecycBlend(
+  timecyc: Timecyc,
+  fromWeather: number,
+  toWeather: number,
+  hour: number,
+  t: number,
+): TimecycHour {
+  if (t <= 0 || fromWeather === toWeather) {
+    return toHour(sampleRow(timecyc, fromWeather, hour));
+  }
+  if (t >= 1) {
+    return toHour(sampleRow(timecyc, toWeather, hour));
+  }
+  const a = sampleRow(timecyc, fromWeather, hour);
+  const b = sampleRow(timecyc, toWeather, hour);
+
+  return toHour(a.map((value, i) => value + (b[i] - value) * t));
+}
+
+/** The flat, FIELDS-ordered row for a weather at a fractional `hour` (hourly lerp; wraps 0–24). */
+function sampleRow(timecyc: Timecyc, weatherIndex: number, hour: number): number[] {
   const weather = timecyc.weathers[weatherIndex] ?? timecyc.weathers[0];
   const total = ((hour % HOURS) + HOURS) % HOURS;
   const h0 = Math.floor(total);
@@ -68,7 +96,7 @@ export function sampleTimecyc(timecyc: Timecyc, weatherIndex: number, hour: numb
   const a = weather.hours[h0];
   const b = weather.hours[h1];
 
-  return toHour(a.map((value, i) => value + (b[i] - value) * f));
+  return a.map((value, i) => value + (b[i] - value) * f);
 }
 
 /** Map a flat FIELDS-ordered row to the named entry (read order must match {@link FIELDS}). */

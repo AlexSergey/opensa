@@ -187,7 +187,9 @@ function readField(tokens: string[], i: number, kind: FieldKind): { next: number
   if (kind === 'rgb') {
     const c = [strictInt(tokens[i]), strictInt(tokens[i + 1]), strictInt(tokens[i + 2])];
 
-    return c.some((n) => n === null) ? { next: i + 3, values: [-100, -100, -100] } : { next: i + 3, values: c as number[] }; // eslint-disable-line prettier/prettier
+    return c.some((n) => n === null)
+      ? { next: i + 3, values: [-100, -100, -100] }
+      : { next: i + 3, values: c as number[] };
   }
   const c = [strictInt(tokens[i]), strictInt(tokens[i + 1]), strictInt(tokens[i + 2]), strictInt(tokens[i + 3])];
 

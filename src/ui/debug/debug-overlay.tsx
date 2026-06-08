@@ -2,6 +2,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 
 import type {
   BloomConfig,
+  CloudsConfig,
   Game,
   ShadowsConfig,
   SkyConfig,
@@ -30,6 +31,8 @@ const TIME_PRESETS: [string, number][] = [
 export interface DebugActions {
   /** Current bloom tuning. */
   bloom(): BloomConfig;
+  /** Current cloud tuning. */
+  clouds(): CloudsConfig;
   /** Flip the occupied car (on wheels → roof, on roof → wheels). No-op on foot. */
   flipVehicle(): void;
   /** Current fog distance (world units to full fog). */
@@ -46,6 +49,8 @@ export interface DebugActions {
   respawnPlayer(): void;
   /** Tune bloom (enabled/intensity/threshold). */
   setBloom(patch: Partial<BloomConfig>): void;
+  /** Tune clouds (coverage/opacity). */
+  setClouds(patch: Partial<CloudsConfig>): void;
   /** Set the fog distance (world units to full fog). */
   setFogDistance(distance: number): void;
   /** Set the in-game time (minutes since midnight). */
@@ -68,6 +73,8 @@ export interface DebugActions {
   setVehicleReflection(patch: Partial<VehicleReflectionConfig>): void;
   /** Tune the water shader (glint/reflection). */
   setWater(patch: Partial<WaterConfig>): void;
+  /** Switch the active timecyc weather (index into WEATHER_NAMES). */
+  setWeather(index: number): void;
   /** Whether sun shadows are on. */
   shadows(): ShadowsConfig;
   /** Current god-rays shader tuning. */
@@ -88,18 +95,23 @@ export interface DebugActions {
   vehicleReflection(): VehicleReflectionConfig;
   /** Current water shader tuning. */
   water(): WaterConfig;
+  /** Active timecyc weather index. */
+  weather(): number;
+  /** Selectable weathers (index + label), rain/storm excluded. */
+  weatherList(): readonly { index: number; label: string }[];
 }
 
 /** Reflection preset cycle order for the debug selector (Off + the registry keys). */
 const REFLECTION_PRESETS = ['off', ...Object.keys(PRESETS)];
 
-type Screen = 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles';
+type Screen = 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles' | 'weather';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Game', screen: 'game' },
   { label: 'Graphics', screen: 'graphics' },
+  { label: 'Weather', screen: 'weather' },
   { label: 'Position', screen: 'position' },
   { label: 'Map', screen: 'map' },
 ];
@@ -126,6 +138,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [godrays, setGodrays] = useState(() => actions.godrays());
   const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
   const [bloom, setBloom] = useState<BloomConfig>(() => actions.bloom());
+  const [clouds, setClouds] = useState<CloudsConfig>(() => actions.clouds());
   const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
   const [water, setWater] = useState<WaterConfig>(() => actions.water());
   const [reflectionCfg, setReflectionCfg] = useState<VehicleReflectionConfig>(() => actions.vehicleReflection());
@@ -133,6 +146,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [shadows, setShadows] = useState<ShadowsConfig>(() => actions.shadows());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
+  const [weather, setWeather] = useState(() => actions.weather());
 
   // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
   useEffect(() => {
@@ -319,6 +333,33 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={10}
                 type="range"
                 value={fog}
+              />
+
+              <div style={styles.groupLabel}>CLOUD COVER: {clouds.coverage.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const coverage = Number(e.target.value);
+                  setClouds((prev) => ({ ...prev, coverage }));
+                  actions.setClouds({ coverage });
+                }}
+                step={0.01}
+                type="range"
+                value={clouds.coverage}
+              />
+              <div style={styles.groupLabel}>CLOUD OPACITY: {clouds.opacity.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const opacity = Number(e.target.value);
+                  setClouds((prev) => ({ ...prev, opacity }));
+                  actions.setClouds({ opacity });
+                }}
+                step={0.01}
+                type="range"
+                value={clouds.opacity}
               />
 
               <div style={styles.groupLabel}>GRAPHICS</div>
@@ -537,6 +578,25 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={reflectionCfg.intensity}
               />
+            </div>
+          )}
+
+          {screen === 'weather' && (
+            <div style={styles.group}>
+              {actions.weatherList().map((w) => (
+                <button
+                  key={w.index}
+                  onClick={() => {
+                    setWeather(w.index);
+                    actions.setWeather(w.index);
+                  }}
+                  style={styles.actionButton}
+                  type="button"
+                >
+                  {weather === w.index ? '● ' : ''}
+                  {w.label}
+                </button>
+              ))}
             </div>
           )}
 

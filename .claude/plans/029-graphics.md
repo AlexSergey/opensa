@@ -135,7 +135,8 @@ ambient light; no shadow maps yet. Profile each phase in-browser before moving o
 
 ## Reserved for later phases (this plan will grow)
 
-Clouds (`lowClouds`/`bottomClouds` + cloud meshes), moon + stars at night, **darker nights** (modulate prelit
-vertex colours by timecyc), other weathers + smooth weather transitions, `ambObj` for peds/vehicles.
+Moon + stars at night, **darker nights** (modulate prelit vertex colours by timecyc), other weathers + smooth
+weather transitions, `ambObj` for peds/vehicles.
 (bloom/tone-mapping — DONE phase 5; water + sun glints — DONE phase 6; **car reflections** — DONE plan 030;
-**SSAO** — DONE; **sun shadows** (directional shadow map, view-following) — DONE.)
+**SSAO** — DONE; **sun shadows** (directional shadow map, view-following) — DONE; **clouds** (procedural FBM in
+the dome shader, timecyc-coloured) + **anti-banding dither** — DONE.)

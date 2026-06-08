@@ -198,14 +198,26 @@ function addBodyAtomic(
 
   const doorSide = frame ? DOOR_RE.exec(name)?.[1] : undefined;
   if (doorSide && frame) {
-    const built = addDoor(root, clump, geometry, frame, doorSide, damGeometry.get(`door_${doorSide}`), textures, options, worldCache); // eslint-disable-line prettier/prettier
+    const built = addDoor(
+      root,
+      clump,
+      geometry,
+      frame,
+      doorSide,
+      damGeometry.get(`door_${doorSide}`),
+      textures,
+      options,
+      worldCache,
+    );
 
     return { door: built.door, part: built.part ?? undefined };
   }
 
   const dam = name.endsWith('_ok') ? damGeometry.get(name.slice(0, -3)) : undefined;
   if (dam) {
-    return { part: addPanel(root, clump, name.slice(0, -3), geometry, dam, atomic.frameIndex, textures, options, worldCache) }; // eslint-disable-line prettier/prettier
+    return {
+      part: addPanel(root, clump, name.slice(0, -3), geometry, dam, atomic.frameIndex, textures, options, worldCache),
+    };
   }
 
   const mesh = vehicleMesh(geometry, textures, options);

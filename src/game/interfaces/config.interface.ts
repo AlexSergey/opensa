@@ -20,6 +20,14 @@ export interface CameraConfig {
   followZoom: boolean;
 }
 
+/** Procedural sky-dome cloud tuning. */
+export interface CloudsConfig {
+  /** Cloud cover 0 (clear) → 1 (overcast). */
+  coverage: number;
+  /** Cloud opacity over the sky (0 = off, skips the cloud shader branch). */
+  opacity: number;
+}
+
 /** Top-level game configuration. Mutated in place so `PluginContext.config` stays live. */
 export interface Config {
   camera: CameraConfig;
@@ -40,6 +48,8 @@ export interface Config {
   streaming: StreamingConfig;
   time: TimeConfig;
   vehicle: VehicleConfig;
+  /** Seconds a weather change eases over (≤0 = instant switch). The current weather is a load param. */
+  weatherTransitionSeconds: number;
 }
 
 /** Remappable keyboard bindings; values are `KeyboardEvent.code`. */
@@ -71,6 +81,8 @@ export type GameState = 'pause' | 'play';
 export interface GraphicsConfig {
   /** Bloom (bright-area glow) tuning. */
   bloom: BloomConfig;
+  /** Procedural clouds on the sky dome. */
+  clouds: CloudsConfig;
   /** Sun shadows (directional shadow map). */
   shadows: ShadowsConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */

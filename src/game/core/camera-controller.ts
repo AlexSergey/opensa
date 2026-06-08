@@ -180,7 +180,11 @@ export class CameraController {
   /** Free-fly: translate along the view direction by the held arrow keys, then look along it. */
   private flyUpdate(delta: number): void {
     const cosPitch = Math.cos(this.flyPitch);
-    const forward = new Vector3(Math.sin(this.flyYaw) * cosPitch, Math.sin(this.flyPitch), Math.cos(this.flyYaw) * cosPitch); // eslint-disable-line prettier/prettier
+    const forward = new Vector3(
+      Math.sin(this.flyYaw) * cosPitch,
+      Math.sin(this.flyPitch),
+      Math.cos(this.flyYaw) * cosPitch,
+    );
     const right = new Vector3().crossVectors(forward, UP).normalize(); // camera-right (strafe +)
     const step = FLY_SPEED * delta;
     if (this.flyKeys.has('ArrowUp')) {

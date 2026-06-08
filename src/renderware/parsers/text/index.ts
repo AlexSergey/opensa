@@ -12,11 +12,12 @@ export {
   type Rgb,
   type Rgba,
   sampleTimecyc,
+  sampleTimecycBlend,
   type Timecyc,
   type TimecycHour,
   type TimecycWeather,
 } from './timecyc';
-export { convertTo24h, parseTimecyc } from './timecyc.parser';
+export { convertTo24h, parseTimecyc, WEATHER_NAMES } from './timecyc.parser';
 export * from './types';
 export { parseVehicleDefs, type VehicleDef } from './vehicle-defs.parser';
 export { parseWater, type WaterQuad } from './water.parser';

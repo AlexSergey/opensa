@@ -23,6 +23,14 @@ import type { Plugin, PluginContext } from './plugin';
 /** The timecyc values the sky/sun need (RGB 0–255 + sun floats). Grows as graphics expand. */
 export interface SkySample {
   amb: Rgb;
+  /** Cloud underside / shadowed colour (timecyc bottomClouds). */
+  cloudBottom: Rgb;
+  /** Cloud cover 0–1 for this weather (curated per-weather profile, not raw cloudAlpha). */
+  cloudCover: number;
+  /** Cloud heaviness 0–1: thin/low-density cloud reads darker (heavier weather). */
+  cloudDark: number;
+  /** Cloud lit / top colour (timecyc lowClouds). */
+  cloudTop: Rgb;
   dir: Rgb;
   skyBot: Rgb;
   skyTop: Rgb;
@@ -65,13 +73,16 @@ const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
 const SUN_INTENSITY = 2.2; // directional at peak
 const AMBIENT_DAY = 1.0;
 const AMBIENT_NIGHT = 0.35;
+/** Heavy overcast: how much the direct sun is dimmed, and the ambient lift that fills in for it. */
+const OVERCAST_DIM = 0.8;
+const AMBIENT_OVERCAST = 0.35;
 /** Corona (glow) size relative to the sun core. */
 const CORONA_RATIO = 4.5;
 
 const VERTEX = `
-  varying float vHeight;
+  varying vec3 vDir;
   void main() {
-    vHeight = normalize(position).y; // -1 (nadir) .. 0 (horizon) .. 1 (zenith)
+    vDir = normalize(position); // direction from the dome centre (the view direction)
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -79,10 +90,54 @@ const VERTEX = `
 const FRAGMENT = `
   uniform vec3 uTop;
   uniform vec3 uBottom;
-  varying float vHeight;
+  uniform vec3 uCloudTop;
+  uniform vec3 uCloudBottom;
+  uniform float uTime;
+  uniform float uCloudCoverage;
+  uniform float uCloudOpacity;
+  uniform float uCloudDark;
+  varying vec3 vDir;
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * vnoise(p); p = p * 2.03 + 1.7; a *= 0.5; }
+    return v;
+  }
+
   void main() {
-    float t = smoothstep(0.0, 1.0, clamp(vHeight, 0.0, 1.0)); // horizon→zenith; below horizon = bottom
-    gl_FragColor = vec4(mix(uBottom, uTop, t), 1.0);
+    vec3 dir = normalize(vDir);
+    float t = smoothstep(0.0, 1.0, clamp(dir.y, 0.0, 1.0)); // horizon→zenith; below horizon = bottom
+    vec3 col = mix(uBottom, uTop, t);
+
+    if (uCloudOpacity > 0.0 && dir.y > 0.0) {
+      // Project the view direction onto a flat cloud ceiling (clouds converge toward the horizon),
+      // drift over time, and fade out near the horizon.
+      vec2 cuv = dir.xz / max(dir.y, 0.12) * 0.45 + vec2(uTime * 0.004, uTime * 0.002);
+      float n = fbm(cuv);
+      float mass = fbm(cuv * 0.4 + 19.0); // large-scale cloud masses: where the sky goes dark vs light (0..1)
+      // fbm values cluster around the middle, so map coverage→threshold across that useful band:
+      // 0 sits above the noise (clear), 1 sits fully below it (solid overcast), 0.5 ≈ half sky.
+      float edge = mix(0.92, -0.25, uCloudCoverage);
+      float density = smoothstep(edge, edge + 0.20, n);
+      float horizon = smoothstep(0.02, 0.30, dir.y); // no clouds right at the horizon line
+      vec3 cloudCol = mix(uCloudBottom, uCloudTop, smoothstep(0.30, 0.80, n)); // lit tops, dark undersides
+      // Heavier weather: deepen the contrast and let whole low-mass regions drop to dark storm-grey
+      // while the thick cores stay lit — a fully overcast sky still reads as distinct clouds, not a flat fill.
+      float bright = smoothstep(0.20, 0.72, n) * mix(0.35, 1.0, smoothstep(0.30, 0.72, mass));
+      float shade = mix(0.16, 1.0, bright);
+      cloudCol *= mix(1.0, shade, uCloudDark);
+      col = mix(col, cloudCol, density * horizon * uCloudOpacity);
+    }
+
+    col += (hash(gl_FragCoord.xy) - 0.5) / 255.0; // dither to break gradient banding
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
@@ -106,6 +161,7 @@ export class SkyPlugin implements Plugin {
   readonly sunSource: Mesh;
 
   private readonly ambient = new AmbientLight(0xffffff, 1);
+  private cloudCover = 0.5; // weather-driven (timecyc cloudAlpha); the dome's coverage base
   private readonly corona: Sprite;
   private readonly dome: Mesh;
   private readonly getHour: () => number;
@@ -121,7 +177,16 @@ export class SkyPlugin implements Plugin {
       depthWrite: false,
       fragmentShader: FRAGMENT,
       side: BackSide,
-      uniforms: { uBottom: { value: new Color() }, uTop: { value: new Color() } },
+      uniforms: {
+        uBottom: { value: new Color() },
+        uCloudBottom: { value: new Color() },
+        uCloudCoverage: { value: 0.5 },
+        uCloudDark: { value: 0 },
+        uCloudOpacity: { value: 0.8 },
+        uCloudTop: { value: new Color() },
+        uTime: { value: 0 },
+        uTop: { value: new Color() },
+      },
       vertexShader: VERTEX,
     });
     this.dome = new Mesh(new SphereGeometry(RADIUS, 32, 16), this.material);
@@ -192,7 +257,12 @@ export class SkyPlugin implements Plugin {
 
   update(context: PluginContext): void {
     this.dome.position.copy(context.camera.position); // keep the sky centred on the view
-    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize);
+    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize); // sets cloudCover
+    const clouds = context.config.graphics.clouds;
+    this.material.uniforms.uTime.value = context.clock.elapsed;
+    this.material.uniforms.uCloudOpacity.value = clouds.opacity;
+    // Cover = weather's cloudAlpha × the user multiplier (slider 0.5 = weather as-authored).
+    this.material.uniforms.uCloudCoverage.value = Math.min(1, this.cloudCover * clouds.coverage * 2);
     this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
@@ -201,27 +271,41 @@ export class SkyPlugin implements Plugin {
     const sky = this.sample(this.getHour());
     setColor(this.material.uniforms.uTop.value as Color, sky.skyTop, false);
     setColor(this.material.uniforms.uBottom.value as Color, sky.skyBot, false);
+    setColor(this.material.uniforms.uCloudTop.value as Color, sky.cloudTop, false);
+    setColor(this.material.uniforms.uCloudBottom.value as Color, sky.cloudBottom, false);
+    this.material.uniforms.uCloudDark.value = sky.cloudDark;
+    this.cloudCover = sky.cloudCover;
 
     const elevation = this.sunElevation(this.getHour()); // radians; ≤0 → below horizon
     const above = elevation > 0;
     const height = Math.max(0, Math.sin(elevation));
+    // Overcast factor: 0 (clear) → 1 (heavy cloud). Direct light dims and shadows soften toward flat,
+    // diffuse light, with a little ambient lift so the scene stays bright (an overcast sky is a big soft light).
+    const overcast = MathUtils.smoothstep(this.cloudCover, 0.3, 0.95);
 
     setColor(this.sun.color, sky.dir, true);
-    this.sun.intensity = above ? SUN_INTENSITY * height : 0;
+    this.sun.intensity = above ? SUN_INTENSITY * height * (1 - OVERCAST_DIM * overcast) : 0;
     this.sun.position.copy(this.sunDir).multiplyScalar(100); // direction only (it's a directional light)
-    this.ambient.intensity = AMBIENT_NIGHT + (AMBIENT_DAY - AMBIENT_NIGHT) * (above ? Math.min(1, height + 0.25) : 0);
+    this.sun.shadow.intensity = 1 - overcast; // shadows fade out under cloud (no harsh shadow when overcast)
+    const ambientDay = AMBIENT_DAY + AMBIENT_OVERCAST * overcast;
+    this.ambient.intensity = AMBIENT_NIGHT + (ambientDay - AMBIENT_NIGHT) * (above ? Math.min(1, height + 0.25) : 0);
 
-    this.sunSource.visible = above;
-    this.corona.visible = above;
-    this.godraysSource.visible = above;
-    if (above) {
+    // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
+    const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);
+    const sunVisible = above && cloudFade > 0;
+    this.sunSource.visible = sunVisible;
+    this.corona.visible = sunVisible;
+    this.godraysSource.visible = sunVisible;
+    if (sunVisible) {
       this.sunSource.position.copy(this.sunDir).multiplyScalar(SUN_DISTANCE);
       this.corona.position.copy(this.sunSource.position);
       this.godraysSource.position.copy(this.sunSource.position);
       setColor((this.sunSource.material as MeshBasicMaterial).color, sky.sunCore, true);
       setColor((this.godraysSource.material as MeshBasicMaterial).color, sky.sunCore, true);
       setColor(this.corona.material.color, sky.sunCorona, true);
-      this.corona.material.opacity = sky.spriteBright;
+      (this.sunSource.material as MeshBasicMaterial).opacity = cloudFade;
+      (this.godraysSource.material as MeshBasicMaterial).opacity = cloudFade;
+      this.corona.material.opacity = sky.spriteBright * cloudFade;
       const core = sunScale * sky.sunSize;
       this.sunSource.scale.setScalar(core);
       this.corona.scale.setScalar(core * CORONA_RATIO * sky.spriteSize);
@@ -252,7 +336,8 @@ export class SkyPlugin implements Plugin {
   /** Aim the sun's shadow map at the view: centre the ortho frustum on the camera, light up-sun from it.
    *  The focus is **snapped to texel increments** so the shadows don't crawl/shimmer as the camera moves. */
   private updateShadow(camera: PerspectiveCamera, enabled: boolean): void {
-    const cast = enabled && this.sun.intensity > 0; // no shadows at night / when disabled
+    // No shadows at night / when disabled / once cloud cover has faded them out (skip the wasted pass).
+    const cast = enabled && this.sun.intensity > 0 && this.sun.shadow.intensity > 0.01;
     this.sun.castShadow = cast;
     if (!cast) {
       return;

@@ -66,16 +66,17 @@
     - [✅] If you run a regular timecyc Python algorithm in 24h format
     - [✅] If 24h, then as is
 - [ ] Graphics
-  - [ ] Light
-  - [ ] Shadows
-  - [ ] Volumetric cloud / Skybox
+  - [✅] Light
+  - [✅] Shadows
+  - [✅] Volumetric cloud / Skybox
   - [✅] Sky
     - [✅] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
     - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [✅] Water shader
   - [ ] Night objects (Tobj)
   - [ ] 2dfx (maybe)
-- [ ] Car reflections
+- [✅] Car reflections
+- [✅] Weather manager
 - [ ] UI Layer
   - [ ] The Ui layer should not be involved in post processing.
   - [ ] Find good fonts
@@ -125,10 +126,9 @@ Next iterations:
 - [ ] Veh paths
 - [ ] Destroyable objects
 - [ ] Birds
-- [ ] Rest timecyc
-  - [ ] Weather
-    - [ ] Rain
-    - [ ] Sand storm
+- [ ] Weather
+  - [ ] Rain
+  - [ ] Sand storm
 - [ ] Advanced Water: floating/bouncing, underwater fog, flow from water.dat, clipping.
 - [ ] Car damage
 - [ ] Car explosion

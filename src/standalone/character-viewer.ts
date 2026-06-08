@@ -44,7 +44,11 @@ const ANIM_IMG = 'anim/animations.img';
 const IFP = 'ped.ifp';
 const DEFAULT_CLIP = 'idle_stance';
 /** Stand the SA bind pose up (matches canvas-host's TOMMY_PLACEMENT). */
-const PLACEMENT = { offset: [0, 0, 0.04] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], scale: 1 }; // eslint-disable-line prettier/prettier
+const PLACEMENT = {
+  offset: [0, 0, 0.04] as [number, number, number],
+  rotation: [0, 0, 0] as [number, number, number],
+  scale: 1,
+};
 /** Player collision half-extents (Z-up) from the game (canvas-host PLAYER_HALF_EXTENTS). */
 const HALF = new Vector3(0.3, 0.3, 0.9);
 

@@ -67,6 +67,7 @@ export class VehicleReflectionPlugin implements Plugin {
 
   configChanged(config: PluginContext['config']): void {
     this.config = config.graphics.vehicleReflection;
+    this.probeHour = Number.NaN; // re-render the sky probe next frame (e.g. after a weather change)
     this.applyAll();
   }
 

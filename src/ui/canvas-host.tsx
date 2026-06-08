@@ -12,6 +12,7 @@ import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
+import { cloudProfile } from '../game/plugins/cloud-profile';
 import { FogPlugin } from '../game/plugins/fog.plugin';
 import { PostFxPlugin } from '../game/plugins/postfx.plugin';
 import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
@@ -23,7 +24,7 @@ import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
-import { sampleTimecyc } from '../renderware';
+import { sampleTimecycBlend, WEATHER_NAMES } from '../renderware';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
@@ -43,8 +44,15 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 // Initial paint per model — carcols.dat palette indices (first two = primary/secondary).
 const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
 
-// Default timecyc weather (index into WEATHER_NAMES; 0 = EXTRASUNNY_LA) until weather is selectable.
+// Default timecyc weather (index into WEATHER_NAMES; 0 = EXTRASUNNY_LA).
 const DEFAULT_WEATHER = 0;
+
+// Selectable weathers for the debug Weather tab — all timecyc weathers except rain/storm/underwater
+// and the cutscene EXTRACOLOURS entries (per the "sunny/cloudy/etc, no rain/storm" ask).
+const WEATHERS: readonly { index: number; label: string }[] = WEATHER_NAMES.map((label, index) => ({
+  index,
+  label,
+})).filter(({ label }) => !/RAINY|SANDSTORM|UNDERWATER|EXTRACOLOUR/.test(label));
 
 // Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
 // admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
@@ -204,13 +212,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       gameState: 'play',
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+        clouds: { coverage: 0.5, opacity: 0.85 },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
-        toneMapping: false,
+        toneMapping: true,
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
-        water: { glint: 1.5, reflection: 0.6 },
+        water: { glint: 1.5, reflection: 0.4 },
       },
       hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
       mapViewer: false,
@@ -225,6 +234,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       streaming: { cellSize: CELL_SIZE, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1000 },
       time: { secondsPerGameMinute: 1.5 },
       vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
+      weatherTransitionSeconds: 6,
     });
     const adapter = new GtaSaWorldAdapter({
       archiveUrl: `${BASE}/models/gta3.img`,
@@ -236,11 +246,19 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Timecyc (sky/sun/light table by time of day) — loaded before the scene so the sky plugin has it.
     // Phase 1: a gradient sky dome from the EXTRASUNNY_LA skyTop/skyBot colours; sun/fog come next.
     const timecyc = await adapter.loadTimecyc();
+    const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
     const skySample = (hour: number): SkySample => {
-      const e = sampleTimecyc(timecyc, DEFAULT_WEATHER, hour);
+      const { from, t, to } = game.getWeatherBlend();
+      const e = sampleTimecycBlend(timecyc, from, to, hour, t);
+      const a = cloudProfile(WEATHER_NAMES[from] ?? '');
+      const b = cloudProfile(WEATHER_NAMES[to] ?? '');
 
       return {
         amb: e.amb,
+        cloudBottom: e.bottomClouds,
+        cloudCover: lerp(a.coverage, b.coverage, t),
+        cloudDark: lerp(a.darkness, b.darkness, t),
+        cloudTop: e.lowClouds,
         dir: e.dir,
         skyBot: e.skyBot,
         skyTop: e.skyTop,
@@ -252,9 +270,15 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       };
     };
     const waterSample = (hour: number): WaterSample => {
-      const e = sampleTimecyc(timecyc, DEFAULT_WEATHER, hour);
+      const { from, t, to } = game.getWeatherBlend();
+      const e = sampleTimecycBlend(timecyc, from, to, hour, t);
 
-      return { horizon: e.skyBot, sun: e.sunCore, water: [e.water[0], e.water[1], e.water[2]] };
+      return {
+        horizon: e.skyBot,
+        sun: e.sunCore,
+        water: [e.water[0], e.water[1], e.water[2]],
+        waterAlpha: e.water[3] / 255,
+      };
     };
     const sky = new SkyPlugin(skySample, () => game.getHours()); // sky dome + sun + lights from timecyc (smooth)
     const reflection = new VehicleReflectionPlugin(() => game.getHours()); // sky-probe reflections on spawned cars
@@ -281,7 +305,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
-    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360 }); // 6:00
+    // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
+    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
@@ -428,6 +453,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
+      clouds: () => game.getConfig().graphics.clouds,
       flipVehicle,
       fogDistance: () => game.getConfig().fog.distance,
       gameTime: () => game.getTime(),
@@ -439,6 +465,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
       },
       setBloom: (patch) => game.setBloom(patch),
+      setClouds: (patch) => game.setClouds(patch),
       setFogDistance: (distance) => game.setFogDistance(distance),
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),
@@ -450,6 +477,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setToneMapping: (enabled) => game.setToneMapping(enabled),
       setVehicleReflection: (patch) => game.setVehicleReflection(patch),
       setWater: (patch) => game.setWater(patch),
+      setWeather: (index) => game.setWeather(index),
       shadows: () => game.getConfig().graphics.shadows,
       sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
@@ -467,6 +495,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       toneMapping: () => game.getConfig().graphics.toneMapping,
       vehicleReflection: () => game.getConfig().graphics.vehicleReflection,
       water: () => game.getConfig().graphics.water,
+      weather: () => game.getWeather(),
+      weatherList: () => WEATHERS,
     };
 
     return { debugActions, game };

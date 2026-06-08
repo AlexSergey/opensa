@@ -24,14 +24,14 @@
     "lint:code": "eslint .",
     "lint:commit": "commitlint --config .commitlintrc.cjs --edit",
     "lint:ts": "tsc --noEmit",
-    "viewer:collision": "tsx scripts/extract-viewer-collision.ts",
     "pack:anim": "node scripts/pack-anim-img.mjs",
     "pack:img": "node scripts/pack-img.mjs",
     "preview": "vite preview",
     "serve:static": "serve static -l 3001 --cors",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "viewer:collision": "tsx scripts/extract-viewer-collision.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.3",

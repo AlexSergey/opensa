@@ -33,6 +33,7 @@ function config(gameState: Config['gameState']): Config {
     gameState,
     graphics: {
       bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
+      clouds: { coverage: 0.5, opacity: 0.85 },
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -50,6 +51,7 @@ function config(gameState: Config['gameState']): Config {
     streaming: { cellSize: 250, collisionDrawDistance: 150, hdDrawDistance: 300, lodDrawDistance: 1500 },
     time: { secondsPerGameMinute: 3 },
     vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
+    weatherTransitionSeconds: 0,
   };
 }
 

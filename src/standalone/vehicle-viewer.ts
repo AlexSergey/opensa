@@ -215,7 +215,9 @@ async function loadVehicle(name: string): Promise<void> {
   // Modded DFFs (e.g. admiral) have stray vertices that blow up the mesh bbox.
   content.updateMatrixWorld(true);
   colBox = col
-    ? new Box3(new Vector3().fromArray(col.bounds.min), new Vector3().fromArray(col.bounds.max)).applyMatrix4(content.matrixWorld) // eslint-disable-line prettier/prettier
+    ? new Box3(new Vector3().fromArray(col.bounds.min), new Vector3().fromArray(col.bounds.max)).applyMatrix4(
+        content.matrixWorld,
+      )
     : null;
 
   rebuildPartSelect();
