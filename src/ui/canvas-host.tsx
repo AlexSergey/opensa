@@ -19,7 +19,6 @@ import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
 import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehicle-reflection.plugin';
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
-import { LightPoolSystem } from '../game/streaming/light-pool.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
@@ -30,7 +29,6 @@ import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import {
   buildTextureMap,
   coronaMaterial,
-  lightPoolMaterial,
   nightColorUniform,
   parseTxd,
   sampleTimecycBlend,
@@ -237,12 +235,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
         night: {
-          // Low flat ambient: the baked night vertex colours (incl. roads' lamp pools) carry the night look.
-          brightness: 0.13,
           coronaDrawDistance: 120,
           grade: 0.05,
-          lampPool: 0, // off — the baked road night colours light the ground (the projection was edge-casey)
-          lampPoolRadius: 13.0,
           skylight: 0.6,
           tint: [1.0, 1.0, 1.0],
           windowGlow: 1.0,
@@ -272,7 +266,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       weatherTransitionSeconds: 6,
     });
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3-pf.img`,
+      archiveUrl: `${BASE}/models/gta3-original.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
@@ -290,6 +284,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
       return {
         amb: e.amb,
+        ambObj: e.ambObj,
         cloudBottom: e.bottomClouds,
         cloudCover: lerp(a.coverage, b.coverage, t),
         cloudDark: lerp(a.darkness, b.darkness, t),
@@ -373,31 +368,23 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.
     game.addSystem(new TimedObjectSystem(game.getStreamingRoot(), () => game.getHours()));
 
-    // Fade the street-lamp coronas on/off around the configured night hours (shared corona material).
-    let coronaOn = 0;
+    // Night lights (coronas + the baked night vertex colours) all ride ONE smooth signal — the sun-height
+    // night factor (`sky.godraysSource.userData.night`) — so they cross-fade together with the ambient at
+    // dusk/dawn. (Not the hard 20→6 lamp hour-window, which snapped the lamps off out of sync with the light.)
     game.addSystem({
       name: 'coronas',
-      update(delta: number): void {
-        const on = game.getConfig().graphics.lights.enabled && game.isNight();
-        coronaOn += ((on ? 1 : 0) - coronaOn) * Math.min(1, delta * 2); // ~0.5s ease
-        const night = game.getConfig().graphics.night;
-        coronaMaterial.uniforms.uOn.value = coronaOn;
+      update(): void {
+        const { lights, night } = game.getConfig().graphics;
+        const nightFactor = (sky.godraysSource.userData.night as number | undefined) ?? 0;
+        coronaMaterial.uniforms.uOn.value = lights.enabled ? nightFactor : 0;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
         coronaMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
-        // Ground light pools share the night on/off, scaled by their own strength knob.
-        lightPoolMaterial.uniforms.uOn.value = coronaOn * night.lampPool;
-        lightPoolMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
-        lightPoolMaterial.uniforms.uRadius.value = night.lampPoolRadius;
-        // Building lit windows (SA night vertex colours) fade in on the same night signal.
-        nightColorUniform.value = coronaOn * night.windowGlow;
+        nightColorUniform.value = nightFactor * night.windowGlow;
       },
     });
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
-
-    // Drop street-lamp light pools onto the real terrain (rays down from each bulb to the streamed collision).
-    game.addSystem(new LightPoolSystem(game.getStreamingRoot(), character.physics));
 
     // Painted cars parked near the spawn (native Z-up under the −90°X root). Each is a
     // dynamic physics body whose chassis collider is the convex hull of its embedded COL

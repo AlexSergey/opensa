@@ -1,12 +1,11 @@
-import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
 import type { CoronaEntry } from '../three/corona';
-import type { LightPoolEntry } from '../three/light-pool';
 
 import { getClump, getTextures, modelKey } from '../archive';
-import { buildClumpLights, buildClumpParts, clumpFloorZ } from '../three/build-clump';
+import { buildClumpLights, buildClumpParts } from '../three/build-clump';
 
 /**
  * Models whose 2d-effect lights (coronas + ground pools) are **temporarily suppressed**: traffic lights
@@ -15,6 +14,14 @@ import { buildClumpLights, buildClumpParts, clumpFloorZ } from '../three/build-c
  * traffic-light cycling lands (see plan 032). Street lamps etc. don't match `traffic`, so they're unaffected.
  */
 const SUPPRESS_LIGHT_MODELS = /traffic/i;
+
+/**
+ * Models forced to render **double-sided**. The `gta3-pf.img` (Proper Fixes) traffic-light housings ship with
+ * inconsistent face winding and no stored normals, so single-sided (`FrontSide`) culling makes the solid metal
+ * box **see-through from one side** (the panels facing away are culled). They're opaque, so double-siding is
+ * harmless (no transparency sorting) and matches the in-game solid look from every angle.
+ */
+const DOUBLE_SIDED_MODELS = /traffic/i;
 
 /**
  * Shared instancing for the streamed map: grouping instances by model+txd and
@@ -60,11 +67,15 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
     // Night-lit timed variants (lit-window / neon overlays, on across midnight) self-illuminate so their
     // bright window texels glow in the dark — emissiveMap = the diffuse map (dark texels stay dark).
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
+    const doubleSided = DOUBLE_SIDED_MODELS.test(group.def.modelName);
     for (const part of parts) {
       if (nightLit && part.material.map) {
         part.material.emissiveMap = part.material.map;
         part.material.emissive.setRGB(1, 1, 1);
         part.material.emissiveIntensity = WINDOW_EMISSIVE;
+      }
+      if (doubleSided) {
+        part.material.side = DoubleSide; // pf traffic-light housings have inconsistent winding — see-through if culled
       }
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
       // Opaque geometry casts; alpha-tested detail (foliage/fences/wires) doesn't — its 1-bit cutout
@@ -96,17 +107,13 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
 }
 
 /**
- * Gather the world-space (GTA Z-up) night lights for a set of model groups: each light-bearing model's
- * clump-local 2d-effect lights, placed by every instance's transform. Returns both the **coronas** (camera-
- * facing glow at the bulb) and the **ground light pools** (a flat splat under each bulb, at the instance's
- * base Z ≈ ground — SA's "light shadow"). Returned flat for one `Points` + one pool `Mesh` per cell.
+ * Gather the world-space (GTA Z-up) **coronas** for a set of model groups: each light-bearing model's
+ * clump-local 2d-effect lights (camera-facing glow at the bulb), placed by every instance's transform.
+ * (The ground glow under lamps is the road's baked **night vertex colours**, not a projected pool.)
+ * Returned flat for one `Points` per cell.
  */
-export function collectLights(
-  archive: ImgArchive,
-  groups: Iterable<RegionMeshData>,
-): { coronas: CoronaEntry[]; pools: LightPoolEntry[] } {
+export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshData>): CoronaEntry[] {
   const coronas: CoronaEntry[] = [];
-  const pools: LightPoolEntry[] = [];
   const placement = new Matrix4();
   const position = new Vector3();
   const quaternion = new Quaternion();
@@ -117,12 +124,10 @@ export function collectLights(
     if (SUPPRESS_LIGHT_MODELS.test(group.def.modelName)) {
       continue; // traffic lights — temporarily off (no sequencing yet); see SUPPRESS_LIGHT_MODELS
     }
-    const clump = getClump(archive, group.def.modelName);
-    const lights = buildClumpLights(clump);
+    const lights = buildClumpLights(getClump(archive, group.def.modelName));
     if (lights.length === 0) {
       continue;
     }
-    const floorZ = clumpFloorZ(clump); // model foot (clump-local) → the ground the pool sits on
     for (const instance of group.instances) {
       position.set(instance.position[0], instance.position[1], instance.position[2]);
       // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
@@ -138,23 +143,11 @@ export function collectLights(
           position: [point.x, point.y, point.z],
           size: light.size,
         });
-        // Ground pool only for warm/white lights (street lamps): red is the dominant channel. Coloured
-        // decorative lights (green/blue neon signs) shouldn't dump a big colour pool on the ground — they
-        // glow via their emissive sign texture, not a lamp-style spill. Keep the corona for them either way.
-        const [lr, lg, lb] = light.color;
-        if (lr >= lg && lr >= lb) {
-          // Pool: under the bulb (X/Y). Initial Z is the model foot (instance.z + floorZ) so it shows at once;
-          // a runtime system then rays the real terrain in a small window around it (curb/road), never far.
-          pools.push({
-            color: [lr, lg, lb],
-            position: [point.x, point.y, instance.position[2] + floorZ],
-          });
-        }
       }
     }
   }
 
-  return { coronas, pools };
+  return coronas;
 }
 
 /** Whether a timed window `[on, off)` is a night-lit variant (visible across midnight → glowing). */

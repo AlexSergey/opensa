@@ -68,6 +68,28 @@ describe('buildClumpParts', () => {
     expect(attrs.normal).toBeDefined();
   });
 
+  it('repairs zero-length normals on coincident opposite-wound faces (no black panels)', () => {
+    // A flat double-sided quad: front + back triangles share the same vertices with opposite winding, so
+    // computeVertexNormals cancels every normal to zero (the SA neon-sign / unclean-road case). The repair
+    // must leave a usable (non-zero, unit) normal so the face is lit instead of rendering pure black.
+    const panel = geometry({
+      materials: [material({ color: [255, 255, 255, 255] })],
+      positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
+      triangles: [
+        { a: 0, b: 1, c: 2, materialIndex: 0 },
+        { a: 0, b: 2, c: 3, materialIndex: 0 },
+        { a: 0, b: 2, c: 1, materialIndex: 0 },
+        { a: 0, b: 3, c: 2, materialIndex: 0 },
+      ],
+      uvLayers: [new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])],
+    });
+    const normal = buildClumpParts(clumpWith(panel))[0].geometry.getAttribute('normal');
+    for (let i = 0; i < normal.count; i += 1) {
+      const length = Math.hypot(normal.getX(i), normal.getY(i), normal.getZ(i));
+      expect(length).toBeGreaterThan(0.99);
+    }
+  });
+
   it('resolves textures and alpha settings into the part material', () => {
     const tex = new Texture();
     tex.name = 'tree_branches44';

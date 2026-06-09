@@ -609,19 +609,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={moon.brightness}
               />
-              <div style={styles.groupLabel}>NIGHT BRIGHTNESS: {night.brightness.toFixed(2)}</div>
-              <input
-                max={1}
-                min={0}
-                onChange={(e) => {
-                  const brightness = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, brightness }));
-                  actions.setNight({ brightness });
-                }}
-                step={0.02}
-                type="range"
-                value={night.brightness}
-              />
               <div style={styles.groupLabel}>CORONA DISTANCE: {night.coronaDrawDistance.toFixed(0)}</div>
               <input
                 max={400}
@@ -660,32 +647,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 step={0.05}
                 type="range"
                 value={night.grade}
-              />
-              <div style={styles.groupLabel}>NIGHT LAMP POOL: {night.lampPool.toFixed(2)}</div>
-              <input
-                max={2}
-                min={0}
-                onChange={(e) => {
-                  const lampPool = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, lampPool }));
-                  actions.setNight({ lampPool });
-                }}
-                step={0.05}
-                type="range"
-                value={night.lampPool}
-              />
-              <div style={styles.groupLabel}>NIGHT LAMP RADIUS: {night.lampPoolRadius.toFixed(1)}</div>
-              <input
-                max={20}
-                min={0.5}
-                onChange={(e) => {
-                  const lampPoolRadius = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, lampPoolRadius }));
-                  actions.setNight({ lampPoolRadius });
-                }}
-                step={0.5}
-                type="range"
-                value={night.lampPoolRadius}
               />
               <div style={styles.groupLabel}>NIGHT WINDOW GLOW: {night.windowGlow.toFixed(2)}</div>
               <input

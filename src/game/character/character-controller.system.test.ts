@@ -38,11 +38,8 @@ function config(gameState: Config['gameState']): Config {
       lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
       moon: { brightness: 1, elevationDeg: 35, size: 150 },
       night: {
-        brightness: 0.5,
         coronaDrawDistance: 120,
         grade: 0.7,
-        lampPool: 0.6,
-        lampPoolRadius: 4.5,
         skylight: 0.6,
         tint: [0.6, 0.66, 0.85],
         windowGlow: 1,

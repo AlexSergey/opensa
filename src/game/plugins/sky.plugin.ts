@@ -26,6 +26,9 @@ import type { Plugin, PluginContext } from './plugin';
 /** The timecyc values the sky/sun need (RGB 0–255 + sun floats). Grows as graphics expand. */
 export interface SkySample {
   amb: Rgb;
+  /** Object ambient (timecyc ambObj) — SA's warm, bright fill that actually lights world objects (the plain
+   *  `amb` is near-black). Drives the day AmbientLight colour so the day reads warm, not flat grey/white. */
+  ambObj: Rgb;
   /** Cloud underside / shadowed colour (timecyc bottomClouds). */
   cloudBottom: Rgb;
   /** Cloud cover 0–1 for this weather (curated per-weather profile, not raw cloudAlpha). */
@@ -74,14 +77,22 @@ const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
 
 /** Light tuning (timecyc dir/dirMult are ~constant for EXTRASUNNY, so day/night rides the sun height). */
 const SUN_INTENSITY = 2.2; // directional at peak
-const AMBIENT_DAY = 1.0;
-/** Night skylight (hemisphere): a moonlit blue from above, near-black from the ground — top-down fill that
- *  gives night objects form (vs the flat ambient). Strength rides `night.skylight` × the night factor. */
+/** Ambient base fill: a small WARM uniform term (the hemisphere skylight below carries most of the day fill +
+ *  form), near-zero at night where the baked **night vertex colours** take over. NB SA's timecyc `amb` is tiny
+ *  (~0.03 — it leans on the directional + prelit), so using it directly left day shadows pitch black. */
+const AMBIENT_DAY = 1.5; // scales the timecyc object-ambient (ambObj) colour into the day AmbientLight intensity
+const AMBIENT_NIGHT = 0.04;
+/** Skylight (hemisphere fill): by DAY a warm sky from above + a tan ground bounce from below — gives buildings
+ *  form and warmth on the shadow side (a flat white ambient looked grey/cold/flat once night vertex faded). By
+ *  NIGHT it cross-fades to a moonlit blue (near-black ground). Day strength is constant; night rides
+ *  `night.skylight` × the night factor. */
+const DAY_SKY_COLOR = new Color(1.0, 0.95, 0.86);
+const DAY_GROUND_COLOR = new Color(0.5, 0.42, 0.32);
+const DAY_SKYLIGHT = 0.4; // lower now that the warm timecyc object-ambient carries most of the day fill
 const NIGHT_SKY_COLOR = new Color(0.42, 0.52, 0.8);
 const NIGHT_GROUND_COLOR = new Color(0.08, 0.09, 0.13);
-/** Heavy overcast: how much the direct sun is dimmed, and the ambient lift that fills in for it. */
+/** Heavy overcast: how much the direct sun is dimmed. */
 const OVERCAST_DIM = 0.8;
-const AMBIENT_OVERCAST = 0.35;
 /** Corona (glow) size relative to the sun core. */
 const CORONA_RATIO = 4.5;
 
@@ -201,8 +212,7 @@ export class SkyPlugin implements Plugin {
   private readonly getHour: () => number;
   private readonly material: ShaderMaterial;
   private readonly moonDisc: Sprite;
-  private night = 0; // 0 day → 1 deep night (sun height); drives stars + the cool ambient tint
-  private readonly nightTint = new Color(); // scratch for the configurable night ambient tint
+  private night = 0; // 0 day → 1 deep night (sun height); drives stars, moon, skylight + the night grade
   private readonly sample: (hour: number) => SkySample;
   /** Night "skylight" — a hemisphere fill from above, faded in at night for form (intensity set per frame). */
   private readonly skylight = new HemisphereLight(NIGHT_SKY_COLOR, NIGHT_GROUND_COLOR, 0);
@@ -339,10 +349,13 @@ export class SkyPlugin implements Plugin {
   /** Push the current time-of-day sky/sun state into the dome, lights and sun/moon sprites. */
   private apply(sunScale: number, godraysScale: number, moon: MoonConfig, nightCfg: NightConfig): void {
     const sky = this.sample(this.getHour());
-    setColor(this.material.uniforms.uTop.value as Color, sky.skyTop, false);
-    setColor(this.material.uniforms.uBottom.value as Color, sky.skyBot, false);
-    setColor(this.material.uniforms.uCloudTop.value as Color, sky.cloudTop, false);
-    setColor(this.material.uniforms.uCloudBottom.value as Color, sky.cloudBottom, false);
+    // Sky/cloud colours are authored in timecyc as 0–255 sRGB (like the sun colours), so decode them as
+    // sRGB (managed) — NOT linear. Treating them as linear gamma-lifts the darks, which washed the near-black
+    // night sky (timecyc [9,11,13]) into a bright grey ([53,59,64] on screen). Managed → it stays dark.
+    setColor(this.material.uniforms.uTop.value as Color, sky.skyTop, true);
+    setColor(this.material.uniforms.uBottom.value as Color, sky.skyBot, true);
+    setColor(this.material.uniforms.uCloudTop.value as Color, sky.cloudTop, true);
+    setColor(this.material.uniforms.uCloudBottom.value as Color, sky.cloudBottom, true);
     this.material.uniforms.uCloudDark.value = sky.cloudDark;
     this.cloudCover = sky.cloudCover;
 
@@ -358,17 +371,23 @@ export class SkyPlugin implements Plugin {
     const overcast = MathUtils.smoothstep(this.cloudCover, 0.3, 0.95);
 
     setColor(this.sun.color, sky.dir, true);
-    this.sun.intensity = above ? SUN_INTENSITY * height * (1 - OVERCAST_DIM * overcast) : 0;
+    // Sun brightness falls off with height as √(sin elevation), NOT linearly: a linear falloff drives the
+    // directional to ~0 at the horizon, so a low rising/setting sun lit nothing — walls facing the sunrise
+    // (golden hour) stayed dark. √ lifts the low-sun range while keeping the midday peak and a day arc.
+    this.sun.intensity = above ? SUN_INTENSITY * Math.sqrt(height) * (1 - OVERCAST_DIM * overcast) : 0;
     this.sun.position.copy(this.sunDir).multiplyScalar(100); // direction only (it's a directional light)
     this.sun.shadow.intensity = 1 - overcast; // shadows fade out under cloud (no harsh shadow when overcast)
-    const ambientDay = AMBIENT_DAY + AMBIENT_OVERCAST * overcast;
-    const nightLow = nightCfg.brightness; // configurable moonlight floor
-    this.ambient.intensity = nightLow + (ambientDay - nightLow) * (above ? Math.min(1, height + 0.25) : 0);
-    // White by day → the configurable cool night tint, by the night factor.
-    this.nightTint.setRGB(nightCfg.tint[0], nightCfg.tint[1], nightCfg.tint[2]);
-    this.ambient.color.setRGB(1, 1, 1).lerp(this.nightTint, this.night);
-    // Night skylight (top-down hemisphere fill) — fades in with the night factor for form, off by day.
-    this.skylight.intensity = this.night * nightCfg.skylight;
+    // Ambient: COLOUR straight from timecyc's object-ambient (ambObj) — SA's warm, bright object fill (the
+    // plain `amb` is near-black). So the day reads warm/sunlit (warm at golden hours, neutral at noon) instead
+    // of our old flat white. Intensity scales it by day → near-zero at night (the night vertex colours light it).
+    setColor(this.ambient.color, sky.ambObj, true);
+    this.ambient.intensity = AMBIENT_NIGHT + (AMBIENT_DAY - AMBIENT_NIGHT) * (1 - this.night);
+    // Skylight (hemisphere): warm sky + tan ground bounce by DAY (form + warmth on the shadow side, so it isn't
+    // flat grey once night vertex fades), cross-fading to the cool moonlit fill at NIGHT. Day strength is
+    // constant; the night term rides `night.skylight`.
+    this.skylight.color.copy(DAY_SKY_COLOR).lerp(NIGHT_SKY_COLOR, this.night);
+    this.skylight.groundColor.copy(DAY_GROUND_COLOR).lerp(NIGHT_GROUND_COLOR, this.night);
+    this.skylight.intensity = DAY_SKYLIGHT * (1 - this.night) + nightCfg.skylight * this.night;
 
     // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
     const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);

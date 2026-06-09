@@ -209,6 +209,8 @@ export function buildGeometry(rw: RWGeometry): BufferGeometry {
     geometry.setAttribute('normal', new BufferAttribute(rw.normals, 3));
   } else {
     geometry.computeVertexNormals();
+    const normal = geometry.getAttribute('normal') as BufferAttribute;
+    sanitizeDegenerateNormals(normal.array as Float32Array, rw.positions, rw.triangles);
   }
   geometry.computeBoundingSphere();
 
@@ -264,46 +266,6 @@ export function buildMaterial(
   }
 
   return material;
-}
-
-/**
- * Lowest point of a clump's geometry in clump-local space (native Z-up) — the model's "foot". For a lamp this
- * is where the pole meets the ground, so a light pool placed at `instance.z + clumpFloorZ` lands on the road
- * regardless of where the model's origin sits (base, centre, …). Returns 0 if the clump has no geometry. Uses
- * each geometry's 8 bbox corners transformed by its frame (cheap; exact for the axis-aligned-after-yaw case).
- */
-export function clumpFloorZ(clump: RWClump): number {
-  const corner = new Vector3();
-  let floor = Infinity;
-  for (const atomic of clump.atomics) {
-    const rw = clump.geometries[atomic.geometryIndex];
-    if (!rw || rw.positions.length === 0) {
-      continue;
-    }
-    const frame = clump.frames[atomic.frameIndex];
-    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
-    let minX = Infinity;
-    let minY = Infinity;
-    let minZ = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let maxZ = -Infinity;
-    const p = rw.positions;
-    for (let i = 0; i < p.length; i += 3) {
-      minX = Math.min(minX, p[i]);
-      maxX = Math.max(maxX, p[i]);
-      minY = Math.min(minY, p[i + 1]);
-      maxY = Math.max(maxY, p[i + 1]);
-      minZ = Math.min(minZ, p[i + 2]);
-      maxZ = Math.max(maxZ, p[i + 2]);
-    }
-    for (let c = 0; c < 8; c += 1) {
-      corner.set(c & 1 ? maxX : minX, c & 2 ? maxY : minY, c & 4 ? maxZ : minZ).applyMatrix4(matrix);
-      floor = Math.min(floor, corner.z);
-    }
-  }
-
-  return floor === Infinity ? 0 : floor;
 }
 
 export function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
@@ -375,6 +337,71 @@ function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): Buffe
   }
   temporary.setIndex(index);
   temporary.computeVertexNormals();
+  const normal = temporary.getAttribute('normal') as BufferAttribute;
+  sanitizeDegenerateNormals(normal.array as Float32Array, rw.positions, rw.triangles);
 
-  return temporary.getAttribute('normal') as BufferAttribute;
+  return normal;
+}
+
+/**
+ * Repair zero-length vertex normals left by `computeVertexNormals`. When a vertex is shared by triangles with
+ * opposite winding (coincident double-sided panels — neon signs — or unclean world meshes like some SA roads),
+ * the per-face normals cancel to zero. A zero normal then yields no diffuse term, so the face renders **pure
+ * black** under any light. We give each such vertex the geometric face normal of an incident triangle (the flat
+ * surface direction; `DoubleSide` materials still flip it per back-face), falling back to +Z up only if every
+ * incident triangle is degenerate. Valid normals are left untouched, so smooth shading elsewhere is unchanged.
+ */
+function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Array, triangles: RWTriangle[]): void {
+  const bad = new Set<number>();
+  for (let v = 0; v < normals.length / 3; v += 1) {
+    const x = normals[v * 3];
+    const y = normals[v * 3 + 1];
+    const z = normals[v * 3 + 2];
+    if (x * x + y * y + z * z < 1e-8) {
+      bad.add(v);
+    }
+  }
+  if (bad.size === 0) {
+    return;
+  }
+  for (const tri of triangles) {
+    if (!bad.has(tri.a) && !bad.has(tri.b) && !bad.has(tri.c)) {
+      continue;
+    }
+    const face = faceNormal(positions, tri.a, tri.b, tri.c);
+    if (!face) {
+      continue; // degenerate triangle — try another incident one
+    }
+    for (const v of [tri.a, tri.b, tri.c]) {
+      if (bad.delete(v)) {
+        normals[v * 3] = face[0];
+        normals[v * 3 + 1] = face[1];
+        normals[v * 3 + 2] = face[2];
+      }
+    }
+  }
+  for (const v of bad) {
+    normals[v * 3] = 0; // only-degenerate-triangle vertices: harmless up normal
+    normals[v * 3 + 1] = 0;
+    normals[v * 3 + 2] = 1;
+  }
+}
+
+/** Normalised geometric normal of a triangle from its vertex positions, or null when degenerate (zero area). */
+function faceNormal(p: Float32Array, a: number, b: number, c: number): [number, number, number] | null {
+  const ux = p[b * 3] - p[a * 3];
+  const uy = p[b * 3 + 1] - p[a * 3 + 1];
+  const uz = p[b * 3 + 2] - p[a * 3 + 2];
+  const vx = p[c * 3] - p[a * 3];
+  const vy = p[c * 3 + 1] - p[a * 3 + 1];
+  const vz = p[c * 3 + 2] - p[a * 3 + 2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const len = Math.hypot(nx, ny, nz);
+  if (len < 1e-6) {
+    return null;
+  }
+
+  return [nx / len, ny / len, nz / len];
 }

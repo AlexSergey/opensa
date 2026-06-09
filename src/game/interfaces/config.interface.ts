@@ -175,21 +175,16 @@ export interface MovementConfig {
 
 /** Night ambient / atmosphere tuning (the "dark night" look). */
 export interface NightConfig {
-  /** Ambient brightness at night — the moonlight floor (objects stay visible; lamps add accents). */
-  brightness: number;
   /** Distance (world units) past which lamp coronas fade out (a near-field cap over their per-lamp far-clip). */
   coronaDrawDistance: number;
   /** Night colour-grade strength (0 = off) — cool tint + desaturation + tinted shadow floor for night mood. */
   grade: number;
-  /** Ground light-pool strength under street lamps (0 = off) — SA's "light shadow" splat on the road. */
-  lampPool: number;
-  /** Ground light-pool radius (world units). */
-  lampPoolRadius: number;
   /** Night skylight (hemisphere "moonlight from above") strength — top-down fill that gives objects form. */
   skylight: number;
-  /** Night ambient tint (RGB 0–1, a cool moonlight blue), lerped in from white as the sun sets. */
+  /** Night colour-grade tint (RGB 0–1, a cool moonlight blue) — used by the post-FX night grade. */
   tint: [number, number, number];
-  /** Lit-window glow strength — how strongly buildings' SA night vertex colours self-illuminate at night. */
+  /** Night-vertex-colour glow strength — how strongly the SA baked night lighting (lit windows / signs /
+   *  road lamp-pools) self-illuminates at night. */
   windowGlow: number;
 }
 

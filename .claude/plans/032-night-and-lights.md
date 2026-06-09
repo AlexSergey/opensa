@@ -5,8 +5,15 @@ other lights switch on after dusk (configurable, default 20:00), lit windows glo
 **stars**. Extends [[029-graphics]] (night was reserved there) and reuses the [[031-weather-manager]] sky/
 timecyc plumbing. **Goal stays: best picture, least cost.**
 Status: **phases 1–10 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon, night
-atmosphere = skylight + colour grade, **ground light pools** under lamps, **night vertex colours** =
-per-building lit windows) + **corona occlusion polish DONE**.
+atmosphere = skylight + colour grade, **night vertex colours** = the whole baked night lighting) + **corona
+occlusion polish DONE**.
+
+**FINAL DIRECTION (the big win):** the night look is the SA **night vertex colours** (phase 10) — dark roads,
+warm baked lamp pools on the road, lit windows/signs — driven straight from the data. Ambient is a **bright day
+fill ramping to near-zero at night** (the baked colours light the night; SA's timecyc `amb` is too tiny to use
+directly — see phase 2). The night-vertex emissive fades by the **smooth sun-height night factor** (not the
+hard 20→6 lamp window), so it cross-fades with the ambient at dawn/dusk (no dark gap at 06:00). The earlier
+**projected light pools (phase 9) and the custom flat night `brightness` floor were REMOVED.** Don't re-add.
 Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
 cheaper SA-style light-pool splat), corona texture variety. The **night grade mask / magic numbers need
 recalibration as other light sources land** — see phase 8's ⚠️ calibration note.
@@ -66,11 +73,14 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    immediately. Wired in canvas-host after streaming; unit-tested. No config (uses `game.getHours()`).
 
 2. ✅ **Dark nights — DONE.** In `SkyPlugin`: a `night` factor `1 - smoothstep(sunHeight, 0, 0.22)` (smooth
-   dusk/dawn cross-fade). The night ambient **brightness** (moonlight floor) + cool **tint** (lerped white→tint
-   by `night`) make evenings dark + moody; world meshes are `MeshStandardMaterial` lit by this ambient (no
-   per-material prelit shader needed). The same `night` drives the stars. Tunable via
-   **`Config.graphics.night { brightness, tint }`** + `Game.setNight` + debug **NIGHT BRIGHTNESS / TINT R/G/B**
-   sliders (was the hardcoded `AMBIENT_NIGHT` / `NIGHT_TINT` consts).
+   dusk/dawn) drives the stars/moon/skylight/grade **and the night-vertex fade** (phase 10). **Ambient** is a
+   bright day fill that ramps to near-zero at night: `ambient.intensity = above ? AMBIENT_DAY(1.0) ×
+   min(1, height+0.3) : AMBIENT_NIGHT(0.04)`, where the baked night vertex colours light the night.
+   - **NB do NOT use timecyc `amb` directly for the ambient** — SA's `amb` is tiny (~`[8,8,10]`/0.03 even at
+     noon; it leans on the directional + prelit), so using it left day shadows pitch black. The day-ramp above
+     is the practical fill.
+   - The earlier custom **flat night `brightness` floor + cool `tint`-on-ambient were REMOVED** (they made
+     nights flat and fought the baked night vertex colours); `night.tint` is kept only for the post-FX grade.
 
 3. ✅ **2dfx light parsing — DONE.** Added `RwSection.TWO_D_EFFECT` (`0x253F2F8`); `dff.ts` parses the
    geometry 2d-effect plugin's **Light** entries (type 0) into `RWGeometry.lights: RWLight2d[]` (position,
@@ -171,8 +181,16 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      the mask threshold.
    - User is hand-tuning the slider values now; treat the committed defaults as a starting point, not final.
 
-9. ✅ **Ground light pools under lamps — DONE (SA "light shadow", not real lights).** Lamps now leave a
-   visible pool of light on the road at night. **How SA does it:** no dynamic lights for street lamps — each
+9. ❌ **Ground light pools under lamps — REMOVED (superseded by phase 10).** Built as a projected "light
+   shadow" splat (raycast a quad onto the terrain under each lamp), but it was edge-casey (floating on slopes,
+   self-hits, far-clip vanish, didn't lay smoothly) and, crucially, **redundant**: the warm lamp pool on the
+   road is already baked into the road's **night vertex colours** (phase 10), which lays perfectly and for free.
+   So `light-pool.ts`, `light-pool.system.ts`, `PhysicsWorld.groundZBelow`, `clumpFloorZ`, and the
+   `night.lampPool`/`lampPoolRadius` config + sliders were all deleted; `collectLights` reverted to
+   `collectCoronas`. Coronas (the bright bulb glow) stay. *History below for reference.*
+
+   ~~**DONE (SA "light shadow", not real lights).** Lamps now leave a
+   visible pool of light on the road at night. How SA does it: no dynamic lights for street lamps — each~~
    2dfx Light carries a corona **and** a projected "light shadow" splat (a flat textured blob, e.g. `shad_exp`)
    that `CShadows` lays on the ground. We mirror that cheaply: `renderware/three/light-pool.ts` —
    `buildLightPools(entries)` builds one flat additive **quad** per lamp on the GTA XY plane (soft radial
@@ -212,6 +230,12 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      `gay_traffic_light`, `mtraffic*`) — we don't sequence them, so every bulb lit at once + cast odd pools.
      **Re-enable** (drop/relax the filter) once traffic-light cycling exists; then only the active phase's bulb
      should light. Street lamps don't match `traffic`, so they're unaffected.
+   - **Traffic-light housing forced double-sided (hardcoded per-model fix).** Separate from the corona
+     suppression: on `gta3-pf.img` the traffic-light housings ship with inconsistent face winding + no stored
+     normals, so single-sided culling made the solid metal box **see-through from one side**. `DOUBLE_SIDED_
+     MODELS = /traffic/i` in `build-region` sets `part.material.side = DoubleSide` for them (opaque → harmless).
+     One of the **hardcoded workarounds** — see the registry note in memory (`hardcoded-fixes`). Revisit if/when
+     the Proper Fixes model geometry is cleaned or normals are honoured.
 
 10. ✅ **Night vertex colours (per-building lit windows) — DONE.** The authentic vanilla mechanism for
     residential lit windows (Ganton etc.), distinct from the downtown tobj overlays of phase 5. SA building DFFs
@@ -245,10 +269,11 @@ lit windows pop. Our blocker is the **prelit** day-bake.
 - `Config.graphics.lights` (new): `{ enabled, nightStartHour, nightEndHour }` — when lamps/coronas switch on
   (default **20:00 → ~06:00**, configurable per the ask), master toggle, plus maybe a corona intensity/budget.
 - `Config.graphics.stars` (new): `{ enabled }` (+ density later). Debug toggles in the Graphics/Weather tab.
-- `Config.graphics.night` (new): `{ brightness, coronaDrawDistance, grade, lampPool, skylight, tint, windowGlow }` — the
-  night atmosphere knobs (ambient floor, corona cap, **colour-grade strength**, **ground light-pool strength**,
-  hemisphere skylight, cool tint). `grade` drives phase 8's `NightGradeEffect`; `lampPool` (default 0.6) scales
-  phase 9's ground pools; `tint` is shared by the ambient *and* the grade.
+- `Config.graphics.night`: **`{ coronaDrawDistance, grade, skylight, tint, windowGlow }`** — corona cap,
+  colour-grade strength, hemisphere skylight, grade tint, and **`windowGlow`** (night-vertex-colour emissive
+  strength = the whole baked night lighting, phase 10). `grade` drives the `NightGradeEffect`; `tint` is the
+  grade tint only. (**Removed:** `brightness` → ambient now from timecyc `amb`; `lampPool`/`lampPoolRadius` →
+  projected pools deleted, phase 9.)
 - (Night darkness in phase 2 can ride the existing sun model; expose a strength const, promote to config only
   if needed.)
 

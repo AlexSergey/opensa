@@ -153,3 +153,4 @@ Next iterations:
 - [ ] Spotlights from lamps at night
 - [ ] Car sidelights, braking, light + vehiclelightson128
 - [ ] Trafficlights
+- [ ] Proper Fixes adaptation

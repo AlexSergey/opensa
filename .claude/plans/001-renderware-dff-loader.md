@@ -163,6 +163,13 @@ parser/adapter split are designed so each is an additive change, not a rewrite.
 plan 032 coronas), and **night vertex colours `0x253F2F9`** (`geometry.nightColors` — SA's second/night prelit
 set; bright window texels glow at night, see plan [[032-night-and-lights]] phase 10).
 
+**Normal sanitization (added).** When a DFF stores no normals we `computeVertexNormals()`, but coincident
+opposite-wound faces (neon-sign panels, unclean `gta3-pf.img`/SA road meshes) cancel to a **zero-length normal**
+→ the face renders pure black. `sanitizeDegenerateNormals()` in `three/build-clump.ts` replaces any zero-length
+normal with an incident triangle's geometric face normal (used in both `buildClumpParts` and `buildGeometry`).
+Fixed the black road triangles / black pawnshop wall / unlit liquorstore sign. See memory
+`degenerate-normals-black-faces`; related name-keyed hardcoded workarounds are tracked in `hardcoded-fixes`.
+
 ---
 *Requested filename: `.claude/plans/001-renderware-dff-loader.md`. Plan mode wrote this to the
 global plans dir; on approval I'll also copy it to the project-local `.claude/plans/` path.*

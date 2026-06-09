@@ -48,6 +48,7 @@ export class PostFxPlugin implements Plugin {
   private ssao: null | SSAOEffect = null;
   private ssaoPass: EffectPass | null = null;
   private readonly sunSource: Mesh;
+  private toneMapping: null | ToneMappingEffect = null;
   private tonePass: EffectPass | null = null;
 
   constructor(sunSource: Mesh) {
@@ -125,6 +126,7 @@ export class PostFxPlugin implements Plugin {
     this.godraysPass = godraysPass;
     this.bloom = bloom;
     this.bloomPass = bloomPass;
+    this.toneMapping = toneMapping;
     this.tonePass = tonePass;
     this.nightGrade = nightGrade;
     this.nightPass = nightPass;
@@ -159,8 +161,13 @@ export class PostFxPlugin implements Plugin {
       this.normalPass.enabled = ssao.enabled; // disabled = the extra normal render is skipped (zero cost)
       this.ssaoPass.enabled = ssao.enabled;
     }
-    if (this.tonePass) {
-      this.tonePass.enabled = toneMapping;
+    if (this.tonePass && this.toneMapping) {
+      // ACES only at NIGHT (where it makes the bright emissive/bloom pop — the "прикол"); fade it out by DAY,
+      // where it just greys/desaturates the midtones (the day reads better un-tonemapped). Blend by the night
+      // factor via the effect's blend opacity (0 = input passes through untouched, 1 = full ACES).
+      const nightFactor = (this.sunSource.userData.night as number | undefined) ?? 0;
+      this.toneMapping.blendMode.opacity.value = nightFactor;
+      this.tonePass.enabled = toneMapping && nightFactor > 0.001;
     }
     this.ensurePass(!context.config.mapViewer); // plain render in the map inspector
   }
