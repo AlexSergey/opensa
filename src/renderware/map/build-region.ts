@@ -3,9 +3,18 @@ import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
 import type { CoronaEntry } from '../three/corona';
+import type { LightPoolEntry } from '../three/light-pool';
 
 import { getClump, getTextures, modelKey } from '../archive';
-import { buildClumpLights, buildClumpParts } from '../three/build-clump';
+import { buildClumpLights, buildClumpParts, clumpFloorZ } from '../three/build-clump';
+
+/**
+ * Models whose 2d-effect lights (coronas + ground pools) are **temporarily suppressed**: traffic lights
+ * (`trafficlight1`, `cj_traffic_light*`, `gay_traffic_light`, `mtraffic*`). We don't sequence them yet, so
+ * every bulb (red/amber/green) lights at once and casts pools — odd-looking. Remove this filter once
+ * traffic-light cycling lands (see plan 032). Street lamps etc. don't match `traffic`, so they're unaffected.
+ */
+const SUPPRESS_LIGHT_MODELS = /traffic/i;
 
 /**
  * Shared instancing for the streamed map: grouping instances by model+txd and
@@ -87,11 +96,17 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
 }
 
 /**
- * Gather the world-space (GTA Z-up) coronas for a set of model groups: each light-bearing model's
- * clump-local lights, placed by every instance's transform. Returned flat for one `Points` per cell.
+ * Gather the world-space (GTA Z-up) night lights for a set of model groups: each light-bearing model's
+ * clump-local 2d-effect lights, placed by every instance's transform. Returns both the **coronas** (camera-
+ * facing glow at the bulb) and the **ground light pools** (a flat splat under each bulb, at the instance's
+ * base Z ≈ ground — SA's "light shadow"). Returned flat for one `Points` + one pool `Mesh` per cell.
  */
-export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshData>): CoronaEntry[] {
+export function collectLights(
+  archive: ImgArchive,
+  groups: Iterable<RegionMeshData>,
+): { coronas: CoronaEntry[]; pools: LightPoolEntry[] } {
   const coronas: CoronaEntry[] = [];
+  const pools: LightPoolEntry[] = [];
   const placement = new Matrix4();
   const position = new Vector3();
   const quaternion = new Quaternion();
@@ -99,10 +114,15 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
   const point = new Vector3();
 
   for (const group of groups) {
-    const lights = buildClumpLights(getClump(archive, group.def.modelName));
+    if (SUPPRESS_LIGHT_MODELS.test(group.def.modelName)) {
+      continue; // traffic lights — temporarily off (no sequencing yet); see SUPPRESS_LIGHT_MODELS
+    }
+    const clump = getClump(archive, group.def.modelName);
+    const lights = buildClumpLights(clump);
     if (lights.length === 0) {
       continue;
     }
+    const floorZ = clumpFloorZ(clump); // model foot (clump-local) → the ground the pool sits on
     for (const instance of group.instances) {
       position.set(instance.position[0], instance.position[1], instance.position[2]);
       // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
@@ -118,11 +138,17 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
           position: [point.x, point.y, point.z],
           size: light.size,
         });
+        // Pool: under the bulb (X/Y). Initial Z is the model foot (instance.z + floorZ) so it shows at once;
+        // a runtime system then rays the real terrain in a small window around it (curb/road), never far.
+        pools.push({
+          color: [light.color[0], light.color[1], light.color[2]],
+          position: [point.x, point.y, instance.position[2] + floorZ],
+        });
       }
     }
   }
 
-  return coronas;
+  return { coronas, pools };
 }
 
 /** Whether a timed window `[on, off)` is a night-lit variant (visible across midnight → glowing). */

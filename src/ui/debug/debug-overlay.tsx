@@ -4,6 +4,7 @@ import type {
   BloomConfig,
   CloudsConfig,
   Game,
+  HeadlightConfig,
   LightsConfig,
   MoonConfig,
   NightConfig,
@@ -47,6 +48,8 @@ export interface DebugActions {
   godrays(): boolean;
   /** Current god-rays light-source size (shaft strength). */
   godraysSize(): number;
+  /** Current vehicle-headlight config (beam strength/reach/cone size + lamp glow). */
+  headlights(): HeadlightConfig;
   /** Current night-lights (street-lamp coronas) config. */
   lights(): LightsConfig;
   /** Current night-moon config (size/glow/elevation). */
@@ -69,6 +72,8 @@ export interface DebugActions {
   setGodrays(enabled: boolean): void;
   /** Set the god-rays light-source size (shaft strength). */
   setGodraysSize(size: number): void;
+  /** Tune vehicle headlights (beam strength/reach/cone size + lamp glow). */
+  setHeadlights(patch: Partial<HeadlightConfig>): void;
   /** Toggle night street-lamp lights (coronas). */
   setLights(patch: Partial<LightsConfig>): void;
   /** Tune the night moon (size/glow/elevation). */
@@ -166,6 +171,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [shadows, setShadows] = useState<ShadowsConfig>(() => actions.shadows());
   const [stars, setStars] = useState<StarsConfig>(() => actions.stars());
   const [lights, setLights] = useState<LightsConfig>(() => actions.lights());
+  const [headlights, setHeadlights] = useState<HeadlightConfig>(() => actions.headlights());
   const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
   const [night, setNight] = useState<NightConfig>(() => actions.night());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
@@ -627,6 +633,58 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={night.coronaDrawDistance}
               />
+              <div style={styles.groupLabel}>NIGHT SKYLIGHT: {night.skylight.toFixed(2)}</div>
+              <input
+                max={2}
+                min={0}
+                onChange={(e) => {
+                  const skylight = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, skylight }));
+                  actions.setNight({ skylight });
+                }}
+                step={0.05}
+                type="range"
+                value={night.skylight}
+              />
+              <div style={styles.groupLabel}>NIGHT GRADE: {night.grade.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const grade = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, grade }));
+                  actions.setNight({ grade });
+                }}
+                step={0.05}
+                type="range"
+                value={night.grade}
+              />
+              <div style={styles.groupLabel}>NIGHT LAMP POOL: {night.lampPool.toFixed(2)}</div>
+              <input
+                max={2}
+                min={0}
+                onChange={(e) => {
+                  const lampPool = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, lampPool }));
+                  actions.setNight({ lampPool });
+                }}
+                step={0.05}
+                type="range"
+                value={night.lampPool}
+              />
+              <div style={styles.groupLabel}>NIGHT LAMP RADIUS: {night.lampPoolRadius.toFixed(1)}</div>
+              <input
+                max={20}
+                min={0.5}
+                onChange={(e) => {
+                  const lampPoolRadius = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, lampPoolRadius }));
+                  actions.setNight({ lampPoolRadius });
+                }}
+                step={0.5}
+                type="range"
+                value={night.lampPoolRadius}
+              />
               {(['R', 'G', 'B'] as const).map((channel, i) => (
                 <div key={channel}>
                   <div style={styles.groupLabel}>
@@ -647,6 +705,58 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
+              <div style={styles.groupLabel}>HEADLIGHT POWER: {headlights.intensity.toFixed(1)}</div>
+              <input
+                max={30}
+                min={0}
+                onChange={(e) => {
+                  const intensity = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, intensity }));
+                  actions.setHeadlights({ intensity });
+                }}
+                step={0.5}
+                type="range"
+                value={headlights.intensity}
+              />
+              <div style={styles.groupLabel}>HEADLIGHT DISTANCE: {headlights.distance.toFixed(0)}</div>
+              <input
+                max={80}
+                min={5}
+                onChange={(e) => {
+                  const distance = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, distance }));
+                  actions.setHeadlights({ distance });
+                }}
+                step={1}
+                type="range"
+                value={headlights.distance}
+              />
+              <div style={styles.groupLabel}>HEADLIGHT CONE: {headlights.angle.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0.1}
+                onChange={(e) => {
+                  const angle = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, angle }));
+                  actions.setHeadlights({ angle });
+                }}
+                step={0.02}
+                type="range"
+                value={headlights.angle}
+              />
+              <div style={styles.groupLabel}>HEADLIGHT GLOW: {headlights.glow.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const glow = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, glow }));
+                  actions.setHeadlights({ glow });
+                }}
+                step={0.02}
+                type="range"
+                value={headlights.glow}
+              />
               <label style={styles.label}>
                 <input
                   checked={toneMapping}

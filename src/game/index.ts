@@ -10,6 +10,7 @@ export type {
   BloomConfig,
   CloudsConfig,
   Config,
+  HeadlightConfig,
   LightsConfig,
   MoonConfig,
   NightConfig,

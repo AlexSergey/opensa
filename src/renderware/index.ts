@@ -34,4 +34,5 @@ export {
 export { buildWater, oceanFrame } from './three/build-water';
 export { type CoronaEntry, coronaMaterial } from './three/corona';
 export { DFFLoader } from './three/dff-loader';
+export { type LightPoolEntry, lightPoolMaterial } from './three/light-pool';
 export { type TextureDictionary, TXDLoader } from './three/txd-loader';

@@ -5,7 +5,8 @@ import type { MapDefinitions } from '../parsers/text';
 import type { GridCell, WorldGrid } from './world-grid';
 
 import { buildCoronaPoints } from '../three/corona';
-import { addToGroup, buildInstancedMeshes, collectCoronas, type RegionMeshData } from './build-region';
+import { buildLightPools } from '../three/light-pool';
+import { addToGroup, buildInstancedMeshes, collectLights, type RegionMeshData } from './build-region';
 import { cellKey } from './world-grid';
 
 /**
@@ -29,10 +30,18 @@ export function buildCell(
   }
   const groups = [...cellGroups(defs, cell, lod).values()];
   const objects: Object3D[] = buildInstancedMeshes(archive, groups);
-  // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect).
-  const coronas = lod ? null : buildCoronaPoints(collectCoronas(archive, groups));
-  if (coronas) {
-    objects.push(coronas);
+  // Night lights only on HD cells (LOD models carry no lights and the glow is a near-field effect):
+  // a corona glow at each bulb + a flat light pool splat on the ground under it.
+  if (!lod) {
+    const { coronas, pools } = collectLights(archive, groups);
+    const coronaPoints = buildCoronaPoints(coronas);
+    const lightPools = buildLightPools(pools);
+    if (coronaPoints) {
+      objects.push(coronaPoints);
+    }
+    if (lightPools) {
+      objects.push(lightPools);
+    }
   }
 
   return objects;

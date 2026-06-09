@@ -24,6 +24,7 @@ import {
   type CloudsConfig,
   type Config,
   type GameState,
+  type HeadlightConfig,
   type LightsConfig,
   type MoonConfig,
   type NightConfig,
@@ -333,6 +334,13 @@ export class Game {
   /** Change the god-rays light-source size at runtime (shaft strength; independent of the disc). */
   setGodraysSize(godraysSize: number): void {
     this.setSun({ godraysSize });
+  }
+
+  /** Tune vehicle headlights (beam size/reach/strength) at runtime; merges into `graphics.headlights`. */
+  setHeadlights(patch: Partial<HeadlightConfig>): void {
+    this.setConfig({
+      graphics: { ...this.config.graphics, headlights: { ...this.config.graphics.headlights, ...patch } },
+    });
   }
 
   /** Tune night light sources (coronas) at runtime; merges into `graphics.lights`. */

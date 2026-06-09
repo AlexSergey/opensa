@@ -257,6 +257,46 @@ export function buildMaterial(
   return material;
 }
 
+/**
+ * Lowest point of a clump's geometry in clump-local space (native Z-up) — the model's "foot". For a lamp this
+ * is where the pole meets the ground, so a light pool placed at `instance.z + clumpFloorZ` lands on the road
+ * regardless of where the model's origin sits (base, centre, …). Returns 0 if the clump has no geometry. Uses
+ * each geometry's 8 bbox corners transformed by its frame (cheap; exact for the axis-aligned-after-yaw case).
+ */
+export function clumpFloorZ(clump: RWClump): number {
+  const corner = new Vector3();
+  let floor = Infinity;
+  for (const atomic of clump.atomics) {
+    const rw = clump.geometries[atomic.geometryIndex];
+    if (!rw || rw.positions.length === 0) {
+      continue;
+    }
+    const frame = clump.frames[atomic.frameIndex];
+    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    const p = rw.positions;
+    for (let i = 0; i < p.length; i += 3) {
+      minX = Math.min(minX, p[i]);
+      maxX = Math.max(maxX, p[i]);
+      minY = Math.min(minY, p[i + 1]);
+      maxY = Math.max(maxY, p[i + 1]);
+      minZ = Math.min(minZ, p[i + 2]);
+      maxZ = Math.max(maxZ, p[i + 2]);
+    }
+    for (let c = 0; c < 8; c += 1) {
+      corner.set(c & 1 ? maxX : minX, c & 2 ? maxY : minY, c & 4 ? maxZ : minZ).applyMatrix4(matrix);
+      floor = Math.min(floor, corner.z);
+    }
+  }
+
+  return floor === Infinity ? 0 : floor;
+}
+
 export function frameMatrix(rotation: number[], position: [number, number, number]): Matrix4 {
   const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = rotation;
   const matrix = new Matrix4();

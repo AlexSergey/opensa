@@ -5,6 +5,7 @@ import {
   CanvasTexture,
   Color,
   DirectionalLight,
+  HemisphereLight,
   MathUtils,
   Mesh,
   MeshBasicMaterial,
@@ -74,6 +75,10 @@ const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
 /** Light tuning (timecyc dir/dirMult are ~constant for EXTRASUNNY, so day/night rides the sun height). */
 const SUN_INTENSITY = 2.2; // directional at peak
 const AMBIENT_DAY = 1.0;
+/** Night skylight (hemisphere): a moonlit blue from above, near-black from the ground — top-down fill that
+ *  gives night objects form (vs the flat ambient). Strength rides `night.skylight` × the night factor. */
+const NIGHT_SKY_COLOR = new Color(0.42, 0.52, 0.8);
+const NIGHT_GROUND_COLOR = new Color(0.08, 0.09, 0.13);
 /** Heavy overcast: how much the direct sun is dimmed, and the ambient lift that fills in for it. */
 const OVERCAST_DIM = 0.8;
 const AMBIENT_OVERCAST = 0.35;
@@ -199,6 +204,8 @@ export class SkyPlugin implements Plugin {
   private night = 0; // 0 day → 1 deep night (sun height); drives stars + the cool ambient tint
   private readonly nightTint = new Color(); // scratch for the configurable night ambient tint
   private readonly sample: (hour: number) => SkySample;
+  /** Night "skylight" — a hemisphere fill from above, faded in at night for form (intensity set per frame). */
+  private readonly skylight = new HemisphereLight(NIGHT_SKY_COLOR, NIGHT_GROUND_COLOR, 0);
   private readonly sun = new DirectionalLight(0xffffff, 1);
   private readonly sunDir = new Vector3();
 
@@ -255,7 +262,15 @@ export class SkyPlugin implements Plugin {
   }
 
   dispose(): void {
-    for (const object of [this.dome, this.ambient, this.sun, this.sunSource, this.corona, this.moonDisc]) {
+    for (const object of [
+      this.dome,
+      this.ambient,
+      this.sun,
+      this.sunSource,
+      this.corona,
+      this.moonDisc,
+      this.skylight,
+    ]) {
       object.removeFromParent();
     }
     this.dome.geometry.dispose();
@@ -276,7 +291,7 @@ export class SkyPlugin implements Plugin {
 
   install(context: PluginContext): void {
     context.scene.add(this.dome, this.ambient, this.sun, this.sun.target, this.sunSource, this.corona);
-    context.scene.add(this.moonDisc);
+    context.scene.add(this.moonDisc, this.skylight);
 
     // Directional sun shadows: a view-following orthographic shadow map. shadowMap.enabled stays on; the
     // runtime toggle is `sun.castShadow` (three recompiles materials when the shadow-light count changes).
@@ -337,6 +352,7 @@ export class SkyPlugin implements Plugin {
     // Night factor (0 day → 1 deep night), ramping as the sun nears/passes the horizon — drives the star
     // fade and the cool ambient tint. Based on sun height so dusk/dawn cross-fade smoothly.
     this.night = 1 - MathUtils.smoothstep(height, 0, 0.22);
+    this.godraysSource.userData.night = this.night; // shared channel → the post-FX night grade reads this
     // Overcast factor: 0 (clear) → 1 (heavy cloud). Direct light dims and shadows soften toward flat,
     // diffuse light, with a little ambient lift so the scene stays bright (an overcast sky is a big soft light).
     const overcast = MathUtils.smoothstep(this.cloudCover, 0.3, 0.95);
@@ -351,6 +367,8 @@ export class SkyPlugin implements Plugin {
     // White by day → the configurable cool night tint, by the night factor.
     this.nightTint.setRGB(nightCfg.tint[0], nightCfg.tint[1], nightCfg.tint[2]);
     this.ambient.color.setRGB(1, 1, 1).lerp(this.nightTint, this.night);
+    // Night skylight (top-down hemisphere fill) — fades in with the night factor for form, off by day.
+    this.skylight.intensity = this.night * nightCfg.skylight;
 
     // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
     const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);

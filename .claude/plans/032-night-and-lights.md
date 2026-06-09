@@ -4,9 +4,11 @@ Make **evening/night** look right: timed objects appear/disappear at their time-
 other lights switch on after dusk (configurable, default 20:00), lit windows glow, and the night sky gets
 **stars**. Extends [[029-graphics]] (night was reserved there) and reuses the [[031-weather-manager]] sky/
 timecyc plumbing. **Goal stays: best picture, least cost.**
-Status: **phases 1–7 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon) + **corona
-occlusion polish DONE**. Optional left for later: **point lights** under coronas (perf-sensitive — user
-deferred), corona texture variety.
+Status: **phases 1–9 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon, night
+atmosphere = skylight + colour grade, **ground light pools** under lamps) + **corona occlusion polish DONE**.
+Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
+cheaper SA-style light-pool splat), corona texture variety. The **night grade mask / magic numbers need
+recalibration as other light sources land** — see phase 8's ⚠️ calibration note.
 
 ## Current state (what the research found)
 
@@ -133,11 +135,90 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    **`Config.graphics.moon { size, brightness }`** + `Game.setMoon` + debug **MOON SIZE / BRIGHTNESS** sliders
    (`MOON_DISTANCE` stays a const).
 
+8. ✅ **Night atmosphere (skylight + colour grade) — DONE.** Two additions to make the dark night read as
+   *alive* and *night-coloured*, not just "darker day":
+   - **Skylight** — a `HemisphereLight` in `SkyPlugin` (sky colour from above, dark ground below), intensity
+     `night × night.skylight`, giving objects top-down form the flat ambient can't. (NB: a structural plugin
+     change — needs a full reload, not HMR, to take effect.)
+   - **Night colour grade** — a screen-space `NightGradeEffect` (`game/plugins/night-grade.effect.ts`), a
+     `postprocessing` `Effect` added as a pass in `PostFxPlugin` **after tone mapping, before SMAA**. Driven by
+     the same sun-height night factor (stashed on the shared `godraysSource.userData.night` by `SkyPlugin`,
+     read by `PostFxPlugin` — no new wiring), it (1) desaturates, (2) cool-multiplies toward `night.tint`,
+     (3) lifts blacks to a faint tinted floor (moonlit blue, not dead black). **Brightness-masked** so bright
+     sources (lamps, lit windows, coronas) keep their warm colour: `strength = uNight·(1 − smoothstep(0.5,
+     0.9, luma))`. The shadow floor rides the raw night factor (only ever lifts darks → never touches sources).
+     Pass disabled when `night ≈ 0` (zero cost by day). `Config.graphics.night.grade` (default 0.7) + debug
+     **NIGHT GRADE** slider; reuses the **NIGHT TINT R/G/B** sliders as the grade colour.
+
+   ### ⚠️ Needs calibration (revisit as other light sources land)
+   The grade's magic numbers are tuned against the *current* set of night light sources and will likely need
+   re-tuning when that set changes — keep them in mind when adding/altering night lighting:
+   - **Brightness mask `smoothstep(0.5, 0.9, luma)`** decides what counts as a "warm source" that escapes the
+     cool grade. It's calibrated to the present lamp coronas / lit-window emissive / headlight glow brightness.
+     **New or brighter/dimmer emissive sources** (vehicle taillights, neon/signs, the deferred corona **point
+     lights**, brighter window emissive, traffic-light glow) may fall on the wrong side of the threshold —
+     dim warm lights getting cooled, or bright cool surfaces wrongly kept. Re-check the 0.5/0.9 band then.
+   - **Desaturation `0.35`, cool-multiply via `night.tint`, shadow floor `0.06`** are tuned to look right at
+     `night.grade = 0.7` with the current ambient floor (`night.brightness`) + **skylight**. If the skylight
+     or ambient floor change a lot, the grade may read too strong/weak — rebalance grade vs ambient together
+     (they interact: ambient/skylight add light, the grade removes colour + cools it).
+   - **Interaction with bloom/tone mapping:** the grade runs after bloom + (optional) tone mapping. If bloom
+     threshold/intensity or tone mapping change, the post-bloom luma the mask keys on shifts → re-check the
+     mask band. Tone mapping is currently **off** by default; turning it on will compress highlights and move
+     the mask threshold.
+   - User is hand-tuning the slider values now; treat the committed defaults as a starting point, not final.
+
+9. ✅ **Ground light pools under lamps — DONE (SA "light shadow", not real lights).** Lamps now leave a
+   visible pool of light on the road at night. **How SA does it:** no dynamic lights for street lamps — each
+   2dfx Light carries a corona **and** a projected "light shadow" splat (a flat textured blob, e.g. `shad_exp`)
+   that `CShadows` lays on the ground. We mirror that cheaply: `renderware/three/light-pool.ts` —
+   `buildLightPools(entries)` builds one flat additive **quad** per lamp on the GTA XY plane (soft radial
+   falloff computed in-shader, no texture), sharing a `lightPoolMaterial` (additive, `depthWrite:false`,
+   depth-tested so walls occlude it). `collectCoronas` became **`collectLights`** → returns `{ coronas, pools }`
+   in one pass under the bulb (light X/Y). **Ground Z is found by a real raycast** at runtime, not guessed: the
+   pool is built at a first-guess Z (`instance.z + clumpFloorZ`, the model's lowest point via `clumpFloorZ` in
+   build-clump) so it shows immediately, then **`LightPoolSystem`** (`game/streaming/light-pool.system.ts`) rays
+   the static collision via `PhysicsWorld.groundZBelow` and re-seats the quad on the hit. This is required
+   because the model foot ≠ ground — a lamp can stand on a **curb**, leaving the foot floating above the road.
+   The ray searches a **small window around the foot estimate** (`SEARCH_UP=0.3` / `SEARCH_DOWN=8`, mostly
+   downward), *not* far down from the bulb: an earlier 50 m bulb-down ray could punch through a missing-
+   collision gap onto a much lower surface and bury the pool underground **permanently** (`done=true`), so
+   pools vanished for good as you drove. `SEARCH_UP` is kept tiny because a light directly over the post (e.g.
+   `lamppost2`'s pale **centre** lamp — it has 3 lights: two offset orange arms + one central) **self-hits the
+   post's own collision** at the ray start; a larger up-margin lifted that pool off the ground onto the post
+   (looked like a stray glow at the lamp, not a ground splat). Failing to find ground (collision not loaded)
+   leaves the pool at the visible estimate. Deferred + retried (the collision under a freshly
+   streamed cell may not be loaded yet), budgeted (`PER_TICK` rays / 0.25 s sweep), and once a mesh's pools are
+   all dropped it clears `userData.lightPools` so it stops being scanned (and stays put if the cached cell
+   re-streams). The pool mesh exposes a `drop(index, z)` closure on `userData` so the game layer never imports
+   renderware (respects the layer boundary). HD cells only; gated by the same night on/off as coronas, scaled
+   by `night.lampPool` (debug **NIGHT LAMP POOL** slider, default 0.6). Pool **radius** is a live shader uniform
+   `uRadius` (quads bake unit corners + an `aCorner` attribute, scaled in the vertex shader) → `night.
+   lampPoolRadius` (debug **NIGHT LAMP RADIUS** slider, default 4.5) tunes it without rebuilding cells. Pools
+   fade by **only** the global `uDrawDistance` (= `coronaDrawDistance`), *not* the per-lamp corona far-clip —
+   that far-clip is authored short for the bright point sprite, so keying the pool to it made some lamps'
+   ground pools vanish early while others persisted (raise `coronaDrawDistance` to push coronas + pools out).
+   - **Limitations / later:** the dropped Z is a single value for the whole quad, so on a **steep slope** the
+     flat pool still won't hug the grade across its radius. The downward ray could **self-hit** a lamp that has
+     its own thin collider (→ pool stays near the foot guess); rare for street lamps. Pool is a flat quad (no
+     soft-particle depth fade), so a steep camera angle shows a hard edge where it meets a wall. Real budgeted
+     **point lights** remain the deferred higher-fidelity option. The night grade may cool the warm pool
+     slightly (mask keys on luma).
+   - **Traffic lights temporarily suppressed.** `SUPPRESS_LIGHT_MODELS = /traffic/i` in `build-region` skips
+     **all** 2d-effect lights (coronas + pools) for traffic-light models (`trafficlight1`, `cj_traffic_light*`,
+     `gay_traffic_light`, `mtraffic*`) — we don't sequence them, so every bulb lit at once + cast odd pools.
+     **Re-enable** (drop/relax the filter) once traffic-light cycling exists; then only the active phase's bulb
+     should light. Street lamps don't match `traffic`, so they're unaffected.
+
 ## Config additions
 
 - `Config.graphics.lights` (new): `{ enabled, nightStartHour, nightEndHour }` — when lamps/coronas switch on
   (default **20:00 → ~06:00**, configurable per the ask), master toggle, plus maybe a corona intensity/budget.
 - `Config.graphics.stars` (new): `{ enabled }` (+ density later). Debug toggles in the Graphics/Weather tab.
+- `Config.graphics.night` (new): `{ brightness, coronaDrawDistance, grade, lampPool, skylight, tint }` — the
+  night atmosphere knobs (ambient floor, corona cap, **colour-grade strength**, **ground light-pool strength**,
+  hemisphere skylight, cool tint). `grade` drives phase 8's `NightGradeEffect`; `lampPool` (default 0.6) scales
+  phase 9's ground pools; `tint` is shared by the ambient *and* the grade.
 - (Night darkness in phase 2 can ride the existing sun model; expose a strength const, promote to config only
   if needed.)
 

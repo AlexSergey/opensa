@@ -19,6 +19,7 @@ import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
 import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehicle-reflection.plugin';
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
+import { LightPoolSystem } from '../game/streaming/light-pool.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
 import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
@@ -26,7 +27,14 @@ import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleHeadlightSystem } from '../game/vehicle/vehicle-headlight.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
-import { buildTextureMap, coronaMaterial, parseTxd, sampleTimecycBlend, WEATHER_NAMES } from '../renderware';
+import {
+  buildTextureMap,
+  coronaMaterial,
+  lightPoolMaterial,
+  parseTxd,
+  sampleTimecycBlend,
+  WEATHER_NAMES,
+} from '../renderware';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
@@ -224,9 +232,18 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
         clouds: { coverage: 0.5, opacity: 0.85 },
+        headlights: { angle: Math.PI / 7, distance: 60, glow: 0.68, intensity: 13 },
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
-        night: { brightness: 0.5, coronaDrawDistance: 120, tint: [0.6, 0.66, 0.85] },
+        night: {
+          brightness: 0.5,
+          coronaDrawDistance: 120,
+          grade: 0.05,
+          lampPool: 0.6,
+          lampPoolRadius: 13.0,
+          skylight: 0.6,
+          tint: [1.0, 1.0, 1.0],
+        },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -360,14 +377,22 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       update(delta: number): void {
         const on = game.getConfig().graphics.lights.enabled && game.isNight();
         coronaOn += ((on ? 1 : 0) - coronaOn) * Math.min(1, delta * 2); // ~0.5s ease
+        const night = game.getConfig().graphics.night;
         coronaMaterial.uniforms.uOn.value = coronaOn;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
-        coronaMaterial.uniforms.uDrawDistance.value = game.getConfig().graphics.night.coronaDrawDistance;
+        coronaMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
+        // Ground light pools share the night on/off, scaled by their own strength knob.
+        lightPoolMaterial.uniforms.uOn.value = coronaOn * night.lampPool;
+        lightPoolMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
+        lightPoolMaterial.uniforms.uRadius.value = night.lampPoolRadius;
       },
     });
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
+
+    // Drop street-lamp light pools onto the real terrain (rays down from each bulb to the streamed collision).
+    game.addSystem(new LightPoolSystem(game.getStreamingRoot(), character.physics));
 
     // Painted cars parked near the spawn (native Z-up under the −90°X root). Each is a
     // dynamic physics body whose chassis collider is the convex hull of its embedded COL
@@ -391,7 +416,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     );
     game.addSystem(enterVehicle);
     // Night headlights on the occupied car (texture swap + a forward-down spotlight), gated on seated + night.
-    game.addSystem(new VehicleHeadlightSystem(enterVehicle, () => game.isNight(), game.getStreamingRoot()));
+    game.addSystem(
+      new VehicleHeadlightSystem(
+        enterVehicle,
+        () => game.isNight(),
+        game.getStreamingRoot(),
+        () => game.getConfig().graphics.headlights,
+      ),
+    );
 
     // Spawn one car: load it, place it, make it a dynamic body, and register it with the vehicle
     // systems. With `anchor`, the position is computed just in front of it (clear of its body, sized
@@ -495,6 +527,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       gameTime: () => game.getTime(),
       godrays: () => game.getConfig().graphics.sun.godrays,
       godraysSize: () => game.getConfig().graphics.sun.godraysSize,
+      headlights: () => game.getConfig().graphics.headlights,
       lights: () => game.getConfig().graphics.lights,
       moon: () => game.getConfig().graphics.moon,
       night: () => game.getConfig().graphics.night,
@@ -509,6 +542,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),
       setGodraysSize: (size) => game.setGodraysSize(size),
+      setHeadlights: (patch) => game.setHeadlights(patch),
       setLights: (patch) => game.setLights(patch),
       setMoon: (patch) => game.setMoon(patch),
       setNight: (patch) => game.setNight(patch),

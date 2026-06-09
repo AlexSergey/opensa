@@ -281,6 +281,18 @@ export class PhysicsWorld {
   }
 
   /**
+   * World Z where a downward ray from `(x, y, z)` first hits static collision, or null if nothing is within
+   * `maxDrop`. Used to drop a feature onto the real terrain under it (e.g. a lamp's ground light pool, which
+   * must land on the road/curb, not at the model's foot).
+   */
+  groundZBelow(x: number, y: number, z: number, maxDrop: number): null | number {
+    const ray = new this.rapier.Ray({ x, y, z }, { x: 0, y: 0, z: -1 });
+    const hit = this.world.castRay(ray, maxDrop, true);
+
+    return hit ? z - hit.timeOfImpact : null;
+  }
+
+  /**
    * Pin a (dynamic) body at a fixed transform with zero velocity — used to hold a parked
    * car perfectly still while the player slides in/out, so the kinematic rider can't shove it.
    */

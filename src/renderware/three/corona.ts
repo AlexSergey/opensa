@@ -19,16 +19,21 @@ const VERTEX = `
   uniform float uViewportHeight;
   uniform float uScale;
   uniform float uDrawDistance; // global near-field cap: coronas fade out by this distance
+  uniform float uBias; // view-space metres to pull the corona's DEPTH toward the camera (clears its own housing)
   varying vec3 vColor;
   varying float vFade;
   void main() {
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 0.001);
-    // No depth bias: the bulb's true depth, so world geometry (bridge deck, walls) genuinely occludes the
-    // corona (a per-fragment depth test against curved geometry naturally clips the round glow). A toward-
-    // camera bias punched the glow through structures the lamp is mounted on (bridges/walls within ~1u).
     gl_Position = projectionMatrix * mv;
+    // Depth bias — DEPTH ONLY (screen position untouched): test as if the bulb sat uBias metres nearer, so
+    // the corona escapes the thin lamp housing it sits in, while geometry more than uBias metres in front
+    // (buildings, bridge decks) still occludes it. A linear view-space bias stays consistent with distance: a
+    // fixed clip-space offset blew up near the far plane and punched through far walls; an mv.z bias before
+    // projection shifted x/y. Camera looks down -z, so +uBias moves the depth toward the camera.
+    vec4 biased = projectionMatrix * vec4(mv.xy, mv.z + uBias, 1.0);
+    gl_Position.z = biased.z / biased.w * gl_Position.w;
     // World size → screen pixels: proj[1][1] = 1/tan(fov/2); NDC height = viewport pixels / 2.
     float px = aSize * uScale * projectionMatrix[1][1] * uViewportHeight / (2.0 * dist);
     gl_PointSize = clamp(px, 0.0, 256.0);
@@ -63,6 +68,7 @@ export const coronaMaterial = new ShaderMaterial({
   fragmentShader: FRAGMENT,
   transparent: true,
   uniforms: {
+    uBias: { value: 1 }, // metres the corona's depth is pulled toward the camera (escape its own housing)
     uDrawDistance: { value: 120 },
     uOn: { value: 0 },
     uScale: { value: 1 },

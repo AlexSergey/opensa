@@ -115,6 +115,7 @@ Known issues:
 - [ ] Streaming is blinking
 
 Next iterations:
+- [ ] Procobj trash, rocks
 - [ ] Particles
   - [ ] Smoke from wheels
   - [ ] Fire
@@ -148,3 +149,4 @@ Next iterations:
 - [ ] HUD
 - [ ] Spotlights from lamps at night
 - [ ] Car sidelights, braking, light + vehiclelightson128
+- [ ] Trafficlights

@@ -145,7 +145,9 @@ export const styles: Record<string, CSSProperties> = {
     fontFamily: '"Courier New", monospace',
     gap: 8,
     left: 16,
+    maxHeight: 'calc(100vh - 32px)', // never taller than the viewport (16px margin top + bottom)
     minHeight: 200,
+    overflowY: 'auto', // scroll when there are more controls than fit
     padding: '12px 14px',
     position: 'fixed',
     top: 16,

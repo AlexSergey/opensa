@@ -83,6 +83,8 @@ export interface GraphicsConfig {
   bloom: BloomConfig;
   /** Procedural clouds on the sky dome. */
   clouds: CloudsConfig;
+  /** Vehicle headlights (the occupied car's night beams). */
+  headlights: HeadlightConfig;
   /** Night light sources (2d-effect coronas — street lamps etc.). */
   lights: LightsConfig;
   /** Night moon disc + glow. */
@@ -105,6 +107,18 @@ export interface GraphicsConfig {
   vehicleReflection: VehicleReflectionConfig;
   /** Water surface shader tuning (reflection + sun glint). */
   water: WaterConfig;
+}
+
+/** Vehicle headlight tuning (the occupied car's night beams; plan 033). */
+export interface HeadlightConfig {
+  /** Spot cone half-angle (radians) — wider = a bigger light pool on the road. */
+  angle: number;
+  /** Beam reach (world units) — how far the light pool extends ahead. */
+  distance: number;
+  /** Glow sprite size at each lamp (world units) — the bright flare on the headlight itself. */
+  glow: number;
+  /** Spotlight intensity (brightness/strength of the beam). */
+  intensity: number;
 }
 
 /** HUD widget styling (the DOM overlay above the canvas; immune to post-processing). */
@@ -165,6 +179,14 @@ export interface NightConfig {
   brightness: number;
   /** Distance (world units) past which lamp coronas fade out (a near-field cap over their per-lamp far-clip). */
   coronaDrawDistance: number;
+  /** Night colour-grade strength (0 = off) — cool tint + desaturation + tinted shadow floor for night mood. */
+  grade: number;
+  /** Ground light-pool strength under street lamps (0 = off) — SA's "light shadow" splat on the road. */
+  lampPool: number;
+  /** Ground light-pool radius (world units). */
+  lampPoolRadius: number;
+  /** Night skylight (hemisphere "moonlight from above") strength — top-down fill that gives objects form. */
+  skylight: number;
   /** Night ambient tint (RGB 0–1, a cool moonlight blue), lerped in from white as the sun sets. */
   tint: [number, number, number];
 }

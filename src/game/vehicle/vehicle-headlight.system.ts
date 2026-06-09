@@ -4,25 +4,22 @@ import {
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
+  type Quaternion,
   SpotLight,
   Sprite,
   SpriteMaterial,
   type Texture,
+  Vector3,
 } from 'three';
 
 import type { System } from '../core/system';
+import type { HeadlightConfig } from '../interfaces/config.interface';
 import type { EnterableVehicle, EnterVehicleSystem } from './enter-vehicle.system';
 
-/** Spotlight tuning (warm white cone onto the road ahead). Position/aim derived from the body half-extents. */
+/** Spotlight look (warm white cone). Intensity/reach/angle + glow size are config (live); these stay fixed. */
 const SPOT_COLOR = 0xfff0d0;
-const SPOT_INTENSITY = 8;
-const SPOT_ANGLE = Math.PI / 7;
 const SPOT_PENUMBRA = 0.5;
-const SPOT_DISTANCE = 35;
 const SPOT_DECAY = 1.5;
-
-/** Headlight glow sprite (additive corona at the lamp, depth-tested so the car body occludes it from behind). */
-const GLOW_SIZE = 0.35;
 
 /**
  * Turns the **occupied** car's headlights on at night: swaps the front-light texture to its lit variant
@@ -35,6 +32,7 @@ const GLOW_SIZE = 0.35;
 export class VehicleHeadlightSystem implements System {
   readonly name = 'vehicle-headlights';
 
+  private readonly config: () => HeadlightConfig;
   private readonly enter: EnterVehicleSystem;
   /** One additive glow corona per lamp (the visible "on" flare), hidden when the lights are off. */
   private readonly glows: Sprite[];
@@ -42,13 +40,16 @@ export class VehicleHeadlightSystem implements System {
   private lit: EnterableVehicle | null = null;
   /** One spotlight per lamp (left/right), placed at the model's headlight dummy positions. */
   private readonly spots: SpotLight[];
+  /** Scratch for transforming local lamp offsets by the car's world transform. */
+  private readonly tmp = new Vector3();
 
-  constructor(enter: EnterVehicleSystem, isNight: () => boolean, root: Object3D) {
+  constructor(enter: EnterVehicleSystem, isNight: () => boolean, root: Object3D, config: () => HeadlightConfig) {
     this.enter = enter;
     this.isNight = isNight;
+    this.config = config;
     const glowMap = glowTexture(); // shared by both lamps
     this.spots = [0, 1].map(() => {
-      const spot = new SpotLight(SPOT_COLOR, 0, SPOT_DISTANCE, SPOT_ANGLE, SPOT_PENUMBRA, SPOT_DECAY);
+      const spot = new SpotLight(SPOT_COLOR, 0, 0, Math.PI / 7, SPOT_PENUMBRA, SPOT_DECAY);
       spot.castShadow = false; // headlight shadows are too costly for the payoff
       spot.name = 'Headlight';
       root.add(spot, spot.target); // persistent: keeps the world's light count constant
@@ -65,7 +66,6 @@ export class VehicleHeadlightSystem implements System {
           map: glowMap,
         }),
       );
-      glow.scale.setScalar(GLOW_SIZE);
       glow.visible = false;
       glow.name = 'HeadlightGlow';
       root.add(glow);
@@ -89,35 +89,40 @@ export class VehicleHeadlightSystem implements System {
     if (target) {
       this.aim(target);
     }
+    const cfg = this.config(); // live: beam strength / reach / cone size + lamp glow size
     for (const spot of this.spots) {
-      spot.intensity = target ? SPOT_INTENSITY : 0;
+      spot.intensity = target ? cfg.intensity : 0;
+      spot.distance = cfg.distance;
+      spot.angle = cfg.angle;
     }
     for (const glow of this.glows) {
       glow.visible = target !== null;
+      glow.scale.setScalar(cfg.glow);
     }
   }
 
   /** Place the two spotlights at the lamps (the model's `headlights` dummy, mirrored ±X; else front of the
-   *  body from half-extents) and aim each forward + down (GTA Z-up, heading about Z). */
+   *  body from half-extents) and aim each forward + down. Lamp offsets are transformed by the car's **full**
+   *  world orientation (`object.quaternion`), so the lamps + beams tilt with the body on slopes (not just yaw). */
   private aim(vehicle: EnterableVehicle): void {
     const [hx, hy, hz] = vehicle.halfExtents;
-    const [px, py, pz] = vehicle.position;
     const dummy = vehicle.object.userData.headlightDummy as [number, number, number] | null | undefined;
     const lx = dummy ? dummy[0] : hx * 0.7; // lamp side offset
     const ly = dummy ? dummy[1] : hy * 0.9; // front (+Y)
     const lz = dummy ? dummy[2] : -hz * 0.3; // lamp height (low)
-    const cos = Math.cos(vehicle.heading);
-    const sin = Math.sin(vehicle.heading);
-    const aimY = ly + 9; // a point well ahead of the lamps
-    const aimZ = pz - hz * 1.6; // forward + down onto the road
-    const glowY = ly + 0.15; // the glow sits just in front of the lamp surface (avoids z-fighting it)
+    const { position, quaternion } = vehicle.object;
     this.spots.forEach((spot, i) => {
       const sx = i === 0 ? lx : -lx; // left / right lamp
-      // Local (sx, ly, lz) rotated by heading about Z: x = sx·cos − ly·sin, y = sx·sin + ly·cos.
-      spot.position.set(px + sx * cos - ly * sin, py + sx * sin + ly * cos, pz + lz);
-      spot.target.position.set(px + sx * cos - aimY * sin, py + sx * sin + aimY * cos, aimZ); // parallel beam
-      this.glows[i].position.set(px + sx * cos - glowY * sin, py + sx * sin + glowY * cos, pz + lz);
+      // Each point is a car-local offset rotated into the world by the body quaternion (incl. pitch/roll).
+      this.toWorld(sx, ly, lz, quaternion, position, spot.position); // lamp
+      this.toWorld(sx, ly + 9, lz - hz * 1.6, quaternion, position, spot.target.position); // forward + down
+      this.toWorld(sx, ly + 0.15, lz, quaternion, position, this.glows[i].position); // glow just ahead of lamp
     });
+  }
+
+  /** Write car-local `(x, y, z)` rotated by `quaternion` and offset by `position` into `out` (world space). */
+  private toWorld(x: number, y: number, z: number, quaternion: Quaternion, position: Vector3, out: Vector3): void {
+    out.copy(this.tmp.set(x, y, z).applyQuaternion(quaternion)).add(position);
   }
 }
 

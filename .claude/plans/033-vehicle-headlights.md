@@ -15,6 +15,10 @@ The current v1 is functional but rough; the glow looks poor and the lights aren'
 - **Glow is crude.** A single radial sprite per side at the `headlights` dummy doesn't match the real lamp
   shape/position; the corona reads as a flat blob rather than a headlight.
 - **No taillights/brake state**, no per-lamp colour (head = white, tail = red), no proper falloff.
+- **Perf note (fixed):** the two always-on spotlights enlarge every world material's shader, which made the
+  sun's dusk `castShadow` toggle recompile noticeably slow (a freeze at nightfall). Fixed in `SkyPlugin.
+  updateShadow` by keeping `sun.castShadow` stable (config-only) and skipping the night shadow render via
+  `shadow.autoUpdate` instead of toggling `castShadow`. Keep this in mind if the rework adds more lights.
 
 **Likely better approach (rework):** parse the vehicle DFF's **2dfx light entries** (the same plugin we
 already parse for street lamps — `geometry.lights`) for exact per-lamp positions/colours/types (head vs tail),
@@ -88,9 +92,12 @@ factor for atmosphere/stars/moon). See [[night-signal-and-traffic-headlights]] m
 
 ## Config
 
-Reuse `config.graphics.lights.nightStartHour/EndHour/enabled` (no new time config — the ask said so). Optional
-new knob if wanted: a small `headlight` intensity/range under `graphics.lights` (or constants first, promote to
-a debug slider later like the moon/night ones).
+Reuse `config.graphics.lights.nightStartHour/EndHour/enabled` for the on/off window (no new time config — the
+ask said so). The **beam look** is now its own live config **`graphics.headlights`** = `{ angle (cone half-
+angle → pool size), distance (reach), glow (lamp sprite size), intensity (strength) }` (`HeadlightConfig`),
+applied each frame by `VehicleHeadlightSystem` (constant light count preserved — only spot params change).
+`Game.setHeadlights` + debug **HEADLIGHT POWER / DISTANCE / CONE / GLOW** sliders. Colour/penumbra/decay stay
+fixed constants. (Defaults: angle π/7, distance 35, glow 0.15, intensity 8.)
 
 ## Open decisions (confirm before building)
 

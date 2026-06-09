@@ -17,6 +17,8 @@ import {
 import type { BloomConfig, SkyConfig, SsaoConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext, RenderPass, RenderPipeline } from './plugin';
 
+import { NightGradeEffect } from './night-grade.effect';
+
 /** Bloom blur radius (mipmap blur) and luminance smoothing — fixed; intensity/threshold are config. */
 const BLOOM_RADIUS = 0.7;
 const BLOOM_SMOOTHING = 0.3;
@@ -37,6 +39,8 @@ export class PostFxPlugin implements Plugin {
   private composer: EffectComposer | null = null;
   private godRays: GodRaysEffect | null = null;
   private godraysPass: EffectPass | null = null;
+  private nightGrade: NightGradeEffect | null = null;
+  private nightPass: EffectPass | null = null;
   private normalPass: NormalPass | null = null;
   private pass: null | RenderPass = null;
   private pipeline: null | RenderPipeline = null;
@@ -102,14 +106,18 @@ export class PostFxPlugin implements Plugin {
       radius: BLOOM_RADIUS,
     });
     const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
+    const nightGrade = new NightGradeEffect();
 
-    // Order: light-emitting effects (god rays, bloom) → tone mapping → SMAA (antialias the final image).
+    // Order: light-emitting effects (god rays, bloom) → tone mapping → night grade → SMAA (antialias the
+    // final image). The night grade goes last (on the final look) so it tints the whole frame at night.
     const godraysPass = new EffectPass(context.camera, godRays);
     const bloomPass = new EffectPass(context.camera, bloom);
     const tonePass = new EffectPass(context.camera, toneMapping);
+    const nightPass = new EffectPass(context.camera, nightGrade);
     composer.addPass(godraysPass);
     composer.addPass(bloomPass);
     composer.addPass(tonePass);
+    composer.addPass(nightPass);
     composer.addPass(new EffectPass(context.camera, new SMAAEffect()));
 
     this.composer = composer;
@@ -118,6 +126,8 @@ export class PostFxPlugin implements Plugin {
     this.bloom = bloom;
     this.bloomPass = bloomPass;
     this.tonePass = tonePass;
+    this.nightGrade = nightGrade;
+    this.nightPass = nightPass;
     this.normalPass = normalPass;
     this.ssao = ssao;
     this.ssaoPass = ssaoPass;
@@ -131,9 +141,16 @@ export class PostFxPlugin implements Plugin {
   }
 
   update(context: PluginContext): void {
-    const { bloom, ssao, sun, toneMapping } = context.config.graphics;
+    const { bloom, night, ssao, sun, toneMapping } = context.config.graphics;
     if (this.godraysPass) {
       this.godraysPass.enabled = sun.godrays && this.sunSource.visible; // shafts only when sun is up
+    }
+    if (this.nightGrade && this.nightPass) {
+      // Night factor (sun height) is stashed on the shared god-rays mesh by the SkyPlugin.
+      const nightFactor = ((this.sunSource.userData.night as number | undefined) ?? 0) * night.grade;
+      this.nightGrade.night = nightFactor;
+      this.nightGrade.setTint(night.tint[0], night.tint[1], night.tint[2]);
+      this.nightPass.enabled = nightFactor > 0.001; // skip the grade by day (zero cost)
     }
     if (this.bloomPass) {
       this.bloomPass.enabled = bloom.enabled;
