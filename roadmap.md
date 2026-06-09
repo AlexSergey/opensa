@@ -82,8 +82,10 @@
   - [✅] The Ui layer should not be involved in post processing.
   - [✅] Find good fonts
   - [✅] Show current time
+- [ ] Increase test coverage
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
+  - [ ] Add build scripts
   - [ ] Gzip
   - [ ] Client Caching
   - [ ] Scripts for creating different archive types
@@ -125,6 +127,7 @@ Next iterations:
     - [ ] Animation
     - [ ] Shooting
     - [ ] Damage
+- [ ] Effects
 - [ ] Peds spawning system
 - [ ] Veh paths
 - [ ] Destroyable objects

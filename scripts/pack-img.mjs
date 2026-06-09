@@ -1,8 +1,8 @@
-// Pack the GTA model folders into a single WIMG archive (see src/map/img-archive.ts).
-// Streams file data so the ~600 MB output is never held in memory. Reads from
-// multiple source folders (comma-separated); later folders override earlier ones
-// by (lowercased) name, so `gta3additional` supplies models missing from the
-// original `gta3` dump (e.g. the gym props / CJ_SWEETIE_TRAY_1).
+// Pack the GTA model folders into a single archive in the stock GTA San Andreas IMG (VER2) format — the
+// same format the game (and mods shipped as .img, e.g. Proper Fixes) use, so our reader handles them
+// interchangeably. Streams file data so the ~600 MB output is never held in memory. Reads from multiple
+// source folders (comma-separated); later folders override earlier ones by (lowercased) name, so
+// `gta3additional` supplies models missing from the original `gta3` dump (e.g. the gym props).
 //
 //   node scripts/pack-img.mjs            # dff + txd (+ col) only (default)
 //   node scripts/pack-img.mjs --all      # every file in the folders
@@ -15,6 +15,7 @@ const SRCS = (process.env.IMG_SRC ?? 'static/img/gta3,static/img/gta3additional'
 const OUT = process.env.IMG_OUT ?? 'static/models/gta3.img';
 const includeAll = process.argv.includes('--all');
 const KEEP = new Set(['.col', '.dff', '.txd']);
+const SECTOR = 2048; // VER2 offsets + sizes are counted in 2048-byte sectors
 
 mkdirSync(dirname(OUT), { recursive: true });
 
@@ -32,31 +33,50 @@ for (const dir of SRCS) {
 }
 const entries = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 
-const files = {};
-let offset = 0;
+// Lay every file out on whole sectors, after a sector-aligned directory.
+const dirSectors = Math.ceil((8 + entries.length * 32) / SECTOR);
+let cursor = dirSectors;
 for (const entry of entries) {
   const size = statSync(entry.path).size;
-  files[entry.name.toLowerCase()] = [offset, size];
-  offset += size;
+  const sectors = Math.max(1, Math.ceil(size / SECTOR));
+  if (sectors > 0xffff) {
+    throw new Error(`${entry.name}: ${sectors} sectors exceeds the VER2 u16 size field`);
+  }
+  if (Buffer.byteLength(entry.name) > 23) {
+    throw new Error(`${entry.name}: name exceeds the 23-byte VER2 limit`);
+  }
+  entry.size = size;
+  entry.sectors = sectors;
+  entry.offset = cursor;
+  cursor += sectors;
 }
 
-const directory = Buffer.from(JSON.stringify({ files }), 'utf8');
-const header = Buffer.alloc(12);
-header.write('WIMG0001', 0, 'ascii');
-header.writeUInt32LE(directory.length, 8);
+// The directory: "VER2" + count, then a 32-byte entry each (offset, streamingSize, sizeInArchive=0, name),
+// zero-padded out to a whole number of sectors so the first file starts sector-aligned.
+const directory = Buffer.alloc(dirSectors * SECTOR);
+directory.write('VER2', 0, 'ascii');
+directory.writeUInt32LE(entries.length, 4);
+entries.forEach((entry, i) => {
+  const base = 8 + i * 32;
+  directory.writeUInt32LE(entry.offset, base);
+  directory.writeUInt16LE(entry.sectors, base + 4);
+  directory.write(entry.name, base + 8, 23, 'ascii'); // NUL padding already in the zeroed buffer
+});
 
 const out = createWriteStream(OUT);
 out.setMaxListeners(0); // many sequential pipeline() calls share this stream
-out.write(header);
 out.write(directory);
 for (const entry of entries) {
   await pipeline(createReadStream(entry.path), out, { end: false });
+  const pad = entry.sectors * SECTOR - entry.size; // fill the file's last partial sector
+  if (pad > 0) {
+    out.write(Buffer.alloc(pad));
+  }
 }
 await new Promise((resolve, reject) => {
   out.end(resolve);
   out.on('error', reject);
 });
 
-console.log(
-  `Packed ${entries.length} files from ${SRCS.length} folder(s), ${(offset / 1048576).toFixed(1)} MB -> ${OUT}`,
-);
+const mb = ((cursor * SECTOR) / 1048576).toFixed(1);
+console.log(`Packed ${entries.length} files from ${SRCS.length} folder(s) into VER2 ${mb} MB -> ${OUT}`);

@@ -138,12 +138,18 @@ export function collectLights(
           position: [point.x, point.y, point.z],
           size: light.size,
         });
-        // Pool: under the bulb (X/Y). Initial Z is the model foot (instance.z + floorZ) so it shows at once;
-        // a runtime system then rays the real terrain in a small window around it (curb/road), never far.
-        pools.push({
-          color: [light.color[0], light.color[1], light.color[2]],
-          position: [point.x, point.y, instance.position[2] + floorZ],
-        });
+        // Ground pool only for warm/white lights (street lamps): red is the dominant channel. Coloured
+        // decorative lights (green/blue neon signs) shouldn't dump a big colour pool on the ground — they
+        // glow via their emissive sign texture, not a lamp-style spill. Keep the corona for them either way.
+        const [lr, lg, lb] = light.color;
+        if (lr >= lg && lr >= lb) {
+          // Pool: under the bulb (X/Y). Initial Z is the model foot (instance.z + floorZ) so it shows at once;
+          // a runtime system then rays the real terrain in a small window around it (curb/road), never far.
+          pools.push({
+            color: [lr, lg, lb],
+            position: [point.x, point.y, instance.position[2] + floorZ],
+          });
+        }
       }
     }
   }

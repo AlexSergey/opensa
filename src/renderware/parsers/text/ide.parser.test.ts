@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { parseGtaDat } from './gta-dat.parser';
-import { parseIde, parseTimedObjects } from './ide.parser';
+import { parseIde, parseTimedObjects, parseTxdParents } from './ide.parser';
 
 /** Resolve the first IDE/IPL file referenced by static/data/gta.dat, if present. */
 function referencedFromDat(kind: 'ide' | 'ipl'): null | string {
@@ -80,6 +80,27 @@ describe('parseTimedObjects', () => {
 
   it('ignores objs / anim sections', () => {
     expect(parseTimedObjects(['objs', '5000, gplane, basicmain, 300, 0', 'end'].join('\n'))).toEqual([]);
+  });
+});
+
+describe('parseTxdParents', () => {
+  it('parses txdp child→parent rows, lowercasing both names', () => {
+    const pairs = parseTxdParents(['txdp', 'A51, countn2_gene', 'desert, countn2_gene', 'end'].join('\n'));
+    expect(pairs).toEqual([
+      ['a51', 'countn2_gene'],
+      ['desert', 'countn2_gene'],
+    ]);
+  });
+
+  it('ignores other sections and malformed (parent-less) rows', () => {
+    const pairs = parseTxdParents(
+      ['objs', '5000, gplane, basicmain, 300, 0', 'end', 'txdp', 'lonely', 'a51, countn2_gene', 'end'].join('\n'),
+    );
+    expect(pairs).toEqual([['a51', 'countn2_gene']]);
+  });
+
+  it('returns an empty list when there is no txdp section', () => {
+    expect(parseTxdParents('objs\n5000, gplane, basicmain, 300, 0\nend')).toEqual([]);
   });
 });
 

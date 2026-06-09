@@ -212,8 +212,21 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
   }
 
   const lights = parseLightEffects(stream, header);
+  const nightColors = parseNightColors(stream, header, numVertices);
 
-  return { flags, lights, materials, normals, numUVLayers, positions, prelitColors, skin, triangles, uvLayers };
+  return {
+    flags,
+    lights,
+    materials,
+    nightColors,
+    normals,
+    numUVLayers,
+    positions,
+    prelitColors,
+    skin,
+    triangles,
+    uvLayers,
+  };
 }
 
 function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
@@ -361,6 +374,29 @@ function parseMatFxEnvMap(stream: BinaryStream, header: ChunkHeader): RWMaterial
   }
 
   return { coefficient, texture, useFrameBufferAlpha };
+}
+
+/**
+ * Parse the geometry's "extra vertex colour" plugin (`0x253F2F9`) — SA's **night** prelit colour set. The
+ * chunk is a `u32` flag (1 = present) followed by `numVertices × RGBA`. Bright (warm) texels here are baked
+ * lit windows: the engine swaps to these at night so windows glow while the day prelit stays dark. Null when
+ * absent or the size doesn't match.
+ */
+function parseNightColors(stream: BinaryStream, header: ChunkHeader, numVertices: number): null | Uint8Array {
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  if (!extension) {
+    return null;
+  }
+  const chunk = findChild(stream, extension.dataStart, extension.end, RwSection.NIGHT_VERTEX_COLORS);
+  if (!chunk || chunk.size !== numVertices * 4 + 4) {
+    return null;
+  }
+  stream.seek(chunk.dataStart);
+  if (stream.u32() === 0) {
+    return null; // leading flag says "no night colours"
+  }
+
+  return stream.bytes(numVertices * 4);
 }
 
 /** Parse the Skin plugin from a geometry's Extension, or undefined if not skinned. */

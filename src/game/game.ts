@@ -444,6 +444,11 @@ export class Game {
     return this;
   }
 
+  /** Snap the map-inspector (debug) camera back to top-down (undo a RIGHT-drag orbit). No-op outside it. */
+  topDownView(): void {
+    this.cameraController.topDownDebugView();
+  }
+
   /** Notify every plugin that config (or weather) changed, so they can refresh derived state. */
   private broadcastConfigChanged(): void {
     for (const plugin of this.plugins) {

@@ -22,6 +22,7 @@ function geometry(partial: Partial<RWGeometry> = {}): RWGeometry {
       material({ texture: { maskName: '', name: 'tree_branches44' }, textured: true }),
       material({ color: [200, 100, 50, 255] }),
     ],
+    nightColors: null,
     normals: null,
     numUVLayers: 1,
     positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),

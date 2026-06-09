@@ -30,6 +30,7 @@ function config(gameState: Config['gameState']): Config {
         lampPoolRadius: 4.5,
         skylight: 0.6,
         tint: [0.6, 0.66, 0.85],
+        windowGlow: 1,
       },
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },

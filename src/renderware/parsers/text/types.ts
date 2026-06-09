@@ -49,4 +49,10 @@ export interface MapDefinitions {
    * their visibility by the game hour (see {@link IdeObjectDef.time}).
    */
   timedCatalog?: Map<number, IdeObjectDef>;
+  /**
+   * TXD parent links from `txdp` sections (lowercased `child → parent`). A child
+   * TXD inherits textures it lacks from its parent (chain) — see the texture
+   * resolver. Absent/empty when no `txdp` data was present.
+   */
+  txdParents?: Map<string, string>;
 }

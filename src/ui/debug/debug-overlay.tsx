@@ -116,6 +116,8 @@ export interface DebugActions {
   teleportToGanton(): void;
   /** Whether ACES tone mapping is on. */
   toneMapping(): boolean;
+  /** Snap the map-inspector camera back to top-down (undo a right-drag orbit). */
+  topDownView(): void;
   /** Current vehicle-reflection tuning (preset + intensity). */
   vehicleReflection(): VehicleReflectionConfig;
   /** Current water shader tuning. */
@@ -685,6 +687,19 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={night.lampPoolRadius}
               />
+              <div style={styles.groupLabel}>NIGHT WINDOW GLOW: {night.windowGlow.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const windowGlow = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, windowGlow }));
+                  actions.setNight({ windowGlow });
+                }}
+                step={0.05}
+                type="range"
+                value={night.windowGlow}
+              />
               {(['R', 'G', 'B'] as const).map((channel, i) => (
                 <div key={channel}>
                   <div style={styles.groupLabel}>
@@ -863,6 +878,11 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
               <button onClick={() => setMapActive((previous) => !previous)} style={styles.actionButton} type="button">
                 {mapActive ? 'Deactivate Map Viewer' : 'Activate Map Viewer'}
               </button>
+              {mapActive && (
+                <button onClick={() => actions.topDownView()} style={styles.actionButton} type="button">
+                  Top (reset view)
+                </button>
+              )}
               {mapActive && <MapInspector game={game} />}
             </div>
           )}

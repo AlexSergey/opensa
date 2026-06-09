@@ -50,6 +50,25 @@ export function parseTimedObjects(text: string): IdeObjectDef[] {
   return objects;
 }
 
+/**
+ * Parse an IDE file's `txdp` (TXD-parent) section into `[childTxd, parentTxd]` pairs (both lowercased).
+ * A child TXD inherits any texture it lacks from its parent — the "optimized map" (and mods shipped that
+ * way) deduplicate by hoisting shared textures into regional `*_gene` parents and stripping the children.
+ * Names only (no extension); the texture resolver walks this chain (see `archive/asset-cache.getTextures`).
+ */
+export function parseTxdParents(text: string): [string, string][] {
+  const pairs: [string, string][] = [];
+  sectionedParse(cleanLines(text), {
+    txdp: (row) => {
+      if (row.length >= 2 && row[0] && row[1]) {
+        pairs.push([row[0].toLowerCase(), row[1].toLowerCase()]);
+      }
+    },
+  });
+
+  return pairs;
+}
+
 function collectObjs(text: string, sections: readonly string[]): IdeObjectDef[] {
   const objects: IdeObjectDef[] = [];
   const handler = (row: string[]): void => {

@@ -30,6 +30,9 @@ export interface RWGeometry {
   /** 2d-effect lights/coronas (geometry-local positions) for street lamps, signs, etc. — empty if none. */
   lights: RWLight2d[];
   materials: RWMaterial[];
+  /** Night (extra) prelit RGBA bytes if present, flattened (numVertices * 4), else null. SA's second vertex-
+   *  colour set used at night — bright window texels here glow when the day prelit stays dark. */
+  nightColors: null | Uint8Array;
   /** Vertex normals if stored, else null (compute downstream). */
   normals: Float32Array | null;
   numUVLayers: number;

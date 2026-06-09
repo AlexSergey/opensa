@@ -54,9 +54,12 @@ export class CameraController {
 
     this.controls = new OrbitControls(camera, domElement);
     this.controls.enabled = false; // off in follow mode (custom orbit); on in debug
-    this.controls.enableRotate = false;
+    this.controls.enableRotate = true; // RIGHT-drag orbits in debug; gated by `enabled` (off in follow/fly)
     this.controls.screenSpacePanning = false; // pan in the world horizontal plane
-    this.controls.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+    // Debug map inspector: LEFT pans, RIGHT orbits, wheel dollies.
+    this.controls.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE };
+    this.controls.minPolarAngle = 0; // straight down …
+    this.controls.maxPolarAngle = Math.PI / 2; // … to the horizon (don't orbit under the ground)
 
     domElement.addEventListener('pointermove', this.onPointerMove);
     domElement.addEventListener('wheel', this.onWheel, { passive: false });
@@ -128,6 +131,16 @@ export class CameraController {
 
   setTarget(object: null | Object3D): void {
     this.target = object;
+  }
+
+  /** Snap the debug map camera back to straight-down over its current pan centre (undo any RIGHT-drag orbit). */
+  topDownDebugView(): void {
+    if (this.mode !== 'debug') {
+      return;
+    }
+    const target = this.controls.target;
+    this.camera.position.set(target.x, target.y + DEBUG_HEIGHT, target.z + 0.001);
+    this.controls.update();
   }
 
   update(delta: number): void {

@@ -159,6 +159,10 @@ Skinning (`SkinPLG`), multi-atomic clumps, frame hierarchy parenting, tristrip v
 palettized/PAL8 rasters, COL collision, IMG/IDE/IPL world streaming. The data model and the
 parser/adapter split are designed so each is an additive change, not a rewrite.
 
+**Since-added geometry plugins** (additive, as designed): 2d-effect lights `0x253F2F8` (`geometry.lights`,
+plan 032 coronas), and **night vertex colours `0x253F2F9`** (`geometry.nightColors` — SA's second/night prelit
+set; bright window texels glow at night, see plan [[032-night-and-lights]] phase 10).
+
 ---
 *Requested filename: `.claude/plans/001-renderware-dff-loader.md`. Plan mode wrote this to the
 global plans dir; on approval I'll also copy it to the project-local `.claude/plans/` path.*

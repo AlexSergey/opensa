@@ -4,8 +4,9 @@ Make **evening/night** look right: timed objects appear/disappear at their time-
 other lights switch on after dusk (configurable, default 20:00), lit windows glow, and the night sky gets
 **stars**. Extends [[029-graphics]] (night was reserved there) and reuses the [[031-weather-manager]] sky/
 timecyc plumbing. **Goal stays: best picture, least cost.**
-Status: **phases 1–9 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon, night
-atmosphere = skylight + colour grade, **ground light pools** under lamps) + **corona occlusion polish DONE**.
+Status: **phases 1–10 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon, night
+atmosphere = skylight + colour grade, **ground light pools** under lamps, **night vertex colours** =
+per-building lit windows) + **corona occlusion polish DONE**.
 Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
 cheaper SA-style light-pool splat), corona texture variety. The **night grade mask / magic numbers need
 recalibration as other light sources land** — see phase 8's ⚠️ calibration note.
@@ -114,10 +115,12 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      nearby overlay glow (e.g. `LongBeBlok1_LAe` ← `nitelites_LAE2` 30u away) and buildings WITHOUT one stay
      dark in vanilla (e.g. `mcstraps_LAe2` in Grove St — no overlay, no 2dfx, nearest overlay 168u away).
      This matches the original game (lit windows = downtown/commercial; residential hoods are dark). We
-     **deliberately do not** add the heuristic "emissive any material whose texture name looks like a window
-     (`*windo*`/`*win*`/`gangwin*`/`*curt*`)" — that's what the *night-windows mods* (IWNL, Proper Night
-     Windows, LS Downtown Night Windows) do, and it's non-vanilla. If we ever want denser nights it'd be an
-     opt-in toggle, but the project choice is vanilla fidelity. See [[gta-sa-lit-windows-vanilla]] memory.
+     **deliberately do not** add the heuristic "emissive any material whose texture name looks like a window."
+     See [[gta-sa-lit-windows-vanilla]] memory.
+   - **UPDATE — phase 10 found the SECOND vanilla mechanism (per-building).** The overlay (above) is downtown;
+     residential **Ganton** houses light per-building via **night vertex colours** — see phase 10. (So the
+     earlier "residential hoods are dark in vanilla / `compfukhouse3` glow is a mod" was wrong: it's the
+     `0x253F2F9` chunk we weren't reading.)
 
 6. ✅ **Stars — DONE.** A procedural hash star field in the dome fragment shader (`starField()`): a gnomonic
    projection of the view direction tiled into cells, ~one star per lit cell with random brightness + gentle
@@ -210,12 +213,39 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      **Re-enable** (drop/relax the filter) once traffic-light cycling exists; then only the active phase's bulb
      should light. Street lamps don't match `traffic`, so they're unaffected.
 
+10. ✅ **Night vertex colours (per-building lit windows) — DONE.** The authentic vanilla mechanism for
+    residential lit windows (Ganton etc.), distinct from the downtown tobj overlays of phase 5. SA building DFFs
+    carry a **second prelit vertex-colour set** in the RW "extra vertex colour" plugin (chunk **`0x253F2F9`**):
+    a `u32` flag (1) + `numVertices × RGBA`, where **bright warm texels are baked lit windows**; the engine
+    swaps to it at night. We weren't reading it (only the grey **day** prelit), so 3589 looked flat.
+    - **Parser:** `RwSection.NIGHT_VERTEX_COLORS = 0x253f2f9`; `parseNightColors` (dff.ts) → `RWGeometry.
+      nightColors: Uint8Array | null` (null if absent or size ≠ `nv*4+4`).
+    - **Render:** `build-clump` adds a `nightColor` vec3 attribute (reusing `prelitColorAttribute`) and, when
+      present, calls `applyNightVertexEmissive` (`three/night-vertex-colors.ts`) — an `onBeforeCompile` that adds
+      `vNightColor * uNightColor` to `totalEmissiveRadiance`, gated by the shared `nightColorUniform` (constant
+      `customProgramCacheKey` so all such materials share one program). Day prelit untouched → daytime unchanged.
+      **It's the WHOLE baked night lighting, not just windows** (key realisation): the night set is dark where
+      unlit, **warm where a street lamp's pool is baked onto the road/ground** (confirmed: `Lae2_roads03` night
+      verts are 740 dark + a few warm-moderate `[112,92,68]…[140,117,89]` = the lamp pools; roads away from
+      lamps are all-dark), and bright at lit windows/signs. So emissive = **`texture × nightColour`** (SA's
+      `texture × night-prelit`), **un-gated** — the moderate warm road/wall texels ARE the baked ambient/lamp
+      light and must show. To stop a flat wash, the **flat night `ambient` is kept low** (`night.brightness`
+      0.13) so the baked colours give the variation; and the **projected light pools are off** (`night.lampPool`
+      0) — the baked road pools replace them, smoothly and without the raycast edge cases. (Earlier brightness/
+      saturation gates were a wrong turn: they rejected exactly the baked road lamp-pools, leaving flat dark
+      ground; the real lever is ambient-vs-baked balance, not gating.)
+    - **Drive:** `nightColorUniform.value = coronaOn × night.windowGlow` in canvas-host (same eased night signal
+      as the coronas/pools). Config **`night.windowGlow`** (default 1.0) + debug **NIGHT WINDOW GLOW** slider.
+    - **Tests:** real fixtures `tests/world/compfukhouse3.dff` (id 3589, lit — bright warm window verts) +
+      `tests/world/mcstraps_LAe2.dff` (id 17699, dark — dull night colours) in `night-colors.test.ts`.
+    - **General:** works for any SA building with night colours (downtown skyscrapers too), not just Ganton.
+
 ## Config additions
 
 - `Config.graphics.lights` (new): `{ enabled, nightStartHour, nightEndHour }` — when lamps/coronas switch on
   (default **20:00 → ~06:00**, configurable per the ask), master toggle, plus maybe a corona intensity/budget.
 - `Config.graphics.stars` (new): `{ enabled }` (+ density later). Debug toggles in the Graphics/Weather tab.
-- `Config.graphics.night` (new): `{ brightness, coronaDrawDistance, grade, lampPool, skylight, tint }` — the
+- `Config.graphics.night` (new): `{ brightness, coronaDrawDistance, grade, lampPool, skylight, tint, windowGlow }` — the
   night atmosphere knobs (ambient floor, corona cap, **colour-grade strength**, **ground light-pool strength**,
   hemisphere skylight, cool tint). `grade` drives phase 8's `NightGradeEffect`; `lampPool` (default 0.6) scales
   phase 9's ground pools; `tint` is shared by the ambient *and* the grade.

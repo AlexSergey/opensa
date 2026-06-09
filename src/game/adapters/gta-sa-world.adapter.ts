@@ -45,6 +45,7 @@ import {
   type RegionColliders,
   type RegionMeshData,
   resolveMap,
+  setTxdParents,
   type Timecyc,
   type VehicleColours,
   type VehicleDef,
@@ -306,6 +307,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
     this.archive = await loadArchive(this.config.archiveUrl);
     this.defs = await resolveMap(this.config.datUrl, this.config.base);
+    setTxdParents(this.defs.txdParents ?? new Map<string, string>()); // wire txdp: area TXDs inherit *_gene parents
     this.grid = buildWorldGrid(this.defs, this.cellSize);
     onProgress?.(1);
   }

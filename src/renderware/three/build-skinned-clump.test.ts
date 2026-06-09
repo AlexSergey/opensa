@@ -26,6 +26,7 @@ function geometry(numBones?: number): RWGeometry {
     flags: 0,
     lights: [],
     materials: [{ color: [255, 255, 255, 255], texture: null, textured: false }],
+    nightColors: null,
     normals: null,
     numUVLayers: 0,
     positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),

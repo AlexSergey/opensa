@@ -189,6 +189,8 @@ export interface NightConfig {
   skylight: number;
   /** Night ambient tint (RGB 0–1, a cool moonlight blue), lerped in from white as the sun sets. */
   tint: [number, number, number];
+  /** Lit-window glow strength — how strongly buildings' SA night vertex colours self-illuminate at night. */
+  windowGlow: number;
 }
 
 /** Sun shadow (directional shadow map) tuning. */

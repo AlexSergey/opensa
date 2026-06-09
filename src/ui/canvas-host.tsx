@@ -31,6 +31,7 @@ import {
   buildTextureMap,
   coronaMaterial,
   lightPoolMaterial,
+  nightColorUniform,
   parseTxd,
   sampleTimecycBlend,
   WEATHER_NAMES,
@@ -236,13 +237,15 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
         night: {
-          brightness: 0.5,
+          // Low flat ambient: the baked night vertex colours (incl. roads' lamp pools) carry the night look.
+          brightness: 0.13,
           coronaDrawDistance: 120,
           grade: 0.05,
-          lampPool: 0.6,
+          lampPool: 0, // off — the baked road night colours light the ground (the projection was edge-casey)
           lampPoolRadius: 13.0,
           skylight: 0.6,
           tint: [1.0, 1.0, 1.0],
+          windowGlow: 1.0,
         },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
@@ -269,7 +272,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       weatherTransitionSeconds: 6,
     });
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3.img`,
+      archiveUrl: `${BASE}/models/gta3-pf.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
@@ -385,6 +388,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         lightPoolMaterial.uniforms.uOn.value = coronaOn * night.lampPool;
         lightPoolMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
         lightPoolMaterial.uniforms.uRadius.value = night.lampPoolRadius;
+        // Building lit windows (SA night vertex colours) fade in on the same night signal.
+        nightColorUniform.value = coronaOn * night.windowGlow;
       },
     });
 
@@ -571,6 +576,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       teleport: (coords) => character.placePlayer(coords, true),
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
+      topDownView: () => game.topDownView(),
       vehicleReflection: () => game.getConfig().graphics.vehicleReflection,
       water: () => game.getConfig().graphics.water,
       weather: () => game.getWeather(),

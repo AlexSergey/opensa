@@ -93,7 +93,7 @@ src/map/                       # R3F walker that ties parsers + renderware loade
   Columns: `id, model, txd, drawDist, flags`. Parse defensively for the SA variant that inserts a
   mesh-count + multiple draw distances: first 3 cells are id/model/txd, the **last** is flags, the
   numeric cells between are draw distances (take the max). `tobj` adds time-on/off (captured but
-  unused for now). Other sections are skipped.
+  unused for now). `path`/`2dfx` are skipped; **`txdp` is now read** — see "TXD parenting" below.
 
 ### `ipl.parser.ts` → `IplInstance[]`
 `parseIpl(text): IplInstance[]` using `sectionedParse`.
@@ -108,6 +108,57 @@ interface IplInstance { id: number; modelName: string; interior: number;
   position: [number, number, number]; rotation: [number, number, number, number]; lod: number; }
 interface MapDefinitions { catalog: Map<number, IdeObjectDef>; instances: IplInstance[]; imgDirs: string[]; }
 ```
+
+## TXD parenting (`txdp`) — optimized map / Proper Fixes — **DONE**
+
+**Implemented:** `parseTxdParents` (ide.parser) → `resolveMap` aggregates all IDEs' `txdp` into
+`MapDefinitions.txdParents` → the adapter calls `setTxdParents` → `getTextures` resolves via `resolveTxdChain`
+(pure, cycle-guarded, child-overrides-parent), memoized per name. No-op on self-contained archives. Tests:
+`parseTxdParents` (ide.parser.test) + `resolveTxdChain` (asset-cache.test: inherit / override / multi-level /
+cycle / absent-parent). Details below.
+
+
+A new IDE was added to `gta.dat` — `DATA\MAPS\SA_Optimized_Map.IDE` — and it is a **single `txdp`
+block** (~1396 rows, nothing else: no `objs`/`tobj`). Each row is `childTxd, parentTxd` (plus `#`
+comment lines). 31 distinct parents, all the regional **"generic" TXDs**: `LA_gene`, `LAe_gene`,
+`SF_gene`, `SFe_gene`, `vegas_gene`, `country_gene`, `countn2_gene`, `*xref_gene`, … So e.g.
+`a51, countn2_gene`, `desert, countn2_gene`, …
+
+### How GTA SA uses it
+`txdp` declares **texture-dictionary inheritance**. The engine's `CTxdStore::SetTxdParent(child,
+parent)` links a TXD to a parent; `RwTexDictionaryFindNamedTexture` then walks the **parent chain** —
+a texture not present in the child is looked up in its parent (recursively up the chain). The
+**optimized map** (and mods shipped this way, e.g. Proper Fixes in `gta3-pf.img`) exploit this to
+**deduplicate**: the textures shared across an area's many TXDs are hoisted into one regional
+`*_gene` TXD, and each area TXD is **stripped** of them and given the `_gene` as parent. Big size win —
+but a renderer that ignores `txdp` will see those area TXDs as **missing the shared textures**
+(untextured/white surfaces).
+
+### What we need to do (against the current code)
+Our texture resolution is flat: `getTextures(archive, txdName)` (`archive/asset-cache.ts`) parses one
+`<txd>.txd` into a `Map<lowercased-name, Texture>`, and `build-region` hands `getTextures(archive,
+def.txdName)` to `buildClumpParts` → `buildMaterial` does `textures.get(name)`. To honour `txdp`:
+
+1. **Parse the section.** Add `parseTxdParents(text): [child, parent][]` (`parsers/text/`) via
+   `sectionedParse` on the `txdp` section — skip `#`-comment + blank rows, lowercase both names. Keep
+   `parseIde` (objs/anim) unchanged; this is a sibling read so existing callers don't move.
+2. **Aggregate.** The adapter merges every IDE's `txdp` into one `txdParents: Map<string,string>`
+   (child→parent, lowercased) on `MapDefinitions` (later files win, like the catalog).
+3. **Resolve with the chain.** In `getTextures`, after building the child's own map, **overlay it on
+   the parent's** so the child overrides: `merged = new Map([...parentMap, ...childMap])`, resolved
+   **recursively** up the chain (with a `seen` set to guard cycles), and cached by name like today.
+   Thread the `txdParents` map into the cache module (set once at load, or pass it in). `build-clump`/
+   `build-region` stay untouched — they still receive a flat Map, now parent-augmented.
+
+### Notes / gotchas
+- **Parent may be absent** (only ships with the optimized map / `gta3-pf.img`): fall back to the child
+  alone, never throw.
+- **Multi-level chains** are legal — recurse + cycle-guard (don't assume one level).
+- **No-op on stock `gta3.img`.** Its area TXDs are self-contained, so even with `txdp` wired every
+  child already has its textures (the overlay just finds nothing extra). So this can land **before**
+  switching the archive — it only *matters* once we point at the optimized map / `gta3-pf.img`.
+- This is a **prerequisite for using `gta3-pf.img`** (the night-window light mod we want): that pack is
+  the optimized-map layout, so its area TXDs assume `txdp` resolution.
 
 ## Map walker (`src/map/`, R3F)
 

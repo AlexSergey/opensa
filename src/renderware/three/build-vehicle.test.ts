@@ -25,6 +25,7 @@ function triangleGeometry(materials: RWMaterial[]): RWGeometry {
     flags: GeometryFlag.POSITIONS,
     lights: [],
     materials,
+    nightColors: null,
     normals: null,
     numUVLayers: 0,
     positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),

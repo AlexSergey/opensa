@@ -2,7 +2,7 @@
 export { parseCarcols, type VehicleColours } from './carcols.parser';
 export { parseGtaDat } from './gta-dat.parser';
 export { type HandlingEntry, parseHandling } from './handling.parser';
-export { parseIde, parseTimedObjects } from './ide.parser';
+export { parseIde, parseTimedObjects, parseTxdParents } from './ide.parser';
 export { interiorId, isInterior } from './interior';
 export { parseBinaryIpl } from './ipl-binary.parser';
 export { parseIpl } from './ipl.parser';

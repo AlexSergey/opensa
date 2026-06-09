@@ -17,6 +17,8 @@ export const RwSection = {
   MATERIAL_LIST: 0x08,
   // Material Effects plugin (RpMatFX) — env-map / bump effect on a material
   MATFX: 0x120,
+  // SA "extra vertex colour" plugin — a second (night) prelit colour set; bright window verts glow at night
+  NIGHT_VERTEX_COLORS: 0x253f2f9,
   // SA custom reflection-material plugin (env-map UV scale/offset + intensity)
   REFLECTION_MAT: 0x253f2fc,
   SKIN: 0x116,

@@ -16,6 +16,7 @@ import {
 import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
+import { applyNightVertexEmissive } from './night-vertex-colors';
 
 /**
  * Convert a parsed RWClump into a renderable three.js Group.
@@ -128,6 +129,8 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
     const position = new BufferAttribute(rw.positions, 3);
     const uv = rw.uvLayers.length > 0 ? new BufferAttribute(rw.uvLayers[0], 2) : null;
     const color = rw.prelitColors ? prelitColorAttribute(rw.prelitColors) : null;
+    // SA night (extra) vertex colours — bright warm texels are lit windows; added as emissive at night.
+    const nightColor = rw.nightColors ? prelitColorAttribute(rw.nightColors) : null;
     const normal = vertexNormalAttribute(position, rw);
 
     groupTrianglesByMaterial(rw.triangles, rw.materials.length).forEach((tris, materialIndex) => {
@@ -142,6 +145,9 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       if (color) {
         geometry.setAttribute('color', color);
       }
+      if (nightColor) {
+        geometry.setAttribute('nightColor', nightColor);
+      }
       geometry.setAttribute('normal', normal);
       const index: number[] = [];
       for (const tri of tris) {
@@ -154,6 +160,9 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       const material = rwMaterial
         ? buildMaterial(rwMaterial, rw, textures)
         : new MeshStandardMaterial({ vertexColors: color !== null });
+      if (nightColor && material.map) {
+        applyNightVertexEmissive(material); // night windows glow via the `nightColor` attribute (× texture)
+      }
       parts.push({ geometry, material, matrix });
     });
   }
