@@ -75,7 +75,7 @@
   - [✅] Water shader
   - [ ] Night objects (Tobj)
   - [✅] 2dfx
-  - [ ] Car headlights - Direct Light + texture from Vehicle
+  - [✅] Car headlights - Direct Light + texture from Vehicle
 - [✅] Car reflections
 - [✅] Weather manager
 - [✅] UI Layer
@@ -98,7 +98,7 @@
 - [ ] Google Analytics
 - [ ] Version in cache file names (reset user caches when update)
 - [ ] Browser caching
-- [ ] Buy domain name
+- [✅] Buy domain name
 - [ ] Rename project
 - [ ] CI/CD
 - [ ] Release v 0.1.0
@@ -147,3 +147,4 @@ Next iterations:
 - [ ] Health for vehs
 - [ ] HUD
 - [ ] Spotlights from lamps at night
+- [ ] Car sidelights, braking, light + vehiclelightson128

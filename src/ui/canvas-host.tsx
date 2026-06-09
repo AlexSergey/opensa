@@ -20,10 +20,10 @@ import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehi
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
-import { inHourWindow } from '../game/time/hour-window';
 import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
+import { VehicleHeadlightSystem } from '../game/vehicle/vehicle-headlight.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { buildTextureMap, coronaMaterial, parseTxd, sampleTimecycBlend, WEATHER_NAMES } from '../renderware';
@@ -226,6 +226,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         clouds: { coverage: 0.5, opacity: 0.85 },
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
+        night: { brightness: 0.5, coronaDrawDistance: 120, tint: [0.6, 0.66, 0.85] },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -357,12 +358,11 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     game.addSystem({
       name: 'coronas',
       update(delta: number): void {
-        const lights = game.getConfig().graphics.lights;
-        const hour = ((game.getHours() % 24) + 24) % 24;
-        const on = lights.enabled && inHourWindow(hour, lights.nightStartHour, lights.nightEndHour);
+        const on = game.getConfig().graphics.lights.enabled && game.isNight();
         coronaOn += ((on ? 1 : 0) - coronaOn) * Math.min(1, delta * 2); // ~0.5s ease
         coronaMaterial.uniforms.uOn.value = coronaOn;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
+        coronaMaterial.uniforms.uDrawDistance.value = game.getConfig().graphics.night.coronaDrawDistance;
       },
     });
 
@@ -390,6 +390,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       game.getLogger(),
     );
     game.addSystem(enterVehicle);
+    // Night headlights on the occupied car (texture swap + a forward-down spotlight), gated on seated + night.
+    game.addSystem(new VehicleHeadlightSystem(enterVehicle, () => game.isNight(), game.getStreamingRoot()));
 
     // Spawn one car: load it, place it, make it a dynamic body, and register it with the vehicle
     // systems. With `anchor`, the position is computed just in front of it (clear of its body, sized
@@ -495,6 +497,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       godraysSize: () => game.getConfig().graphics.sun.godraysSize,
       lights: () => game.getConfig().graphics.lights,
       moon: () => game.getConfig().graphics.moon,
+      night: () => game.getConfig().graphics.night,
       playerCoords: () => character.viewOf(),
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
@@ -508,6 +511,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setGodraysSize: (size) => game.setGodraysSize(size),
       setLights: (patch) => game.setLights(patch),
       setMoon: (patch) => game.setMoon(patch),
+      setNight: (patch) => game.setNight(patch),
       setShadows: (patch) => game.setShadows(patch),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),

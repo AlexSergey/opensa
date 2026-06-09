@@ -184,6 +184,11 @@ export class EnterVehicleSystem implements System {
     return this.active;
   }
 
+  /** Whether the player is seated in (driving) the active car — distinct from merely approaching/exiting. */
+  isSeated(): boolean {
+    return this.phase === 'seated' || this.phase === 'stopping';
+  }
+
   /** Drop a (parked, unoccupied) car when it is unloaded. No-op if it is the active car. */
   remove(vehicle: EnterableVehicle): void {
     if (this.active === vehicle) {

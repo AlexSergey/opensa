@@ -87,6 +87,8 @@ export interface GraphicsConfig {
   lights: LightsConfig;
   /** Night moon disc + glow. */
   moon: MoonConfig;
+  /** Night ambient/atmosphere tuning (how dark + the moonlight tint). */
+  night: NightConfig;
   /** Sun shadows (directional shadow map). */
   shadows: ShadowsConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */
@@ -155,6 +157,16 @@ export interface MovementConfig {
   runSpeed: number;
   /** Planar speed when walking (default). */
   walkSpeed: number;
+}
+
+/** Night ambient / atmosphere tuning (the "dark night" look). */
+export interface NightConfig {
+  /** Ambient brightness at night — the moonlight floor (objects stay visible; lamps add accents). */
+  brightness: number;
+  /** Distance (world units) past which lamp coronas fade out (a near-field cap over their per-lamp far-clip). */
+  coronaDrawDistance: number;
+  /** Night ambient tint (RGB 0–1, a cool moonlight blue), lerped in from white as the sun sets. */
+  tint: [number, number, number];
 }
 
 /** Sun shadow (directional shadow map) tuning. */

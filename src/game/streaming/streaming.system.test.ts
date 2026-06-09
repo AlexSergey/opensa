@@ -18,6 +18,7 @@ function config(overrides: Partial<Config> = {}): Config {
       clouds: { coverage: 0.5, opacity: 0.85 },
       lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
       moon: { brightness: 1, elevationDeg: 35, size: 150 },
+      night: { brightness: 0.5, coronaDrawDistance: 120, tint: [0.6, 0.66, 0.85] },
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },

@@ -169,11 +169,18 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     backseat: seatMatrix(clump, 'ped_backseat', worldCache),
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
+  // The `headlights` dummy sits at one front lamp; SA mirrors it to both sides. Keep `|x|` (the lamp's side
+  // offset), front (Y) and height (Z) so the headlight spotlights sit at the real lamps, not on the bonnet.
+  const headlights = seatMatrix(clump, 'headlights', worldCache);
+  root.userData.headlightDummy = headlights
+    ? [Math.abs(headlights.elements[12]), headlights.elements[13], headlights.elements[14]]
+    : null;
 
   root.traverse((object) => {
     object.castShadow = true; // body/wheels/parts cast + receive sun shadows
     object.receiveShadow = true;
   });
+  tagHeadlights(root, textures);
 
   return {
     doors,
@@ -415,7 +422,6 @@ function collectDamGeometry(clump: RWClump): Map<string, RWGeometry> {
   return damGeometry;
 }
 
-/** Gather the vehicle's env-map-reflective materials (tagged in `buildMaterial`), deduped. */
 function collectReflectiveMaterials(root: Object3D): MeshStandardMaterial[] {
   const found = new Set<MeshStandardMaterial>();
   root.traverse((object) => {
@@ -483,6 +489,33 @@ function seatMatrix(clump: RWClump, name: string, worldCache: Map<number, Matrix
   const index = clump.frames.findIndex((f) => f.name.toLowerCase() === name);
 
   return index >= 0 ? worldMatrix(clump, index, worldCache).clone() : null;
+}
+
+/** Gather the vehicle's env-map-reflective materials (tagged in `buildMaterial`), deduped. */
+/**
+ * Tag the front-light materials (those using the shared `vehiclelights128` texture) with their day/night
+ * maps on `userData` so the headlight system can swap them to `vehiclelightson128` (same UVs, the "lights on"
+ * variant) when the car drives at night. No-op if the car uses neither texture.
+ */
+function tagHeadlights(root: Object3D, textures: Map<string, Texture>): void {
+  const lightsOn = textures.get('vehiclelightson128');
+  if (!lightsOn) {
+    return;
+  }
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      const map = (material as MeshStandardMaterial).map;
+      if (map && map.name.toLowerCase() === 'vehiclelights128' && !material.userData.lightsOnMap) {
+        material.userData.lightsOffMap = map;
+        material.userData.lightsOnMap = lightsOn;
+      }
+    }
+  });
 }
 
 /** A vehicle body mesh: geometry + painted/glass materials. */

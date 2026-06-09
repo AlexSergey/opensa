@@ -26,6 +26,7 @@ import {
   type GameState,
   type LightsConfig,
   type MoonConfig,
+  type NightConfig,
   type ShadowsConfig,
   type SkyConfig,
   type SsaoConfig,
@@ -39,6 +40,7 @@ import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/
 import { BasicRenderPipeline } from './plugins/render-pipeline';
 import { type CellCoord } from './streaming/grid';
 import { GameClock } from './time/game-clock';
+import { inHourWindow } from './time/hour-window';
 import { type WeatherBlend, WeatherTransition } from './weather/weather-transition';
 
 const FIXED_STEP = 1 / 60;
@@ -227,6 +229,15 @@ export class Game {
     this.events.emit('ready');
   }
 
+  /** Whether it's "night" by the configured lamp hours (`graphics.lights.nightStartHour/EndHour`). The single
+   *  hour-based night signal for night lights — coronas + vehicle headlights (the master `lights.enabled`
+   *  toggle is applied per-feature by callers). Distinct from `SkyPlugin`'s sun-height factor for atmosphere. */
+  isNight(): boolean {
+    const lights = this.config.graphics.lights;
+
+    return inHourWindow(((this.getHours() % 24) + 24) % 24, lights.nightStartHour, lights.nightEndHour);
+  }
+
   /** Every grid cell that holds content (for the debug section inspector). */
   listCells(): CellCoord[] {
     return this.adapter?.listCells() ?? [];
@@ -343,6 +354,11 @@ export class Game {
   /** Tune the night moon (size/glow/elevation) at runtime; merges into `graphics.moon`. */
   setMoon(patch: Partial<MoonConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, moon: { ...this.config.graphics.moon, ...patch } } });
+  }
+
+  /** Tune night ambient/atmosphere (brightness/tint) at runtime; merges into `graphics.night`. */
+  setNight(patch: Partial<NightConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, night: { ...this.config.graphics.night, ...patch } } });
   }
 
   /** Toggle sun shadows at runtime; merges into `graphics.shadows`. */

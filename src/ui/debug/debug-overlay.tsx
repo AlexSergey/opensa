@@ -6,6 +6,7 @@ import type {
   Game,
   LightsConfig,
   MoonConfig,
+  NightConfig,
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,
@@ -50,6 +51,8 @@ export interface DebugActions {
   lights(): LightsConfig;
   /** Current night-moon config (size/glow/elevation). */
   moon(): MoonConfig;
+  /** Current night ambient/atmosphere config (brightness/tint). */
+  night(): NightConfig;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
   /** Re-drop Tommy at his current spot (to unstick). */
@@ -70,6 +73,8 @@ export interface DebugActions {
   setLights(patch: Partial<LightsConfig>): void;
   /** Tune the night moon (size/glow/elevation). */
   setMoon(patch: Partial<MoonConfig>): void;
+  /** Tune night ambient/atmosphere (brightness/tint). */
+  setNight(patch: Partial<NightConfig>): void;
   /** Toggle sun shadows. */
   setShadows(patch: Partial<ShadowsConfig>): void;
   /** Tune the god-rays shader (density/exposure/weight). */
@@ -162,6 +167,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [stars, setStars] = useState<StarsConfig>(() => actions.stars());
   const [lights, setLights] = useState<LightsConfig>(() => actions.lights());
   const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
+  const [night, setNight] = useState<NightConfig>(() => actions.night());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -595,6 +601,52 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={moon.brightness}
               />
+              <div style={styles.groupLabel}>NIGHT BRIGHTNESS: {night.brightness.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const brightness = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, brightness }));
+                  actions.setNight({ brightness });
+                }}
+                step={0.02}
+                type="range"
+                value={night.brightness}
+              />
+              <div style={styles.groupLabel}>CORONA DISTANCE: {night.coronaDrawDistance.toFixed(0)}</div>
+              <input
+                max={400}
+                min={20}
+                onChange={(e) => {
+                  const coronaDrawDistance = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, coronaDrawDistance }));
+                  actions.setNight({ coronaDrawDistance });
+                }}
+                step={5}
+                type="range"
+                value={night.coronaDrawDistance}
+              />
+              {(['R', 'G', 'B'] as const).map((channel, i) => (
+                <div key={channel}>
+                  <div style={styles.groupLabel}>
+                    NIGHT TINT {channel}: {night.tint[i].toFixed(2)}
+                  </div>
+                  <input
+                    max={1}
+                    min={0}
+                    onChange={(e) => {
+                      const tint = [...night.tint] as [number, number, number];
+                      tint[i] = Number(e.target.value);
+                      setNight((prev) => ({ ...prev, tint }));
+                      actions.setNight({ tint });
+                    }}
+                    step={0.02}
+                    type="range"
+                    value={night.tint[i]}
+                  />
+                </div>
+              ))}
               <label style={styles.label}>
                 <input
                   checked={toneMapping}

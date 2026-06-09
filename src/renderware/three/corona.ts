@@ -18,20 +18,24 @@ const VERTEX = `
   attribute float aFar;
   uniform float uViewportHeight;
   uniform float uScale;
+  uniform float uDrawDistance; // global near-field cap: coronas fade out by this distance
   varying vec3 vColor;
   varying float vFade;
   void main() {
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 0.001);
-    // Nudge the point toward the camera (view-space +z) so the corona clears its own thin lamp head
-    // (a centred post light sits ~1u behind its housing); world geometry farther in front still occludes it.
-    mv.z += 3.0;
+    // No depth bias: the bulb's true depth, so world geometry (bridge deck, walls) genuinely occludes the
+    // corona (a per-fragment depth test against curved geometry naturally clips the round glow). A toward-
+    // camera bias punched the glow through structures the lamp is mounted on (bridges/walls within ~1u).
     gl_Position = projectionMatrix * mv;
     // World size → screen pixels: proj[1][1] = 1/tan(fov/2); NDC height = viewport pixels / 2.
     float px = aSize * uScale * projectionMatrix[1][1] * uViewportHeight / (2.0 * dist);
     gl_PointSize = clamp(px, 0.0, 256.0);
-    vFade = 1.0 - smoothstep(aFar * 0.75, aFar, dist); // fade toward the corona far-clip
+    // Fade toward the per-lamp far-clip AND the configurable global draw distance (whichever is nearer).
+    float farFade = 1.0 - smoothstep(aFar * 0.75, aFar, dist);
+    float distFade = 1.0 - smoothstep(uDrawDistance * 0.8, uDrawDistance, dist);
+    vFade = farFade * distFade;
   }
 `;
 
@@ -54,12 +58,12 @@ const FRAGMENT = `
  */
 export const coronaMaterial = new ShaderMaterial({
   blending: AdditiveBlending,
-  // Depth-tested so world geometry (buildings) occludes coronas — the self-occlusion by a lamp's own head is
-  // handled by a small toward-camera depth nudge in the vertex shader. Never writes depth (it's a glow).
+  // Depth-tested so world geometry (buildings, bridge decks) occludes coronas; never writes depth (it's a glow).
   depthWrite: false,
   fragmentShader: FRAGMENT,
   transparent: true,
   uniforms: {
+    uDrawDistance: { value: 120 },
     uOn: { value: 0 },
     uScale: { value: 1 },
     uViewportHeight: { value: 1080 },

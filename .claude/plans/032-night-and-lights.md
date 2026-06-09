@@ -63,9 +63,11 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    immediately. Wired in canvas-host after streaming; unit-tested. No config (uses `game.getHours()`).
 
 2. ✅ **Dark nights — DONE.** In `SkyPlugin`: a `night` factor `1 - smoothstep(sunHeight, 0, 0.22)` (smooth
-   dusk/dawn cross-fade). Night ambient lowered (`AMBIENT_NIGHT 0.35 → 0.16`) and the ambient **colour** lerps
-   white→cool blue (`NIGHT_TINT`) by `night`, so evenings go dark + moody (world meshes are `MeshStandardMaterial`,
-   lit by this ambient — no per-material prelit shader needed after all). The same `night` drives the stars.
+   dusk/dawn cross-fade). The night ambient **brightness** (moonlight floor) + cool **tint** (lerped white→tint
+   by `night`) make evenings dark + moody; world meshes are `MeshStandardMaterial` lit by this ambient (no
+   per-material prelit shader needed). The same `night` drives the stars. Tunable via
+   **`Config.graphics.night { brightness, tint }`** + `Game.setNight` + debug **NIGHT BRIGHTNESS / TINT R/G/B**
+   sliders (was the hardcoded `AMBIENT_NIGHT` / `NIGHT_TINT` consts).
 
 3. ✅ **2dfx light parsing — DONE.** Added `RwSection.TWO_D_EFFECT` (`0x253F2F8`); `dff.ts` parses the
    geometry 2d-effect plugin's **Light** entries (type 0) into `RWGeometry.lights: RWLight2d[]` (position,

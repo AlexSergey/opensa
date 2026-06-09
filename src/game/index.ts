@@ -12,6 +12,7 @@ export type {
   Config,
   LightsConfig,
   MoonConfig,
+  NightConfig,
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,

@@ -19,7 +19,7 @@ import {
   Vector3,
 } from 'three';
 
-import type { MoonConfig } from '../interfaces/config.interface';
+import type { MoonConfig, NightConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext } from './plugin';
 
 /** The timecyc values the sky/sun need (RGB 0–255 + sun floats). Grows as graphics expand. */
@@ -74,9 +74,6 @@ const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
 /** Light tuning (timecyc dir/dirMult are ~constant for EXTRASUNNY, so day/night rides the sun height). */
 const SUN_INTENSITY = 2.2; // directional at peak
 const AMBIENT_DAY = 1.0;
-const AMBIENT_NIGHT = 0.5; // moonlight floor: keeps map objects clearly visible (lamps/coronas add accents)
-/** Night ambient tint — a soft moonlight blue, lerped in from white as the sun sets. */
-const NIGHT_TINT = new Color(0.6, 0.66, 0.85);
 /** Heavy overcast: how much the direct sun is dimmed, and the ambient lift that fills in for it. */
 const OVERCAST_DIM = 0.8;
 const AMBIENT_OVERCAST = 0.35;
@@ -200,6 +197,7 @@ export class SkyPlugin implements Plugin {
   private readonly material: ShaderMaterial;
   private readonly moonDisc: Sprite;
   private night = 0; // 0 day → 1 deep night (sun height); drives stars + the cool ambient tint
+  private readonly nightTint = new Color(); // scratch for the configurable night ambient tint
   private readonly sample: (hour: number) => SkySample;
   private readonly sun = new DirectionalLight(0xffffff, 1);
   private readonly sunDir = new Vector3();
@@ -300,6 +298,7 @@ export class SkyPlugin implements Plugin {
       context.config.graphics.sun.sunSize,
       context.config.graphics.sun.godraysSize,
       context.config.graphics.moon,
+      context.config.graphics.night,
     );
     this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
@@ -310,6 +309,7 @@ export class SkyPlugin implements Plugin {
       context.config.graphics.sun.sunSize,
       context.config.graphics.sun.godraysSize,
       context.config.graphics.moon,
+      context.config.graphics.night,
     ); // sets cloudCover/night
     const clouds = context.config.graphics.clouds;
     this.material.uniforms.uTime.value = context.clock.elapsed;
@@ -322,7 +322,7 @@ export class SkyPlugin implements Plugin {
   }
 
   /** Push the current time-of-day sky/sun state into the dome, lights and sun/moon sprites. */
-  private apply(sunScale: number, godraysScale: number, moon: MoonConfig): void {
+  private apply(sunScale: number, godraysScale: number, moon: MoonConfig, nightCfg: NightConfig): void {
     const sky = this.sample(this.getHour());
     setColor(this.material.uniforms.uTop.value as Color, sky.skyTop, false);
     setColor(this.material.uniforms.uBottom.value as Color, sky.skyBot, false);
@@ -346,8 +346,11 @@ export class SkyPlugin implements Plugin {
     this.sun.position.copy(this.sunDir).multiplyScalar(100); // direction only (it's a directional light)
     this.sun.shadow.intensity = 1 - overcast; // shadows fade out under cloud (no harsh shadow when overcast)
     const ambientDay = AMBIENT_DAY + AMBIENT_OVERCAST * overcast;
-    this.ambient.intensity = AMBIENT_NIGHT + (ambientDay - AMBIENT_NIGHT) * (above ? Math.min(1, height + 0.25) : 0);
-    this.ambient.color.setRGB(1, 1, 1).lerp(NIGHT_TINT, this.night); // white by day → cool blue at night
+    const nightLow = nightCfg.brightness; // configurable moonlight floor
+    this.ambient.intensity = nightLow + (ambientDay - nightLow) * (above ? Math.min(1, height + 0.25) : 0);
+    // White by day → the configurable cool night tint, by the night factor.
+    this.nightTint.setRGB(nightCfg.tint[0], nightCfg.tint[1], nightCfg.tint[2]);
+    this.ambient.color.setRGB(1, 1, 1).lerp(this.nightTint, this.night);
 
     // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
     const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);
@@ -409,10 +412,14 @@ export class SkyPlugin implements Plugin {
   /** Aim the sun's shadow map at the view: centre the ortho frustum on the camera, light up-sun from it.
    *  The focus is **snapped to texel increments** so the shadows don't crawl/shimmer as the camera moves. */
   private updateShadow(camera: PerspectiveCamera, enabled: boolean): void {
-    // No shadows at night / when disabled / once cloud cover has faded them out (skip the wasted pass).
-    const cast = enabled && this.sun.intensity > 0 && this.sun.shadow.intensity > 0.01;
-    this.sun.castShadow = cast;
-    if (!cast) {
+    const lit = this.sun.intensity > 0 && this.sun.shadow.intensity > 0.01; // sun actually casting now
+    // Keep `castShadow` stable across day↔night: toggling it recompiles every shadow-receiving material
+    // (a dusk/dawn hitch — worse now the vehicle-headlight spotlights enlarge those shaders). Instead skip
+    // the shadow *render* at night/overcast via `autoUpdate` (no recompile); the frozen map is invisible
+    // anyway since the sun then lights nothing.
+    this.sun.castShadow = enabled;
+    this.sun.shadow.autoUpdate = enabled && lit;
+    if (!enabled || !lit) {
       return;
     }
     // Snap the focus to the shadow-map texel grid **in the light's right/up basis** (world-axis snapping
