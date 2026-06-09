@@ -10,6 +10,7 @@ import {
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
+  Vector3,
 } from 'three';
 
 import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/binary/types';
@@ -28,6 +29,14 @@ export interface BuildClumpOptions {
   /** Rotate the result from RenderWare Z-up into three.js Y-up. Default true.
    *  Set false when placing instances in shared GTA world (Z-up) space. */
   convertToYUp?: boolean;
+}
+
+/** A model's 2d-effect light in clump-local space (frame transform applied; still native Z-up). */
+export interface ClumpLight {
+  color: [number, number, number];
+  farClip: number;
+  position: [number, number, number];
+  size: number;
 }
 
 /** A single-material renderable slice of a clump (for InstancedMesh). */
@@ -67,6 +76,35 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>, opti
   }
 
   return root;
+}
+
+/**
+ * Extract a clump's 2d-effect lights/coronas, each placed by its atomic's frame transform into
+ * clump-local space (native Z-up — the streaming root applies the Z-up→Y-up rotation, like the parts).
+ * Empty when the model has no lights. The caller multiplies these by each instance transform.
+ */
+export function buildClumpLights(clump: RWClump): ClumpLight[] {
+  const lights: ClumpLight[] = [];
+  const point = new Vector3();
+  for (const atomic of clump.atomics) {
+    const rw = clump.geometries[atomic.geometryIndex];
+    if (!rw || rw.lights.length === 0) {
+      continue;
+    }
+    const frame = clump.frames[atomic.frameIndex];
+    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+    for (const light of rw.lights) {
+      point.set(light.position[0], light.position[1], light.position[2]).applyMatrix4(matrix);
+      lights.push({
+        color: [light.color[0], light.color[1], light.color[2]],
+        farClip: light.coronaFarClip,
+        position: [point.x, point.y, point.z],
+        size: light.coronaSize,
+      });
+    }
+  }
+
+  return lights;
 }
 
 /**

@@ -74,13 +74,14 @@
     - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [✅] Water shader
   - [ ] Night objects (Tobj)
-  - [ ] 2dfx (maybe)
+  - [✅] 2dfx
+  - [ ] Car headlights - Direct Light + texture from Vehicle
 - [✅] Car reflections
 - [✅] Weather manager
-- [ ] UI Layer
-  - [ ] The Ui layer should not be involved in post processing.
-  - [ ] Find good fonts
-  - [ ] Show current time
+- [✅] UI Layer
+  - [✅] The Ui layer should not be involved in post processing.
+  - [✅] Find good fonts
+  - [✅] Show current time
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Gzip
@@ -111,6 +112,7 @@ Known issues:
 - [ ] Exiting a car that's flipped over while already in it—Tommy emerges from the wrong side (the door calculation only takes into account yaw). We'll come back when you decide.
 - [ ] Ugly water foam
 - [ ] Shadow acne on small objects (temporal solution: disable shadows for smal objects)
+- [ ] Streaming is blinking
 
 Next iterations:
 - [ ] Particles
@@ -144,3 +146,4 @@ Next iterations:
 - [ ] Health for Peds
 - [ ] Health for vehs
 - [ ] HUD
+- [ ] Spotlights from lamps at night

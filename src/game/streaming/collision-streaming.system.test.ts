@@ -16,6 +16,8 @@ function config(collisionDrawDistance: number): Config {
     graphics: {
       bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
       clouds: { coverage: 0.5, opacity: 0.85 },
+      lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
+      moon: { brightness: 1, elevationDeg: 35, size: 150 },
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },

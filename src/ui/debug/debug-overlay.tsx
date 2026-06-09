@@ -4,6 +4,8 @@ import type {
   BloomConfig,
   CloudsConfig,
   Game,
+  LightsConfig,
+  MoonConfig,
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,
@@ -44,6 +46,10 @@ export interface DebugActions {
   godrays(): boolean;
   /** Current god-rays light-source size (shaft strength). */
   godraysSize(): number;
+  /** Current night-lights (street-lamp coronas) config. */
+  lights(): LightsConfig;
+  /** Current night-moon config (size/glow/elevation). */
+  moon(): MoonConfig;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
   /** Re-drop Tommy at his current spot (to unstick). */
@@ -60,6 +66,10 @@ export interface DebugActions {
   setGodrays(enabled: boolean): void;
   /** Set the god-rays light-source size (shaft strength). */
   setGodraysSize(size: number): void;
+  /** Toggle night street-lamp lights (coronas). */
+  setLights(patch: Partial<LightsConfig>): void;
+  /** Tune the night moon (size/glow/elevation). */
+  setMoon(patch: Partial<MoonConfig>): void;
   /** Toggle sun shadows. */
   setShadows(patch: Partial<ShadowsConfig>): void;
   /** Tune the god-rays shader (density/exposure/weight). */
@@ -150,6 +160,8 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [ssao, setSsao] = useState<SsaoConfig>(() => actions.ssao());
   const [shadows, setShadows] = useState<ShadowsConfig>(() => actions.shadows());
   const [stars, setStars] = useState<StarsConfig>(() => actions.stars());
+  const [lights, setLights] = useState<LightsConfig>(() => actions.lights());
+  const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -531,6 +543,58 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 />
                 <span style={stars.enabled ? styles.optionActive : styles.option}>Night stars</span>
               </label>
+              <label style={styles.label}>
+                <input
+                  checked={lights.enabled}
+                  onChange={() => {
+                    const enabled = !lights.enabled;
+                    setLights((prev) => ({ ...prev, enabled }));
+                    actions.setLights({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={lights.enabled ? styles.optionActive : styles.option}>Night lights (lamps)</span>
+              </label>
+              <div style={styles.groupLabel}>MOON SIZE: {moon.size.toFixed(0)}</div>
+              <input
+                max={400}
+                min={40}
+                onChange={(e) => {
+                  const size = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, size }));
+                  actions.setMoon({ size });
+                }}
+                step={5}
+                type="range"
+                value={moon.size}
+              />
+              <div style={styles.groupLabel}>MOON ELEVATION: {moon.elevationDeg.toFixed(0)}°</div>
+              <input
+                max={80}
+                min={2}
+                onChange={(e) => {
+                  const elevationDeg = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, elevationDeg }));
+                  actions.setMoon({ elevationDeg });
+                }}
+                step={1}
+                type="range"
+                value={moon.elevationDeg}
+              />
+              <div style={styles.groupLabel}>MOON BRIGHTNESS: {moon.brightness.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const brightness = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, brightness }));
+                  actions.setMoon({ brightness });
+                }}
+                step={0.05}
+                type="range"
+                value={moon.brightness}
+              />
               <label style={styles.label}>
                 <input
                   checked={toneMapping}

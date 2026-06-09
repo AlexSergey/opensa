@@ -27,6 +27,8 @@ export const RwSection = {
   TEXTURE: 0x06,
   TEXTURE_DICTIONARY: 0x16,
   TEXTURE_NATIVE: 0x15,
+  // 2d Effect plugin (per-geometry lights/coronas, particles, ped attractors, …)
+  TWO_D_EFFECT: 0x253f2f8,
 } as const;
 
 /** RpMatFX material effect type (the env-map effect is what SA vehicles use for reflections). */

@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { type Mesh, type Object3D, Quaternion, Vector3 } from 'three';
+import { type Mesh, type Object3D, Quaternion, type Texture, Vector3 } from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
@@ -20,12 +20,13 @@ import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehi
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { inHourWindow } from '../game/time/hour-window';
 import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
-import { sampleTimecycBlend, WEATHER_NAMES } from '../renderware';
+import { buildTextureMap, coronaMaterial, parseTxd, sampleTimecycBlend, WEATHER_NAMES } from '../renderware';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
@@ -66,6 +67,15 @@ const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
 interface Bootstrap {
   debugActions: DebugActions;
   game: Game;
+}
+
+/** Fetch + parse a standalone .txd into a name→Texture map (null on any failure). */
+async function loadTxd(url: string): Promise<Map<string, Texture> | null> {
+  try {
+    return buildTextureMap(parseTxd(await fetch(url).then((response) => response.arrayBuffer())));
+  } catch {
+    return null;
+  }
 }
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
@@ -214,6 +224,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
         clouds: { coverage: 0.5, opacity: 0.85 },
+        lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
+        moon: { brightness: 1, elevationDeg: 5, size: 55 },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -282,7 +294,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         waterAlpha: e.water[3] / 255,
       };
     };
-    const sky = new SkyPlugin(skySample, () => game.getHours()); // sky dome + sun + lights from timecyc (smooth)
+    // The moon uses the SA `coronamoon` texture from particle.txd (alpha-shaped); null if it can't be loaded.
+    const particleTextures = await loadTxd(`${BASE}/models/particle.txd`);
+    const moonTexture = particleTextures?.get('coronamoon') ?? null;
+    const sky = new SkyPlugin(skySample, () => game.getHours(), moonTexture); // sky dome + sun/moon + lights
     const reflection = new VehicleReflectionPlugin(() => game.getHours()); // sky-probe reflections on spawned cars
 
     // Water mesh (geometry from the adapter) loaded up front so the WaterPlugin can own its material;
@@ -336,6 +351,20 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.
     game.addSystem(new TimedObjectSystem(game.getStreamingRoot(), () => game.getHours()));
+
+    // Fade the street-lamp coronas on/off around the configured night hours (shared corona material).
+    let coronaOn = 0;
+    game.addSystem({
+      name: 'coronas',
+      update(delta: number): void {
+        const lights = game.getConfig().graphics.lights;
+        const hour = ((game.getHours() % 24) + 24) % 24;
+        const on = lights.enabled && inHourWindow(hour, lights.nightStartHour, lights.nightEndHour);
+        coronaOn += ((on ? 1 : 0) - coronaOn) * Math.min(1, delta * 2); // ~0.5s ease
+        coronaMaterial.uniforms.uOn.value = coronaOn;
+        coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
+      },
+    });
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
     game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
@@ -464,6 +493,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       gameTime: () => game.getTime(),
       godrays: () => game.getConfig().graphics.sun.godrays,
       godraysSize: () => game.getConfig().graphics.sun.godraysSize,
+      lights: () => game.getConfig().graphics.lights,
+      moon: () => game.getConfig().graphics.moon,
       playerCoords: () => character.viewOf(),
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
@@ -475,6 +506,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),
       setGodraysSize: (size) => game.setGodraysSize(size),
+      setLights: (patch) => game.setLights(patch),
+      setMoon: (patch) => game.setMoon(patch),
       setShadows: (patch) => game.setShadows(patch),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),

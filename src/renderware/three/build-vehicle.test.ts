@@ -23,6 +23,7 @@ function material(partial: Partial<RWMaterial> = {}): RWMaterial {
 function triangleGeometry(materials: RWMaterial[]): RWGeometry {
   return {
     flags: GeometryFlag.POSITIONS,
+    lights: [],
     materials,
     normals: null,
     numUVLayers: 0,

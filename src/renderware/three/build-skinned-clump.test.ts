@@ -24,6 +24,7 @@ function frame(name: string, parentIndex: number): RWFrame {
 function geometry(numBones?: number): RWGeometry {
   return {
     flags: 0,
+    lights: [],
     materials: [{ color: [255, 255, 255, 255], texture: null, textured: false }],
     normals: null,
     numUVLayers: 0,

@@ -2,6 +2,8 @@ import type { Object3D } from 'three';
 
 import type { System } from '../core/system';
 
+import { inHourWindow } from './hour-window';
+
 /** A `tobj` visibility window in hours: `[on, off)`, wrapping midnight when `on > off`. */
 interface TimedWindow {
   off: number;
@@ -30,16 +32,8 @@ export class TimedObjectSystem implements System {
     for (const child of this.root.children) {
       const window = child.userData.timed as TimedWindow | undefined;
       if (window) {
-        child.visible = inWindow(hour, window.on, window.off);
+        child.visible = inHourWindow(hour, window.on, window.off);
       }
     }
   }
-}
-
-function inWindow(hour: number, on: number, off: number): boolean {
-  if (on === off) {
-    return true; // degenerate window → always visible
-  }
-
-  return on < off ? hour >= on && hour < off : hour >= on || hour < off;
 }

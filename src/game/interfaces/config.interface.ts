@@ -83,6 +83,10 @@ export interface GraphicsConfig {
   bloom: BloomConfig;
   /** Procedural clouds on the sky dome. */
   clouds: CloudsConfig;
+  /** Night light sources (2d-effect coronas — street lamps etc.). */
+  lights: LightsConfig;
+  /** Night moon disc + glow. */
+  moon: MoonConfig;
   /** Sun shadows (directional shadow map). */
   shadows: ShadowsConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */
@@ -114,8 +118,28 @@ export interface HudTextStyle {
   fontSize: number;
 }
 
+/** Night light-source (2d-effect corona) tuning. */
+export interface LightsConfig {
+  /** Master toggle (off = coronas never render). */
+  enabled: boolean;
+  /** Hour the lamps switch off in the morning (e.g. 6 = 06:00). */
+  nightEndHour: number;
+  /** Hour the lamps switch on in the evening (e.g. 20 = 20:00). */
+  nightStartHour: number;
+}
+
 /** Diagnostic severity, low → high. The configured `showLogs` value is the floor that is emitted. */
 export type LogLevel = 'debug' | 'error' | 'log' | 'warn';
+
+/** Night moon tuning (a static sprite that fades in as night falls). */
+export interface MoonConfig {
+  /** Brightness multiplier for the (additive) moon sprite. */
+  brightness: number;
+  /** Height of the static moon above the horizon, in degrees. */
+  elevationDeg: number;
+  /** Moon disc size (world units). */
+  size: number;
+}
 
 /** Player movement tuning (world units/second; rates in units/s²). */
 export interface MovementConfig {

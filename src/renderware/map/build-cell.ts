@@ -1,17 +1,19 @@
-import type { InstancedMesh } from 'three';
+import type { Object3D } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { MapDefinitions } from '../parsers/text';
 import type { GridCell, WorldGrid } from './world-grid';
 
-import { addToGroup, buildInstancedMeshes, type RegionMeshData } from './build-region';
+import { buildCoronaPoints } from '../three/corona';
+import { addToGroup, buildInstancedMeshes, collectCoronas, type RegionMeshData } from './build-region';
 import { cellKey } from './world-grid';
 
 /**
- * Build the instanced meshes for one grid cell — its HD (`lod=false`) or LOD
- * (`lod=true`) instances, grouped by model with the same transforms /
- * `userData.region` as {@link buildRegion}. Empty array if the cell isn't in the
- * grid. The streaming layer calls this per cell and caches the result.
+ * Build the renderable objects for one grid cell — its HD (`lod=false`) or LOD
+ * (`lod=true`) instanced meshes (grouped by model, with `userData.region` for
+ * picking), plus, for HD cells, a single `Points` glow cloud for any 2d-effect
+ * coronas (street-lamp lights). Empty array if the cell isn't in the grid. The
+ * streaming layer calls this per cell and caches the result.
  */
 export function buildCell(
   archive: ImgArchive,
@@ -20,13 +22,20 @@ export function buildCell(
   cx: number,
   cy: number,
   lod: boolean,
-): InstancedMesh[] {
+): Object3D[] {
   const cell = grid.get(cellKey(cx, cy));
   if (!cell) {
     return [];
   }
+  const groups = [...cellGroups(defs, cell, lod).values()];
+  const objects: Object3D[] = buildInstancedMeshes(archive, groups);
+  // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect).
+  const coronas = lod ? null : buildCoronaPoints(collectCoronas(archive, groups));
+  if (coronas) {
+    objects.push(coronas);
+  }
 
-  return buildInstancedMeshes(archive, cellGroups(defs, cell, lod).values());
+  return objects;
 }
 
 /** Group one cell's HD (`lod=false`) or LOD (`lod=true`) instances by model+txd. */

@@ -10,6 +10,8 @@ export type {
   BloomConfig,
   CloudsConfig,
   Config,
+  LightsConfig,
+  MoonConfig,
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,

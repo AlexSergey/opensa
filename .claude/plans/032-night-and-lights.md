@@ -4,7 +4,9 @@ Make **evening/night** look right: timed objects appear/disappear at their time-
 other lights switch on after dusk (configurable, default 20:00), lit windows glow, and the night sky gets
 **stars**. Extends [[029-graphics]] (night was reserved there) and reuses the [[031-weather-manager]] sky/
 timecyc plumbing. **Goal stays: best picture, least cost.**
-Status: **TOBJ gating + dark nights + stars DONE** (phases 1–2, 6); **2dfx coronas / lit windows / moon remain** (phases 3–5, 7).
+Status: **phases 1–7 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon) + **corona
+occlusion polish DONE**. Optional left for later: **point lights** under coronas (perf-sensitive — user
+deferred), corona texture variety.
 
 ## Current state (what the research found)
 
@@ -65,23 +67,53 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    white→cool blue (`NIGHT_TINT`) by `night`, so evenings go dark + moody (world meshes are `MeshStandardMaterial`,
    lit by this ambient — no per-material prelit shader needed after all). The same `night` drives the stars.
 
-3. **2dfx light parsing** (renderware). Add `0x253F2F8` to `RwSection`; parse the geometry 2d-effect plugin in
-   `dff.ts` into a typed model data: `RWLight { position, color, coronaSize, range, coronaTex, shadowTex,
-   flags … }[]` on the geometry/clump. **Decode the exact layout against a known lamp DFF** (e.g. a
-   `streetlamp`/`lamppost`) + unit test, mirroring the original DFF plan's verification. Non-light entry types
-   are skipped (extension point).
+3. ✅ **2dfx light parsing — DONE.** Added `RwSection.TWO_D_EFFECT` (`0x253F2F8`); `dff.ts` parses the
+   geometry 2d-effect plugin's **Light** entries (type 0) into `RWGeometry.lights: RWLight2d[]` (position,
+   RGBA, corona size, far-clip, corona texture, flags1), skipping non-light entries by their `dataSize`.
+   **Byte layout verified against real lamp DFFs** (`mlamppost`, `streetlamp2`, `lamppost2`, `vegaslampost2`,
+   `chinalamp_sf`) — lights sit atop the posts with sane warm/white colours, `coronastar`, sizes 1–4,
+   far-clips 62–300. Synthetic-chunk unit tests cover light parse + non-light skip + no-effect.
 
-4. **Corona / light rendering** (a `LightsPlugin` or system). For each placed instance that carries lights,
-   spawn camera-facing additive corona sprites at `instanceMatrix · localPos` (texture from `particle.txd`),
-   **night-gated** by flag + sun-below-horizon, **distance-faded**, and **occlusion-tested** (depth compare /
-   raycast against the streamed cell, budgeted). Optionally a pooled set of real point lights for the **N
-   nearest** coronas (cheap, capped) so nearby walls/road catch light. Lives alongside streaming so coronas
-   load/unload with their cell; hard cap + distance cull for cost.
-   - Reuse: the sun corona sprite/`radialTexture` pattern already in `sky.plugin.ts`.
+4. ✅ **Corona rendering — DONE (sprites; point lights deferred).** `renderware/three/corona.ts` owns a
+   **shared additive `ShaderMaterial`** (`coronaMaterial`) + `buildCoronaPoints(entries)` → one `Points`
+   glow cloud per cell. `build-clump.buildClumpLights(clump)` extracts a model's lights in clump-local space
+   (frame applied); `build-region.collectCoronas` places them by every instance transform (world Z-up);
+   `build-cell` appends the `Points` to **HD** cells (streams in/out with the cell). The shader sizes points
+   perspective-correctly (`proj[1][1] · viewportHeight / dist`, clamped) with a soft radial glow, per-point
+   colour, and a far-clip fade; a corona render `Config.graphics.lights { enabled, nightStartHour=20,
+   nightEndHour=6 }` drives a tiny canvas-host system that eases the shared `uOn` on/off around the night
+   hours (+ updates `uViewportHeight`). Debug **Night lights (lamps)** toggle + `Game.setLights`. Hour-window
+   logic shared with the timed objects via `game/time/hour-window.ts`.
+   ✅ **Occlusion (polish) — DONE.** Coronas are **depth-tested** (buildings occlude them, no shine-through),
+   and self-occlusion by a lamp's own head is solved by a small **toward-camera depth nudge** in the vertex
+   shader (`mv.z += 3.0`): a centred post light (e.g. `Streetlamp1`, light at x≈0/z=2.74) clears its housing
+   while world geometry farther in front still occludes the glow. (Replaced the earlier `depthTest:false`.)
+   - **Deferred (try later):** real **point lights for nearby coronas** so the ground/walls catch warm light.
+     Sketch: store each cell's `CoronaEntry[]` on the `Points` `userData`; a small pool (~6) of `PointLight`s
+     under the streaming root follows the **nearest** coronas to the camera each frame (camera in GTA space via
+     `streamingRoot.worldToLocal`), colour/intensity × `uOn`, distance-culled. **Perf-sensitive** (adds
+     per-fragment light cost to every world material), so make it **config-toggled + off by default** (only
+     add the lights to the scene when enabled, to stay zero-cost off). User chose to **skip for now**.
+   - **Deferred:** corona texture variety (`coronastar` look is baked into the shader for now),
+     particle/other 2dfx entry types.
 
-5. **Lit windows / emissive night**. Where the night model is a lit-texture variant (phase 1 already swaps it
-   in at night), make it actually **glow**: treat its emissive from the lit texture (or a flat emissive boost),
-   gated by night, so it's visible in the dark and reads as interior light. Pairs with bloom (plan 029).
+5. ✅ **Lit windows / emissive night — DONE.** Night-lit timed variants (windows `[on, off)` that wrap
+   midnight, e.g. `20→6`) get their materials made **self-illuminated** in `build-region`:
+   `emissiveMap = the diffuse map`, `emissive = white`, `emissiveIntensity = 1.2`. So the bright window
+   texels glow in the dark while dark texels stay dark — no per-window data needed. They only render at
+   night (phase-1 gating), so no daytime toggle is required; pairs with bloom (plan 029). Daytime `[6,20)`
+   timed variants are left matte.
+   - **DECISION — vanilla-accurate only (no mod-style window lighting).** Researched the authentic SA
+     mechanism: lit windows are **separate night tobj overlay models + textures** (`nitelites*`,
+     `nightlights*`, `LTSLAsky/build*`, `lanitewin*`), i.e. model/texture swapping — *not* dynamic per-window
+     lighting on the base building. We reproduce exactly that (emissive on night tobj), so buildings WITH a
+     nearby overlay glow (e.g. `LongBeBlok1_LAe` ← `nitelites_LAE2` 30u away) and buildings WITHOUT one stay
+     dark in vanilla (e.g. `mcstraps_LAe2` in Grove St — no overlay, no 2dfx, nearest overlay 168u away).
+     This matches the original game (lit windows = downtown/commercial; residential hoods are dark). We
+     **deliberately do not** add the heuristic "emissive any material whose texture name looks like a window
+     (`*windo*`/`*win*`/`gangwin*`/`*curt*`)" — that's what the *night-windows mods* (IWNL, Proper Night
+     Windows, LS Downtown Night Windows) do, and it's non-vanilla. If we ever want denser nights it'd be an
+     opt-in toggle, but the project choice is vanilla fidelity. See [[gta-sa-lit-windows-vanilla]] memory.
 
 6. ✅ **Stars — DONE.** A procedural hash star field in the dome fragment shader (`starField()`): a gnomonic
    projection of the view direction tiled into cells, ~one star per lit cell with random brightness + gentle
@@ -90,8 +122,14 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    camera-follow + probe layer. `Config.graphics.stars { enabled }` + **Night stars** debug checkbox + setter.
    (Richer point-cloud version remains a future option.)
 
-7. **(Optional) Moon** — a timecyc-coloured billboard opposite the sun arc at night (mirrors the sun disc in
-   `sky.plugin.ts`), maybe phased. Low priority; behind stars.
+7. ✅ **Moon — DONE (static, `coronamoon`).** A **static additive Sprite** in `SkyPlugin` at a fixed sky
+   direction (`MOON_DIR`), using the SA **`coronamoon`** texture from `particle.txd` (alpha-shaped; canvas-host
+   loads it via a small `loadTxd` helper and passes it to the plugin — falls back to a soft radial glow if it
+   can't load). It simply **fades in** as night falls: opacity = `night × cloudFade` (heavy overcast hides it),
+   depth-tested so geometry occludes it, on the reflection-probe layer. (Earlier arc-across-the-sky +
+   procedural cratered disc + glow halo were replaced per the request for a simple static moon.)
+   **`Config.graphics.moon { size, brightness }`** + `Game.setMoon` + debug **MOON SIZE / BRIGHTNESS** sliders
+   (`MOON_DISTANCE` stays a const).
 
 ## Config additions
 

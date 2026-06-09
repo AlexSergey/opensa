@@ -27,6 +27,8 @@ export interface RWFrame {
 
 export interface RWGeometry {
   flags: number;
+  /** 2d-effect lights/coronas (geometry-local positions) for street lamps, signs, etc. — empty if none. */
+  lights: RWLight2d[];
   materials: RWMaterial[];
   /** Vertex normals if stored, else null (compute downstream). */
   normals: Float32Array | null;
@@ -40,6 +42,22 @@ export interface RWGeometry {
   triangles: RWTriangle[];
   /** UV layers, each flattened (numVertices * 2). */
   uvLayers: Float32Array[];
+}
+
+/** A 2d-effect light (corona + optional point light) at a geometry-local position. */
+export interface RWLight2d {
+  /** RGBA 0–255. */
+  color: [number, number, number, number];
+  /** Distance (world units) past which the corona stops drawing. */
+  coronaFarClip: number;
+  /** Corona sprite base size. */
+  coronaSize: number;
+  /** Corona texture name (e.g. `coronastar`), in the model's TXD / particle.txd. */
+  coronaTexture: string;
+  /** SA light flags (corona show-mode / fog / checks) — kept for later gating. */
+  flags: number;
+  /** Geometry-local position. */
+  position: [number, number, number];
 }
 
 export interface RWMaterial {

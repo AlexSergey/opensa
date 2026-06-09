@@ -27,6 +27,7 @@ function clumpWith(geo: RWGeometry): RWClump {
 function geometry(partial: Partial<RWGeometry> = {}): RWGeometry {
   return {
     flags: GeometryFlag.POSITIONS | GeometryFlag.PRELIT | GeometryFlag.TEXTURED,
+    lights: [],
     materials: [
       material({ texture: { maskName: '', name: 'tree_branches44' }, textured: true }),
       material({ color: [200, 100, 50, 255] }),

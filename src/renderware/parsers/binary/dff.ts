@@ -4,6 +4,7 @@ import type {
   RWClump,
   RWFrame,
   RWGeometry,
+  RWLight2d,
   RWMaterial,
   RWMaterialEffects,
   RWSkin,
@@ -16,6 +17,8 @@ import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 
 /** RenderWare chunk header size (type + size + libraryVersion, 3 × u32). */
 const CHUNK_HEADER_BYTES = 12;
+/** 2d-effect entry type for a light/corona (vs particle, ped attractor, …). */
+const LIGHT_EFFECT = 0;
 
 /**
  * Parse a RenderWare Clump (.dff) into a renderer-agnostic RWClump.
@@ -208,7 +211,9 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
     applyBinMeshMaterials(stream, header, triangles);
   }
 
-  return { flags, materials, normals, numUVLayers, positions, prelitColors, skin, triangles, uvLayers };
+  const lights = parseLightEffects(stream, header);
+
+  return { flags, lights, materials, normals, numUVLayers, positions, prelitColors, skin, triangles, uvLayers };
 }
 
 function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
@@ -220,6 +225,48 @@ function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometr
   });
 
   return geometries;
+}
+
+/**
+ * Parse the geometry's 2d Effect plugin (`0x253F2F8`) — the per-model light/corona definitions for
+ * street lamps, signs, traffic lights, etc. Each entry is `position(3×f32), type(u32), size(u32), data`;
+ * we read the **Light** entries (type 0) and skip the rest by `size`. The light data starts with the RGBA
+ * colour + four floats (corona far-clip, point-light range, corona size, shadow size), five flag/mode bytes,
+ * then the 24-char corona texture name. Returns [] when the model has no effects.
+ */
+function parseLightEffects(stream: BinaryStream, header: ChunkHeader): RWLight2d[] {
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  if (!extension) {
+    return [];
+  }
+  const fx = findChild(stream, extension.dataStart, extension.end, RwSection.TWO_D_EFFECT);
+  if (!fx) {
+    return [];
+  }
+
+  stream.seek(fx.dataStart);
+  const count = stream.u32();
+  const lights: RWLight2d[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const position: [number, number, number] = [stream.f32(), stream.f32(), stream.f32()];
+    const entryType = stream.u32();
+    const dataSize = stream.u32();
+    const entryEnd = stream.position + dataSize;
+    if (entryType === LIGHT_EFFECT) {
+      const color: [number, number, number, number] = [stream.u8(), stream.u8(), stream.u8(), stream.u8()];
+      const coronaFarClip = stream.f32();
+      stream.f32(); // point-light range (unused for now)
+      const coronaSize = stream.f32();
+      stream.f32(); // shadow size
+      stream.skip(4); // corona show-mode, reflection, flare type, shadow-colour multiplier
+      const flags = stream.u8(); // flags1 (corona checks / fog type)
+      const coronaTexture = stream.string(24);
+      lights.push({ color, coronaFarClip, coronaSize, coronaTexture, flags, position });
+    }
+    stream.seek(entryEnd); // skip to the next entry regardless of type/size
+  }
+
+  return lights;
 }
 
 function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {

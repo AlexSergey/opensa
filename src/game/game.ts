@@ -24,6 +24,8 @@ import {
   type CloudsConfig,
   type Config,
   type GameState,
+  type LightsConfig,
+  type MoonConfig,
   type ShadowsConfig,
   type SkyConfig,
   type SsaoConfig,
@@ -322,6 +324,11 @@ export class Game {
     this.setSun({ godraysSize });
   }
 
+  /** Tune night light sources (coronas) at runtime; merges into `graphics.lights`. */
+  setLights(patch: Partial<LightsConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, lights: { ...this.config.graphics.lights, ...patch } } });
+  }
+
   /** Debug: render an explicit set of cells at one detail level (null resumes streaming). */
   setManualCells(cells: CellCoord[] | null, lod = false): void {
     this.streamingSystem?.setManualCells(cells, lod);
@@ -331,6 +338,11 @@ export class Game {
     this.setConfig({ mapViewer: enabled });
     this.cameraController.setMode(enabled ? 'debug' : 'follow');
     this.events.emit('map-viewer', { enabled });
+  }
+
+  /** Tune the night moon (size/glow/elevation) at runtime; merges into `graphics.moon`. */
+  setMoon(patch: Partial<MoonConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, moon: { ...this.config.graphics.moon, ...patch } } });
   }
 
   /** Toggle sun shadows at runtime; merges into `graphics.shadows`. */

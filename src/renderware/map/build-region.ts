@@ -2,15 +2,19 @@ import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
+import type { CoronaEntry } from '../three/corona';
 
 import { getClump, getTextures, modelKey } from '../archive';
-import { buildClumpParts } from '../three/build-clump';
+import { buildClumpLights, buildClumpParts } from '../three/build-clump';
 
 /**
  * Shared instancing for the streamed map: grouping instances by model+txd and
  * building one `InstancedMesh` per single-material part. Used by the per-cell
  * builder ({@link buildCell}); the map renders through the streaming system.
  */
+
+/** Emissive intensity for lit-window night models (a touch over 1 so they read as glowing + bloom). */
+const WINDOW_EMISSIVE = 1.2;
 
 /** Per-mesh data for click-inspect / describe. */
 export interface RegionMeshData {
@@ -44,7 +48,15 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
 
   for (const group of groups) {
     const parts = buildClumpParts(getClump(archive, group.def.modelName), getTextures(archive, group.def.txdName));
+    // Night-lit timed variants (lit-window / neon overlays, on across midnight) self-illuminate so their
+    // bright window texels glow in the dark — emissiveMap = the diffuse map (dark texels stay dark).
+    const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
     for (const part of parts) {
+      if (nightLit && part.material.map) {
+        part.material.emissiveMap = part.material.map;
+        part.material.emissive.setRGB(1, 1, 1);
+        part.material.emissiveIntensity = WINDOW_EMISSIVE;
+      }
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
       // Opaque geometry casts; alpha-tested detail (foliage/fences/wires) doesn't — its 1-bit cutout
       // shimmers badly in the shadow map. It still receives shadows.
@@ -72,4 +84,52 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
   }
 
   return meshes;
+}
+
+/**
+ * Gather the world-space (GTA Z-up) coronas for a set of model groups: each light-bearing model's
+ * clump-local lights, placed by every instance's transform. Returned flat for one `Points` per cell.
+ */
+export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshData>): CoronaEntry[] {
+  const coronas: CoronaEntry[] = [];
+  const placement = new Matrix4();
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3(1, 1, 1);
+  const point = new Vector3();
+
+  for (const group of groups) {
+    const lights = buildClumpLights(getClump(archive, group.def.modelName));
+    if (lights.length === 0) {
+      continue;
+    }
+    for (const instance of group.instances) {
+      position.set(instance.position[0], instance.position[1], instance.position[2]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
+      quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+      placement.compose(position, quaternion, scale);
+      for (const light of lights) {
+        point.set(light.position[0], light.position[1], light.position[2]).applyMatrix4(placement);
+        coronas.push({
+          color: light.color,
+          farClip: light.farClip,
+          position: [point.x, point.y, point.z],
+          size: light.size,
+        });
+      }
+    }
+  }
+
+  return coronas;
+}
+
+/** Whether a timed window `[on, off)` is a night-lit variant (visible across midnight → glowing). */
+function isNightWindow(on: number, off: number): boolean {
+  if (on === off) {
+    return false; // always-on objects aren't specifically night-lit
+  }
+
+  return on < off ? on <= 0 && off > 0 : true; // wrapping (e.g. 20→6) = night
 }

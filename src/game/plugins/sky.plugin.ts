@@ -15,9 +15,11 @@ import {
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
+  type Texture,
   Vector3,
 } from 'three';
 
+import type { MoonConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext } from './plugin';
 
 /** The timecyc values the sky/sun need (RGB 0–255 + sun floats). Grows as graphics expand. */
@@ -80,6 +82,11 @@ const OVERCAST_DIM = 0.8;
 const AMBIENT_OVERCAST = 0.35;
 /** Corona (glow) size relative to the sun core. */
 const CORONA_RATIO = 4.5;
+
+/** Static moon: its compass direction (horizontal, x/z); the height comes from config (`elevationDeg`).
+ *  `MOON_DISTANCE` = how far along the resulting direction the sprite sits (< camera.far). */
+const MOON_AZIMUTH = new Vector3(0.35, 0, 0.4).normalize();
+const MOON_DISTANCE = 3400;
 
 const VERTEX = `
   varying vec3 vDir;
@@ -191,12 +198,13 @@ export class SkyPlugin implements Plugin {
   private readonly dome: Mesh;
   private readonly getHour: () => number;
   private readonly material: ShaderMaterial;
+  private readonly moonDisc: Sprite;
   private night = 0; // 0 day → 1 deep night (sun height); drives stars + the cool ambient tint
   private readonly sample: (hour: number) => SkySample;
   private readonly sun = new DirectionalLight(0xffffff, 1);
   private readonly sunDir = new Vector3();
 
-  constructor(sample: (hour: number) => SkySample, getHour: () => number) {
+  constructor(sample: (hour: number) => SkySample, getHour: () => number, moonTexture: null | Texture = null) {
     this.sample = sample;
     this.getHour = getHour;
     this.material = new ShaderMaterial({
@@ -236,14 +244,20 @@ export class SkyPlugin implements Plugin {
     );
     this.godraysSource.name = 'SunGodrays';
     this.corona = sunSprite(radialTexture());
+
+    // Moon: a static additive billboard using the SA `coronamoon` texture (alpha-shaped); falls back to a
+    // soft radial glow if the texture is missing. Fades in with night; depth-tested so geometry occludes it.
+    this.moonDisc = sunSprite(moonTexture ?? radialTexture());
+    this.moonDisc.name = 'Moon';
+
     // Also expose the sky on the probe layer so the vehicle-reflection cube probe can render sky-only.
-    for (const object of [this.dome, this.sunSource, this.corona]) {
+    for (const object of [this.dome, this.sunSource, this.corona, this.moonDisc]) {
       object.layers.enable(SKY_PROBE_LAYER);
     }
   }
 
   dispose(): void {
-    for (const object of [this.dome, this.ambient, this.sun, this.sunSource, this.corona]) {
+    for (const object of [this.dome, this.ambient, this.sun, this.sunSource, this.corona, this.moonDisc]) {
       object.removeFromParent();
     }
     this.dome.geometry.dispose();
@@ -253,6 +267,8 @@ export class SkyPlugin implements Plugin {
     (this.godraysSource.material as MeshBasicMaterial).dispose();
     this.corona.material.dispose();
     this.corona.material.map?.dispose();
+    this.moonDisc.material.dispose();
+    this.moonDisc.material.map?.dispose();
   }
 
   /** Current sun direction in three world space (unit; points toward the sun). For water glints etc. */
@@ -262,6 +278,7 @@ export class SkyPlugin implements Plugin {
 
   install(context: PluginContext): void {
     context.scene.add(this.dome, this.ambient, this.sun, this.sun.target, this.sunSource, this.corona);
+    context.scene.add(this.moonDisc);
 
     // Directional sun shadows: a view-following orthographic shadow map. shadowMap.enabled stays on; the
     // runtime toggle is `sun.castShadow` (three recompiles materials when the shadow-light count changes).
@@ -279,13 +296,21 @@ export class SkyPlugin implements Plugin {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.6; // small — high values bloat thin objects' shadows
 
-    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize);
+    this.apply(
+      context.config.graphics.sun.sunSize,
+      context.config.graphics.sun.godraysSize,
+      context.config.graphics.moon,
+    );
     this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
   update(context: PluginContext): void {
     this.dome.position.copy(context.camera.position); // keep the sky centred on the view
-    this.apply(context.config.graphics.sun.sunSize, context.config.graphics.sun.godraysSize); // sets cloudCover/night
+    this.apply(
+      context.config.graphics.sun.sunSize,
+      context.config.graphics.sun.godraysSize,
+      context.config.graphics.moon,
+    ); // sets cloudCover/night
     const clouds = context.config.graphics.clouds;
     this.material.uniforms.uTime.value = context.clock.elapsed;
     this.material.uniforms.uCloudOpacity.value = clouds.opacity;
@@ -296,8 +321,8 @@ export class SkyPlugin implements Plugin {
     this.updateShadow(context.camera, context.config.graphics.shadows.enabled);
   }
 
-  /** Push the current time-of-day sky/sun state into the dome, lights and sun sprites. */
-  private apply(sunScale: number, godraysScale: number): void {
+  /** Push the current time-of-day sky/sun state into the dome, lights and sun/moon sprites. */
+  private apply(sunScale: number, godraysScale: number, moon: MoonConfig): void {
     const sky = this.sample(this.getHour());
     setColor(this.material.uniforms.uTop.value as Color, sky.skyTop, false);
     setColor(this.material.uniforms.uBottom.value as Color, sky.skyBot, false);
@@ -347,6 +372,20 @@ export class SkyPlugin implements Plugin {
       // godraysSource isn't in the scene (GodRaysEffect renders it itself with matrixAutoUpdate
       // off), so nothing else refreshes its matrix — bake it here or the source stays at the origin.
       this.godraysSource.updateMatrix();
+    }
+
+    // Moon: a static sprite at a fixed sky direction, fading in as night falls (× cloud cover so heavy
+    // overcast hides it). `brightness` scales the additive contribution.
+    const moonFade = this.night * cloudFade;
+    this.moonDisc.visible = moonFade > 0.01;
+    if (this.moonDisc.visible) {
+      const cosEl = Math.cos(MathUtils.degToRad(moon.elevationDeg)); // height set by config (tuned in-browser)
+      this.moonDisc.position
+        .set(MOON_AZIMUTH.x * cosEl, Math.sin(MathUtils.degToRad(moon.elevationDeg)), MOON_AZIMUTH.z * cosEl)
+        .multiplyScalar(MOON_DISTANCE);
+      this.moonDisc.material.color.setScalar(moon.brightness);
+      this.moonDisc.material.opacity = moonFade;
+      this.moonDisc.scale.setScalar(moon.size);
     }
   }
 
@@ -420,7 +459,7 @@ function setColor(color: Color, [r, g, b]: Rgb, managed: boolean): void {
   color.setRGB(r / 255, g / 255, b / 255, managed ? SRGBColorSpace : undefined);
 }
 
-function sunSprite(map: CanvasTexture): Sprite {
+function sunSprite(map: Texture): Sprite {
   return new Sprite(
     new SpriteMaterial({ blending: AdditiveBlending, depthWrite: false, fog: false, map, transparent: true }),
   );

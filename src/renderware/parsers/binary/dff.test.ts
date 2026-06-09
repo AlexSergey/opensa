@@ -318,6 +318,54 @@ describe('parseDff BinMeshPLG material recovery', () => {
   });
 });
 
+/** A geometry Extension holding a 2d Effect plugin with one Light entry + one non-light entry. */
+function twoDEffectExtension(): Uint8Array {
+  const lightData = concat(
+    u8(255, 200, 100, 255), // colour RGBA
+    f32(150), // corona far-clip
+    f32(20), // point-light range
+    f32(1.5), // corona size
+    f32(3), // shadow size
+    u8(0, 0, 0, 0), // show-mode, reflection, flare type, shadow-colour multiplier
+    u8(7), // flags1
+    fixedString('coronastar', 24), // corona texture
+    fixedString('shad_exp', 24), // shadow texture
+    u8(0, 0), // shadow-Z distance, flags2
+  );
+  const light = concat(f32a([5, 6, 7]), u32(0), u32(lightData.length), lightData); // type 0 = light
+  const particle = concat(f32a([1, 1, 1]), u32(1), u32(4), u8(9, 9, 9, 9)); // type 1 = particle (skipped)
+  const fx = chunk(RwSection.TWO_D_EFFECT, concat(u32(2), light, particle));
+
+  return chunk(RwSection.EXTENSION, fx);
+}
+
+describe('parseDff 2d-effect lights', () => {
+  describe('negative cases', () => {
+    it('returns no lights when the geometry has no 2d-effect plugin', () => {
+      expect(parseDff(buildSyntheticClump()).geometries[0].lights).toEqual([]);
+    });
+  });
+
+  describe('positive cases', () => {
+    const lights = parseDff(buildSyntheticClump(twoDEffectExtension())).geometries[0].lights;
+
+    it('parses the Light entry and skips non-light entries', () => {
+      expect(lights).toHaveLength(1);
+    });
+
+    it('reads the light position, colour, corona size and texture', () => {
+      expect(lights[0]).toEqual({
+        color: [255, 200, 100, 255],
+        coronaFarClip: 150,
+        coronaSize: 1.5,
+        coronaTexture: 'coronastar',
+        flags: 7,
+        position: [5, 6, 7],
+      });
+    });
+  });
+});
+
 const dffPath = join(process.cwd(), 'tests', 'renderware', 'testground.dff');
 const dffExists = existsSync(dffPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection,
