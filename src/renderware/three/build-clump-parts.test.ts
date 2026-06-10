@@ -1,4 +1,4 @@
-import { Matrix4, Texture } from 'three';
+import { Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
@@ -53,10 +53,12 @@ describe('buildClumpParts', () => {
     expect(Array.isArray(parts[0].material)).toBe(false);
   });
 
-  it('carries the atomic frame transform as the part matrix (native, no up-axis flip)', () => {
+  it('ignores the DFF frame transform — map atomics live in raw model space, like SA re-frames them', () => {
+    // The fixture frame carries position [1, 2, 3]; the part must NOT bake it in (dirty re-exports
+    // ship stray frame translations that would displace the mesh away from its collision).
     const parts = buildClumpParts(clumpWith(geometry()));
-    const position = new Matrix4().copy(parts[0].matrix).elements.slice(12, 15);
-    expect(position).toEqual([1, 2, 3]);
+    expect('matrix' in parts[0]).toBe(false);
+    expect(parts[0].geometry.getAttribute('position').getX(0)).toBe(0); // raw vertex, no offset
   });
 
   it('builds position/uv/color attributes and computes normals when absent', () => {

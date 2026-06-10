@@ -31,7 +31,6 @@ function part(swayAlphaMin?: number): RenderPart {
   return {
     geometry: undefined as never, // the mod only touches the material
     material: buildWorldMaterial({ color: [255, 255, 255, 255], texture: null, textured: false }, geometry),
-    matrix: undefined as never,
     ...(swayAlphaMin === undefined ? {} : { swayAlphaMin }),
   };
 }

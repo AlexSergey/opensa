@@ -48,8 +48,6 @@ export interface RenderPart {
   geometry: BufferGeometry;
   /** The unlit SA world material (plan 038) — the map is prelit, never dynamically lit. */
   material: MeshBasicMaterial;
-  /** Local atomic-frame transform, in native Z-up. */
-  matrix: Matrix4;
   /** Minimum day-prelit ALPHA, present only when some vertex alpha < 255 — wind-adapted vegetation
    *  encodes per-vertex sway weight there (plan 039: 255 = rigid trunk, lower = swaying canopy).
    *  The geometry then also carries a `swayWeight` attribute (= (255 − a) / 255). */
@@ -131,8 +129,11 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
     if (!rw) {
       continue;
     }
-    const frame = clump.frames[atomic.frameIndex];
-    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+    // NB the DFF's frame transform is deliberately IGNORED for map models, like SA: CFileLoader
+    // re-frames atomic-model atomics onto a fresh identity frame, so map geometry lives in raw
+    // model space (== its COL space). Vanilla frames are identity anyway; dirty re-exports
+    // (gta3-pf CE_grndPALCST05 shipped a stray (12.9, 317, −28.5) frame translation) would
+    // otherwise render ~300 m away from their collision.
 
     const position = new BufferAttribute(rw.positions, 3);
     const uv = rw.uvLayers.length > 0 ? new BufferAttribute(rw.uvLayers[0], 2) : null;
@@ -172,7 +173,7 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       // Unlit SA prelit blend (plan 038) — the night set is consumed by the material's dnBalance mix.
       const rwMaterial = rw.materials[materialIndex] ?? rw.materials[0];
       const material = buildWorldMaterial(rwMaterial ?? FALLBACK_RW_MATERIAL, rw, textures);
-      parts.push({ geometry, material, matrix, ...(sway ? { swayAlphaMin: sway.minAlpha } : {}) });
+      parts.push({ geometry, material, ...(sway ? { swayAlphaMin: sway.minAlpha } : {}) });
     });
   }
 

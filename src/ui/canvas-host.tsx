@@ -505,6 +505,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     const worldTintDayArc = new Color();
     // Timed window overlays: authored additive glow base, scaled live by the `night.windowGlow` knob.
     const WINDOW_GLOW_BASE = 1.2;
+    // `?nocull=1` (debug): disable frustum culling on every streamed mesh each frame — if a
+    // "missing" model appears, its bounding sphere (not the geometry) is the bug.
+    const noCull = new URLSearchParams(window.location.search).get('nocull') === '1';
     // `?shadowdebug=1`: paint the world-shadow term red + draw the sun shadow camera frustum, to
     // separate it from SSAO / baked prelit darkening while calibrating plan 038.
     const shadowDebug = new URLSearchParams(window.location.search).get('shadowdebug') === '1';
@@ -564,6 +567,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
             ? worldLight.shadowStrength * sunUp * sunShadow.intensity
             : 0;
         shadowHelper?.update(); // debug frustum follows the view-snapped shadow camera
+        if (noCull) {
+          // Diagnostic only: brute-force per frame so freshly streamed cells are covered too.
+          game.getStreamingRoot().traverse((object) => {
+            object.frustumCulled = false;
+          });
+        }
       },
     });
 

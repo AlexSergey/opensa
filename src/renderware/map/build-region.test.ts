@@ -127,6 +127,46 @@ describe('buildInstancedMeshes (SA IDE render flags, plan 039)', () => {
       }
     });
 
+    it('places parts by the instance transform alone — stray DFF frame offsets are ignored', () => {
+      // Real case: gta3-pf ce_grndpalcst05 ships a junk (12.9, 317, −28.5) frame translation; SA
+      // re-frames map atomics to identity, so the mesh must land where its collision is.
+      const archive = openArchive(
+        buildArchiveBuffer([
+          {
+            data: readFileSync('tests/dff/frame-offset-ignored/ce_grndpalcst05.dff'),
+            name: 'ce_grndpalcst05.dff',
+          },
+        ]),
+      );
+      const palcstDef: IdeObjectDef = {
+        drawDistance: 299,
+        flags: 0,
+        id: 13810,
+        modelName: 'CE_grndPALCST05',
+        txdName: 'lahillsground4',
+      };
+      const palcstInstance: IplInstance = {
+        id: 13810,
+        interior: 0,
+        lod: -1,
+        modelName: '',
+        position: [2948.41, -951.77, -28.52], // the real lahills.ipl placement
+        rotation: [0, 0, 0, 1],
+      };
+      const meshes = buildInstancedMeshes(archive, [{ def: palcstDef, instances: [palcstInstance] }]);
+      expect(meshes.length).toBeGreaterThan(0);
+      for (const mesh of meshes) {
+        const center = mesh.boundingSphere?.center;
+        expect(center).toBeDefined();
+        // Raw geometry is centred near local (−39, 0, +39) → world ≈ (2909, −952, 10.5). With the
+        // frame offset wrongly applied it would sit ~300 units north at y ≈ −635.
+        expect(center?.y).toBeGreaterThan(-1050);
+        expect(center?.y).toBeLessThan(-850);
+        expect(center?.z).toBeGreaterThan(5);
+        expect(center?.z).toBeLessThan(15);
+      }
+    });
+
     it('runs the mod decoratePart hook once per part, after the vanilla treatment', () => {
       const seen: { flags: number; model: string; transparent: boolean }[] = [];
       const meshes = buildInstancedMeshes(caseArchive(), [{ def: def(IdeFlag.DRAW_LAST), instances: [instance] }], {

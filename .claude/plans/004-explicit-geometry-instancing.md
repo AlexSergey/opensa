@@ -121,3 +121,17 @@ name-keyed
 `DOUBLE_SIDED_MODELS = /traffic/i` workaround (see memory `hardcoded-fixes`). Covered
 by
 `build-region.test.ts`.
+
+---
+
+**Since-fixed (2026-06-10): DFF frame transforms are IGNORED for map parts.** Real SA's
+`CFileLoader` re-attaches atomic-model atomics onto a fresh identity frame — map geometry lives in
+raw model space (== its COL space). We used to bake the file frame into `RenderPart.matrix`;
+vanilla frames are identity so it never showed, but gta3-pf's `ce_grndpalcst05` ships a junk frame
+translation `(12.85, 317.05, −28.52)` which rendered the coast strip ~300 m away from its own
+collision (the pier hole at (2908, −1058) — collision walkable, mesh dangling north). Fix:
+`buildClumpParts` applies no frame matrix (`RenderPart.matrix` removed; build-region places by the
+instance transform alone). Vehicles/characters/`buildClump` keep frames — legit there. Regression
+fixture `tests/dff/frame-offset-ignored/` in `build-region.test.ts`; diagnosis toolkit added:
+`scripts/inspect-area.ts`, `scripts/find-instances.ts`, `scripts/model-bbox.ts`, `?nocull=1`.
+See memory `sa-map-frames-ignored`.

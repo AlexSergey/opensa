@@ -71,7 +71,6 @@ export function buildInstancedMeshes(
 ): InstancedMesh[] {
   const meshes: InstancedMesh[] = [];
   const placement = new Matrix4();
-  const composed = new Matrix4();
   const position = new Vector3();
   const quaternion = new Quaternion();
   const scale = new Vector3(1, 1, 1);
@@ -97,8 +96,7 @@ export function buildInstancedMeshes(
           .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
           .conjugate();
         placement.compose(position, quaternion, scale);
-        composed.multiplyMatrices(placement, part.matrix);
-        mesh.setMatrixAt(index, composed);
+        mesh.setMatrixAt(index, placement); // parts are in raw model space (no DFF frame transform)
       });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
