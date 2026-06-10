@@ -1,4 +1,4 @@
-import { DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
@@ -14,14 +14,6 @@ import { buildClumpLights, buildClumpParts } from '../three/build-clump';
  * traffic-light cycling lands (see plan 032). Street lamps etc. don't match `traffic`, so they're unaffected.
  */
 const SUPPRESS_LIGHT_MODELS = /traffic/i;
-
-/**
- * Models forced to render **double-sided**. The `gta3-pf.img` (Proper Fixes) traffic-light housings ship with
- * inconsistent face winding and no stored normals, so single-sided (`FrontSide`) culling makes the solid metal
- * box **see-through from one side** (the panels facing away are culled). They're opaque, so double-siding is
- * harmless (no transparency sorting) and matches the in-game solid look from every angle.
- */
-const DOUBLE_SIDED_MODELS = /traffic/i;
 
 /**
  * Shared instancing for the streamed map: grouping instances by model+txd and
@@ -67,15 +59,11 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
     // Night-lit timed variants (lit-window / neon overlays, on across midnight) self-illuminate so their
     // bright window texels glow in the dark — emissiveMap = the diffuse map (dark texels stay dark).
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
-    const doubleSided = DOUBLE_SIDED_MODELS.test(group.def.modelName);
     for (const part of parts) {
       if (nightLit && part.material.map) {
         part.material.emissiveMap = part.material.map;
         part.material.emissive.setRGB(1, 1, 1);
         part.material.emissiveIntensity = WINDOW_EMISSIVE;
-      }
-      if (doubleSided) {
-        part.material.side = DoubleSide; // pf traffic-light housings have inconsistent winding — see-through if culled
       }
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
       // Opaque geometry casts; alpha-tested detail (foliage/fences/wires) doesn't — its 1-bit cutout

@@ -131,12 +131,13 @@ export interface DebugActions {
 /** Reflection preset cycle order for the debug selector (Off + the registry keys). */
 const REFLECTION_PRESETS = ['off', ...Object.keys(PRESETS)];
 
-type Screen = 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles' | 'weather';
+type Screen = 'atmosphere' | 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles' | 'weather';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Game', screen: 'game' },
+  { label: 'Atmosphere', screen: 'atmosphere' },
   { label: 'Graphics', screen: 'graphics' },
   { label: 'Weather', screen: 'weather' },
   { label: 'Position', screen: 'position' },
@@ -348,6 +349,38 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={time}
               />
+            </div>
+          )}
+
+          {screen === 'atmosphere' && (
+            <div style={styles.group}>
+              <div style={styles.groupLabel}>NIGHT LIGHTING FADE (windows + tonemap)</div>
+              {(
+                [
+                  ['duskStart', 'DUSK START'],
+                  ['duskEnd', 'DUSK END'],
+                  ['dawnStart', 'DAWN START'],
+                  ['dawnEnd', 'DAWN END'],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key}>
+                  <div style={styles.groupLabel}>
+                    {label}: {night.litFade[key].toFixed(1)}h
+                  </div>
+                  <input
+                    max={24}
+                    min={0}
+                    onChange={(e) => {
+                      const litFade = { ...night.litFade, [key]: Number(e.target.value) };
+                      setNight((prev) => ({ ...prev, litFade }));
+                      actions.setNight({ litFade });
+                    }}
+                    step={0.5}
+                    type="range"
+                    value={night.litFade[key]}
+                  />
+                </div>
+              ))}
             </div>
           )}
 

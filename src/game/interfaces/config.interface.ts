@@ -144,6 +144,22 @@ export interface LightsConfig {
   nightStartHour: number;
 }
 
+/**
+ * Clock schedule (hours 0–24) for the night-lit content — the SA baked **night vertex colours** (lit
+ * windows/signs/road lamp-pools) **and** the ACES night tonemap, which rides the same window. Fades in over
+ * dusk `[duskStart, duskEnd]` (0→1), full overnight, fades out over dawn `[dawnStart, dawnEnd]` (1→0).
+ */
+export interface LitFadeConfig {
+  /** Hour the dawn fade-out completes — fully day (e.g. 7). */
+  dawnEnd: number;
+  /** Hour the dawn fade-out begins — still fully lit (e.g. 6). */
+  dawnStart: number;
+  /** Hour the dusk fade-in completes — fully lit (e.g. 21). */
+  duskEnd: number;
+  /** Hour the dusk fade-in begins — still day (e.g. 20). */
+  duskStart: number;
+}
+
 /** Diagnostic severity, low → high. The configured `showLogs` value is the floor that is emitted. */
 export type LogLevel = 'debug' | 'error' | 'log' | 'warn';
 
@@ -179,6 +195,8 @@ export interface NightConfig {
   coronaDrawDistance: number;
   /** Night colour-grade strength (0 = off) — cool tint + desaturation + tinted shadow floor for night mood. */
   grade: number;
+  /** Dusk/dawn fade schedule for the night vertex colours + the night tonemap (they share one window). */
+  litFade: LitFadeConfig;
   /** Night skylight (hemisphere "moonlight from above") strength — top-down fill that gives objects form. */
   skylight: number;
   /** Night colour-grade tint (RGB 0–1, a cool moonlight blue) — used by the post-FX night grade. */

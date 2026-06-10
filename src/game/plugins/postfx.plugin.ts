@@ -17,6 +17,7 @@ import {
 import type { BloomConfig, SkyConfig, SsaoConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext, RenderPass, RenderPipeline } from './plugin';
 
+import { clockNightFactor } from '../time/hour-window';
 import { NightGradeEffect } from './night-grade.effect';
 
 /** Bloom blur radius (mipmap blur) and luminance smoothing — fixed; intensity/threshold are config. */
@@ -39,6 +40,7 @@ export class PostFxPlugin implements Plugin {
   private composer: EffectComposer | null = null;
   private godRays: GodRaysEffect | null = null;
   private godraysPass: EffectPass | null = null;
+  private readonly hours: () => number;
   private nightGrade: NightGradeEffect | null = null;
   private nightPass: EffectPass | null = null;
   private normalPass: NormalPass | null = null;
@@ -51,8 +53,9 @@ export class PostFxPlugin implements Plugin {
   private toneMapping: null | ToneMappingEffect = null;
   private tonePass: EffectPass | null = null;
 
-  constructor(sunSource: Mesh) {
+  constructor(sunSource: Mesh, hours: () => number) {
     this.sunSource = sunSource;
+    this.hours = hours;
   }
 
   configChanged(config: PluginContext['config']): void {
@@ -106,7 +109,12 @@ export class PostFxPlugin implements Plugin {
       mipmapBlur: true,
       radius: BLOOM_RADIUS,
     });
-    const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
+    // NORMAL (not the effect's default SRC, which *ignores* opacity) so the blend opacity actually fades ACES
+    // in/out over the clock window — at opacity 1 it's identical to SRC, so the full-night look is unchanged.
+    const toneMapping = new ToneMappingEffect({
+      blendFunction: BlendFunction.NORMAL,
+      mode: ToneMappingMode.ACES_FILMIC,
+    });
     const nightGrade = new NightGradeEffect();
 
     // Order: light-emitting effects (god rays, bloom) → tone mapping → night grade → SMAA (antialias the
@@ -163,9 +171,10 @@ export class PostFxPlugin implements Plugin {
     }
     if (this.tonePass && this.toneMapping) {
       // ACES only at NIGHT (where it makes the bright emissive/bloom pop — the "прикол"); fade it out by DAY,
-      // where it just greys/desaturates the midtones (the day reads better un-tonemapped). Blend by the night
-      // factor via the effect's blend opacity (0 = input passes through untouched, 1 = full ACES).
-      const nightFactor = (this.sunSource.userData.night as number | undefined) ?? 0;
+      // where it just greys/desaturates the midtones. Rides the same fixed CLOCK schedule as the night vertex
+      // colours (dusk fade-in 20→21, dawn fade-out 06→07), not the sun height, so it cross-fades with the lit
+      // windows. Blend by the effect's opacity (0 = passthrough, 1 = ACES); pass off by day = zero cost.
+      const nightFactor = clockNightFactor(this.hours(), night.litFade);
       this.toneMapping.blendMode.opacity.value = nightFactor;
       this.tonePass.enabled = toneMapping && nightFactor > 0.001;
     }

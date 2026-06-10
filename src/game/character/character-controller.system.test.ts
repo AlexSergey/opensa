@@ -40,6 +40,7 @@ function config(gameState: Config['gameState']): Config {
       night: {
         coronaDrawDistance: 120,
         grade: 0.7,
+        litFade: { dawnEnd: 7, dawnStart: 6, duskEnd: 21, duskStart: 20 },
         skylight: 0.6,
         tint: [0.6, 0.66, 0.85],
         windowGlow: 1,

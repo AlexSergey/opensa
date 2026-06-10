@@ -11,8 +11,9 @@ occlusion polish DONE**.
 **FINAL DIRECTION (the big win):** the night look is the SA **night vertex colours** (phase 10) — dark roads,
 warm baked lamp pools on the road, lit windows/signs — driven straight from the data. Ambient is a **bright day
 fill ramping to near-zero at night** (the baked colours light the night; SA's timecyc `amb` is too tiny to use
-directly — see phase 2). The night-vertex emissive fades by the **smooth sun-height night factor** (not the
-hard 20→6 lamp window), so it cross-fades with the ambient at dawn/dusk (no dark gap at 06:00). The earlier
+directly — see phase 2). The night-vertex emissive fades on a fixed **wall-CLOCK schedule** (`clockNightFactor`
+→ `night.litFade`: dusk fade-in 20→21, dawn fade-out 06→07), **not** the sun-height factor — see "Clock schedule"
+below. The earlier
 **projected light pools (phase 9) and the custom flat night `brightness` floor were REMOVED.** Don't re-add.
 Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
 cheaper SA-style light-pool splat), corona texture variety. The **night grade mask / magic numbers need
@@ -230,12 +231,12 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      `gay_traffic_light`, `mtraffic*`) — we don't sequence them, so every bulb lit at once + cast odd pools.
      **Re-enable** (drop/relax the filter) once traffic-light cycling exists; then only the active phase's bulb
      should light. Street lamps don't match `traffic`, so they're unaffected.
-   - **Traffic-light housing forced double-sided (hardcoded per-model fix).** Separate from the corona
-     suppression: on `gta3-pf.img` the traffic-light housings ship with inconsistent face winding + no stored
-     normals, so single-sided culling made the solid metal box **see-through from one side**. `DOUBLE_SIDED_
-     MODELS = /traffic/i` in `build-region` sets `part.material.side = DoubleSide` for them (opaque → harmless).
-     One of the **hardcoded workarounds** — see the registry note in memory (`hardcoded-fixes`). Revisit if/when
-     the Proper Fixes model geometry is cleaned or normals are honoured.
+   - **Traffic-light housing see-through on pf (hardcoded fix, currently rolled back).** Separate from the
+     corona suppression: on `gta3-pf.img` the traffic-light housings ship with inconsistent face winding + no
+     stored normals, so single-sided culling made the solid metal box **see-through from one side**. A
+     `DOUBLE_SIDED_MODELS = /traffic/i` hack in `build-region` (`part.material.side = DoubleSide`) fixed it, but
+     was **rolled back** on returning to stock `gta3-original.img` (clean model, no hack needed). Re-apply on pf
+     — tracked in memory (`hardcoded-fixes`). Better long-term: honour stored normals / detect bad winding.
 
 10. ✅ **Night vertex colours (per-building lit windows) — DONE.** The authentic vanilla mechanism for
     residential lit windows (Ganton etc.), distinct from the downtown tobj overlays of phase 5. SA building DFFs
@@ -258,8 +259,9 @@ lit windows pop. Our blocker is the **prelit** day-bake.
       0) — the baked road pools replace them, smoothly and without the raycast edge cases. (Earlier brightness/
       saturation gates were a wrong turn: they rejected exactly the baked road lamp-pools, leaving flat dark
       ground; the real lever is ambient-vs-baked balance, not gating.)
-    - **Drive:** `nightColorUniform.value = coronaOn × night.windowGlow` in canvas-host (same eased night signal
-      as the coronas/pools). Config **`night.windowGlow`** (default 1.0) + debug **NIGHT WINDOW GLOW** slider.
+    - **Drive:** `nightColorUniform.value = clockNightFactor(hour, night.litFade) × night.windowGlow` in
+      canvas-host — a fixed wall-CLOCK fade (**not** the sun-height/corona signal anymore; see "Clock schedule"
+      below). Config **`night.windowGlow`** (default 1.0) + debug **NIGHT WINDOW GLOW** slider.
     - **Tests:** real fixtures `tests/world/compfukhouse3.dff` (id 3589, lit — bright warm window verts) +
       `tests/world/mcstraps_LAe2.dff` (id 17699, dark — dull night colours) in `night-colors.test.ts`.
     - **General:** works for any SA building with night colours (downtown skyscrapers too), not just Ganton.
@@ -269,13 +271,31 @@ lit windows pop. Our blocker is the **prelit** day-bake.
 - `Config.graphics.lights` (new): `{ enabled, nightStartHour, nightEndHour }` — when lamps/coronas switch on
   (default **20:00 → ~06:00**, configurable per the ask), master toggle, plus maybe a corona intensity/budget.
 - `Config.graphics.stars` (new): `{ enabled }` (+ density later). Debug toggles in the Graphics/Weather tab.
-- `Config.graphics.night`: **`{ coronaDrawDistance, grade, skylight, tint, windowGlow }`** — corona cap,
-  colour-grade strength, hemisphere skylight, grade tint, and **`windowGlow`** (night-vertex-colour emissive
-  strength = the whole baked night lighting, phase 10). `grade` drives the `NightGradeEffect`; `tint` is the
-  grade tint only. (**Removed:** `brightness` → ambient now from timecyc `amb`; `lampPool`/`lampPoolRadius` →
-  projected pools deleted, phase 9.)
+- `Config.graphics.night`: **`{ coronaDrawDistance, grade, litFade, skylight, tint, windowGlow }`** — corona cap,
+  colour-grade strength, the **`litFade`** dusk/dawn clock window (see below), hemisphere skylight, grade tint,
+  and **`windowGlow`** (night-vertex-colour emissive strength = the whole baked night lighting, phase 10).
+  `grade` drives the `NightGradeEffect`; `tint` is the grade tint only. (**Removed:** `brightness` → ambient now
+  from timecyc `amb`; `lampPool`/`lampPoolRadius` → projected pools deleted, phase 9.)
 - (Night darkness in phase 2 can ride the existing sun model; expose a strength const, promote to config only
   if needed.)
+
+## Clock schedule (night vertex colours + ACES tonemap)
+
+The baked **night vertex colours** (lit windows/signs, phase 10) and the **ACES night tonemap** (`PostFxPlugin`)
+**no longer ride the sun-height night factor** — they ride a fixed **wall-clock** schedule so lit content
+switches on at set hours regardless of weather/sun. Coronas + the night grade still ride the sun factor.
+
+- **Helper:** `clockNightFactor(hour, fade)` (`game/time/hour-window.ts`) → `nightHourFactor(hour, onStart,
+  onEnd, offStart, offEnd)`: smooth 0–1, linear dusk fade-in `[duskStart, duskEnd]` (0→1), full overnight, dawn
+  fade-out `[dawnStart, dawnEnd]` (1→0). Single source of truth for both consumers. Tested in `hour-window.test.ts`.
+- **Config:** `Config.graphics.night.litFade: LitFadeConfig = { duskStart: 20, duskEnd: 21, dawnStart: 6,
+  dawnEnd: 7 }` (`config.interface.ts`). Both consumers read the same object → always in sync.
+- **Tonemap:** `PostFxPlugin` is constructed with a `() => game.getHours()` getter; the ACES pass fades via
+  `toneMapping.blendMode.opacity = clockNightFactor(...)`. The effect is created with **`blendFunction:
+  BlendFunction.NORMAL`** because its default `SRC` *ignores* opacity (would make the fade a hard on/off).
+  ⚠️ A subtle image artefact during the fade is under investigation by the user (not yet root-caused).
+- **Debug:** a new **Atmosphere** tab (above Graphics) with 4 sliders — **DUSK START / DUSK END / DAWN START /
+  DAWN END** (0–24h) — writes the full `litFade` via `actions.setNight`.
 
 ## What's missing (net new work, biggest first)
 

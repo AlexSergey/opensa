@@ -20,6 +20,7 @@ import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehi
 import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
 import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
 import { StreamingSystem } from '../game/streaming/streaming.system';
+import { clockNightFactor } from '../game/time/hour-window';
 import { TimedObjectSystem } from '../game/time/timed-object.system';
 import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
@@ -237,6 +238,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         night: {
           coronaDrawDistance: 120,
           grade: 0.05,
+          litFade: { dawnEnd: 7, dawnStart: 6, duskEnd: 21, duskStart: 20 },
           skylight: 0.6,
           tint: [1.0, 1.0, 1.0],
           windowGlow: 1.0,
@@ -334,7 +336,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         ),
       )
       .addPlugin(reflection) // vehicle env-map reflections (preset-driven)
-      .addPlugin(new PostFxPlugin(sky.godraysSource)); // post-FX host: god rays + bloom + tone mapping
+      .addPlugin(new PostFxPlugin(sky.godraysSource, () => game.getHours())); // post-FX host: god rays + bloom + tone mapping
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
@@ -368,9 +370,11 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.
     game.addSystem(new TimedObjectSystem(game.getStreamingRoot(), () => game.getHours()));
 
-    // Night lights (coronas + the baked night vertex colours) all ride ONE smooth signal — the sun-height
-    // night factor (`sky.godraysSource.userData.night`) — so they cross-fade together with the ambient at
-    // dusk/dawn. (Not the hard 20→6 lamp hour-window, which snapped the lamps off out of sync with the light.)
+    // Night lights ride two signals: the **coronas** cross-fade by the smooth sun-height night factor
+    // (`sky.godraysSource.userData.night`) so they fade with the ambient at dusk/dawn; the baked **night vertex
+    // colours** (and the ACES night tonemap, in PostFxPlugin) instead ride a fixed wall-CLOCK schedule —
+    // `clockNightFactor(hour, night.litFade)` — so lit windows switch on at set hours (tunable in debug →
+    // Atmosphere). Neither uses the hard 20→6 lamp hour-window, which snapped lamps off out of sync.
     game.addSystem({
       name: 'coronas',
       update(): void {
@@ -379,7 +383,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         coronaMaterial.uniforms.uOn.value = lights.enabled ? nightFactor : 0;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
         coronaMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
-        nightColorUniform.value = nightFactor * night.windowGlow;
+        // Night vertex colours ride a fixed CLOCK schedule (see clockNightFactor) instead of the sun-height
+        // signal, so lit windows switch on a wall-clock time. The ACES night tonemap rides the same schedule.
+        nightColorUniform.value = clockNightFactor(game.getHours(), night.litFade) * night.windowGlow;
       },
     });
 
