@@ -324,7 +324,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       weatherTransitionSeconds: 6,
     });
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3-pf.img`,
+      archiveUrl: `${BASE}/models/gta3-original.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,

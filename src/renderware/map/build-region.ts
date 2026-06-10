@@ -1,4 +1,4 @@
-import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
@@ -23,6 +23,14 @@ const SUPPRESS_LIGHT_MODELS = /traffic/i;
 
 /** Emissive intensity for lit-window night models (a touch over 1 so they read as glowing + bloom). */
 const WINDOW_EMISSIVE = 1.2;
+
+/**
+ * SA IDE object flag: render the model **without backface culling** (two-sided). The original engine
+ * culls map geometry by default and disables it per object via this flag (e.g. `trafficlight1` in
+ * `dynamic.ide`, flags 2130048) — re-exported assets (gta3-pf.img) rely on it for their mixed-winding
+ * housings. Honouring it here replaces the old name-keyed DOUBLE_SIDED_MODELS workaround.
+ */
+const IDE_FLAG_DISABLE_BACKFACE_CULLING = 0x200000;
 
 /** Per-mesh data for click-inspect / describe. */
 export interface RegionMeshData {
@@ -59,7 +67,11 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
     // Night-lit timed variants (lit-window / neon overlays, on across midnight) self-illuminate so their
     // bright window texels glow in the dark — emissiveMap = the diffuse map (dark texels stay dark).
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
+    const twoSided = (group.def.flags & IDE_FLAG_DISABLE_BACKFACE_CULLING) !== 0;
     for (const part of parts) {
+      if (twoSided) {
+        part.material.side = DoubleSide; // the def opts out of backface culling, like the original engine
+      }
       if (nightLit && part.material.map) {
         part.material.emissiveMap = part.material.map;
         part.material.emissive.setRGB(1, 1, 1);

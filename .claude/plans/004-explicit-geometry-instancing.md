@@ -105,3 +105,19 @@ per-unique-model, and high-count models draw in one call each.
 - COL collision, LOD cross-linking/transitions, dynamic-object physics, draw-distance culling,
   loading the whole map at once without region scoping (network), texture atlas/merge beyond
   instancing.
+
+---
+
+**Since-added (2026-06-10): IDE flag `0x200000` — disable backface culling.** SA culls map geometry
+by
+default and disables it **per object def** via IDE flag `0x200000` (e.g. `trafficlight1` in
+`dynamic.ide`,
+flags `2130048`); re-exported archives (gta3-pf.img) ship mixed-winding meshes that rely on
+it.
+`buildInstancedMeshes` (`build-region.ts`) now sets `DoubleSide` on a model's part materials when its
+def
+carries the flag — engine-accurate, data-driven, and it permanently replaces the old
+name-keyed
+`DOUBLE_SIDED_MODELS = /traffic/i` workaround (see memory `hardcoded-fixes`). Covered
+by
+`build-region.test.ts`.
