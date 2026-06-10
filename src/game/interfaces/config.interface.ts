@@ -214,14 +214,10 @@ export interface NightConfig {
   coronaDrawDistance: number;
   /** Cheap shader night-fill for dynamic objects (player/vehicles) so they aren't black at night (plan 034). */
   dynamicObjectsFill: DynamicObjectsFillConfig;
-  /** Night colour-grade strength (0 = off) — cool tint + desaturation + tinted shadow floor for night mood. */
-  grade: number;
   /** Dusk/dawn fade schedule for the night vertex colours + the night tonemap (they share one window). */
   litFade: LitFadeConfig;
   /** Night skylight (hemisphere "moonlight from above") strength — top-down fill that gives objects form. */
   skylight: number;
-  /** Night colour-grade tint (RGB 0–1, a cool moonlight blue) — used by the post-FX night grade. */
-  tint: [number, number, number];
   /** Night-vertex-colour glow strength — how strongly the SA baked night lighting (lit windows / signs /
    *  road lamp-pools) self-illuminates at night. */
   windowGlow: number;

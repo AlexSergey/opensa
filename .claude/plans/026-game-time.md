@@ -4,7 +4,8 @@
 
 An in-game clock that later drives timecyc (sky/sun/lighting). `loadGame` receives a start time
 (e.g. 6:00) and the game counts from there. **1 game-minute = N real seconds** (canvas-host **1.5**),
-configurable in the initial config. A **Time** tab in the debugger → Game section to jump to a time.
+configurable in the initial config. A **Time** section in the debugger to jump to a time. (This is now its own
+top-level **Time** tab — it was the "Game" section/screen when written.)
 No visual effect yet — just console output now; a HUD clock + timecyc come later.
 
 ## Design
@@ -62,7 +63,7 @@ Iteration 3 (HUD clock + timecyc) is the later, separate work.
 - `src/game/events/events.global.ts` — `time: { minutes: number }`.
 - `src/game/diagnostics/logger.ts` — add `'time'` to `LogType`.
 - `src/ui/canvas-host.tsx` — `time` config + `startMinutes` in `loadGame`; `DebugActions.gameTime/setGameTime`.
-- `src/ui/debug/debug-overlay.tsx` — the Time section in the Game screen.
+- `src/ui/debug/debug-overlay.tsx` — the Time tab (originally the "Game" screen).
 - The 4 config test fixtures — add `time`.
 
 ## Out of scope (later)

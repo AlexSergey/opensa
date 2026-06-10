@@ -96,7 +96,8 @@ totalEmissiveRadiance += (fill + uFillRim * rim) * uNightFill;
 ## Config + debug
 
 - `Config.graphics.night` (new sub-keys or a `fill` object): **strength** + **sky/ground tint** (+ maybe rim
-  strength/power). Defaults: a cool dim moonlight (tie tint to `night.tint` for consistency).
+  strength/power). Defaults: a cool dim moonlight. (Shipped with baked sky/ground/rim constants in
+  `night-fill.ts`, not a config tint; the once-proposed `night.tint` was later removed entirely.)
 - **Debug → Atmosphere tab** (the one added for `litFade`): sliders for fill strength + tint so the look is
   tunable in-browser without rebuilds (mirror the existing night sliders).
 

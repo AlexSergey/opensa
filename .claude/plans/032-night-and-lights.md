@@ -5,7 +5,7 @@ other lights switch on after dusk (configurable, default 20:00), lit windows glo
 **stars**. Extends [[029-graphics]] (night was reserved there) and reuses the [[031-weather-manager]] sky/
 timecyc plumbing. **Goal stays: best picture, least cost.**
 Status: **phases 1–10 DONE** (tobj gating, dark nights, stars, 2dfx coronas, lit windows, moon, night
-atmosphere = skylight + colour grade, **night vertex colours** = the whole baked night lighting) + **corona
+atmosphere = skylight [+ a colour grade, since removed], **night vertex colours** = the whole baked night lighting) + **corona
 occlusion polish DONE**.
 
 **FINAL DIRECTION (the big win):** the night look is the SA **night vertex colours** (phase 10) — dark roads,
@@ -16,8 +16,8 @@ directly — see phase 2). The night-vertex emissive fades on a fixed **wall-CLO
 below. The earlier
 **projected light pools (phase 9) and the custom flat night `brightness` floor were REMOVED.** Don't re-add.
 Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
-cheaper SA-style light-pool splat), corona texture variety. The **night grade mask / magic numbers need
-recalibration as other light sources land** — see phase 8's ⚠️ calibration note.
+cheaper SA-style light-pool splat), corona texture variety. (The **night colour grade was later removed** —
+see phase 8's ⛔ note.)
 
 ## Current state (what the research found)
 
@@ -81,7 +81,8 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      noon; it leans on the directional + prelit), so using it left day shadows pitch black. The day-ramp above
      is the practical fill.
    - The earlier custom **flat night `brightness` floor + cool `tint`-on-ambient were REMOVED** (they made
-     nights flat and fought the baked night vertex colours); `night.tint` is kept only for the post-FX grade.
+     nights flat and fought the baked night vertex colours). (`night.tint` was later removed too, with the
+     post-FX grade — see phase 8's ⛔ note.)
 
 3. ✅ **2dfx light parsing — DONE.** Added `RwSection.TWO_D_EFFECT` (`0x253F2F8`); `dff.ts` parses the
    geometry 2d-effect plugin's **Light** entries (type 0) into `RWGeometry.lights: RWLight2d[]` (position,
@@ -156,6 +157,11 @@ lit windows pop. Our blocker is the **prelit** day-bake.
    - **Skylight** — a `HemisphereLight` in `SkyPlugin` (sky colour from above, dark ground below), intensity
      `night × night.skylight`, giving objects top-down form the flat ambient can't. (NB: a structural plugin
      change — needs a full reload, not HMR, to take effect.)
+   - **Night colour grade — ⛔ REMOVED (cleanup, 2026-06-10).** Deleted as a near-dead no-op: the live default
+     had been dialled to `night.grade = 0.05` (≈ invisible), and the night mood is now carried by the dark
+     timecyc sky + night-fill (plan 034) + the ACES night tonemap + the skylight. Gone: `night-grade.effect.ts`,
+     the pass wiring, the `night.grade` + `night.tint` config + sliders. The `userData.night` stash stays (it
+     feeds the corona cross-fade). See memory [[night-grade-calibration]]. Original description below, for record:
    - **Night colour grade** — a screen-space `NightGradeEffect` (`game/plugins/night-grade.effect.ts`), a
      `postprocessing` `Effect` added as a pass in `PostFxPlugin` **after tone mapping, before SMAA**. Driven by
      the same sun-height night factor (stashed on the shared `godraysSource.userData.night` by `SkyPlugin`,
@@ -273,11 +279,12 @@ lit windows pop. Our blocker is the **prelit** day-bake.
 - `Config.graphics.lights` (new): `{ enabled, nightStartHour, nightEndHour }` — when lamps/coronas switch on
   (default **20:00 → ~06:00**, configurable per the ask), master toggle, plus maybe a corona intensity/budget.
 - `Config.graphics.stars` (new): `{ enabled }` (+ density later). Debug toggles in the Graphics/Weather tab.
-- `Config.graphics.night`: **`{ coronaDrawDistance, grade, litFade, skylight, tint, windowGlow }`** — corona cap,
-  colour-grade strength, the **`litFade`** dusk/dawn clock window (see below), hemisphere skylight, grade tint,
-  and **`windowGlow`** (night-vertex-colour emissive strength = the whole baked night lighting, phase 10).
-  `grade` drives the `NightGradeEffect`; `tint` is the grade tint only. (**Removed:** `brightness` → ambient now
-  from timecyc `amb`; `lampPool`/`lampPoolRadius` → projected pools deleted, phase 9.)
+- `Config.graphics.night`: **`{ coronaDrawDistance, dynamicObjectsFill, litFade, skylight, windowGlow }`** —
+  corona cap, the night-fill for dynamic objects (plan 034), the **`litFade`** dusk/dawn clock window (see below),
+  hemisphere skylight, and **`windowGlow`** (night-vertex-colour emissive strength = the whole baked night
+  lighting, phase 10). (**Removed:** `grade` + `tint` → the `NightGradeEffect` was deleted (2026-06-10), see
+  phase 8; `brightness` → ambient now from timecyc `amb`; `lampPool`/`lampPoolRadius` → projected pools deleted,
+  phase 9.)
 - (Night darkness in phase 2 can ride the existing sun model; expose a strength const, promote to config only
   if needed.)
 
@@ -285,7 +292,7 @@ lit windows pop. Our blocker is the **prelit** day-bake.
 
 The baked **night vertex colours** (lit windows/signs, phase 10) and the **ACES night tonemap** (`PostFxPlugin`)
 **no longer ride the sun-height night factor** — they ride a fixed **wall-clock** schedule so lit content
-switches on at set hours regardless of weather/sun. Coronas + the night grade still ride the sun factor.
+switches on at set hours regardless of weather/sun. Coronas still ride the sun factor (the night grade is gone).
 
 - **Helper:** `clockNightFactor(hour, fade)` (`game/time/hour-window.ts`) → `nightHourFactor(hour, onStart,
   onEnd, offStart, offEnd)`: smooth 0–1, linear dusk fade-in `[duskStart, duskEnd]` (0→1), full overnight, dawn

@@ -92,7 +92,7 @@ Post-FX library = **pmndrs `postprocessing`** (added when godrays lands). **Godr
    `RenderPipeline.removePass`: the composer pass is added **only when `config.graphics.godrays` is on**,
    so disabling it falls back to a plain (cheaper, natively-AA) render. The shafts are further gated to
    sun-above-horizon and not-map-viewer. `Config.graphics.godrays` (+ 4 fixtures, default on),
-   `Game.setGodrays`, and a **debug Game-screen toggle** ("God rays"). Tune in
+   `Game.setGodrays`, and a **debug toggle** ("God rays", now in the Graphics tab). Tune in
    `godrays.plugin.ts` (samples/density/decay/weight/exposure/resolutionScale).
 5. ✅ **Bloom + tone mapping — DONE.** Generalised the god-rays composer into a single post-FX host
    (`GodRaysPlugin` → **`PostFxPlugin`**, `game/plugins/postfx.plugin.ts`): one `EffectComposer` with three

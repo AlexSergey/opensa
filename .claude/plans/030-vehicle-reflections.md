@@ -151,7 +151,7 @@ In `buildMaterial`, when `rw.effects?.reflection` / MatFX ENVMAP is present:
   (+ 4 fixtures). `preset` selects the strategy; `intensity` is a live global multiplier over the preset/DFF
   values. `preset` is a plain string key → **a new preset never changes this type's shape**.
 - `Game.setVehicleReflection(patch)` (nested merge like `setSky`/`setWater`).
-- Debug Game-screen: a **preset selector** (cycle/buttons: Off / PC / PS2 / Enhanced — generated from the
+- Debug Graphics tab (formerly "Game" screen): a **preset selector** (cycle/buttons: Off / PC / PS2 / Enhanced — generated from the
   `PRESETS` keys, so new presets show up automatically) + an INTENSITY slider (live), mirroring bloom/water.
 
 ## 7. Performance strategy
@@ -188,7 +188,7 @@ In `buildMaterial`, when `rw.effects?.reflection` / MatFX ENVMAP is present:
    **`VehicleReflectionPlugin`** holds a material registry (vehicles `register`/`unregister` on spawn/despawn in
    canvas-host) and applies the preset: roughness↓ (glossier) + `envMapIntensity` from coefficient×intensity×
    preset; **metalness is gated on an env map being present** (none yet → stays matte, avoids dark PBR metal).
-   Debug Game-screen: "Car reflect" preset cycle (Off + registry keys) + REFLECT INTENSITY slider. **Visible
+   Debug Graphics tab (formerly "Game" screen): "Car reflect" preset cycle (Off + registry keys) + REFLECT INTENSITY slider. **Visible
    now:** reflective body panels get a sharper sun highlight (no actual reflections until phase 3). 303 tests.
 3. ✅ **`enhanced` (sky probe) — DONE.** `SkyPlugin` exposes its dome + sun on a shared **`SKY_PROBE_LAYER`**
    (1). `VehicleReflectionPlugin` owns a `WebGLCubeRenderTarget` (128, mipmapped) + `CubeCamera`

@@ -3,16 +3,6 @@ import { join, resolve } from 'node:path';
 
 import { TimecycManager } from './core/timecyc-manager';
 
-/*
- * base:
- * The main timecyc. Uses Timecyc Cinematic v1.3.dat for its very bright, nice colours.
- *
- * merge:
- * GTA SA Ezekiel Skybox addon.dat - take the sky settings; the best config for the skybox.
- * Timecyc New Summer.dat - a great config for water.
- * 24h TimeCycle gtadrive's Atmosphere Simulation.dat - really nice sky, but I only use it for rain.
- * */
-
 const init = async (): Promise<void> => {
   const manager = new TimecycManager();
   await manager.setBase(resolve(__dirname, './base/Modern Fusion Timecyc.dat'));

@@ -15,7 +15,7 @@ Plan 026 (`.claude/plans/026-game-time.md`), DONE — the foundation for timecyc
   `GameEvent` `{ minutes }` and logs `HH:MM` via the `Logger` (new `'time'` LogType — the "console"
   output, visible when `showLogs` is set). `Game.getTime()`/`setTime(minutes)`; `loadGame({ startMinutes })`
   seeds it (canvas-host passes 360 = 6:00; default noon).
-- Debugger Game screen → **Time**: live `HH:MM` + presets + 0–1439 slider via
+- Debugger **Time** tab (formerly "Game"): live `HH:MM` + presets + 0–1439 slider via
   `DebugActions.gameTime()/setGameTime()` → `game.setTime`.
 - No visual effect yet (no sky/sun). Next: HUD clock UI + timecyc consumers read `getTime()` / `'time'`.
   Related: [[fog]], [[in-game-debugger]], [[diagnostics-logging]].

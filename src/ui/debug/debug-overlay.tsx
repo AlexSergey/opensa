@@ -153,19 +153,19 @@ const CITY_LABEL: Record<City, string> = {
 type Screen =
   | 'atmosphere'
   | 'camera'
-  | 'game'
   | 'graphics'
   | 'map'
   | 'player'
   | 'position'
   | 'root'
+  | 'time'
   | 'vehicles'
   | 'weather';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
-  { label: 'Game', screen: 'game' },
+  { label: 'Time', screen: 'time' },
   { label: 'Atmosphere', screen: 'atmosphere' },
   { label: 'Camera', screen: 'camera' },
   { label: 'Graphics', screen: 'graphics' },
@@ -252,9 +252,9 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   // Keep the city label live — updates on city crossings (event-driven, no polling).
   useEffect(() => game.events.on('city', ({ city: next }) => setCity(next)), [game]);
 
-  // Keep the live clock label ticking while the Game screen is open.
+  // Keep the live clock label ticking while the Time screen is open.
   useEffect(() => {
-    if (!visible || screen !== 'game') {
+    if (!visible || screen !== 'time') {
       return;
     }
     const id = setInterval(() => setTime(actions.gameTime()), 500);
@@ -375,7 +375,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
             </div>
           )}
 
-          {screen === 'game' && (
+          {screen === 'time' && (
             <div style={styles.group}>
               <div style={styles.groupLabel}>TIME: {GameClock.format(time)}</div>
               <div style={styles.presetRow}>
@@ -462,6 +462,149 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
+              <div style={styles.groupLabel}>FOG: {fog} m</div>
+              <input
+                max={2000}
+                min={10}
+                onChange={(e) => {
+                  const distance = Number(e.target.value);
+                  setFog(distance);
+                  actions.setFogDistance(distance);
+                }}
+                step={10}
+                type="range"
+                value={fog}
+              />
+              <div style={styles.groupLabel}>CLOUD COVER: {clouds.coverage.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const coverage = Number(e.target.value);
+                  setClouds((prev) => ({ ...prev, coverage }));
+                  actions.setClouds({ coverage });
+                }}
+                step={0.01}
+                type="range"
+                value={clouds.coverage}
+              />
+              <div style={styles.groupLabel}>CLOUD OPACITY: {clouds.opacity.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0}
+                onChange={(e) => {
+                  const opacity = Number(e.target.value);
+                  setClouds((prev) => ({ ...prev, opacity }));
+                  actions.setClouds({ opacity });
+                }}
+                step={0.01}
+                type="range"
+                value={clouds.opacity}
+              />
+              <label style={styles.label}>
+                <input
+                  checked={stars.enabled}
+                  onChange={() => {
+                    const enabled = !stars.enabled;
+                    setStars({ enabled });
+                    actions.setStars({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={stars.enabled ? styles.optionActive : styles.option}>Night stars</span>
+              </label>
+              <label style={styles.label}>
+                <input
+                  checked={lights.enabled}
+                  onChange={() => {
+                    const enabled = !lights.enabled;
+                    setLights((prev) => ({ ...prev, enabled }));
+                    actions.setLights({ enabled });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={lights.enabled ? styles.optionActive : styles.option}>Night lights (lamps)</span>
+              </label>
+              <div style={styles.groupLabel}>MOON SIZE: {moon.size.toFixed(0)}</div>
+              <input
+                max={400}
+                min={40}
+                onChange={(e) => {
+                  const size = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, size }));
+                  actions.setMoon({ size });
+                }}
+                step={5}
+                type="range"
+                value={moon.size}
+              />
+              <div style={styles.groupLabel}>MOON ELEVATION: {moon.elevationDeg.toFixed(0)}°</div>
+              <input
+                max={80}
+                min={2}
+                onChange={(e) => {
+                  const elevationDeg = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, elevationDeg }));
+                  actions.setMoon({ elevationDeg });
+                }}
+                step={1}
+                type="range"
+                value={moon.elevationDeg}
+              />
+              <div style={styles.groupLabel}>MOON BRIGHTNESS: {moon.brightness.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const brightness = Number(e.target.value);
+                  setMoon((prev) => ({ ...prev, brightness }));
+                  actions.setMoon({ brightness });
+                }}
+                step={0.05}
+                type="range"
+                value={moon.brightness}
+              />
+              <div style={styles.groupLabel}>CORONA DISTANCE: {night.coronaDrawDistance.toFixed(0)}</div>
+              <input
+                max={400}
+                min={20}
+                onChange={(e) => {
+                  const coronaDrawDistance = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, coronaDrawDistance }));
+                  actions.setNight({ coronaDrawDistance });
+                }}
+                step={5}
+                type="range"
+                value={night.coronaDrawDistance}
+              />
+              <div style={styles.groupLabel}>NIGHT SKYLIGHT: {night.skylight.toFixed(2)}</div>
+              <input
+                max={2}
+                min={0}
+                onChange={(e) => {
+                  const skylight = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, skylight }));
+                  actions.setNight({ skylight });
+                }}
+                step={0.05}
+                type="range"
+                value={night.skylight}
+              />
+              <div style={styles.groupLabel}>NIGHT WINDOW GLOW: {night.windowGlow.toFixed(2)}</div>
+              <input
+                max={3}
+                min={0}
+                onChange={(e) => {
+                  const windowGlow = Number(e.target.value);
+                  setNight((prev) => ({ ...prev, windowGlow }));
+                  actions.setNight({ windowGlow });
+                }}
+                step={0.05}
+                type="range"
+                value={night.windowGlow}
+              />
             </div>
           )}
 
@@ -517,47 +660,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
           {screen === 'graphics' && (
             <div style={styles.group}>
-              <div style={styles.groupLabel}>FOG: {fog} m</div>
-              <input
-                max={2000}
-                min={10}
-                onChange={(e) => {
-                  const distance = Number(e.target.value);
-                  setFog(distance);
-                  actions.setFogDistance(distance);
-                }}
-                step={10}
-                type="range"
-                value={fog}
-              />
-
-              <div style={styles.groupLabel}>CLOUD COVER: {clouds.coverage.toFixed(2)}</div>
-              <input
-                max={1}
-                min={0}
-                onChange={(e) => {
-                  const coverage = Number(e.target.value);
-                  setClouds((prev) => ({ ...prev, coverage }));
-                  actions.setClouds({ coverage });
-                }}
-                step={0.01}
-                type="range"
-                value={clouds.coverage}
-              />
-              <div style={styles.groupLabel}>CLOUD OPACITY: {clouds.opacity.toFixed(2)}</div>
-              <input
-                max={1}
-                min={0}
-                onChange={(e) => {
-                  const opacity = Number(e.target.value);
-                  setClouds((prev) => ({ ...prev, opacity }));
-                  actions.setClouds({ opacity });
-                }}
-                step={0.01}
-                type="range"
-                value={clouds.opacity}
-              />
-
               <div style={styles.groupLabel}>GRAPHICS</div>
               <label style={styles.label}>
                 <input
@@ -708,143 +810,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 />
                 <span style={shadows.enabled ? styles.optionActive : styles.option}>Sun shadows</span>
               </label>
-              <label style={styles.label}>
-                <input
-                  checked={stars.enabled}
-                  onChange={() => {
-                    const enabled = !stars.enabled;
-                    setStars({ enabled });
-                    actions.setStars({ enabled });
-                  }}
-                  style={styles.radio}
-                  type="checkbox"
-                />
-                <span style={stars.enabled ? styles.optionActive : styles.option}>Night stars</span>
-              </label>
-              <label style={styles.label}>
-                <input
-                  checked={lights.enabled}
-                  onChange={() => {
-                    const enabled = !lights.enabled;
-                    setLights((prev) => ({ ...prev, enabled }));
-                    actions.setLights({ enabled });
-                  }}
-                  style={styles.radio}
-                  type="checkbox"
-                />
-                <span style={lights.enabled ? styles.optionActive : styles.option}>Night lights (lamps)</span>
-              </label>
-              <div style={styles.groupLabel}>MOON SIZE: {moon.size.toFixed(0)}</div>
-              <input
-                max={400}
-                min={40}
-                onChange={(e) => {
-                  const size = Number(e.target.value);
-                  setMoon((prev) => ({ ...prev, size }));
-                  actions.setMoon({ size });
-                }}
-                step={5}
-                type="range"
-                value={moon.size}
-              />
-              <div style={styles.groupLabel}>MOON ELEVATION: {moon.elevationDeg.toFixed(0)}°</div>
-              <input
-                max={80}
-                min={2}
-                onChange={(e) => {
-                  const elevationDeg = Number(e.target.value);
-                  setMoon((prev) => ({ ...prev, elevationDeg }));
-                  actions.setMoon({ elevationDeg });
-                }}
-                step={1}
-                type="range"
-                value={moon.elevationDeg}
-              />
-              <div style={styles.groupLabel}>MOON BRIGHTNESS: {moon.brightness.toFixed(2)}</div>
-              <input
-                max={3}
-                min={0}
-                onChange={(e) => {
-                  const brightness = Number(e.target.value);
-                  setMoon((prev) => ({ ...prev, brightness }));
-                  actions.setMoon({ brightness });
-                }}
-                step={0.05}
-                type="range"
-                value={moon.brightness}
-              />
-              <div style={styles.groupLabel}>CORONA DISTANCE: {night.coronaDrawDistance.toFixed(0)}</div>
-              <input
-                max={400}
-                min={20}
-                onChange={(e) => {
-                  const coronaDrawDistance = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, coronaDrawDistance }));
-                  actions.setNight({ coronaDrawDistance });
-                }}
-                step={5}
-                type="range"
-                value={night.coronaDrawDistance}
-              />
-              <div style={styles.groupLabel}>NIGHT SKYLIGHT: {night.skylight.toFixed(2)}</div>
-              <input
-                max={2}
-                min={0}
-                onChange={(e) => {
-                  const skylight = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, skylight }));
-                  actions.setNight({ skylight });
-                }}
-                step={0.05}
-                type="range"
-                value={night.skylight}
-              />
-              <div style={styles.groupLabel}>NIGHT GRADE: {night.grade.toFixed(2)}</div>
-              <input
-                max={1}
-                min={0}
-                onChange={(e) => {
-                  const grade = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, grade }));
-                  actions.setNight({ grade });
-                }}
-                step={0.05}
-                type="range"
-                value={night.grade}
-              />
-              <div style={styles.groupLabel}>NIGHT WINDOW GLOW: {night.windowGlow.toFixed(2)}</div>
-              <input
-                max={3}
-                min={0}
-                onChange={(e) => {
-                  const windowGlow = Number(e.target.value);
-                  setNight((prev) => ({ ...prev, windowGlow }));
-                  actions.setNight({ windowGlow });
-                }}
-                step={0.05}
-                type="range"
-                value={night.windowGlow}
-              />
-              {(['R', 'G', 'B'] as const).map((channel, i) => (
-                <div key={channel}>
-                  <div style={styles.groupLabel}>
-                    NIGHT TINT {channel}: {night.tint[i].toFixed(2)}
-                  </div>
-                  <input
-                    max={1}
-                    min={0}
-                    onChange={(e) => {
-                      const tint = [...night.tint] as [number, number, number];
-                      tint[i] = Number(e.target.value);
-                      setNight((prev) => ({ ...prev, tint }));
-                      actions.setNight({ tint });
-                    }}
-                    step={0.02}
-                    type="range"
-                    value={night.tint[i]}
-                  />
-                </div>
-              ))}
               <div style={styles.groupLabel}>HEADLIGHT POWER: {headlights.intensity.toFixed(1)}</div>
               <input
                 max={30}

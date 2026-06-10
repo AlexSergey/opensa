@@ -18,7 +18,7 @@ Plan 024 (`.claude/plans/024-fog.md`), DONE. GTA-style distance fog hiding the f
   on (no fog in the map inspector) — works because `setMapViewer`/`setFogDistance` both go through
   `Game.setConfig` → `configChanged`.
 - `Game.setFogDistance(distance)` → `setConfig({ fog: { distance } })` (runtime change).
-- Debugger Game screen: range slider 10–2000 (step 10) via `DebugActions.fogDistance()/setFogDistance()`.
+- Debugger Atmosphere tab: range slider 10–2000 (step 10) via `DebugActions.fogDistance()/setFogDistance()`.
 
 Camera far plane (100000) untouched. Fog colour now tracks the sky horizon (skyBot) each frame via a `horizon` sampler (plan 029) — fully-fogged geometry blends into the sky dome; lodDrawDistance pulled to ~fog.distance so far geometry is culled, not ghosted. Related: [[world-streaming-plan]] (fade), [[in-game-debugger]].
 

@@ -369,7 +369,7 @@ export class SkyPlugin implements Plugin {
     // Night factor (0 day → 1 deep night), ramping as the sun nears/passes the horizon — drives the star
     // fade and the cool ambient tint. Based on sun height so dusk/dawn cross-fade smoothly.
     this.night = 1 - MathUtils.smoothstep(height, 0, 0.22);
-    this.godraysSource.userData.night = this.night; // shared channel → the post-FX night grade reads this
+    this.godraysSource.userData.night = this.night; // shared channel → the corona cross-fade reads this
     // Overcast factor: 0 (clear) → 1 (heavy cloud). Direct light dims and shadows soften toward flat,
     // diffuse light, with a little ambient lift so the scene stays bright (an overcast sky is a big soft light).
     const overcast = MathUtils.smoothstep(this.cloudCover, 0.3, 0.95);

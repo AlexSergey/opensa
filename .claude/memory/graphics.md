@@ -36,11 +36,11 @@ resolutionScale 0.5) with the **SkyPlugin sun Mesh** as light source (sun core i
 `Mesh`, not Sprite, since GodRays needs a transparent non-depth-writing mesh; corona stays a sprite).
 Pipeline gained `removePass`: the composer pass is added **only when `config.graphics.godrays`** → off =
 plain native-AA render (zero post-FX cost). Shafts gated to sun-up + !mapViewer. `Config.graphics.godrays`
-(default on, +4 fixtures), `Game.setGodrays`, debug Game-screen "God rays" toggle. Tunables in the plugin.
+(default on, +4 fixtures), `Game.setGodrays`, debug Graphics-tab "God rays" toggle. Tunables in the plugin.
 Smooth time: sun/sky read `game.getHours()` (continuous), HUD/clock stay whole-minute.
 
 Sun size is config-driven: `Config.graphics.sunSize` (default **15**, world units; +4 fixtures), `Game.setSunSize`,
-debug Game-screen "SUN SIZE" slider. Visible sun disc world size = `sunSize × timecyc.sunSize`; corona =
+debug Graphics-tab "SUN SIZE" slider. Visible sun disc world size = `sunSize × timecyc.sunSize`; corona =
 `core × CORONA_RATIO(4.5) × spriteSize` (old fixed `CORE_SCALE`/`CORONA_SCALE` consts removed). Note:
 any `Game` setter touching `config.graphics` must spread the existing object (`setConfig` is a shallow
 `Object.assign`) — `setGodrays`/`setSunSize`/`setGodraysSize` all do.
@@ -61,7 +61,7 @@ calls `this.godraysSource.updateMatrix()` every frame after setting position/sca
 God-rays **shader tuning** is config too: `Config.graphics.sky` (sub-object) = `{ density 0.96, exposure 0.5,
 weight 0.4 }` (+4 fixtures), exported as `SkyConfig` from the game barrel. `Game.setSky(patch)` merges into
 `graphics.sky`; `GodRaysPlugin.configChanged` pushes them onto the live `godRaysMaterial` (density/exposure/
-weight setters). Debug Game-screen sliders DENSITY/EXPOSURE/WEIGHT (0–1). (decay/samples/resolutionScale stay
+weight setters). Debug Graphics-tab sliders DENSITY/EXPOSURE/WEIGHT (0–1). (decay/samples/resolutionScale stay
 hardcoded in the plugin.)
 
 **Config shape (current):** `Config.graphics = { bloom: BloomConfig, sky: SkyConfig, sun: SunConfig, toneMapping: boolean, water: WaterConfig }`.
@@ -77,7 +77,7 @@ single `EffectComposer` and three separate `EffectPass`es sharing it — **god r
 use `EffectPass.enabled` (a disabled pass is skipped → ~0 cost; can't use `BlendFunction.SKIP`, it's
 deprecated/doesn't fully disable). godrays pass enabled = `sun.godrays && sunSource.visible`; bloom pass =
 `bloom.enabled`. Composer is the pipeline render pass except in **map-viewer** (plain render via `removePass`).
-renderer.toneMapping stays NoToneMapping (default) so ACES isn't double-applied. Debug Game-screen: Bloom
+renderer.toneMapping stays NoToneMapping (default) so ACES isn't double-applied. Debug Graphics-tab: Bloom
 checkbox + INTENSITY (0–3) + THRESHOLD (0–1) sliders + "Tone map (ACES)" checkbox. Tunables:
 BLOOM_RADIUS/BLOOM_SMOOTHING in the plugin.
 
@@ -118,7 +118,7 @@ FBM value-noise (5 octaves) drifts over `clock.elapsed`, faded out near the hori
 `bottomClouds`(underside)→`lowClouds`(lit tops) by density — added to SkySample as `cloudBottom`/`cloudTop`
 (raw sRGB, like the gradient). A `gl_FragCoord` hash **dither** (`±0.5/255`) breaks gradient banding. Branch
 gated on `uCloudOpacity > 0 && dir.y > 0` (clear sky = skip). `Config.graphics.clouds { coverage, opacity }`
-(default 0.5/0.85, +4 fixtures), `Game.setClouds`, debug CLOUD COVER/OPACITY sliders (in the Graphics tab).
+(default 0.5/0.85, +4 fixtures), `Game.setClouds`, debug CLOUD COVER/OPACITY sliders (in the Atmosphere tab).
 Chose this over the three.js `Sky` scattering addon / HDR panorama to **keep the GTA timecyc palette** that
 fog/water/probe all sample. (We're plain three, not R3F — drei `<Sky>/<Cloud>` not usable.)
 
