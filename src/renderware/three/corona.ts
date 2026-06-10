@@ -1,5 +1,13 @@
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Points, ShaderMaterial } from 'three';
 
+/**
+ * Render layer for glow point clouds (coronas). They are excluded from AO's normal prepass: its
+ * override material never writes `gl_PointSize`, so point sprites would smear undefined-size phantom
+ * quads into the normal buffer (large flickering dark squares on facades behind street lamps). The
+ * main camera must have this layer enabled; the AO normal pass disables it while it renders.
+ */
+export const GLOW_LAYER = 2;
+
 /** A placed corona: a world-space (GTA Z-up) glow point from a 2d-effect light. */
 export interface CoronaEntry {
   /** RGB 0–255. */
@@ -107,6 +115,7 @@ export function buildCoronaPoints(entries: readonly CoronaEntry[]): null | Point
   const points = new Points(geometry, coronaMaterial);
   points.renderOrder = 2; // after opaque + transparent geometry
   points.name = 'Coronas';
+  points.layers.set(GLOW_LAYER); // excluded from the AO normal prepass (see GLOW_LAYER)
 
   return points;
 }

@@ -34,6 +34,7 @@ import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
 import {
   buildTextureMap,
   coronaMaterial,
+  GLOW_LAYER,
   gxtKeyHash,
   type MapZone,
   nightColorUniform,
@@ -324,7 +325,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       weatherTransitionSeconds: 6,
     });
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3-original.img`,
+      archiveUrl: `${BASE}/models/gta3-pf.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
@@ -392,10 +393,13 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         ),
       )
       .addPlugin(reflection) // vehicle env-map reflections (preset-driven)
-      .addPlugin(new PostFxPlugin(sky.godraysSource, () => game.getHours())); // post-FX host: god rays + bloom + tone mapping
+      // Post-FX host: god rays + bloom + tone mapping + SSAO (GLOW_LAYER is hidden from its normal prepass).
+      .addPlugin(new PostFxPlugin(sky.godraysSource, () => game.getHours(), GLOW_LAYER));
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
+    // Corona Points live on GLOW_LAYER (excluded from the SSAO normal prepass) — the camera must see it.
+    game.getCamera().layers.enable(GLOW_LAYER);
     // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
 

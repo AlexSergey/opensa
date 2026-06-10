@@ -140,3 +140,18 @@ weather transitions, `ambObj` for peds/vehicles.
 (bloom/tone-mapping — DONE phase 5; water + sun glints — DONE phase 6; **car reflections** — DONE plan 030;
 **SSAO** — DONE; **sun shadows** (directional shadow map, view-following) — DONE; **clouds** (procedural FBM in
 the dome shader, timecyc-coloured) + **anti-banding dither** — DONE.)
+
+
+---
+
+**Since-fixed (2026-06-10): SSAO × corona Points — phantom dark squares.** The SSAO `NormalPass` renders
+the scene with an override material that applies to **everything**, including the street-lamp corona
+`Points` (plan 032): their `transparent`/`depthWrite`/`uOn` are ignored, and the override vertex shader never
+writes `gl_PointSize`, so the points rasterized with **undefined size** into the normal buffer — SSAO then
+multiplied large, rapidly flickering dark squares onto facades behind lamps (in daylight too, since the prepass
+ignores corona visibility). Fix: coronas live on **`GLOW_LAYER` (2)** (`corona.ts`, exported from the barrel); the
+main camera enables it (canvas-host, after `game.init()`), and `PostFxPlugin` disables that layer for the
+duration of the `NormalPass` render only. **Any future glow point-cloud must go on `GLOW_LAYER` too.** (
+Vehicle headlight glows are `Sprite`s — three ignores override materials for sprites, so they were never
+affected.)
+See memory `ssao-glow-layer`.

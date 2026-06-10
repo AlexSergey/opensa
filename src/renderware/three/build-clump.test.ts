@@ -1,11 +1,14 @@
 import type { MeshStandardMaterial } from 'three';
 
+import { readFileSync } from 'node:fs';
 import { DoubleSide, FrontSide, Mesh, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
+import { parseDff } from '../parsers/binary/dff';
+import { toArrayBuffer } from '../test-utils';
 import { buildClump } from './build-clump';
 
 function alphaTextureMap(): Map<string, Texture> {
@@ -116,5 +119,55 @@ describe('buildClump', () => {
     const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
     const mesh = buildClump(clumpWith(geometry({ normals }))).children[0] as Mesh;
     expect(Array.from(mesh.geometry.attributes.normal.array.slice(0, 3))).toEqual([0, 0, 1]);
+  });
+});
+
+// Real regression case (plan 037): the gta3-pf.img re-export of the Casino Royale building stores
+// a normals block that is ~81% exact zeros (SA's prelit-only map pipeline never reads normals, so
+// the mod shipped garbage) — zero normals rendered the building black under our dynamic sun.
+const CASROYALE_DFF = 'tests/dff/casroyale-zero-normals/casroyale02_lvs.dff';
+
+/** Count of zero-length (or non-finite) normals in a packed xyz array. */
+function degenerateCount(normals: Float32Array): number {
+  let count = 0;
+  for (let v = 0; v < normals.length / 3; v += 1) {
+    const lengthSq = normals[v * 3] ** 2 + normals[v * 3 + 1] ** 2 + normals[v * 3 + 2] ** 2;
+    if (!Number.isFinite(lengthSq) || lengthSq < 1e-8) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function parseCasroyale(): RWClump {
+  return parseDff(toArrayBuffer(new Uint8Array(readFileSync(CASROYALE_DFF))));
+}
+
+describe('stored-normal sanitization (casroyale zero-normals case)', () => {
+  describe('negative cases', () => {
+    it('the fixture ships zero-length stored normals (the broken input)', () => {
+      const clump = parseCasroyale();
+      const stored = clump.geometries[0].normals;
+      expect(stored).not.toBeNull();
+      expect(degenerateCount(stored as Float32Array)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('builds the real model with no zero/non-finite normals left', () => {
+      const group = buildClump(parseCasroyale());
+      const meshes = group.children.filter((child): child is Mesh => (child as Mesh).isMesh);
+      expect(meshes.length).toBeGreaterThan(0);
+      for (const mesh of meshes) {
+        expect(degenerateCount(mesh.geometry.attributes.normal.array as Float32Array)).toBe(0);
+      }
+    });
+
+    it('repairs synthetic NaN stored normals (finiteness guard)', () => {
+      const normals = new Float32Array([NaN, NaN, NaN, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+      const mesh = buildClump(clumpWith(geometry({ normals }))).children[0] as Mesh;
+      expect(degenerateCount(mesh.geometry.attributes.normal.array as Float32Array)).toBe(0);
+    });
   });
 });

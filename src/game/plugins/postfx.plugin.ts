@@ -37,6 +37,7 @@ export class PostFxPlugin implements Plugin {
   private bloom: BloomEffect | null = null;
   private bloomPass: EffectPass | null = null;
   private composer: EffectComposer | null = null;
+  private readonly glowLayer: number;
   private godRays: GodRaysEffect | null = null;
   private godraysPass: EffectPass | null = null;
   private readonly hours: () => number;
@@ -50,9 +51,16 @@ export class PostFxPlugin implements Plugin {
   private toneMapping: null | ToneMappingEffect = null;
   private tonePass: EffectPass | null = null;
 
-  constructor(sunSource: Mesh, hours: () => number) {
+  /**
+   * `glowLayer` — render layer of glow point clouds (street-lamp coronas). It is hidden during the
+   * SSAO normal prepass: the normals override material never writes `gl_PointSize`, so point sprites
+   * would smear undefined-size phantom quads into the normal buffer, and SSAO then multiplies large
+   * flickering dark squares onto facades behind lamps.
+   */
+  constructor(sunSource: Mesh, hours: () => number, glowLayer: number) {
     this.sunSource = sunSource;
     this.hours = hours;
+    this.glowLayer = glowLayer;
   }
 
   configChanged(config: PluginContext['config']): void {
@@ -73,6 +81,15 @@ export class PostFxPlugin implements Plugin {
 
     // Ambient occlusion: a scene-normals pass feeds an SSAO effect that multiply-darkens corners/contacts.
     const normalPass = new NormalPass(context.scene, context.camera);
+    // Hide glow points (coronas) from the normals prepass — see the constructor doc for why.
+    const { camera } = context;
+    const glowLayer = this.glowLayer;
+    const renderNormals = normalPass.render.bind(normalPass);
+    normalPass.render = (...args: Parameters<NormalPass['render']>): void => {
+      camera.layers.disable(glowLayer);
+      renderNormals(...args);
+      camera.layers.enable(glowLayer);
+    };
     const ssao = new SSAOEffect(context.camera, normalPass.texture, {
       blendFunction: BlendFunction.MULTIPLY,
       fade: 0.02,

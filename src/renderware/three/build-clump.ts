@@ -206,6 +206,9 @@ export function buildGeometry(rw: RWGeometry): BufferGeometry {
   geometry.setIndex(index);
 
   if (rw.normals) {
+    // Stored normals can be exporter garbage too (PF re-exports ship all-zero blocks — black faces);
+    // repair is in-place and idempotent, so mutating the cached parse is safe. See plan 037.
+    sanitizeDegenerateNormals(rw.normals, rw.positions, rw.triangles);
     geometry.setAttribute('normal', new BufferAttribute(rw.normals, 3));
   } else {
     geometry.computeVertexNormals();
@@ -345,12 +348,15 @@ function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {
 }
 
 /**
- * Repair zero-length vertex normals left by `computeVertexNormals`. When a vertex is shared by triangles with
- * opposite winding (coincident double-sided panels — neon signs — or unclean world meshes like some SA roads),
- * the per-face normals cancel to zero. A zero normal then yields no diffuse term, so the face renders **pure
- * black** under any light. We give each such vertex the geometric face normal of an incident triangle (the flat
- * surface direction; `DoubleSide` materials still flip it per back-face), falling back to +Z up only if every
- * incident triangle is degenerate. Valid normals are left untouched, so smooth shading elsewhere is unchanged.
+ * Repair zero-length (or NaN/Infinity) vertex normals — both ones left by `computeVertexNormals` and ones
+ * **stored in the DFF**. Computed normals cancel to zero when a vertex is shared by triangles with opposite
+ * winding (coincident double-sided panels — neon signs — or unclean world meshes like some SA roads); stored
+ * normals arrive zeroed from dirty re-exports (gta3-pf.img casroyale02/04 — SA's prelit-only map pipeline never
+ * reads them, so the mod shipped garbage; plan 037). A zero normal yields no diffuse term, so the face renders
+ * **pure black** under any light. We give each such vertex the geometric face normal of an incident triangle
+ * (the flat surface direction; `DoubleSide` materials still flip it per back-face), falling back to +Z up only
+ * if every incident triangle is degenerate. Valid normals are left untouched, so smooth shading elsewhere is
+ * unchanged, and the repair is idempotent (safe on the cached parse).
  */
 function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Array, triangles: RWTriangle[]): void {
   const bad = new Set<number>();
@@ -358,8 +364,9 @@ function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Arra
     const x = normals[v * 3];
     const y = normals[v * 3 + 1];
     const z = normals[v * 3 + 2];
-    if (x * x + y * y + z * z < 1e-8) {
-      bad.add(v);
+    const lengthSq = x * x + y * y + z * z;
+    if (!Number.isFinite(lengthSq) || lengthSq < 1e-8) {
+      bad.add(v); // zero-length or NaN/Infinity — both render black/undefined
     }
   }
   if (bad.size === 0) {
@@ -390,6 +397,9 @@ function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Arra
 
 function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): BufferAttribute {
   if (rw.normals) {
+    // Stored garbage too (zeroed PF re-exports) — see plan 037.
+    sanitizeDegenerateNormals(rw.normals, rw.positions, rw.triangles);
+
     return new BufferAttribute(rw.normals, 3);
   }
   const temporary = new BufferGeometry();

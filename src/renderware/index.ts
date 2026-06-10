@@ -33,7 +33,7 @@ export {
   type VehicleOptions,
 } from './three/build-vehicle';
 export { buildWater, oceanFrame } from './three/build-water';
-export { type CoronaEntry, coronaMaterial } from './three/corona';
+export { type CoronaEntry, coronaMaterial, GLOW_LAYER } from './three/corona';
 export { DFFLoader } from './three/dff-loader';
 export { nightFillRim, nightFillUniform } from './three/night-fill';
 export { nightColorUniform } from './three/night-vertex-colors';

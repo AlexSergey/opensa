@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
-
 import type { MeshStandardMaterial } from 'three';
 
+import { readFileSync } from 'node:fs';
 import { DoubleSide, FrontSide } from 'three';
 import { describe, expect, it } from 'vitest';
 
