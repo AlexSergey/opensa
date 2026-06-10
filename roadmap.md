@@ -65,7 +65,7 @@
   - [✅] 2 strategies
     - [✅] If you run a regular timecyc Python algorithm in 24h format
     - [✅] If 24h, then as is
-- [ ] Graphics
+- [✅] Graphics
   - [✅] Light
   - [✅] Shadows
   - [✅] Volumetric cloud / Skybox
@@ -73,7 +73,7 @@
     - [✅] Check sample - https://discourse.threejs.org/t/complete-sky-system-for-three-js-skybox-sun-moon-day-night-cycle-clouds-stars-lensflares/88311
     - [✅] Check sample - https://discourse.threejs.org/t/how-do-i-get-dynamic-realistic-sun-rays-in-webgpu/66430
   - [✅] Water shader
-  - [ ] Night objects (Tobj)
+  - [✅] Night objects (Tobj)
   - [✅] 2dfx
   - [✅] Car headlights - Direct Light + texture from Vehicle
 - [✅] Car reflections
@@ -82,7 +82,16 @@
   - [✅] The Ui layer should not be involved in post processing.
   - [✅] Find good fonts
   - [✅] Show current time
+- [ ] Weather manager zone detection (map.zon support)
+- [ ] Zones and text
+  - [ ] Info.zon parser
+  - [ ] District decection
+  - [ ] gxt parser
+  - [ ] Show text
+- [ ] Player camera enhancements
+- [ ] Fog enhanced
 - [ ] Increase test coverage
+- [ ] Fix car headlight
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Add build scripts

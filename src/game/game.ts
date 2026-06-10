@@ -11,6 +11,7 @@ import {
 } from 'three';
 
 import type { StreamingSystem } from './streaming/streaming.system';
+import type { City } from './zones/city';
 
 import { CameraController } from './core/camera-controller';
 import { Clock } from './core/clock';
@@ -78,6 +79,7 @@ export class Game {
   private readonly collisionObjects: Object3D[] = [];
   private readonly config: Config;
   private context: null | PluginContext = null;
+  private currentCity: City = 'COUNTRYSIDE';
   private readonly entityRoot = new Group();
   private readonly gameClock = new GameClock();
   private lastRequest: null | RegionRequest = null;
@@ -153,6 +155,11 @@ export class Game {
   /** The scene camera (read-only handle; e.g. for camera-relative input). */
   getCamera(): PerspectiveCamera {
     return this.camera;
+  }
+
+  /** The city the player is currently in (driven by {@link CityZoneSystem}); Countryside until a world loads. */
+  getCity(): City {
+    return this.currentCity;
   }
 
   /** The live config (mutated in place by `setConfig`); systems read it for state. */
@@ -287,6 +294,15 @@ export class Game {
   /** Tune bloom (enabled/intensity/threshold) at runtime; merges into `graphics.bloom`. */
   setBloom(patch: Partial<BloomConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, bloom: { ...this.config.graphics.bloom, ...patch } } });
+  }
+
+  /** Tune the water shader (glint/reflection) at runtime; merges into `graphics.water`. */
+  /** Set the player's current city (from {@link CityZoneSystem}); emits `'city'` only on a real change. */
+  setCity(city: City): void {
+    if (city !== this.currentCity) {
+      this.currentCity = city;
+      this.events.emit('city', { city });
+    }
   }
 
   /** Tune procedural sky clouds (coverage/opacity) at runtime; merges into `graphics.clouds`. */
@@ -427,7 +443,6 @@ export class Game {
     this.setConfig({ graphics: { ...this.config.graphics, vehicleReflection } });
   }
 
-  /** Tune the water shader (glint/reflection) at runtime; merges into `graphics.water`. */
   setWater(patch: Partial<WaterConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, water: { ...this.config.graphics.water, ...patch } } });
   }

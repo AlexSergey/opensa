@@ -1,9 +1,12 @@
 import type { LogEntry } from '../diagnostics/logger';
 import type { GameState } from '../interfaces/config.interface';
 import type { WorldObjectInfo } from '../interfaces/world-adapter.interface';
+import type { City } from '../zones/city';
 
 /** Typed event map for the game's {@link EventBus}. */
 export interface GameEvents {
+  /** Player moved into a different city (Los Santos / San Fierro / Las Venturas / Countryside). */
+  city: { city: City };
   'fly-camera': { enabled: boolean };
   'game-state': { state: GameState };
   loaded: void;

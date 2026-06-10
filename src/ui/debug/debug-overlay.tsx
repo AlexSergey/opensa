@@ -2,6 +2,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 
 import type {
   BloomConfig,
+  City,
   CloudsConfig,
   Game,
   HeadlightConfig,
@@ -36,6 +37,8 @@ const TIME_PRESETS: [string, number][] = [
 export interface DebugActions {
   /** Current bloom tuning. */
   bloom(): BloomConfig;
+  /** The city the player is currently in (Los Santos / San Fierro / Las Venturas / Countryside). */
+  city(): City;
   /** Current cloud tuning. */
   clouds(): CloudsConfig;
   /** Flip the occupied car (on wheels → roof, on roof → wheels). No-op on foot. */
@@ -131,6 +134,15 @@ export interface DebugActions {
 /** Reflection preset cycle order for the debug selector (Off + the registry keys). */
 const REFLECTION_PRESETS = ['off', ...Object.keys(PRESETS)];
 
+/** Display label per city token. */
+const CITY_LABEL: Record<City, string> = {
+  COUNTRYSIDE: 'Countryside',
+  DESERT: 'Desert (Bone County)',
+  LA: 'Los Santos',
+  SF: 'San Fierro',
+  VEGAS: 'Las Venturas',
+};
+
 type Screen = 'atmosphere' | 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles' | 'weather';
 
 const MENU: { label: string; screen: Screen }[] = [
@@ -160,6 +172,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [screen, setScreen] = useState<Screen>('root');
   const [showCoords, setShowCoords] = useState(false);
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
+  const [city, setCity] = useState<City>(() => actions.city());
   const [mapActive, setMapActive] = useState(false);
   const [fog, setFog] = useState(() => actions.fogDistance());
   const [time, setTime] = useState(() => actions.gameTime());
@@ -206,6 +219,9 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
     return (): void => clearInterval(id);
   }, [actions, visible, screen, showCoords]);
+
+  // Keep the city label live — updates on city crossings (event-driven, no polling).
+  useEffect(() => game.events.on('city', ({ city: next }) => setCity(next)), [game]);
 
   // Keep the live clock label ticking while the Game screen is open.
   useEffect(() => {
@@ -282,6 +298,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
           {screen === 'position' && (
             <div style={styles.group}>
+              <div style={styles.groupLabel}>CITY: {CITY_LABEL[city]}</div>
               <button
                 onClick={() => {
                   setCoords(actions.playerCoords());

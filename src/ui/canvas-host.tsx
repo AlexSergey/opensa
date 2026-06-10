@@ -27,6 +27,9 @@ import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleHeadlightSystem } from '../game/vehicle/vehicle-headlight.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
+import { weatherForCity } from '../game/weather/weather-zones';
+import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
+import { CityZoneSystem } from '../game/zones/city-zone.system';
 import {
   buildTextureMap,
   coronaMaterial,
@@ -34,6 +37,7 @@ import {
   nightFillRim,
   nightFillUniform,
   parseTxd,
+  parseZones,
   sampleTimecycBlend,
   WEATHER_NAMES,
 } from '../renderware';
@@ -77,6 +81,34 @@ const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
 interface Bootstrap {
   debugActions: DebugActions;
   game: Game;
+}
+
+/** Fetch map.zon and map its boxes to city AABBs ([] on any failure → everything classifies as Countryside). */
+async function loadCityBoxes(url: string): Promise<CityBox[]> {
+  try {
+    const zones = parseZones(await fetch(url).then((response) => response.text()));
+
+    return zones.flatMap((zone) => {
+      const city = cityFromLevel(zone.level);
+
+      return city ? [{ city, max: zone.max, min: zone.min }] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch info.zon and pull the two desert county boxes (Bone County + Tierra Robada) as DESERT AABBs. */
+async function loadDesertBoxes(url: string): Promise<CityBox[]> {
+  try {
+    const zones = parseZones(await fetch(url).then((response) => response.text()));
+
+    return zones.flatMap((zone) =>
+      isDesertZone(zone.name) ? [{ city: 'DESERT' as const, max: zone.max, min: zone.min }] : [],
+    );
+  } catch {
+    return [];
+  }
 }
 
 /** Fetch + parse a standalone .txd into a name→Texture map (null on any failure). */
@@ -370,6 +402,22 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     game.addSystem(streaming);
     game.setStreamingSystem(streaming);
 
+    // Track which city the player is in (map.zon boxes) → `game.setCity` emits `'city'` on change (HUD/debug;
+    // later: cross-fade the weather for that city). Plan 035.
+    // On a region crossing: update the city state, and follow the weather for that region while KEEPING the
+    // current type (cross-fades over weatherTransitionSeconds; falls back per weatherForCity). Desert boxes go
+    // FIRST so they win over the coarse Las Venturas city box where it overruns Bone County.
+    const [cityBoxes, desertBoxes] = await Promise.all([
+      loadCityBoxes(`${BASE}/data/map.zon`),
+      loadDesertBoxes(`${BASE}/data/info.zon`),
+    ]);
+    game.addSystem(
+      new CityZoneSystem([...desertBoxes, ...cityBoxes], character.viewOf, (city) => {
+        game.setCity(city);
+        game.setWeather(weatherForCity(WEATHER_NAMES, game.getWeather(), city));
+      }),
+    );
+
     // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.
     game.addSystem(new TimedObjectSystem(game.getStreamingRoot(), () => game.getHours()));
 
@@ -526,6 +574,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
+      city: () => game.getCity(),
       clouds: () => game.getConfig().graphics.clouds,
       flipVehicle,
       fogDistance: () => game.getConfig().fog.distance,

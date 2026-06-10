@@ -135,10 +135,12 @@ lit windows pop. Our blocker is the **prelit** day-bake.
 
 6. ✅ **Stars — DONE.** A procedural hash star field in the dome fragment shader (`starField()`): a gnomonic
    projection of the view direction tiled into cells, ~one star per lit cell with random brightness + gentle
-   `uTime` twinkle, tapering toward the horizon. Added **before** the cloud blend so overcast hides them, gated
-   by `uNight` (sun height) + a `uStars` master toggle. No extra geometry/draw call; inherits the dome's
-   camera-follow + probe layer. `Config.graphics.stars { enabled }` + **Night stars** debug checkbox + setter.
-   (Richer point-cloud version remains a future option.)
+   `uTime` twinkle, tapering toward the horizon. Gated by `uNight` (sun height) + a `uStars` master toggle. No
+   extra geometry/draw call; inherits the dome's camera-follow + probe layer. `Config.graphics.stars { enabled }`
+   + **Night stars** debug checkbox + setter. (Richer point-cloud version remains a future option.)
+   - **Fixed (cloud fade):** the local cloud-noise blend alone left stars showing in overcast *gaps* while the
+     moon (which fades globally) vanished. Stars now also multiply by **`uCloudClear`** (= the moon's
+     `cloudFade = 1 − smoothstep(cloudCover, 0.45, 0.85)`), so overcast hides moon **and** stars together.
 
 7. ✅ **Moon — DONE (static, `coronamoon`).** A **static additive Sprite** in `SkyPlugin` at a fixed sky
    direction (`MOON_DIR`), using the SA **`coronamoon`** texture from `particle.txd` (alpha-shaped; canvas-host

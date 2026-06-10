@@ -21,3 +21,4 @@ export { convertTo24h, parseTimecyc, WEATHER_NAMES } from './timecyc.parser';
 export * from './types';
 export { parseVehicleDefs, type VehicleDef } from './vehicle-defs.parser';
 export { parseWater, type WaterQuad } from './water.parser';
+export { type MapZone, parseZones } from './zon.parser';
