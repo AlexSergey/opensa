@@ -63,21 +63,21 @@ export interface BuiltWheel {
 export interface VehicleOptions {
   /** Primary paint RGB (0-255), replaces the `(60,255,0)` marker. */
   primary: [number, number, number];
-  /** 4th-colour paint RGB, replaces the `(255,255,0)` marker (falls back to secondary). */
+  /** 4th-colour paint RGB, replaces the `(255,60,0)` marker (falls back to secondary). */
   quaternary?: [number, number, number];
   /** Secondary paint RGB (0-255), replaces the `(255,0,175)` marker. */
   secondary: [number, number, number];
-  /** 3rd-colour paint RGB, replaces the `(0,255,255)` marker (falls back to primary). */
+  /** 3rd-colour paint RGB, replaces the `(255,175,0)` marker (falls back to primary). */
   tertiary?: [number, number, number];
   /** Wheel scale `[front, rear]` from vehicles.ide. */
   wheelScale: [number, number];
 }
 
-/** Material marker colours that the carcol paint replaces. */
+/** Material marker colours that the carcol paint replaces (SA's editable material colours 1-4). */
 const PRIMARY_MARKER: [number, number, number] = [60, 255, 0];
 const SECONDARY_MARKER: [number, number, number] = [255, 0, 175];
-const TERTIARY_MARKER: [number, number, number] = [0, 255, 255];
-const QUATERNARY_MARKER: [number, number, number] = [255, 255, 0];
+const TERTIARY_MARKER: [number, number, number] = [255, 175, 0];
+const QUATERNARY_MARKER: [number, number, number] = [255, 60, 0];
 
 /** The single wheel atomic, instanced at each `wheel_*_dummy`. */
 const WHEEL_FRAME = 'wheel';
@@ -393,6 +393,11 @@ function buildVehicleMaterial(
   if (paint) {
     // setHex (sRGB), matching buildMaterial — setRGB would treat it as linear and wash the paint out.
     material.color.setHex((paint[0] << 16) | (paint[1] << 8) | paint[2]);
+  } else if (material.map) {
+    // RenderWare modulates the texture by the material colour. The shared builder forces white for
+    // textured materials (fine for map geometry), but vehicles rely on it: interiors tint a light
+    // fabric/leather texture with dark grey material colours. Restore the modulate.
+    material.color.setHex((rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2]);
   }
 
   // Glass/translucent parts encode their opacity in the material colour's alpha,

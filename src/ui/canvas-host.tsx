@@ -61,7 +61,8 @@ const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
 const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
 
-// Initial paint per model — carcols.dat palette indices (first two = primary/secondary).
+// Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
+// omitted 3rd/4th default to palette 0, like SA).
 const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
 
 // Default timecyc weather on load (index into WEATHER_NAMES).

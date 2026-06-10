@@ -109,3 +109,21 @@ src/ui/canvas-host.tsx                             # load admiral + camper, plac
 `dummy` component system (wheel spin/steer, doors, lights, seats, exhaust), `collision` (vehicle COL),
 `physic` (driving/handling from `handling.cfg`), `vehicle_vlo` (LOD switching), `damage` (`_ok`/`_dam`),
 full 4-colour paint, vehicle spawning/streaming/traffic, enter/exit.
+
+---
+
+**Since-fixed (2026-06-10): paint markers + interior modulate.** Found via a custom Mustang
+`admiral.dff`
+(white interior). (1) The real SA editable colours are **1=(60,255,0), 2=(255,0,175), 3=(
+255,175,0),
+4=(255,60,0)** — the 3rd/4th constants in `build-vehicle.ts` were wrong ((0,255,255)/(255,255,0); no real
+DFF
+uses those). (2) The "buildMaterial forces white when textured" caveat above bit harder than paint:
+RW
+**modulates texture × material colour**, and vehicle interiors are light textures × dark grey
+colours —
+`buildVehicleMaterial` now restores that modulate for non-marker textured materials (vehicle path
+only).
+(3) `resolveVehicleColours` defaults missing 3rd/4th combo colours to **palette[0] (black)**, like SA
+does
+for 2-colour `car`-section cars. See memory `vehicle-paint-markers`.

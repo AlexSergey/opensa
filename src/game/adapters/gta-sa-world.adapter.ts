@@ -338,16 +338,17 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     return this.genericVehicleTextures;
   }
 
-  /** First carcol combo for a model → primary/secondary RGB (falls back to white). */
+  /** First carcol combo for a model → primary/secondary RGB (falls back to white).
+   *  Missing 3rd/4th colours default to palette index 0 (black), like SA does for 2-colour cars. */
   private resolveVehicleColours(name: string, indices?: number[]): VehiclePaint {
     const colours = this.vehicleColours;
     const white: [number, number, number] = [255, 255, 255];
     const rgb = (index: number): [number, number, number] => colours?.palette[index] ?? white;
     const paint = (combo: readonly number[]): VehiclePaint => ({
       primary: rgb(combo[0]),
-      quaternary: combo[3] === undefined ? undefined : rgb(combo[3]),
+      quaternary: rgb(combo[3] ?? 0),
       secondary: rgb(combo[1] ?? combo[0]),
-      tertiary: combo[2] === undefined ? undefined : rgb(combo[2]),
+      tertiary: rgb(combo[2] ?? 0),
     });
 
     // Explicit carcols indices (e.g. '37,37' / '0,6,3,0') win.

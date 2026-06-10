@@ -42,12 +42,14 @@ const bodyGeometry: RWGeometry = {
     material({ color: [255, 0, 175, 255] }), // secondary marker
     material({ color: [10, 20, 30, 255] }), // plain
     material({ color: [255, 255, 255, 128], texture: { maskName: '', name: 'glass' } }), // translucent glass
-    material({ color: [0, 255, 255, 255] }), // tertiary (3rd-colour) marker
+    material({ color: [255, 175, 0, 255] }), // tertiary (3rd-colour) marker
+    material({ color: [50, 50, 50, 255], texture: { maskName: '', name: 'interior' } }), // dark textured (interior)
   ]),
   triangles: [
     { a: 0, b: 1, c: 2, materialIndex: 0 }, // opaque
     { a: 0, b: 1, c: 2, materialIndex: 3 }, // glass
     { a: 0, b: 1, c: 2, materialIndex: 4 }, // tertiary
+    { a: 0, b: 1, c: 2, materialIndex: 5 }, // interior
   ],
 };
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
@@ -207,9 +209,16 @@ describe('buildVehicle', () => {
       expect(materials[2].color.getHex()).toBe((10 << 16) | (20 << 8) | 30);
     });
 
-    it('replaces the 3rd-colour (cyan) marker with the tertiary paint', () => {
+    it('replaces the 3rd-colour (255,175,0) marker with the tertiary paint', () => {
       const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
       expect(materials[4].color.getHex()).toBe((11 << 16) | (22 << 8) | 33);
+    });
+
+    it('modulates non-marker textured materials by their RW colour (dark interiors)', () => {
+      const vehicle = buildVehicle(vehicleClump(), new Map([['interior', new Texture()]]), OPTIONS);
+      const materials = bodyMaterials(vehicle);
+      expect(materials[5].map).not.toBeNull();
+      expect(materials[5].color.getHex()).toBe((50 << 16) | (50 << 8) | 50);
     });
 
     it('scales wheels per front/rear (with the in-engine size boost)', () => {

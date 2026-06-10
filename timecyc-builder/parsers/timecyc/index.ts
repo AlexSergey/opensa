@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
-import { TimecycParsed } from '../../interfaces/timecyc.interface';
+import type { TimecycParsed } from '../../interfaces/timecyc.interface';
+
 import { properties, time, weather } from './timecyc.constants';
 
 export class TimecycParser {
@@ -52,6 +53,7 @@ export class TimecycParser {
           this._parsed[zone][`${counterTime}h`][p.name] = lineClean.splice(0, p.numbers);
         });
       } else {
+        // eslint-disable-next-line no-console
         console.warn(`Wrong count for props: ${counterTime}h, ${zone}, ${line}`);
       }
 
@@ -77,6 +79,7 @@ export class TimecycParser {
 
   stringify(): string | undefined {
     if (Object.keys(this._parsed).length === 0) {
+      // eslint-disable-next-line no-console
       console.error('Need to parse first');
 
       return;
@@ -94,6 +97,7 @@ export class TimecycParser {
           try {
             prop += this._parsed[w][t][p].join(' ') + ' ';
           } catch (e) {
+            // eslint-disable-next-line no-console
             console.error(e);
           }
         });

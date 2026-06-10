@@ -45,6 +45,7 @@ export class TimecycManager {
       Object.keys(base[w]).forEach((t: string) => {
         const toMerge = this.timecycItems.find(({ times }) => {
           if (times && Array.isArray(times)) {
+            // eslint-disable-next-line no-console
             console.log(times, t, times?.includes(t));
 
             return times?.includes(t);

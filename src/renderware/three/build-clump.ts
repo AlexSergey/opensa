@@ -287,6 +287,25 @@ export function groupTrianglesByMaterial(triangles: RWTriangle[], materialCount:
   return groups;
 }
 
+/** Normalised geometric normal of a triangle from its vertex positions, or null when degenerate (zero area). */
+function faceNormal(p: Float32Array, a: number, b: number, c: number): [number, number, number] | null {
+  const ux = p[b * 3] - p[a * 3];
+  const uy = p[b * 3 + 1] - p[a * 3 + 1];
+  const uz = p[b * 3 + 2] - p[a * 3 + 2];
+  const vx = p[c * 3] - p[a * 3];
+  const vy = p[c * 3 + 1] - p[a * 3 + 1];
+  const vz = p[c * 3 + 2] - p[a * 3 + 2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const len = Math.hypot(nx, ny, nz);
+  if (len < 1e-6) {
+    return null;
+  }
+
+  return [nx / len, ny / len, nz / len];
+}
+
 /**
  * Wire the GTA-SA env-map reflection (PC/PS2) into a reflective material via `onBeforeCompile`: an additive
  * **sphere/matcap** reflection of `saEnvMap`, sampled by the **camera-space normal** (so it's screen-locked
@@ -323,24 +342,6 @@ function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {
   }
 
   return new BufferAttribute(colors, 3);
-}
-
-function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): BufferAttribute {
-  if (rw.normals) {
-    return new BufferAttribute(rw.normals, 3);
-  }
-  const temporary = new BufferGeometry();
-  temporary.setAttribute('position', position);
-  const index: number[] = [];
-  for (const tri of rw.triangles) {
-    index.push(tri.a, tri.b, tri.c);
-  }
-  temporary.setIndex(index);
-  temporary.computeVertexNormals();
-  const normal = temporary.getAttribute('normal') as BufferAttribute;
-  sanitizeDegenerateNormals(normal.array as Float32Array, rw.positions, rw.triangles);
-
-  return normal;
 }
 
 /**
@@ -387,21 +388,20 @@ function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Arra
   }
 }
 
-/** Normalised geometric normal of a triangle from its vertex positions, or null when degenerate (zero area). */
-function faceNormal(p: Float32Array, a: number, b: number, c: number): [number, number, number] | null {
-  const ux = p[b * 3] - p[a * 3];
-  const uy = p[b * 3 + 1] - p[a * 3 + 1];
-  const uz = p[b * 3 + 2] - p[a * 3 + 2];
-  const vx = p[c * 3] - p[a * 3];
-  const vy = p[c * 3 + 1] - p[a * 3 + 1];
-  const vz = p[c * 3 + 2] - p[a * 3 + 2];
-  const nx = uy * vz - uz * vy;
-  const ny = uz * vx - ux * vz;
-  const nz = ux * vy - uy * vx;
-  const len = Math.hypot(nx, ny, nz);
-  if (len < 1e-6) {
-    return null;
+function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): BufferAttribute {
+  if (rw.normals) {
+    return new BufferAttribute(rw.normals, 3);
   }
+  const temporary = new BufferGeometry();
+  temporary.setAttribute('position', position);
+  const index: number[] = [];
+  for (const tri of rw.triangles) {
+    index.push(tri.a, tri.b, tri.c);
+  }
+  temporary.setIndex(index);
+  temporary.computeVertexNormals();
+  const normal = temporary.getAttribute('normal') as BufferAttribute;
+  sanitizeDegenerateNormals(normal.array as Float32Array, rw.positions, rw.triangles);
 
-  return [nx / len, ny / len, nz / len];
+  return normal;
 }

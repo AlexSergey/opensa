@@ -25,15 +25,6 @@ if (dataIdx.length % HOURS !== 0) throw new Error(`data lines ${dataIdx.length} 
 
 const orig = dataIdx.map((i) => lines[i]); // verbatim original data-line text (per k)
 
-/** target hour → { copy: srcHour } or { lerp: [a, b, f] } source hours within the same weather block. */
-function mapHour(h) {
-  if (h <= 3) return { copy: 0 }; // 0..3 dark (hold midnight)
-  if (h === 4) return { copy: 1 }; // dawn starts
-  if (h <= 19) return { copy: h }; // 5..19 unchanged (5←5, day identity)
-  if (h === 20) return { copy: 23 }; // twilight moved to 20:00
-  return { lerp: [23, 0, (h - 20) / 4] }; // 21,22,23 → smooth 23→0 fade (f = .25/.5/.75)
-}
-
 /** Lerp the numeric tokens of two data lines, preserving column widths + int/float formatting of line `a`. */
 function lerpLine(aLine, bLine, f) {
   const cr = aLine.endsWith('\r') ? '\r' : '';
@@ -53,11 +44,21 @@ function lerpLine(aLine, bLine, f) {
   return out + cr;
 }
 
+/** target hour → { copy: srcHour } or { lerp: [a, b, f] } source hours within the same weather block. */
+function mapHour(h) {
+  if (h <= 3) return { copy: 0 }; // 0..3 dark (hold midnight)
+  if (h === 4) return { copy: 1 }; // dawn starts
+  if (h <= 19) return { copy: h }; // 5..19 unchanged (5←5, day identity)
+  if (h === 20) return { copy: 23 }; // twilight moved to 20:00
+  return { lerp: [23, 0, (h - 20) / 4] }; // 21,22,23 → smooth 23→0 fade (f = .25/.5/.75)
+}
+
 for (let k = 0; k < orig.length; k += 1) {
   const base = Math.floor(k / HOURS) * HOURS;
   const h = k % HOURS;
   const m = mapHour(h);
-  const newText = m.copy !== undefined ? orig[base + m.copy] : lerpLine(orig[base + m.lerp[0]], orig[base + m.lerp[1]], m.lerp[2]);
+  const newText =
+    m.copy !== undefined ? orig[base + m.copy] : lerpLine(orig[base + m.lerp[0]], orig[base + m.lerp[1]], m.lerp[2]);
   lines[dataIdx[k]] = newText;
 }
 
