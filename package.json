@@ -31,6 +31,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "timecyc": "tsx ./timecyc-builder/index.ts",
     "viewer:collision": "tsx scripts/extract-viewer-collision.ts"
   },
   "dependencies": {

@@ -120,6 +120,7 @@ const FRAGMENT = `
   uniform float uCloudDark;
   uniform float uNight;  // 0 day → 1 deep night (drives the star fade)
   uniform float uStars;  // master toggle (0 = off, skip)
+  uniform float uCloudClear;  // 1 = clear sky → 0 = overcast (fades stars globally, like the moon)
   varying vec3 vDir;
 
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
@@ -156,9 +157,11 @@ const FRAGMENT = `
     float t = smoothstep(0.0, 1.0, clamp(dir.y, 0.0, 1.0)); // horizon→zenith; below horizon = bottom
     vec3 col = mix(uBottom, uTop, t);
 
-    // Stars sit behind the clouds (added before the cloud blend so overcast hides them), night-gated.
+    // Stars: night-gated, and faded globally by cloud cover (uCloudClear) so overcast hides them like the
+    // moon — not just where the procedural cloud noise happens to be dense. The cloud blend below still covers
+    // any that remain in clear patches.
     if (uStars > 0.5 && uNight > 0.0) {
-      col += starField(dir) * uNight;
+      col += starField(dir) * uNight * uCloudClear;
     }
 
     if (uCloudOpacity > 0.0 && dir.y > 0.0) {
@@ -229,6 +232,7 @@ export class SkyPlugin implements Plugin {
       uniforms: {
         uBottom: { value: new Color() },
         uCloudBottom: { value: new Color() },
+        uCloudClear: { value: 1 },
         uCloudCoverage: { value: 0.5 },
         uCloudDark: { value: 0 },
         uCloudOpacity: { value: 0.8 },
@@ -391,6 +395,7 @@ export class SkyPlugin implements Plugin {
 
     // Cloud cover hides the sun: visible up to ~half cover, fully gone under heavy overcast.
     const cloudFade = 1 - MathUtils.smoothstep(this.cloudCover, 0.45, 0.85);
+    this.material.uniforms.uCloudClear.value = cloudFade; // stars fade with overcast, matching the moon below
     const sunVisible = above && cloudFade > 0;
     this.sunSource.visible = sunVisible;
     this.corona.visible = sunVisible;
