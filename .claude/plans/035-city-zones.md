@@ -5,8 +5,8 @@ Identify which **city** the player is in — **Los Santos, San Fierro, Las Ventu
 prerequisite for **weather-by-zone**: each timecyc weather belongs to a city (its name suffix), and the active
 weather should follow the player's city, **cross-fading** on enter/leave.
 
-Status: **Phases 1–3 DONE.** Zone identifier (cities + **Desert**) shows in debug → Position (CITY: …); weather
-follows the region keeping its type, cross-fading at the border. Full suite green (354 pass).
+Status: **Phases 1–4 DONE.** Region identifier (cities + Desert) drives weather (keep-type cross-fade); the
+**district name** shows as a HUD label (resolved via a new GXT parser). Full suite green (363 pass).
 
 ## Research (what's already here)
 
@@ -80,6 +80,31 @@ the desert is keyed by **zone name** (`isDesertZone` in `game/zones/city.ts`; `D
 - **Weather:** the desert only runs **clear** weather (SANDSTORM is **script-triggered**, not zone-driven):
   `weatherForCity(..., 'DESERT')` → `EXTRASUNNY_DESERT` if the current type is EXTRASUNNY, else `SUNNY_DESERT`
   (never SANDSTORM/cloudy/rainy). Tested.
+
+## Phase 4 — District name HUD (DONE)
+
+Shows the player's **district** name (the fine `info.zon` zone) as a DOM HUD label (like the clock). The name
+comes from the GXT.
+
+- **GXT parser** `renderware/parsers/binary/gxt.ts`: `parseGxt(buffer) → Map<hash, string>` + `gxtKeyHash(key)`.
+  SA GXT is 8-bit (`04 00 08 00` header → TABL/TKEY/TDAT); **keys are hashed** — the hash is a **CRC-32
+  (`0xEDB88320`, init `0xFFFFFFFF`) WITHOUT the final inversion** (reverse-engineered: 169/169 info.zon labels
+  matched only this variant; Jenkins/standard-CRC/FNV/etc. all scored 0). Strings kept as raw 1-byte chars (the
+  bundled `american.gxt` is a Russian "fake-Latin" encoding — extracted faithfully). Tested vs the real file.
+- **System** `game/zones/zone-name.system.ts`: `ZoneNameSystem` reports the **smallest** containing zone
+  (sorted by area) → `onChange(zoneKey)`; `''` when in no zone. Tested.
+- **GXT key = the `info.zon` LABEL (col 10), not the name (col 1)** — numbered districts (`OCEAF1/2/3`) share
+  one label (`OCEAF`); col-1 names resolved only 31%, labels resolve 169/169. `parseZones` now also returns
+  `label`. Blank labels (`" "` = no display name) are trimmed → hidden.
+- **Game/UI:** `game.setZone(text)` + `'zone'` event; `info.zon` + `american.gxt` fetched once in canvas-host;
+  `ZoneNameSystem` (uses the label) → `game.setZone((gxt.get(gxtKeyHash(label)) ?? '').trim())`. HUD (`hud.tsx`)
+  shows the name **bottom-right**, white + black outline (`fonts.hud.zone`, config-extended; SixCaps), **flashes
+  on entry then fades** (3 s hold + 1 s opacity transition), hidden when blank.
+- **Tests** read the real files from **`tests/text/american.gxt`** + **`tests/data/info.zon`** (existsSync-
+  guarded): GXT size, `GAN → "Ganton"` (spawn district) + Linden Station / Little Mexico / Restricted Area, and
+  that **every** info.zon label resolves to non-empty text. (A complete english american.gxt names all 169
+  zones; an incomplete one can leave Los Santos districts blank `" "` → HUD empty in central LS — a file gap,
+  not a parser/data bug.)
 
 ## Out of scope
 

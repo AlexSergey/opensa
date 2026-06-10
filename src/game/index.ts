@@ -33,3 +33,4 @@ export { StreamingSystem } from './streaming/streaming.system';
 export { weatherForCity } from './weather/weather-zones';
 export { type City, type CityBox, cityFromLevel, isDesertZone } from './zones/city';
 export { CityZoneSystem } from './zones/city-zone.system';
+export { type NamedZone, ZoneNameSystem } from './zones/zone-name.system';

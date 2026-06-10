@@ -30,12 +30,16 @@ import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { weatherForCity } from '../game/weather/weather-zones';
 import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
 import { CityZoneSystem } from '../game/zones/city-zone.system';
+import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
 import {
   buildTextureMap,
   coronaMaterial,
+  gxtKeyHash,
+  type MapZone,
   nightColorUniform,
   nightFillRim,
   nightFillUniform,
+  parseGxt,
   parseTxd,
   parseZones,
   sampleTimecycBlend,
@@ -98,14 +102,19 @@ async function loadCityBoxes(url: string): Promise<CityBox[]> {
   }
 }
 
-/** Fetch info.zon and pull the two desert county boxes (Bone County + Tierra Robada) as DESERT AABBs. */
-async function loadDesertBoxes(url: string): Promise<CityBox[]> {
+/** Fetch + parse a `.gxt` text archive into a `hash → text` map (null on any failure). */
+async function loadGxt(url: string): Promise<Map<number, string> | null> {
   try {
-    const zones = parseZones(await fetch(url).then((response) => response.text()));
+    return parseGxt(await fetch(url).then((response) => response.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
 
-    return zones.flatMap((zone) =>
-      isDesertZone(zone.name) ? [{ city: 'DESERT' as const, max: zone.max, min: zone.min }] : [],
-    );
+/** Fetch info.zon's zones ([] on any failure). Drives both the desert boxes (by name) and the zone-name HUD. */
+async function loadInfoZones(url: string): Promise<MapZone[]> {
+  try {
+    return parseZones(await fetch(url).then((response) => response.text()));
   } catch {
     return [];
   }
@@ -261,7 +270,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
       fog: { distance: 800 },
-      fonts: { hud: { clock: 'SixCaps-Regular' } },
+      fonts: { hud: { clock: 'SixCaps-Regular', zone: 'SixCaps-Regular' } },
       gameState: 'play',
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
@@ -287,7 +296,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
         water: { darkness: 0.75, glint: 0.9, reflection: 0.35 },
       },
-      hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
+      hud: {
+        clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 },
+        zone: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 40 },
+      },
       mapViewer: false,
       movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 3.5, runSpeed: 7, walkSpeed: 2 },
       showCollision: false,
@@ -404,18 +416,32 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     // Track which city the player is in (map.zon boxes) → `game.setCity` emits `'city'` on change (HUD/debug;
     // later: cross-fade the weather for that city). Plan 035.
-    // On a region crossing: update the city state, and follow the weather for that region while KEEPING the
-    // current type (cross-fades over weatherTransitionSeconds; falls back per weatherForCity). Desert boxes go
-    // FIRST so they win over the coarse Las Venturas city box where it overruns Bone County.
-    const [cityBoxes, desertBoxes] = await Promise.all([
+    // Zones: city/desert (weather) from map.zon + info.zon counties; district name (HUD) from all info.zon zones
+    // resolved through the GXT. info.zon + the GXT are fetched once and shared.
+    const [cityBoxes, infoZones, gxt] = await Promise.all([
       loadCityBoxes(`${BASE}/data/map.zon`),
-      loadDesertBoxes(`${BASE}/data/info.zon`),
+      loadInfoZones(`${BASE}/data/info.zon`),
+      loadGxt(`${BASE}/text/american.gxt`),
     ]);
+
+    // On a region crossing: update the city state, and follow the weather for that region while KEEPING the
+    // current type (cross-fades over weatherTransitionSeconds). Desert boxes go FIRST so they win over the
+    // coarse Las Venturas city box where it overruns Bone County.
+    const desertBoxes: CityBox[] = infoZones.flatMap((zone) =>
+      isDesertZone(zone.name) ? [{ city: 'DESERT' as const, max: zone.max, min: zone.min }] : [],
+    );
     game.addSystem(
       new CityZoneSystem([...desertBoxes, ...cityBoxes], character.viewOf, (city) => {
         game.setCity(city);
         game.setWeather(weatherForCity(WEATHER_NAMES, game.getWeather(), city));
       }),
+    );
+
+    // District name HUD: the smallest containing info.zon zone → its GXT text (the zone's text LABEL is the GXT
+    // key; numbered districts like OCEAF1/2/3 share label OCEAF). Blank/whitespace names = no label → hidden.
+    const namedZones: NamedZone[] = infoZones.map((zone) => ({ max: zone.max, min: zone.min, name: zone.label }));
+    game.addSystem(
+      new ZoneNameSystem(namedZones, character.viewOf, (key) => game.setZone((gxt?.get(gxtKeyHash(key)) ?? '').trim())),
     );
 
     // Show/hide time-of-day (tobj) objects (lit-window night variants, etc.) by the game hour.

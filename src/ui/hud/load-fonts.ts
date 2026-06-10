@@ -13,7 +13,7 @@ const FONT_SOURCES: Record<string, string> = {
  * HUD first renders. Unknown families are skipped (assumed system fonts).
  */
 export async function loadFonts(fonts: FontsConfig): Promise<void> {
-  const families = new Set<string>([fonts.hud.clock]);
+  const families = new Set<string>([fonts.hud.clock, fonts.hud.zone]);
   await Promise.all([...families].map((family) => loadFont(family)));
 }
 

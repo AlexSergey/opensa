@@ -80,6 +80,7 @@ export class Game {
   private readonly config: Config;
   private context: null | PluginContext = null;
   private currentCity: City = 'COUNTRYSIDE';
+  private currentZone = ''; // district display name (GXT text); '' = no zone
   private readonly entityRoot = new Group();
   private readonly gameClock = new GameClock();
   private lastRequest: null | RegionRequest = null;
@@ -205,6 +206,11 @@ export class Game {
   /** Live weather blend (from/to indices + eased `t`) for the samplers — drives smooth transitions. */
   getWeatherBlend(): WeatherBlend {
     return this.weatherTransition.blend();
+  }
+
+  /** The district display name the player is in (GXT text from {@link ZoneNameSystem}); '' until in a zone. */
+  getZone(): string {
+    return this.currentZone;
   }
 
   async init(): Promise<void> {
@@ -457,6 +463,14 @@ export class Game {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Set the player's current district display name; emits `'zone'` only on a real change. */
+  setZone(name: string): void {
+    if (name !== this.currentZone) {
+      this.currentZone = name;
+      this.events.emit('zone', { name });
+    }
   }
 
   /** Snap the map-inspector (debug) camera back to top-down (undo a RIGHT-drag orbit). No-op outside it. */

@@ -17,4 +17,6 @@ export interface GameEvents {
   select: null | WorldObjectInfo;
   /** In-game clock ticked to a new whole minute (minutes since midnight). */
   time: { minutes: number };
+  /** Player moved into a different named district (`info.zon` zone); `name` is the resolved GXT text. */
+  zone: { name: string };
 }

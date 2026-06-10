@@ -82,12 +82,16 @@
   - [✅] The Ui layer should not be involved in post processing.
   - [✅] Find good fonts
   - [✅] Show current time
-- [ ] Weather manager zone detection (map.zon support)
-- [ ] Zones and text
-  - [ ] Info.zon parser
-  - [ ] District decection
-  - [ ] gxt parser
-  - [ ] Show text
+- [✅] Weather manager zone detection (map.zon support)
+- [✅] Zones and text
+  - [✅] Info.zon parser
+  - [✅] District decection
+  - [✅] gxt parser
+  - [✅] Show text
+- [ ] Add teleports
+  - [ ] Vegas
+  - [ ] San Fierro
+- [ ] Animation textures
 - [ ] Player camera enhancements
 - [ ] Fog enhanced
 - [ ] Increase test coverage
@@ -109,8 +113,18 @@
 - [ ] Google Analytics
 - [ ] Version in cache file names (reset user caches when update)
 - [ ] Browser caching
-- [✅] Buy domain name
+- [ ] Testing
+  - [ ] Map
+  - [ ] Mods
 - [ ] Rename project
+- [ ] Routine deals
+  - [ ] Readme
+  - [ ] Dev Docs
+  - [ ] Create site
+  - [ ] Articles
+  - [ ] Screenshots
+  - [ ] Video
+- [✅] Buy domain name
 - [ ] CI/CD
 - [ ] Release v 0.1.0
 

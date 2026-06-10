@@ -79,7 +79,7 @@ export interface FogConfig {
 
 /** Font family names per HUD widget (registered by the font loader before the scene). */
 export interface FontsConfig {
-  hud: { clock: string };
+  hud: { clock: string; zone: string };
 }
 
 /** Whether the simulation is running (physics + control) or frozen. */
@@ -132,6 +132,7 @@ export interface HeadlightConfig {
 /** HUD widget styling (the DOM overlay above the canvas; immune to post-processing). */
 export interface HudConfig {
   clock: HudTextStyle;
+  zone: HudTextStyle;
 }
 
 /** Text style for a HUD widget: fill `color` + an outline (`borderColor`/`borderWidth` px). */

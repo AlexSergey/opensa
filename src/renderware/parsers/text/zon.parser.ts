@@ -5,8 +5,10 @@
  * classifies a point. Mapping level → city and the point test live in the game layer (`game/zones/city`).
  */
 
-/** A city box from `map.zon`: a 2D area (world x/y, native Z-up) + its `level` (the city). */
+/** A zone box from `map.zon`/`info.zon`: a 2D area (world x/y, native Z-up) + its `level` and text `label`. */
 export interface MapZone {
+  /** Last field — the GXT text key (`info.zon`; numbered districts like `OCEAF1/2/3` share one label `OCEAF`). */
+  label: string;
   level: number;
   max: [number, number];
   min: [number, number];
@@ -25,7 +27,7 @@ export function parseZones(text: string): MapZone[] {
     if (parts.length < 9) {
       continue;
     }
-    const [name, , x1, y1, , x2, y2, , levelToken] = parts;
+    const [name, , x1, y1, , x2, y2, , levelToken, label] = parts;
     const level = Number(levelToken);
     const bounds = [x1, y1, x2, y2].map(Number);
     if (!Number.isFinite(level) || bounds.some((n) => !Number.isFinite(n))) {
@@ -33,6 +35,7 @@ export function parseZones(text: string): MapZone[] {
     }
     const [ax, ay, bx, by] = bounds;
     zones.push({
+      label: label ?? name,
       level,
       max: [Math.max(ax, bx), Math.max(ay, by)],
       min: [Math.min(ax, bx), Math.min(ay, by)],

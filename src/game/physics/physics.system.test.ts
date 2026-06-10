@@ -14,7 +14,7 @@ function config(gameState: Config['gameState']): Config {
     camera: { followDistance: 12, followMaxPolar: 1.5, followMinPolar: 0.25, followZoom: true },
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
     fog: { distance: 800 },
-    fonts: { hud: { clock: 'SixCaps-Regular' } },
+    fonts: { hud: { clock: 'SixCaps-Regular', zone: 'SixCaps-Regular' } },
     gameState,
     graphics: {
       bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
@@ -40,7 +40,10 @@ function config(gameState: Config['gameState']): Config {
       vehicleReflection: { intensity: 1, preset: 'enhanced' },
       water: { darkness: 0.55, glint: 1.5, reflection: 0.6 },
     },
-    hud: { clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 } },
+    hud: {
+      clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 },
+      zone: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 40 },
+    },
     mapViewer: false,
     movement: { accel: 20, airControl: 0.3, deceleration: 25, jumpSpeed: 6, runSpeed: 26, walkSpeed: 10 },
     showCollision: false,
