@@ -5,6 +5,7 @@ import { Bone, BufferAttribute, BufferGeometry, Group, Matrix4, Skeleton, Skinne
 import type { RWClump, RWFrame, RWGeometry, RWSkin } from '../parsers/binary/types';
 
 import { buildMaterial, groupTrianglesByMaterial } from './build-clump';
+import { applyNightFill } from './night-fill';
 
 /** A skinned character build: the renderable root plus its skeleton + named bones. */
 export interface SkinnedClump {
@@ -45,6 +46,7 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
   const rootBone = bones[clump.frames.findIndex((f) => f.parentIndex < 0)];
 
   const materials = rw.materials.map((m) => buildMaterial(m, rw, textures));
+  materials.forEach(applyNightFill); // plan 034: self-illuminate the player at night
   const mesh = new SkinnedMesh(buildSkinnedGeometry(rw, skin), materials.length > 1 ? materials : materials[0]);
   mesh.castShadow = true;
   mesh.receiveShadow = true;

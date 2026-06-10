@@ -63,6 +63,14 @@ export interface ControlsConfig {
   run?: string;
 }
 
+/** Night-fill tuning for dynamic objects (player/vehicles) — plan 034. */
+export interface DynamicObjectsFillConfig {
+  /** Fresnel edge-rim strength (cool sheen on silhouettes). */
+  rim: number;
+  /** Overall fill strength (× the night factor → the moonlit albedo term). 0 = off. */
+  strength: number;
+}
+
 /** Distance fog tuning. */
 export interface FogConfig {
   /** Distance (world units) at which the world is fully fogged (the horizon); fog ramps in before it. */
@@ -193,6 +201,8 @@ export interface MovementConfig {
 export interface NightConfig {
   /** Distance (world units) past which lamp coronas fade out (a near-field cap over their per-lamp far-clip). */
   coronaDrawDistance: number;
+  /** Cheap shader night-fill for dynamic objects (player/vehicles) so they aren't black at night (plan 034). */
+  dynamicObjectsFill: DynamicObjectsFillConfig;
   /** Night colour-grade strength (0 = off) — cool tint + desaturation + tinted shadow floor for night mood. */
   grade: number;
   /** Dusk/dawn fade schedule for the night vertex colours + the night tonemap (they share one window). */

@@ -5,6 +5,7 @@ import { BackSide, DoubleSide, FrontSide, Group, Matrix4, Mesh, Vector3 } from '
 import type { RWClump, RWFrame, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { buildGeometry, buildMaterial, frameMatrix } from './build-clump';
+import { applyNightFill } from './night-fill';
 
 /** One door: the group rotated about its hinge (open = closed × rotation about up). */
 export interface BuiltDoor {
@@ -403,6 +404,8 @@ function buildVehicleMaterial(
     material.alphaTest = 0;
     material.depthWrite = false;
     material.side = DoubleSide;
+  } else {
+    applyNightFill(material); // plan 034: self-illuminate the car body at night (skip glass)
   }
 
   return material;

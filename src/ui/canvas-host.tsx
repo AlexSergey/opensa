@@ -31,6 +31,8 @@ import {
   buildTextureMap,
   coronaMaterial,
   nightColorUniform,
+  nightFillRim,
+  nightFillUniform,
   parseTxd,
   sampleTimecycBlend,
   WEATHER_NAMES,
@@ -237,6 +239,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
         night: {
           coronaDrawDistance: 120,
+          dynamicObjectsFill: { rim: 0.1, strength: 0.8 }, // plan 034: dynamic-object night fill
           grade: 0.05,
           litFade: { dawnEnd: 7, dawnStart: 6, duskEnd: 20, duskStart: 19 },
           skylight: 0.6,
@@ -386,6 +389,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         // Night vertex colours ride a fixed CLOCK schedule (see clockNightFactor) instead of the sun-height
         // signal, so lit windows switch on a wall-clock time. The ACES night tonemap rides the same schedule.
         nightColorUniform.value = clockNightFactor(game.getHours(), night.litFade) * night.windowGlow;
+        // Dynamic objects (player/vehicles) self-illuminate at night via a shader fill (plan 034), faded by the
+        // sun-height factor (how dark it actually is) × the configurable strength.
+        nightFillUniform.value = nightFactor * night.dynamicObjectsFill.strength;
+        nightFillRim.value = night.dynamicObjectsFill.rim;
       },
     });
 

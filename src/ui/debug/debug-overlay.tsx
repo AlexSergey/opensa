@@ -381,6 +381,31 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
+              <div style={styles.groupLabel}>DYNAMIC NIGHT FILL (player + cars)</div>
+              {(
+                [
+                  ['strength', 'NIGHT FILL', 2],
+                  ['rim', 'NIGHT FILL RIM', 2],
+                ] as const
+              ).map(([key, label, max]) => (
+                <div key={key}>
+                  <div style={styles.groupLabel}>
+                    {label}: {night.dynamicObjectsFill[key].toFixed(2)}
+                  </div>
+                  <input
+                    max={max}
+                    min={0}
+                    onChange={(e) => {
+                      const dynamicObjectsFill = { ...night.dynamicObjectsFill, [key]: Number(e.target.value) };
+                      setNight((prev) => ({ ...prev, dynamicObjectsFill }));
+                      actions.setNight({ dynamicObjectsFill });
+                    }}
+                    step={0.05}
+                    type="range"
+                    value={night.dynamicObjectsFill[key]}
+                  />
+                </div>
+              ))}
             </div>
           )}
 
