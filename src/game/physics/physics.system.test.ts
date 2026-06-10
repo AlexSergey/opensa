@@ -11,7 +11,17 @@ import { initRapier } from './rapier';
 
 function config(gameState: Config['gameState']): Config {
   return {
-    camera: { followDistance: 12, followMaxPolar: 1.5, followMinPolar: 0.25, followZoom: true },
+    camera: {
+      followDistance: 12,
+      followHeight: 1.5,
+      followLerp: 3,
+      followMaxPolar: 1.5,
+      followMinPolar: 0.25,
+      followPolar: 1.15,
+      followZoom: true,
+      followZoomMax: 40,
+      followZoomMin: 6,
+    },
     controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD' },
     fog: { distance: 800 },
     fonts: { hud: { clock: 'SixCaps-Regular', zone: 'SixCaps-Regular' } },

@@ -2,6 +2,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 
 import type {
   BloomConfig,
+  CameraConfig,
   City,
   CloudsConfig,
   Game,
@@ -37,6 +38,10 @@ const TIME_PRESETS: [string, number][] = [
 export interface DebugActions {
   /** Current bloom tuning. */
   bloom(): BloomConfig;
+  /** Current follow-camera tuning (distance / angle / responsiveness / zoom range). */
+  camera(): CameraConfig;
+  /** Live follow distance (includes wheel zoom) — polled for the "current" readout. */
+  cameraDistance(): number;
   /** The city the player is currently in (Los Santos / San Fierro / Las Venturas / Countryside). */
   city(): City;
   /** Current cloud tuning. */
@@ -65,6 +70,8 @@ export interface DebugActions {
   respawnPlayer(): void;
   /** Tune bloom (enabled/intensity/threshold). */
   setBloom(patch: Partial<BloomConfig>): void;
+  /** Tune the follow camera (distance / angle / responsiveness / zoom range). */
+  setCamera(patch: Partial<CameraConfig>): void;
   /** Tune clouds (coverage/opacity). */
   setClouds(patch: Partial<CloudsConfig>): void;
   /** Set the fog distance (world units to full fog). */
@@ -143,13 +150,24 @@ const CITY_LABEL: Record<City, string> = {
   VEGAS: 'Las Venturas',
 };
 
-type Screen = 'atmosphere' | 'game' | 'graphics' | 'map' | 'player' | 'position' | 'root' | 'vehicles' | 'weather';
+type Screen =
+  | 'atmosphere'
+  | 'camera'
+  | 'game'
+  | 'graphics'
+  | 'map'
+  | 'player'
+  | 'position'
+  | 'root'
+  | 'vehicles'
+  | 'weather';
 
 const MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Game', screen: 'game' },
   { label: 'Atmosphere', screen: 'atmosphere' },
+  { label: 'Camera', screen: 'camera' },
   { label: 'Graphics', screen: 'graphics' },
   { label: 'Weather', screen: 'weather' },
   { label: 'Position', screen: 'position' },
@@ -179,6 +197,8 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [godrays, setGodrays] = useState(() => actions.godrays());
   const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
   const [bloom, setBloom] = useState<BloomConfig>(() => actions.bloom());
+  const [camera, setCamera] = useState<CameraConfig>(() => actions.camera());
+  const [cameraZoom, setCameraZoom] = useState(() => actions.cameraDistance());
   const [clouds, setClouds] = useState<CloudsConfig>(() => actions.clouds());
   const [toneMapping, setToneMapping] = useState(() => actions.toneMapping());
   const [water, setWater] = useState<WaterConfig>(() => actions.water());
@@ -229,6 +249,16 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
       return;
     }
     const id = setInterval(() => setTime(actions.gameTime()), 500);
+
+    return (): void => clearInterval(id);
+  }, [actions, visible, screen]);
+
+  // Keep the live follow-distance (wheel zoom) readout updating while the Camera screen is open.
+  useEffect(() => {
+    if (!visible || screen !== 'camera') {
+      return;
+    }
+    const id = setInterval(() => setCameraZoom(actions.cameraDistance()), 200);
 
     return (): void => clearInterval(id);
   }, [actions, visible, screen]);
@@ -423,6 +453,56 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {screen === 'camera' && (
+            <div style={styles.group}>
+              <div style={styles.groupLabel}>FOLLOW CAMERA (mouse looks; auto-trails when you change direction)</div>
+              <div style={styles.groupLabel}>CURRENT ZOOM: {cameraZoom.toFixed(1)}</div>
+              {(
+                [
+                  ['followDistance', 'DISTANCE', 4, 80, 1],
+                  ['followZoomMin', 'MIN ZOOM', 4, 40, 1],
+                  ['followZoomMax', 'MAX ZOOM', 6, 80, 1],
+                  ['followHeight', 'HEIGHT', 0, 4, 0.1],
+                  ['followPolar', 'ANGLE', 0.2, 1.5, 0.05],
+                  ['followLerp', 'RESPONSE', 0.5, 12, 0.5],
+                  ['followMinPolar', 'MIN ANGLE', 0.05, 1.5, 0.05],
+                  ['followMaxPolar', 'MAX ANGLE', 0.5, 1.55, 0.05],
+                ] as const
+              ).map(([key, label, min, max, step]) => (
+                <div key={key}>
+                  <div style={styles.groupLabel}>
+                    {label}: {camera[key].toFixed(2)}
+                  </div>
+                  <input
+                    max={max}
+                    min={min}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setCamera((prev) => ({ ...prev, [key]: value }));
+                      actions.setCamera({ [key]: value });
+                    }}
+                    step={step}
+                    type="range"
+                    value={camera[key]}
+                  />
+                </div>
+              ))}
+              <label style={styles.label}>
+                <input
+                  checked={camera.followZoom}
+                  onChange={() => {
+                    const followZoom = !camera.followZoom;
+                    setCamera((prev) => ({ ...prev, followZoom }));
+                    actions.setCamera({ followZoom });
+                  }}
+                  style={styles.radio}
+                  type="checkbox"
+                />
+                <span style={camera.followZoom ? styles.optionActive : styles.option}>Wheel zoom</span>
+              </label>
             </div>
           )}
 

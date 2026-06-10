@@ -8,6 +8,7 @@ export { Game } from './game';
 export type { ColliderBox, ColliderShape, ColliderSphere, ModelColliders } from './interfaces/collider.interface';
 export type {
   BloomConfig,
+  CameraConfig,
   CloudsConfig,
   Config,
   HeadlightConfig,

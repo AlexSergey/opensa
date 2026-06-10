@@ -92,7 +92,7 @@
   - [ ] Vegas
   - [ ] San Fierro
 - [ ] Animation textures
-- [ ] Player camera enhancements
+- [✅] Player camera enhancements
 - [ ] Fog enhanced
 - [ ] Increase test coverage
 - [ ] Fix car headlight
@@ -178,3 +178,4 @@ Next iterations:
 - [ ] Car sidelights, braking, light + vehiclelightson128
 - [ ] Trafficlights
 - [ ] Proper Fixes adaptation
+- [ ] GTA SA Like Camera

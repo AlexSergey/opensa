@@ -267,7 +267,17 @@ export function CanvasHost(): ReactElement {
 function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
   bootstrapped ??= (async (): Promise<Bootstrap> => {
     const game = Game.getInstance(canvas, {
-      camera: { followDistance: 12, followMaxPolar: Math.PI / 2 - 0.05, followMinPolar: 0.25, followZoom: true },
+      camera: {
+        followDistance: 7,
+        followHeight: 1.2,
+        followLerp: 3,
+        followMaxPolar: Math.PI / 2 - 0.05,
+        followMinPolar: 0.25,
+        followPolar: 1.15,
+        followZoom: true,
+        followZoomMax: 10,
+        followZoomMin: 4,
+      },
       controls: { back: 'KeyS', forward: 'KeyW', jump: 'Space', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft' },
       fog: { distance: 800 },
       fonts: { hud: { clock: 'SixCaps-Regular', zone: 'SixCaps-Regular' } },
@@ -600,6 +610,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
+      camera: () => game.getConfig().camera,
+      cameraDistance: () => game.getCameraDistance(),
       city: () => game.getCity(),
       clouds: () => game.getConfig().graphics.clouds,
       flipVehicle,
@@ -617,6 +629,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
       },
       setBloom: (patch) => game.setBloom(patch),
+      setCamera: (patch) => game.setCamera(patch),
       setClouds: (patch) => game.setClouds(patch),
       setFogDistance: (distance) => game.setFogDistance(distance),
       setGameTime: (minutes) => game.setTime(minutes),

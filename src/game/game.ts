@@ -22,6 +22,7 @@ import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
 import {
   type BloomConfig,
+  type CameraConfig,
   type CloudsConfig,
   type Config,
   type GameState,
@@ -156,6 +157,11 @@ export class Game {
   /** The scene camera (read-only handle; e.g. for camera-relative input). */
   getCamera(): PerspectiveCamera {
     return this.camera;
+  }
+
+  /** Live follow distance (includes wheel zoom) — for the debug "current" readout. */
+  getCameraDistance(): number {
+    return this.cameraController.getDistance();
   }
 
   /** The city the player is currently in (driven by {@link CityZoneSystem}); Countryside until a world loads. */
@@ -303,6 +309,14 @@ export class Game {
   }
 
   /** Tune the water shader (glint/reflection) at runtime; merges into `graphics.water`. */
+  /** Tune the follow camera (distance / angle / responsiveness / zoom range) at runtime; merges into `camera`. */
+  setCamera(patch: Partial<CameraConfig>): void {
+    this.setConfig({ camera: { ...this.config.camera, ...patch } });
+    if (patch.followDistance !== undefined) {
+      this.cameraController.setDistance(patch.followDistance); // keep the live (wheel) distance in sync
+    }
+  }
+
   /** Set the player's current city (from {@link CityZoneSystem}); emits `'city'` only on a real change. */
   setCity(city: City): void {
     if (city !== this.currentCity) {

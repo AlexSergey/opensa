@@ -10,14 +10,24 @@ export interface BloomConfig {
 
 /** Follow/play camera tuning (the debug overview camera is fixed top-down). */
 export interface CameraConfig {
-  /** Distance from the player in follow mode (GTA/world units). */
+  /** Initial distance from the player in follow mode (GTA/world units); wheel zoom moves it within the range. */
   followDistance: number;
+  /** Height above the player the camera orbits + looks at (world units) — raises the framing off the feet. */
+  followHeight: number;
+  /** How fast the camera swings behind the player when they change direction (per second). */
+  followLerp: number;
   /** Lowest the camera may drop toward the horizon (radians from straight up); keeps it above the floor. */
   followMaxPolar: number;
   /** Highest the camera may rise toward straight-down (radians from straight up). */
   followMinPolar: number;
+  /** Initial pitch — the "behind + above" angle (radians from straight up); the mouse then moves it freely. */
+  followPolar: number;
   /** Allow wheel zoom in follow/play mode. */
   followZoom: boolean;
+  /** Farthest the wheel can zoom out (world units). */
+  followZoomMax: number;
+  /** Nearest the wheel can zoom in (world units). */
+  followZoomMin: number;
 }
 
 /** Procedural sky-dome cloud tuning. */

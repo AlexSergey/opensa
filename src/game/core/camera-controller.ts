@@ -11,8 +11,10 @@ const UP = new Vector3(0, 1, 0);
 
 const LOOK_SENSITIVITY = 0.004; // radians per pixel of mouse movement
 const ZOOM_SENSITIVITY = 0.02; // world units per wheel notch
-const MIN_FOLLOW_DISTANCE = 4;
-const MAX_FOLLOW_DISTANCE = 80;
+const MOVE_THRESHOLD = 0.5; // world units/second the player must be moving for auto-follow to consider heading
+const TURN_THRESHOLD = 0.9; // radians/second of heading change before the camera swings behind (else hold the angle)
+const MANUAL_GRACE_MS = 250; // after a mouse look, hold off auto-follow this long (manual framing wins)
+const SETTLE_EPSILON = 0.03; // radians from "directly behind" at which an engaged follow stops easing
 const DEBUG_HEIGHT = 250; // how high above the district the debug camera sits
 
 const FLY_SPEED = 18; // free-fly translation (world units/second)
@@ -22,9 +24,11 @@ const FLY_CODES = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp']);
 
 /**
  * Three camera modes:
- * - **follow** (play): orbits the target via plain mouse movement (no button),
- *   clamped to a hemisphere above it (never below the floor); wheel zoom is
- *   optional. Distance / clamps / zoom come from {@link Config.camera}.
+ * - **follow** (play): trails the target from behind + above. **Plain mouse movement orbits** it (no button),
+ *   clamped to a hemisphere above. When the player **changes direction** (turns / starts reversing) it
+ *   **auto-swings behind** their heading — but going straight keeps whatever angle the player set, and an active
+ *   mouse look suppresses it (the player wins). Wheel zoom (optional) is clamped to the configured range. All
+ *   tuning (distance / angle / responsiveness / clamps / zoom range) is {@link Config.camera}.
  * - **debug**: detached, top-down over the district; drag (held button) pans X/Y,
  *   wheel dollies down. Built on OrbitControls.
  * - **fly**: detached free-fly for screenshots — arrow keys translate along the
@@ -40,8 +44,14 @@ export class CameraController {
   private readonly flyKeys = new Set<string>();
   private flyPitch = 0;
   private flyYaw = 0;
+  private following = false; // a direction change engaged auto-follow; eases until settled behind, then clears
+  private hasHeading = false;
+  private hasPrevTarget = false;
+  private lastManualMs = 0; // performance.now() of the last mouse look — suppresses auto-follow for a grace window
   private mode: CameraMode = 'follow';
   private polar: number;
+  private prevHeading = 0; // last movement heading (radians) — to detect a direction change
+  private readonly prevTarget = new Vector3();
   private target: null | Object3D = null;
   private readonly targetPosition = new Vector3();
 
@@ -50,7 +60,7 @@ export class CameraController {
     this.domElement = domElement;
     this.config = config;
     this.distance = config.camera.followDistance;
-    this.polar = clamp(1, config.camera.followMinPolar, config.camera.followMaxPolar);
+    this.polar = clamp(config.camera.followPolar, config.camera.followMinPolar, config.camera.followMaxPolar);
 
     this.controls = new OrbitControls(camera, domElement);
     this.controls.enabled = false; // off in follow mode (custom orbit); on in debug
@@ -108,9 +118,19 @@ export class CameraController {
     this.controls.target.copy(center);
   }
 
+  /** Current live follow distance (wheel zoom included) — for the debug "current" readout. */
+  getDistance(): number {
+    return this.distance;
+  }
+
   /** Set the follow-orbit azimuth (yaw about world up) — e.g. to swing behind the player on car exit. */
   setAzimuth(azimuth: number): void {
     this.azimuth = azimuth;
+  }
+
+  /** Set the follow distance (debug tuning); clamped to the configured zoom range. */
+  setDistance(distance: number): void {
+    this.distance = clamp(distance, this.config.camera.followZoomMin, this.config.camera.followZoomMax);
   }
 
   /** Switch camera behaviour (follow ⇄ debug ⇄ fly). */
@@ -120,6 +140,9 @@ export class CameraController {
     }
     this.mode = mode;
     this.controls.enabled = mode === 'debug';
+    this.following = false;
+    this.hasHeading = false;
+    this.hasPrevTarget = false; // forget the last position so re-entering follow doesn't jump
     if (mode === 'debug') {
       this.enterDebug();
     } else if (mode === 'fly') {
@@ -131,6 +154,9 @@ export class CameraController {
 
   setTarget(object: null | Object3D): void {
     this.target = object;
+    this.following = false;
+    this.hasHeading = false;
+    this.hasPrevTarget = false;
   }
 
   /** Snap the debug map camera back to straight-down over its current pan centre (undo any RIGHT-drag orbit). */
@@ -158,13 +184,58 @@ export class CameraController {
       return;
     }
     this.target.getWorldPosition(this.targetPosition);
+    this.autoFollow(delta); // swing behind the player when they change direction (unless they're steering the camera)
     const sinPolar = Math.sin(this.polar);
+    const lookY = this.targetPosition.y + this.config.camera.followHeight; // orbit + look at a raised point, not the feet
     this.camera.position.set(
       this.targetPosition.x + this.distance * sinPolar * Math.sin(this.azimuth),
-      this.targetPosition.y + this.distance * Math.cos(this.polar),
+      lookY + this.distance * Math.cos(this.polar),
       this.targetPosition.z + this.distance * sinPolar * Math.cos(this.azimuth),
     );
-    this.camera.lookAt(this.targetPosition);
+    this.camera.lookAt(this.targetPosition.x, lookY, this.targetPosition.z);
+    this.prevTarget.copy(this.targetPosition);
+    this.hasPrevTarget = true;
+  }
+
+  /**
+   * Swing the orbit **behind the player's movement direction — but only while their heading is changing**
+   * (a turn, or starting to reverse). Walking/driving straight leaves the azimuth alone, so a camera angle the
+   * player set with the mouse is kept. A recent mouse look ({@link MANUAL_GRACE_MS}) also suppresses it, so
+   * "turn while steering the camera" obeys the player. Pitch is never auto-touched (manual only). Easing rate is
+   * `followLerp`.
+   */
+  private autoFollow(delta: number): void {
+    if (!this.hasPrevTarget) {
+      return;
+    }
+    const moveX = this.targetPosition.x - this.prevTarget.x;
+    const moveZ = this.targetPosition.z - this.prevTarget.z;
+    const step = Math.max(delta, 1e-4);
+    if (Math.hypot(moveX, moveZ) / step < MOVE_THRESHOLD) {
+      return; // standing still: keep the current heading reference and angle
+    }
+    const heading = Math.atan2(moveX, moveZ);
+    const turning = this.hasHeading && Math.abs(shortestAngle(heading - this.prevHeading)) / step > TURN_THRESHOLD;
+    this.prevHeading = heading;
+    this.hasHeading = true;
+    // Steering the camera wins; a detected turn engages a follow that runs until the camera has settled behind
+    // (so even a one-frame reverse fully re-centres, while going straight just holds the angle).
+    if (performance.now() - this.lastManualMs < MANUAL_GRACE_MS) {
+      this.following = false;
+
+      return;
+    }
+    if (turning) {
+      this.following = true;
+    }
+    if (!this.following) {
+      return;
+    }
+    const diff = shortestAngle(Math.atan2(-moveX, -moveZ) - this.azimuth); // toward behind the movement direction
+    this.azimuth += diff * Math.min(1, this.config.camera.followLerp * delta);
+    if (Math.abs(diff) < SETTLE_EPSILON) {
+      this.following = false; // settled directly behind → stop until the next direction change
+    }
   }
 
   /** Detach over the district: top-down, panable, looking down at the last target. */
@@ -238,9 +309,11 @@ export class CameraController {
 
       return;
     }
-    if (this.mode !== 'follow') {
+    if (this.mode !== 'follow' || (event.movementX === 0 && event.movementY === 0)) {
       return;
     }
+    // Plain mouse movement orbits (no button). This is a manual look → hold off auto-follow for a grace window.
+    this.lastManualMs = performance.now();
     this.azimuth -= event.movementX * LOOK_SENSITIVITY;
     this.polar = clamp(
       this.polar - event.movementY * LOOK_SENSITIVITY,
@@ -254,10 +327,16 @@ export class CameraController {
       return;
     }
     event.preventDefault();
-    this.distance = clamp(this.distance + event.deltaY * ZOOM_SENSITIVITY, MIN_FOLLOW_DISTANCE, MAX_FOLLOW_DISTANCE);
+    const { followZoomMax, followZoomMin } = this.config.camera;
+    this.distance = clamp(this.distance + event.deltaY * ZOOM_SENSITIVITY, followZoomMin, followZoomMax);
   };
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+/** Wrap an angle difference to the shortest signed rotation in (−π, π]. */
+function shortestAngle(delta: number): number {
+  return Math.atan2(Math.sin(delta), Math.cos(delta));
 }
