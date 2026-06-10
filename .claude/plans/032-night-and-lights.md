@@ -12,7 +12,7 @@ occlusion polish DONE**.
 warm baked lamp pools on the road, lit windows/signs — driven straight from the data. Ambient is a **bright day
 fill ramping to near-zero at night** (the baked colours light the night; SA's timecyc `amb` is too tiny to use
 directly — see phase 2). The night-vertex emissive fades on a fixed **wall-CLOCK schedule** (`clockNightFactor`
-→ `night.litFade`: dusk fade-in 20→21, dawn fade-out 06→07), **not** the sun-height factor — see "Clock schedule"
+→ `night.litFade`: dusk fade-in 19→20, dawn fade-out 06→07), **not** the sun-height factor — see "Clock schedule"
 below. The earlier
 **projected light pools (phase 9) and the custom flat night `brightness` floor were REMOVED.** Don't re-add.
 Optional left for later: real **point lights** under coronas (perf-sensitive — user deferred in favour of the
@@ -288,7 +288,7 @@ switches on at set hours regardless of weather/sun. Coronas + the night grade st
 - **Helper:** `clockNightFactor(hour, fade)` (`game/time/hour-window.ts`) → `nightHourFactor(hour, onStart,
   onEnd, offStart, offEnd)`: smooth 0–1, linear dusk fade-in `[duskStart, duskEnd]` (0→1), full overnight, dawn
   fade-out `[dawnStart, dawnEnd]` (1→0). Single source of truth for both consumers. Tested in `hour-window.test.ts`.
-- **Config:** `Config.graphics.night.litFade: LitFadeConfig = { duskStart: 20, duskEnd: 21, dawnStart: 6,
+- **Config:** `Config.graphics.night.litFade: LitFadeConfig = { duskStart: 19, duskEnd: 20, dawnStart: 6,
   dawnEnd: 7 }` (`config.interface.ts`). Both consumers read the same object → always in sync.
 - **Tonemap:** `PostFxPlugin` is constructed with a `() => game.getHours()` getter; the ACES pass fades via
   `toneMapping.blendMode.opacity = clockNightFactor(...)`. The effect is created with **`blendFunction:

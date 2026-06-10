@@ -117,6 +117,7 @@ Known issues:
 - [ ] Streaming is blinking
 
 Next iterations:
+- [ ] Ugly shadows. A bug at dawn - white and black spots on objects
 - [ ] Procobj trash, rocks
 - [ ] Particles
   - [ ] Smoke from wheels

@@ -54,8 +54,8 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 // Initial paint per model — carcols.dat palette indices (first two = primary/secondary).
 const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
 
-// Default timecyc weather (index into WEATHER_NAMES; 0 = EXTRASUNNY_LA).
-const DEFAULT_WEATHER = 0;
+// Default timecyc weather on load (index into WEATHER_NAMES).
+const DEFAULT_WEATHER = WEATHER_NAMES.indexOf('EXTRASUNNY_SMOG_LA');
 
 // Selectable weathers for the debug Weather tab — all timecyc weathers except rain/storm/underwater
 // and the cutscene EXTRACOLOURS entries (per the "sunny/cloudy/etc, no rain/storm" ask).
@@ -238,7 +238,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         night: {
           coronaDrawDistance: 120,
           grade: 0.05,
-          litFade: { dawnEnd: 7, dawnStart: 6, duskEnd: 21, duskStart: 20 },
+          litFade: { dawnEnd: 7, dawnStart: 6, duskEnd: 20, duskStart: 19 },
           skylight: 0.6,
           tint: [1.0, 1.0, 1.0],
           windowGlow: 1.0,

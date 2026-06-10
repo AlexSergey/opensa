@@ -154,9 +154,9 @@ export interface LitFadeConfig {
   dawnEnd: number;
   /** Hour the dawn fade-out begins — still fully lit (e.g. 6). */
   dawnStart: number;
-  /** Hour the dusk fade-in completes — fully lit (e.g. 21). */
+  /** Hour the dusk fade-in completes — fully lit (e.g. 20). */
   duskEnd: number;
-  /** Hour the dusk fade-in begins — still day (e.g. 20). */
+  /** Hour the dusk fade-in begins — still day (e.g. 19). */
   duskStart: number;
 }
 
