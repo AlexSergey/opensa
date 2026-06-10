@@ -21,6 +21,7 @@ export type {
   StarsConfig,
   VehicleReflectionConfig,
   WaterConfig,
+  WorldLightConfig,
 } from './interfaces/config.interface';
 
 export type { RegionRequest, Vec3, WorldAdapter, WorldObjectInfo } from './interfaces/world-adapter.interface';

@@ -14,6 +14,8 @@ export type Rapier = typeof RAPIER;
 let ready: null | Promise<typeof RAPIER> = null;
 
 export function initRapier(): Promise<typeof RAPIER> {
+  // NB `rapier3d-compat@0.19` logs a harmless "using deprecated parameters for the initialization
+  // function" warning from its own WASM glue — upstream issue, fixed by upgrading the dependency.
   ready ??= RAPIER.init().then(() => RAPIER);
 
   return ready;

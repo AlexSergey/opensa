@@ -6,6 +6,7 @@ import type { CoronaEntry } from '../three/corona';
 
 import { getClump, getTextures, modelKey } from '../archive';
 import { buildClumpLights, buildClumpParts } from '../three/build-clump';
+import { applyWorldWindowGlow } from '../three/world-material';
 
 /**
  * Models whose 2d-effect lights (coronas + ground pools) are **temporarily suppressed**: traffic lights
@@ -20,9 +21,6 @@ const SUPPRESS_LIGHT_MODELS = /traffic/i;
  * building one `InstancedMesh` per single-material part. Used by the per-cell
  * builder ({@link buildCell}); the map renders through the streaming system.
  */
-
-/** Emissive intensity for lit-window night models (a touch over 1 so they read as glowing + bloom). */
-const WINDOW_EMISSIVE = 1.2;
 
 /**
  * SA IDE object flag: render the model **without backface culling** (two-sided). The original engine
@@ -64,8 +62,8 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
 
   for (const group of groups) {
     const parts = buildClumpParts(getClump(archive, group.def.modelName), getTextures(archive, group.def.txdName));
-    // Night-lit timed variants (lit-window / neon overlays, on across midnight) self-illuminate so their
-    // bright window texels glow in the dark — emissiveMap = the diffuse map (dark texels stay dark).
+    // Night-lit timed variants (lit-window / neon overlays, on across midnight) glow additively over
+    // the world material's night blend so their bright window texels read in the dark.
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
     const twoSided = (group.def.flags & IDE_FLAG_DISABLE_BACKFACE_CULLING) !== 0;
     for (const part of parts) {
@@ -73,15 +71,13 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
         part.material.side = DoubleSide; // the def opts out of backface culling, like the original engine
       }
       if (nightLit && part.material.map) {
-        part.material.emissiveMap = part.material.map;
-        part.material.emissive.setRGB(1, 1, 1);
-        part.material.emissiveIntensity = WINDOW_EMISSIVE;
+        applyWorldWindowGlow(part.material);
       }
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
-      // Opaque geometry casts; alpha-tested detail (foliage/fences/wires) doesn't — its 1-bit cutout
-      // shimmers badly in the shadow map. It still receives shadows.
-      mesh.castShadow = !part.material.transparent;
-      mesh.receiveShadow = true;
+      // The map neither casts nor uses the renderer's shadow receive (plan 038): only dynamics cast,
+      // and the unlit world material samples that map manually (worldShadowUniforms).
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       group.instances.forEach((instance, index) => {
         position.set(instance.position[0], instance.position[1], instance.position[2]);
         // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate.

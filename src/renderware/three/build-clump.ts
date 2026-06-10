@@ -1,4 +1,4 @@
-import type { Texture } from 'three';
+import type { MeshBasicMaterial, Texture } from 'three';
 
 import {
   BufferAttribute,
@@ -16,7 +16,7 @@ import {
 import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
-import { applyNightVertexEmissive } from './night-vertex-colors';
+import { buildWorldMaterial } from './world-material';
 
 /**
  * Convert a parsed RWClump into a renderable three.js Group.
@@ -32,6 +32,9 @@ export interface BuildClumpOptions {
   convertToYUp?: boolean;
 }
 
+/** Stand-in for the rare geometry slice whose material table is empty (renders plain white). */
+const FALLBACK_RW_MATERIAL: RWMaterial = { color: [255, 255, 255, 255], texture: null, textured: false };
+
 /** A model's 2d-effect light in clump-local space (frame transform applied; still native Z-up). */
 export interface ClumpLight {
   color: [number, number, number];
@@ -43,7 +46,8 @@ export interface ClumpLight {
 /** A single-material renderable slice of a clump (for InstancedMesh). */
 export interface RenderPart {
   geometry: BufferGeometry;
-  material: MeshStandardMaterial;
+  /** The unlit SA world material (plan 038) — the map is prelit, never dynamically lit. */
+  material: MeshBasicMaterial;
   /** Local atomic-frame transform, in native Z-up. */
   matrix: Matrix4;
 }
@@ -156,13 +160,9 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       geometry.setIndex(index);
       geometry.computeBoundingSphere();
 
+      // Unlit SA prelit blend (plan 038) — the night set is consumed by the material's dnBalance mix.
       const rwMaterial = rw.materials[materialIndex] ?? rw.materials[0];
-      const material = rwMaterial
-        ? buildMaterial(rwMaterial, rw, textures)
-        : new MeshStandardMaterial({ vertexColors: color !== null });
-      if (nightColor && material.map) {
-        applyNightVertexEmissive(material); // night windows glow via the `nightColor` attribute (× texture)
-      }
+      const material = buildWorldMaterial(rwMaterial ?? FALLBACK_RW_MATERIAL, rw, textures);
       parts.push({ geometry, material, matrix });
     });
   }

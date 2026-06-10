@@ -1,5 +1,14 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { type Mesh, type Object3D, Quaternion, type Texture, Vector3 } from 'three';
+import {
+  CameraHelper,
+  Color,
+  type Mesh,
+  type Object3D,
+  Quaternion,
+  SRGBColorSpace,
+  type Texture,
+  Vector3,
+} from 'three';
 
 import type { CharacterPlacement } from '../game/character/orient-character';
 import type { Vec3 } from '../game/interfaces/world-adapter.interface';
@@ -34,10 +43,10 @@ import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
 import {
   buildTextureMap,
   coronaMaterial,
+  dnBalanceUniform,
   GLOW_LAYER,
   gxtKeyHash,
   type MapZone,
-  nightColorUniform,
   nightFillRim,
   nightFillUniform,
   parseGxt,
@@ -45,6 +54,10 @@ import {
   parseZones,
   sampleTimecycBlend,
   WEATHER_NAMES,
+  windowGlowUniform,
+  worldDayTintUniform,
+  worldShadowUniforms,
+  worldTintUniform,
 } from '../renderware';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
@@ -305,6 +318,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         toneMapping: true,
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
         water: { darkness: 0.75, glint: 0.9, reflection: 0.35 },
+        // SA prelit world (plan 038) calibration — live-tunable in debug → Atmosphere.
+        worldLight: {
+          dayBrightness: 0.85,
+          duskBrightness: 0.45,
+          lodNightAmbScale: 1.6,
+          nightPrelitBrightness: 0.7,
+          shadowStrength: 0.55,
+        },
       },
       hud: {
         clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 },
@@ -394,7 +415,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       )
       .addPlugin(reflection) // vehicle env-map reflections (preset-driven)
       // Post-FX host: god rays + bloom + tone mapping + SSAO (GLOW_LAYER is hidden from its normal prepass).
-      .addPlugin(new PostFxPlugin(sky.godraysSource, () => game.getHours(), GLOW_LAYER));
+      .addPlugin(new PostFxPlugin(sky.godraysSource, GLOW_LAYER));
 
     await loadFonts(game.getConfig().fonts); // register HUD fonts before the scene/HUD render
     await game.init();
@@ -465,21 +486,78 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // colours** (and the ACES night tonemap, in PostFxPlugin) instead ride a fixed wall-CLOCK schedule —
     // `clockNightFactor(hour, night.litFade)` — so lit windows switch on at set hours (tunable in debug →
     // Atmosphere). Neither uses the hard 20→6 lamp hour-window, which snapped lamps off out of sync.
+    // SA prelit world (plan 038): the brightness scalars live in `graphics.worldLight` (debug →
+    // Atmosphere); only the fixed hues stay here. Day arc follows the SUN HEIGHT (peak at noon →
+    // warm dim near the horizon), like SA's per-hour timecyc table — otherwise dawn snaps to full
+    // brightness on the clock fade and the sunrise/sun disc/god-rays all read wrong.
+    const WORLD_DAWN_HUE = new Color(1, 0.89, 0.84); // warm horizon dim (× duskBrightness)
+    const WORLD_NIGHT_PRELIT_HUE = new Color(1, 1, 1.03); // faint cool cast on the night prelit
+    const worldTintNight = new Color();
+    const worldTintDayPeak = new Color();
+    const worldTintDawn = new Color();
+    const worldTintNightPrelit = new Color();
+    const worldTintDayArc = new Color();
+    // Timed window overlays: authored additive glow base, scaled live by the `night.windowGlow` knob.
+    const WINDOW_GLOW_BASE = 1.2;
+    // `?shadowdebug=1`: paint the world-shadow term red + draw the sun shadow camera frustum, to
+    // separate it from SSAO / baked prelit darkening while calibrating plan 038.
+    const shadowDebug = new URLSearchParams(window.location.search).get('shadowdebug') === '1';
+    worldShadowUniforms.uWorldShadowDebug.value = shadowDebug ? 1 : 0;
+    const shadowHelper = shadowDebug ? new CameraHelper(sky.getSunShadow().camera) : null;
+    if (shadowHelper) {
+      game.getScene().add(shadowHelper);
+    }
+
     game.addSystem({
       name: 'coronas',
       update(): void {
-        const { lights, night } = game.getConfig().graphics;
+        const { lights, night, worldLight } = game.getConfig().graphics;
         const nightFactor = (sky.godraysSource.userData.night as number | undefined) ?? 0;
         coronaMaterial.uniforms.uOn.value = lights.enabled ? nightFactor : 0;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
         coronaMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
-        // Night vertex colours ride a fixed CLOCK schedule (see clockNightFactor) instead of the sun-height
-        // signal, so lit windows switch on a wall-clock time. The ACES night tonemap rides the same schedule.
-        nightColorUniform.value = clockNightFactor(game.getHours(), night.litFade) * night.windowGlow;
+        // Timed window overlays glow additively over the world material's night blend; the existing
+        // `night.windowGlow` debug knob keeps scaling them (1.0 = the authored 1.2 base inside the uniform).
+        windowGlowUniform.value = WINDOW_GLOW_BASE * night.windowGlow;
         // Dynamic objects (player/vehicles) self-illuminate at night via a shader fill (plan 034), faded by the
         // sun-height factor (how dark it actually is) × the configurable strength.
         nightFillUniform.value = nightFactor * night.dynamicObjectsFill.strength;
         nightFillRim.value = night.dynamicObjectsFill.rim;
+        // SA prelit world (plan 038): the day↔night prelit blend rides the same wall-clock fade as the lit
+        // windows; the global tint dims models without night prelit toward the weather's timecyc ambient.
+        // Driven unconditionally — the uniforms are inert in 'dynamic' mode (no world materials exist).
+        dnBalanceUniform.value = clockNightFactor(game.getHours(), night.litFade);
+        const amb = skySample(game.getHours()).amb;
+        worldTintNight
+          .setRGB(amb[0] / 255, amb[1] / 255, amb[2] / 255, SRGBColorSpace)
+          .multiplyScalar(worldLight.lodNightAmbScale);
+        worldTintDayPeak.setScalar(worldLight.dayBrightness);
+        worldTintDawn.copy(WORLD_DAWN_HUE).multiplyScalar(worldLight.duskBrightness);
+        worldTintNightPrelit.copy(WORLD_NIGHT_PRELIT_HUE).multiplyScalar(worldLight.nightPrelitBrightness);
+        // Day arc by sun height (nightFactor ramps as the sun nears the horizon) — smooth sunrise/sunset.
+        worldTintDayArc.copy(worldTintDayPeak).lerp(worldTintDawn, nightFactor);
+        // No-night models (LODs): day arc → dark night ambient; night-prelit models: day arc → the
+        // night-prelit level (their own night set carries the picture; this only scales its brightness).
+        worldTintUniform.value.copy(worldTintDayArc).lerp(worldTintNight, dnBalanceUniform.value);
+        worldDayTintUniform.value.copy(worldTintDayArc).lerp(worldTintNightPrelit, dnBalanceUniform.value);
+        // Manual shadow-receive on the unlit world (plan 038 iter 3): mirror the sun's shadow map +
+        // matrix into the world material, with strength = config × day factor × overcast fade.
+        // `autoUpdate` gate: while the sun isn't actually casting (night / below horizon / heavy
+        // overcast) the SkyPlugin freezes the shadow render — sampling that STALE map pointed dawn
+        // shadows the wrong way (yesterday's sunset direction), so the term must be fully off.
+        const sunShadow = sky.getSunShadow();
+        const { shadows } = game.getConfig().graphics;
+        worldShadowUniforms.uWorldShadowMap.value = sunShadow.map?.texture ?? null;
+        worldShadowUniforms.uWorldShadowMatrix.value = sunShadow.matrix;
+        worldShadowUniforms.uWorldShadowMapSize.value.copy(sunShadow.mapSize);
+        // (1 − nightFactor)² — squared so low-sun (dawn/dusk) shadows dissolve fast: at horizon sun the
+        // geometric shadow length explodes (1/tan elevation), and a 30 m faint streak reads as a glitch.
+        const sunUp = (1 - nightFactor) * (1 - nightFactor);
+        worldShadowUniforms.uWorldShadowStrength.value =
+          shadows.enabled && sunShadow.autoUpdate && worldShadowUniforms.uWorldShadowMap.value
+            ? worldLight.shadowStrength * sunUp * sunShadow.intensity
+            : 0;
+        shadowHelper?.update(); // debug frustum follows the view-snapped shadow camera
       },
     });
 
@@ -651,6 +729,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setVehicleReflection: (patch) => game.setVehicleReflection(patch),
       setWater: (patch) => game.setWater(patch),
       setWeather: (index) => game.setWeather(index),
+      setWorldLight: (patch) => game.setWorldLight(patch),
       shadows: () => game.getConfig().graphics.shadows,
       sky: () => game.getConfig().graphics.sky,
       spawnVehicle: async (model) => {
@@ -672,6 +751,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       water: () => game.getConfig().graphics.water,
       weather: () => game.getWeather(),
       weatherList: () => WEATHERS,
+      worldLight: () => game.getConfig().graphics.worldLight,
     };
 
     return { debugActions, game };

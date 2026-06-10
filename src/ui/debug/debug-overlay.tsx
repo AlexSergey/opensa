@@ -17,6 +17,7 @@ import type {
   Vec3,
   VehicleReflectionConfig,
   WaterConfig,
+  WorldLightConfig,
 } from '../../game';
 
 import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
@@ -108,6 +109,8 @@ export interface DebugActions {
   setWater(patch: Partial<WaterConfig>): void;
   /** Switch the active timecyc weather (index into WEATHER_NAMES). */
   setWeather(index: number): void;
+  /** Tune the SA prelit world lighting (plan 038 day/night tints + shadow strength). */
+  setWorldLight(patch: Partial<WorldLightConfig>): void;
   /** Whether sun shadows are on. */
   shadows(): ShadowsConfig;
   /** Current god-rays shader tuning. */
@@ -136,6 +139,8 @@ export interface DebugActions {
   weather(): number;
   /** Selectable weathers (index + label), rain/storm excluded. */
   weatherList(): readonly { index: number; label: string }[];
+  /** Current SA prelit world-lighting calibration. */
+  worldLight(): WorldLightConfig;
 }
 
 /** Reflection preset cycle order for the debug selector (Off + the registry keys). */
@@ -219,6 +224,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [headlights, setHeadlights] = useState<HeadlightConfig>(() => actions.headlights());
   const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
   const [night, setNight] = useState<NightConfig>(() => actions.night());
+  const [worldLight, setWorldLight] = useState<WorldLightConfig>(() => actions.worldLight());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -605,6 +611,34 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 type="range"
                 value={night.windowGlow}
               />
+              <div style={styles.groupLabel}>WORLD LIGHT (SA prelit map — plan 038)</div>
+              {(
+                [
+                  ['dayBrightness', 'WORLD DAY', 0.3, 1.2, 0.05],
+                  ['duskBrightness', 'WORLD DUSK', 0.1, 1, 0.05],
+                  ['nightPrelitBrightness', 'WORLD NIGHT PRELIT', 0.2, 1.5, 0.05],
+                  ['lodNightAmbScale', 'LOD NIGHT AMB', 0.2, 4, 0.1],
+                  ['shadowStrength', 'WORLD SHADOW', 0, 1, 0.05],
+                ] as const
+              ).map(([key, label, min, max, step]) => (
+                <div key={key}>
+                  <div style={styles.groupLabel}>
+                    {label}: {worldLight[key].toFixed(2)}
+                  </div>
+                  <input
+                    max={max}
+                    min={min}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setWorldLight((prev) => ({ ...prev, [key]: value }));
+                      actions.setWorldLight({ [key]: value });
+                    }}
+                    step={step}
+                    type="range"
+                    value={worldLight[key]}
+                  />
+                </div>
+              ))}
             </div>
           )}
 

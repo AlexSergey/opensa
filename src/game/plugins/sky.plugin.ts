@@ -5,6 +5,7 @@ import {
   CanvasTexture,
   Color,
   DirectionalLight,
+  type DirectionalLightShadow,
   HemisphereLight,
   MathUtils,
   Mesh,
@@ -56,9 +57,11 @@ const SUN_DISTANCE = 3500;
 /** Render layer the sky (dome + sun) is *also* on, so a reflection cube probe can render sky-only. */
 export const SKY_PROBE_LAYER = 1;
 
-/** Sun shadow map: resolution, ortho half-extent (world units around the view), light distance + far plane. */
+/** Sun shadow map: resolution, ortho half-extent (world units around the view), light distance + far plane.
+ *  The half-extent is tight (plan 038): only dynamics (vehicles/peds near the view) cast — the unlit map
+ *  neither casts nor receives through the renderer — so a small frustum keeps the 2048 map sharp. */
 const SHADOW_MAP = 2048;
-const SHADOW_SIZE = 140;
+const SHADOW_SIZE = 45;
 const SHADOW_DISTANCE = 400;
 const SHADOW_FAR = 900;
 
@@ -301,6 +304,12 @@ export class SkyPlugin implements Plugin {
   /** Current sun direction in three world space (unit; points toward the sun). For water glints etc. */
   getSunDirection(): Vector3 {
     return this.sunDir;
+  }
+
+  /** The sun's shadow handle (map/matrix/intensity) — the SA world material's manual shadow-receive
+   *  (plan 038) is driven from it each frame by the game layer. */
+  getSunShadow(): DirectionalLightShadow {
+    return this.sun.shadow;
   }
 
   install(context: PluginContext): void {

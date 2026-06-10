@@ -1,4 +1,4 @@
-import type { MeshStandardMaterial } from 'three';
+import type { MeshBasicMaterial } from 'three';
 
 import { readFileSync } from 'node:fs';
 import { DoubleSide, FrontSide } from 'three';
@@ -43,18 +43,21 @@ const instance: IplInstance = {
   rotation: [0, 0, 0, 1],
 };
 
-function sides(flags: number): number[] {
-  const meshes = buildInstancedMeshes(caseArchive(), [{ def: def(flags), instances: [instance] }]);
-
-  return meshes.map((mesh) => (mesh.material as MeshStandardMaterial).side);
+function materials(
+  flags: number,
+): { material: MeshBasicMaterial; mesh: ReturnType<typeof buildInstancedMeshes>[number] }[] {
+  return buildInstancedMeshes(caseArchive(), [{ def: def(flags), instances: [instance] }]).map((mesh) => ({
+    material: mesh.material as MeshBasicMaterial,
+    mesh,
+  }));
 }
 
 describe('buildInstancedMeshes (trafficlight1 backface-culling case)', () => {
   describe('negative cases', () => {
     it('keeps default front-side culling when the def lacks the IDE flag', () => {
-      const result = sides(TRAFFICLIGHT_IDE_FLAGS & ~DISABLE_BACKFACE_CULLING);
-      expect(result.length).toBeGreaterThan(0);
-      expect(result.every((side) => side === FrontSide)).toBe(true);
+      const built = materials(TRAFFICLIGHT_IDE_FLAGS & ~DISABLE_BACKFACE_CULLING);
+      expect(built.length).toBeGreaterThan(0);
+      expect(built.every(({ material }) => material.side === FrontSide)).toBe(true);
     });
   });
 
@@ -66,9 +69,20 @@ describe('buildInstancedMeshes (trafficlight1 backface-culling case)', () => {
     });
 
     it('renders the def double-sided with its real dynamic.ide flags', () => {
-      const result = sides(TRAFFICLIGHT_IDE_FLAGS);
-      expect(result.length).toBeGreaterThan(0);
-      expect(result.every((side) => side === DoubleSide)).toBe(true);
+      const built = materials(TRAFFICLIGHT_IDE_FLAGS);
+      expect(built.length).toBeGreaterThan(0);
+      expect(built.every(({ material }) => material.side === DoubleSide)).toBe(true);
+    });
+
+    it('builds the unlit SA world material with shadows fully off (plan 038)', () => {
+      const built = materials(TRAFFICLIGHT_IDE_FLAGS);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material, mesh } of built) {
+        expect(material.isMeshBasicMaterial).toBe(true); // unlit — normals/sun never touch the map
+        expect(material.customProgramCacheKey()).toContain('saWorld');
+        expect(mesh.castShadow).toBe(false); // only dynamics cast
+        expect(mesh.receiveShadow).toBe(false); // the world material samples the shadow map manually
+      }
     });
   });
 });

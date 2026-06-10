@@ -125,6 +125,8 @@ export interface GraphicsConfig {
   vehicleReflection: VehicleReflectionConfig;
   /** Water surface shader tuning (reflection + sun glint). */
   water: WaterConfig;
+  /** SA prelit world-lighting calibration (plan 038) — tints/strengths of the unlit map pipeline. */
+  worldLight: WorldLightConfig;
 }
 
 /** Vehicle headlight tuning (the occupied car's night beams; plan 033). */
@@ -309,4 +311,22 @@ export interface WaterConfig {
   glint: number;
   /** How much the sky horizon reflects at grazing angles (0–1). */
   reflection: number;
+}
+
+/**
+ * SA prelit world lighting (plan 038): the map renders unlit — `texture × day/night prelit blend ×
+ * tint` — and these scalars calibrate the tints. All read live each frame (debug → Atmosphere).
+ */
+export interface WorldLightConfig {
+  /** Noon world brightness (× prelit). Sub-white compensates the always-on ACES tone curve. */
+  dayBrightness: number;
+  /** Dawn/dusk dim level the sun-height day arc sinks to near the horizon (warm hue is fixed). */
+  duskBrightness: number;
+  /** Deep-night brightness scale for models WITHOUT night prelit (the distant LOD ring) — multiplies
+   *  the timecyc `amb` colour of the active weather. */
+  lodNightAmbScale: number;
+  /** Deep-night brightness of the night-prelit set itself (1 = exactly as authored by Rockstar). */
+  nightPrelitBrightness: number;
+  /** How dark dynamic-object (car/ped) shadows read on the unlit world (0 = off, 1 = black). */
+  shadowStrength: number;
 }

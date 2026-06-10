@@ -47,6 +47,13 @@ function config(gameState: Config['gameState']): Config {
       toneMapping: false,
       vehicleReflection: { intensity: 1, preset: 'enhanced' },
       water: { darkness: 0.55, glint: 1.5, reflection: 0.6 },
+      worldLight: {
+        dayBrightness: 0.85,
+        duskBrightness: 0.45,
+        lodNightAmbScale: 1.6,
+        nightPrelitBrightness: 0.7,
+        shadowStrength: 0.55,
+      },
     },
     hud: {
       clock: { borderColor: '#000', borderWidth: 1, color: '#fff', fontSize: 52 },

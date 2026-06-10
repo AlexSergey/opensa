@@ -17,8 +17,6 @@ import {
 import type { BloomConfig, SkyConfig, SsaoConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext, RenderPass, RenderPipeline } from './plugin';
 
-import { clockNightFactor } from '../time/hour-window';
-
 /** Bloom blur radius (mipmap blur) and luminance smoothing — fixed; intensity/threshold are config. */
 const BLOOM_RADIUS = 0.7;
 const BLOOM_SMOOTHING = 0.3;
@@ -40,7 +38,6 @@ export class PostFxPlugin implements Plugin {
   private readonly glowLayer: number;
   private godRays: GodRaysEffect | null = null;
   private godraysPass: EffectPass | null = null;
-  private readonly hours: () => number;
   private normalPass: NormalPass | null = null;
   private pass: null | RenderPass = null;
   private pipeline: null | RenderPipeline = null;
@@ -57,9 +54,8 @@ export class PostFxPlugin implements Plugin {
    * would smear undefined-size phantom quads into the normal buffer, and SSAO then multiplies large
    * flickering dark squares onto facades behind lamps.
    */
-  constructor(sunSource: Mesh, hours: () => number, glowLayer: number) {
+  constructor(sunSource: Mesh, glowLayer: number) {
     this.sunSource = sunSource;
-    this.hours = hours;
     this.glowLayer = glowLayer;
   }
 
@@ -158,7 +154,7 @@ export class PostFxPlugin implements Plugin {
   }
 
   update(context: PluginContext): void {
-    const { bloom, night, ssao, sun, toneMapping } = context.config.graphics;
+    const { bloom, ssao, sun, toneMapping } = context.config.graphics;
     if (this.godraysPass) {
       this.godraysPass.enabled = sun.godrays && this.sunSource.visible; // shafts only when sun is up
     }
@@ -170,13 +166,9 @@ export class PostFxPlugin implements Plugin {
       this.ssaoPass.enabled = ssao.enabled;
     }
     if (this.tonePass && this.toneMapping) {
-      // ACES only at NIGHT (where it makes the bright emissive/bloom pop — the whole point); fade it out by DAY,
-      // where it just greys/desaturates the midtones. Rides the same fixed CLOCK schedule as the night vertex
-      // colours (dusk fade-in 20→21, dawn fade-out 06→07), not the sun height, so it cross-fades with the lit
-      // windows. Blend by the effect's opacity (0 = passthrough, 1 = ACES); pass off by day = zero cost.
-      const nightFactor = clockNightFactor(this.hours(), night.litFade);
-      this.toneMapping.blendMode.opacity.value = nightFactor;
-      this.tonePass.enabled = toneMapping && nightFactor > 0.001;
+      // ACES full-time (plan 038): one tone curve day and night over the unlit SA world.
+      this.toneMapping.blendMode.opacity.value = 1;
+      this.tonePass.enabled = toneMapping;
     }
     this.ensurePass(!context.config.mapViewer); // plain render in the map inspector
   }

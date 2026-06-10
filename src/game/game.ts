@@ -37,6 +37,7 @@ import {
   type SunConfig,
   type VehicleReflectionConfig,
   type WaterConfig,
+  type WorldLightConfig,
 } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
@@ -187,6 +188,11 @@ export class Game {
   /** Shared diagnostics logger; pass to systems so they can emit gated `'log'` events. */
   getLogger(): Logger {
     return this.logger;
+  }
+
+  /** The scene root (read-only handle; e.g. for debug helpers that need world space, not a Z-up root). */
+  getScene(): Scene {
+    return this.scene;
   }
 
   /** Root group the streaming system adds/removes map cells under (native GTA Z-up). */
@@ -477,6 +483,13 @@ export class Game {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Tune the SA prelit world lighting (plan 038) at runtime; merges into `graphics.worldLight`. */
+  setWorldLight(patch: Partial<WorldLightConfig>): void {
+    this.setConfig({
+      graphics: { ...this.config.graphics, worldLight: { ...this.config.graphics.worldLight, ...patch } },
+    });
   }
 
   /** Set the player's current district display name; emits `'zone'` only on a real change. */
