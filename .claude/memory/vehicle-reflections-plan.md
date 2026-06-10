@@ -6,7 +6,7 @@ metadata:
 ---
 
 Plan 030 (`.claude/plans/030-vehicle-reflections.md`) — give cars GTA-SA env-map reflections + specular.
-**ALL 4 PHASES DONE** (functionally complete). ⚠️ **Visual quality "так себе" (user 2026-06-08) — final
+**ALL 4 PHASES DONE** (functionally complete). ⚠️ **Visual quality "so-so" (user 2026-06-08) — final
 calibration DEFERRED on purpose:** the user wants to lift the **overall scene** (lighting/shadows/grade)
 FIRST, then re-tune the cars against it. Don't keep micro-tuning reflection numbers in isolation; revisit
 preset values (PC/PS2 reflectivity 0.2/0.45, enhanced clearcoat/reflectivity 0.4) once the scene looks better.
@@ -41,11 +41,11 @@ approach (metalness-based env washed out the paint — user feedback): reflectiv
 **`clearcoat`** (glossy lacquer reflecting the probe; paint shows through). enhanced = clearcoat 1 /
 clearcoatRoughness 0.15 / reflectivity **0.4** / roughness 0.6. **REFLECT INTENSITY scales `envMapIntensity`**
 (`= reflectivity × intensity`), NOT clearcoat — because the envMap on MeshStandard/Physical also adds **diffuse
-IBL (sky ambient)** that washes out upward faces if too strong (user: "пересвечены"); keep it modest. clearcoat
+IBL (sky ambient)** that washes out upward faces if too strong (user: "overexposed"); keep it modest. clearcoat
 is constant (the sun still highlights the lacquer at low env intensity). `needsUpdate` set each apply (rare).
 User accepted the look at reflectivity 0.4. Cars reflect the
 real timecyc sky. **Colour-space gotcha FIXED:** the sky dome outputs raw (already-sRGB) colours, so the probe
-texture must be `colorSpace = SRGBColorSpace` or the PBR reflection is ~1.5× too bright (user: "пересвеченными");
+texture must be `colorSpace = SRGBColorSpace` or the PBR reflection is ~1.5× too bright (user: "overexposed");
 also keep `reflectivity`/`metalness` low (enhanced = 0.8/0.2) — it's a subtle paint sheen, not chrome. Phase 4 =
 SA sphere-map shader for PC/PS2 (decided: faithful).
 

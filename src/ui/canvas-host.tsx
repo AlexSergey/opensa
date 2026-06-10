@@ -405,7 +405,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
     const model = await adapter.loadCharacter(`${BASE}/player/tommy.dff`, `${BASE}/player/tommy.txd`);
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
-    const character = await setupCharacter(game, player, PLAYER_SPAWN, {
+    const character = await setupCharacter(game, player, [2031.09, 1539.7, 10.74], {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,
       skeleton: model.skeleton,

@@ -176,8 +176,17 @@ const MENU: { label: string; screen: Screen }[] = [
 
 /** Quick teleport destinations (native GTA Z-up world coords). */
 const TELEPORTS: { coords: Vec3; label: string }[] = [
-  { coords: PLAYER_SPAWN, label: 'Ganton' },
-  { coords: [2860.28, -1887.01, 10.86], label: 'Pier' },
+  { coords: PLAYER_SPAWN, label: 'LS - Ganton' },
+  { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
+  { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
+  { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
+  { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
+  { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
+  { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
+  { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
+  { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
+  { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
+  { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
 ];
 
 /**

@@ -170,7 +170,7 @@ export class PostFxPlugin implements Plugin {
       this.ssaoPass.enabled = ssao.enabled;
     }
     if (this.tonePass && this.toneMapping) {
-      // ACES only at NIGHT (where it makes the bright emissive/bloom pop — the "прикол"); fade it out by DAY,
+      // ACES only at NIGHT (where it makes the bright emissive/bloom pop — the whole point); fade it out by DAY,
       // where it just greys/desaturates the midtones. Rides the same fixed CLOCK schedule as the night vertex
       // colours (dusk fade-in 20→21, dawn fade-out 06→07), not the sun height, so it cross-fades with the lit
       // windows. Blend by the effect's opacity (0 = passthrough, 1 = ACES); pass off by day = zero cost.

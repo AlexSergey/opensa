@@ -5,12 +5,12 @@ import { TimecycManager } from './core/timecyc-manager';
 
 /*
  * base:
- * Главный timecyc. Используется Timecyc Cinematic v1.3.dat так как очень яркие и прикольные цвета
+ * The main timecyc. Uses Timecyc Cinematic v1.3.dat for its very bright, nice colours.
  *
  * merge:
- * GTA SA Ezekiel Skybox addon.dat - использовать настройки неба, лучший конфиг для skybox
- * Timecyc New Summer.dat - отличный конфиг для воды
- * 24h TimeCycle gtadrive's Atmosphere Simulation.dat - вообще прикольное небо, но использую только дял дождя
+ * GTA SA Ezekiel Skybox addon.dat - take the sky settings; the best config for the skybox.
+ * Timecyc New Summer.dat - a great config for water.
+ * 24h TimeCycle gtadrive's Atmosphere Simulation.dat - really nice sky, but I only use it for rain.
  * */
 
 const init = async (): Promise<void> => {

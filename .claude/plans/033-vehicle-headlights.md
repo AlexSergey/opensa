@@ -6,11 +6,11 @@ from [[032-night-and-lights]] (`config.graphics.lights.nightStartHour/EndHour`) 
 on" window. Status: **DONE (v1, rough)** — texture swap + two glow coronas + two spotlights at the model's
 `headlights` dummy (±X), gated on `seated && game.isNight()`. Works, but **needs rework later** (see below).
 
-## ⚠️ Known issues — rework later (user: "пока остановимся на этом")
+## ⚠️ Known issues — rework later (user: "let's stop here for now")
 
 The current v1 is functional but rough; the glow looks poor and the lights aren't handled per-lamp:
-- **`габариты` / marker + tail lights wrong.** We swap the whole shared `vehiclelights128 → vehiclelightson128`
-  atlas, so *all* lights in it (head, tail, indicators, marker/`габариты`) switch "on" together — there's no
+- **Marker + tail lights wrong.** We swap the whole shared `vehiclelights128 → vehiclelightson128`
+  atlas, so *all* lights in it (head, tail, indicators, marker) switch "on" together — there's no
   per-lamp control, and non-headlight lights light up incorrectly / look bad.
 - **Glow is crude.** A single radial sprite per side at the `headlights` dummy doesn't match the real lamp
   shape/position; the corona reads as a flat blob rather than a headlight.

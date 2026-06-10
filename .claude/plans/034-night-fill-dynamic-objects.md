@@ -4,7 +4,7 @@ Light the **dynamic** meshes (the player character, spawned vehicles) at night s
 disturbing the carefully-tuned static-map night look and at **~zero performance cost**. Reuses the dusk/dawn
 fade idea from [[032-night-and-lights]] (fade an intensity uniform, like the ACES tonemap).
 
-Status: **DONE (v1, user-accepted — "выглядит отлично").** A deliberately cheap shader fill (not real lights);
+Status: **DONE (v1, user-accepted — "looks great").** A deliberately cheap shader fill (not real lights);
 stylised, so likely revisit once shadows are reworked ([[shadows-deferred]]). Looks good in-browser.
 
 **Landed:** `three/night-fill.ts` (`nightFillUniform` + `applyNightFill`, composes with the vehicle reflection's
