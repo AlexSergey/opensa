@@ -1,13 +1,14 @@
 import type { MeshBasicMaterial } from 'three';
 
 import { readFileSync } from 'node:fs';
-import { DoubleSide, FrontSide } from 'three';
+import { AdditiveBlending, DoubleSide, FrontSide, NormalBlending } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
 
 import { buildArchiveBuffer, openArchive } from '../archive';
 import { parseDff } from '../parsers/binary/dff';
+import { IdeFlag } from '../parsers/text';
 import { toArrayBuffer } from '../test-utils';
 import { buildInstancedMeshes } from './build-region';
 
@@ -17,9 +18,6 @@ import { buildInstancedMeshes } from './build-region';
 // disable backface culling — which buildInstancedMeshes must honour.
 const CASE_DIR = 'tests/dff/trafficlight-backface-culling';
 const TRAFFICLIGHT_IDE_FLAGS = 2130048;
-
-/** SA IDE flag 0x200000 — disable backface culling (see build-region). */
-const DISABLE_BACKFACE_CULLING = 0x200000;
 
 function caseArchive(): ReturnType<typeof openArchive> {
   return openArchive(
@@ -55,7 +53,7 @@ function materials(
 describe('buildInstancedMeshes (trafficlight1 backface-culling case)', () => {
   describe('negative cases', () => {
     it('keeps default front-side culling when the def lacks the IDE flag', () => {
-      const built = materials(TRAFFICLIGHT_IDE_FLAGS & ~DISABLE_BACKFACE_CULLING);
+      const built = materials(TRAFFICLIGHT_IDE_FLAGS & ~IdeFlag.DISABLE_BACKFACE_CULLING);
       expect(built.length).toBeGreaterThan(0);
       expect(built.every(({ material }) => material.side === FrontSide)).toBe(true);
     });
@@ -82,6 +80,66 @@ describe('buildInstancedMeshes (trafficlight1 backface-culling case)', () => {
         expect(material.customProgramCacheKey()).toContain('saWorld');
         expect(mesh.castShadow).toBe(false); // only dynamics cast
         expect(mesh.receiveShadow).toBe(false); // the world material samples the shadow map manually
+      }
+    });
+  });
+});
+
+describe('buildInstancedMeshes (SA IDE render flags, plan 039)', () => {
+  describe('negative cases', () => {
+    it('keeps opaque depth-writing defaults when no render flags are set', () => {
+      const built = materials(0);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material } of built) {
+        expect(material.transparent).toBe(false);
+        expect(material.depthWrite).toBe(true);
+        expect(material.blending).toBe(NormalBlending);
+      }
+    });
+  });
+
+  describe('positive cases', () => {
+    it('DRAW_LAST moves the parts into the sorted alpha list', () => {
+      const built = materials(IdeFlag.DRAW_LAST);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material } of built) {
+        expect(material.transparent).toBe(true);
+        expect(material.depthWrite).toBe(true); // sorted, but still occludes
+      }
+    });
+
+    it('NO_ZBUFFER_WRITE stops the parts writing depth (ground decals)', () => {
+      const built = materials(IdeFlag.NO_ZBUFFER_WRITE);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material } of built) {
+        expect(material.depthWrite).toBe(false);
+      }
+    });
+
+    it('ADDITIVE implies sorted + no depth write + additive blending', () => {
+      const built = materials(IdeFlag.ADDITIVE);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material } of built) {
+        expect(material.blending).toBe(AdditiveBlending);
+        expect(material.transparent).toBe(true);
+        expect(material.depthWrite).toBe(false);
+        expect(material.alphaTest).toBe(0);
+      }
+    });
+
+    it('runs the mod decoratePart hook once per part, after the vanilla treatment', () => {
+      const seen: { flags: number; model: string; transparent: boolean }[] = [];
+      const meshes = buildInstancedMeshes(caseArchive(), [{ def: def(IdeFlag.DRAW_LAST), instances: [instance] }], {
+        decoratePart: (partDef, part) => {
+          // DRAW_LAST already applied → the hook observes the post-treatment material.
+          seen.push({ flags: partDef.flags, model: partDef.modelName, transparent: part.material.transparent });
+        },
+      });
+      expect(seen).toHaveLength(meshes.length);
+      for (const call of seen) {
+        expect(call.model).toBe('trafficlight1');
+        expect(call.flags).toBe(IdeFlag.DRAW_LAST);
+        expect(call.transparent).toBe(true);
       }
     });
   });

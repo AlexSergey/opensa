@@ -5,7 +5,13 @@ import type { MapDefinitions } from '../parsers/text';
 import type { GridCell, WorldGrid } from './world-grid';
 
 import { buildCoronaPoints } from '../three/corona';
-import { addToGroup, buildInstancedMeshes, collectCoronas, type RegionMeshData } from './build-region';
+import {
+  addToGroup,
+  buildInstancedMeshes,
+  type BuildRegionOptions,
+  collectCoronas,
+  type RegionMeshData,
+} from './build-region';
 import { cellKey } from './world-grid';
 
 /**
@@ -22,13 +28,14 @@ export function buildCell(
   cx: number,
   cy: number,
   lod: boolean,
+  options: BuildRegionOptions = {},
 ): Object3D[] {
   const cell = grid.get(cellKey(cx, cy));
   if (!cell) {
     return [];
   }
   const groups = [...cellGroups(defs, cell, lod).values()];
-  const objects: Object3D[] = buildInstancedMeshes(archive, groups);
+  const objects: Object3D[] = buildInstancedMeshes(archive, groups, options);
   // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect). The ground
   // glow under lamps is the road's baked night vertex colours, not a projected pool.
   if (!lod) {

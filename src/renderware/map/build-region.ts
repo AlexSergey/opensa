@@ -1,10 +1,12 @@
-import { DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { AdditiveBlending, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
+import type { RenderPart } from '../three/build-clump';
 import type { CoronaEntry } from '../three/corona';
 
 import { getClump, getTextures, modelKey } from '../archive';
+import { hasIdeFlag, IdeFlag } from '../parsers/text';
 import { buildClumpLights, buildClumpParts } from '../three/build-clump';
 import { applyWorldWindowGlow } from '../three/world-material';
 
@@ -22,18 +24,28 @@ const SUPPRESS_LIGHT_MODELS = /traffic/i;
  * builder ({@link buildCell}); the map renders through the streaming system.
  */
 
-/**
- * SA IDE object flag: render the model **without backface culling** (two-sided). The original engine
- * culls map geometry by default and disables it per object via this flag (e.g. `trafficlight1` in
- * `dynamic.ide`, flags 2130048) — re-exported assets (gta3-pf.img) rely on it for their mixed-winding
- * housings. Honouring it here replaces the old name-keyed DOUBLE_SIDED_MODELS workaround.
- */
-const IDE_FLAG_DISABLE_BACKFACE_CULLING = 0x200000;
+/** Options threaded from the adapter into the per-cell mesh builders. */
+export interface BuildRegionOptions {
+  /** Game-layer mod hook (plan 039): called once per built part, AFTER the vanilla treatment, so a
+   *  mod (e.g. vegetation wind) can patch the part's material based on its object def. */
+  decoratePart?: (def: IdeObjectDef, part: RenderPart) => void;
+}
 
 /** Per-mesh data for click-inspect / describe. */
 export interface RegionMeshData {
   def: IdeObjectDef;
   instances: IplInstance[];
+}
+
+/** Per-def material treatment from the SA IDE render flags (plans 004/039), all verified on real
+ *  assets: backface-culling opt-out (trafficlight1 housings), ADDITIVE glow overlays
+ *  (`LTS*`/`nitelites*`), DRAW_LAST sorted-alpha pieces (`*Tr*` block sections), NO_ZBUFFER_WRITE
+ *  ground decals (`grnd_alpha*` z-fought the ground they overlay). */
+interface DefTreatment {
+  additive: boolean;
+  drawLast: boolean;
+  noDepthWrite: boolean;
+  twoSided: boolean;
 }
 
 /** Group an instance under its model+txd key (shared by the cell builder). */
@@ -52,7 +64,11 @@ export function addToGroup(groups: Map<string, RegionMeshData>, def: IdeObjectDe
  * every instance with its GTA world transform (IPL quaternion conjugated, unit
  * scale). `userData.region` carries the group for picking.
  */
-export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<RegionMeshData>): InstancedMesh[] {
+export function buildInstancedMeshes(
+  archive: ImgArchive,
+  groups: Iterable<RegionMeshData>,
+  options: BuildRegionOptions = {},
+): InstancedMesh[] {
   const meshes: InstancedMesh[] = [];
   const placement = new Matrix4();
   const composed = new Matrix4();
@@ -65,14 +81,10 @@ export function buildInstancedMeshes(archive: ImgArchive, groups: Iterable<Regio
     // Night-lit timed variants (lit-window / neon overlays, on across midnight) glow additively over
     // the world material's night blend so their bright window texels read in the dark.
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
-    const twoSided = (group.def.flags & IDE_FLAG_DISABLE_BACKFACE_CULLING) !== 0;
+    const treatment = defTreatment(group.def);
     for (const part of parts) {
-      if (twoSided) {
-        part.material.side = DoubleSide; // the def opts out of backface culling, like the original engine
-      }
-      if (nightLit && part.material.map) {
-        applyWorldWindowGlow(part.material);
-      }
+      applyTreatment(part, treatment, nightLit);
+      options.decoratePart?.(group.def, part); // game-layer mods (e.g. wind sway) — after vanilla
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
       // The map neither casts nor uses the renderer's shadow receive (plan 038): only dynamics cast,
       // and the unlit world material samples that map manually (worldShadowUniforms).
@@ -144,6 +156,37 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
   }
 
   return coronas;
+}
+
+/** Apply a def's treatment to one part's material (mutates it; parts are built per group). */
+function applyTreatment(part: RenderPart, treatment: DefTreatment, nightLit: boolean): void {
+  if (treatment.twoSided) {
+    part.material.side = DoubleSide;
+  }
+  if (treatment.drawLast) {
+    part.material.transparent = true; // three: moves the part into the sorted after-opaque list
+  }
+  if (treatment.noDepthWrite) {
+    part.material.depthWrite = false;
+  }
+  if (treatment.additive) {
+    part.material.blending = AdditiveBlending;
+    part.material.alphaTest = 0; // black texels add nothing — cutout testing only punches holes
+  } else if (nightLit && part.material.map) {
+    applyWorldWindowGlow(part.material); // non-additive timed overlays keep the glow injection
+  }
+}
+
+/** Resolve a def's treatment once per group. */
+function defTreatment(def: IdeObjectDef): DefTreatment {
+  const additive = hasIdeFlag(def, IdeFlag.ADDITIVE);
+
+  return {
+    additive,
+    drawLast: additive || hasIdeFlag(def, IdeFlag.DRAW_LAST),
+    noDepthWrite: additive || hasIdeFlag(def, IdeFlag.NO_ZBUFFER_WRITE),
+    twoSided: hasIdeFlag(def, IdeFlag.DISABLE_BACKFACE_CULLING),
+  };
 }
 
 /** Whether a timed window `[on, off)` is a night-lit variant (visible across midnight → glowing). */

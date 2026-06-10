@@ -50,6 +50,10 @@ export interface RenderPart {
   material: MeshBasicMaterial;
   /** Local atomic-frame transform, in native Z-up. */
   matrix: Matrix4;
+  /** Minimum day-prelit ALPHA, present only when some vertex alpha < 255 — wind-adapted vegetation
+   *  encodes per-vertex sway weight there (plan 039: 255 = rigid trunk, lower = swaying canopy).
+   *  The geometry then also carries a `swayWeight` attribute (= (255 − a) / 255). */
+  swayAlphaMin?: number;
 }
 
 export function buildClump(clump: RWClump, textures?: Map<string, Texture>, options: BuildClumpOptions = {}): Group {
@@ -136,6 +140,8 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
     // SA night (extra) vertex colours — bright warm texels are lit windows; added as emissive at night.
     const nightColor = rw.nightColors ? prelitColorAttribute(rw.nightColors) : null;
     const normal = vertexNormalAttribute(position, rw);
+    // Wind-adapted vegetation encodes per-vertex sway weight in the day-prelit ALPHA (plan 039).
+    const sway = rw.prelitColors ? swayWeightAttribute(rw.prelitColors) : null;
 
     groupTrianglesByMaterial(rw.triangles, rw.materials.length).forEach((tris, materialIndex) => {
       if (tris.length === 0) {
@@ -152,6 +158,9 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       if (nightColor) {
         geometry.setAttribute('nightColor', nightColor);
       }
+      if (sway) {
+        geometry.setAttribute('swayWeight', sway.attribute);
+      }
       geometry.setAttribute('normal', normal);
       const index: number[] = [];
       for (const tri of tris) {
@@ -163,7 +172,7 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       // Unlit SA prelit blend (plan 038) — the night set is consumed by the material's dnBalance mix.
       const rwMaterial = rw.materials[materialIndex] ?? rw.materials[0];
       const material = buildWorldMaterial(rwMaterial ?? FALLBACK_RW_MATERIAL, rw, textures);
-      parts.push({ geometry, material, matrix });
+      parts.push({ geometry, material, matrix, ...(sway ? { swayAlphaMin: sway.minAlpha } : {}) });
     });
   }
 
@@ -393,6 +402,30 @@ function sanitizeDegenerateNormals(normals: Float32Array, positions: Float32Arra
     normals[v * 3 + 1] = 0;
     normals[v * 3 + 2] = 1;
   }
+}
+
+/**
+ * Per-vertex sway weights from the day-prelit ALPHA channel, or null when every alpha is 255 (the
+ * model is not wind-adapted). Weight = (255 − a) / 255: alpha 255 → 0 (rigid trunk), lower alpha →
+ * more sway (cedar canopies ship 0xAA ≈ 0.33, dead trees 0xDC ≈ 0.14). `minAlpha` lets the caller
+ * reject fade-style alpha gradients (skirts go near 0) as sway candidates.
+ */
+function swayWeightAttribute(prelit: Uint8Array): null | { attribute: BufferAttribute; minAlpha: number } {
+  let minAlpha = 255;
+  for (let i = 3; i < prelit.length; i += 4) {
+    if (prelit[i] < minAlpha) {
+      minAlpha = prelit[i];
+    }
+  }
+  if (minAlpha === 255) {
+    return null;
+  }
+  const weights = new Float32Array(prelit.length / 4);
+  for (let i = 3, j = 0; i < prelit.length; i += 4, j += 1) {
+    weights[j] = (255 - prelit[i]) / 255;
+  }
+
+  return { attribute: new BufferAttribute(weights, 1), minAlpha };
 }
 
 function vertexNormalAttribute(position: BufferAttribute, rw: RWGeometry): BufferAttribute {

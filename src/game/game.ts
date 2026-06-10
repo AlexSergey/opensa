@@ -40,6 +40,7 @@ import {
   type WorldLightConfig,
 } from './interfaces/config.interface';
 import { type RegionRequest, type Vec3, type WorldAdapter } from './interfaces/world-adapter.interface';
+import { type WorldMod } from './mods/mod.interface';
 import { type Plugin, type PluginContext, type RenderPipeline } from './plugins/plugin';
 import { BasicRenderPipeline } from './plugins/render-pipeline';
 import { type CellCoord } from './streaming/grid';
@@ -253,6 +254,22 @@ export class Game {
 
     this.start();
     this.events.emit('ready');
+  }
+
+  /**
+   * Install a game mod (plan 039): wires its per-frame `update` in as a system. The mod's
+   * `decoratePart` build hook is delivered separately — the host passes the same mod objects into
+   * the world adapter's config (see canvas-host), since the adapter builds cells, not the engine.
+   */
+  installMod(mod: WorldMod): this {
+    if (mod.update) {
+      this.addSystem({
+        name: `mod:${mod.name}`,
+        update: (): void => mod.update?.({ hours: this.getHours(), seconds: performance.now() / 1000 }),
+      });
+    }
+
+    return this;
   }
 
   /** Whether it's "night" by the configured lamp hours (`graphics.lights.nightStartHour/EndHour`). The single

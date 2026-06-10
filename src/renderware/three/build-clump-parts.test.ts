@@ -90,6 +90,22 @@ describe('buildClumpParts', () => {
     }
   });
 
+  it('exposes prelit-alpha sway weights only when some alpha is below 255 (plan 039)', () => {
+    // Fixture prelit is opaque (all alphas 255) → no sway data.
+    const plain = buildClumpParts(clumpWith(geometry()));
+    expect(plain[0].swayAlphaMin).toBeUndefined();
+    expect(plain[0].geometry.getAttribute('swayWeight')).toBeUndefined();
+
+    // Wind-adapted: canopy alphas at 0xAA (the cedar convention) → weight (255−170)/255.
+    const prelit = new Uint8Array(16).fill(255);
+    prelit[7] = 170; // vertex 1's alpha
+    const adapted = buildClumpParts(clumpWith(geometry({ prelitColors: prelit })));
+    expect(adapted[0].swayAlphaMin).toBe(170);
+    const weights = adapted[0].geometry.getAttribute('swayWeight');
+    expect(weights.getX(0)).toBe(0);
+    expect(weights.getX(1)).toBeCloseTo((255 - 170) / 255, 5);
+  });
+
   it('resolves textures and alpha settings into the part material', () => {
     const tex = new Texture();
     tex.name = 'tree_branches44';

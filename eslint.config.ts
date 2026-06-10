@@ -225,10 +225,11 @@ const scriptsConfig = {
 };
 
 // Layer boundary: the generic `game` engine may touch `renderware` only via
-// `game/adapters/**`. Keeps game logic free of GTA-SA-specific implementation.
+// `game/adapters/**` and `game/mods/**` (plan 040: mods are GTA-specific by nature — they patch
+// world materials and read object defs). Keeps the engine core free of GTA-SA implementation.
 const gameBoundaryConfig = {
   files: ['src/game/**/*.{ts,tsx}'],
-  ignores: ['src/game/adapters/**'],
+  ignores: ['src/game/adapters/**', 'src/game/mods/**'],
   rules: {
     'no-restricted-imports': [
       'error',
@@ -236,7 +237,7 @@ const gameBoundaryConfig = {
         patterns: [
           {
             group: ['**/renderware', '**/renderware/**'],
-            message: 'The game layer must access renderware only through game/adapters.',
+            message: 'The game layer must access renderware only through game/adapters or game/mods.',
           },
         ],
       },

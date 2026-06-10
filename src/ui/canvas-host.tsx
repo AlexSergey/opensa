@@ -21,6 +21,7 @@ import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
+import { createWindMod } from '../game/mods/wind.mod';
 import { cloudProfile } from '../game/plugins/cloud-profile';
 import { FogPlugin } from '../game/plugins/fog.plugin';
 import { PostFxPlugin } from '../game/plugins/postfx.plugin';
@@ -345,11 +346,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       vehicle: { hdDistance: 80, lodDistance: 250, unloadDistance: 500 },
       weatherTransitionSeconds: 6,
     });
+    // Game mods (plan 039): installMod wires their per-frame update; the adapter runs their
+    // decoratePart build hooks (one mod object, both registrations).
+    const windMod = createWindMod();
+    game.installMod(windMod);
     const adapter = new GtaSaWorldAdapter({
       archiveUrl: `${BASE}/models/gta3-pf.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
+      mods: [windMod],
     });
 
     // Timecyc (sky/sun/light table by time of day) — loaded before the scene so the sky plugin has it.

@@ -38,6 +38,7 @@ export { DFFLoader } from './three/dff-loader';
 export { nightFillRim, nightFillUniform } from './three/night-fill';
 export { type TextureDictionary, TXDLoader } from './three/txd-loader';
 export {
+  buildWorldMaterial,
   dnBalanceUniform,
   windowGlowUniform,
   worldDayTintUniform,

@@ -10,9 +10,10 @@ import type {
   WorldAdapter,
   WorldObjectInfo,
 } from '../interfaces/world-adapter.interface';
+import type { WorldMod } from '../mods/mod.interface';
 import type { CellCoord } from '../streaming/grid';
 
-// game/adapters/** is the only place allowed to import renderware.
+// game/adapters/** (and game/mods/**) are the only places allowed to import renderware.
 import {
   buildAnimationClip,
   buildCell,
@@ -29,6 +30,7 @@ import {
   buildWorldGrid,
   convertTo24h,
   type HandlingEntry,
+  type IdeObjectDef,
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
@@ -44,6 +46,7 @@ import {
   parseWater,
   type RegionColliders,
   type RegionMeshData,
+  type RenderPart,
   resolveMap,
   setTxdParents,
   type Timecyc,
@@ -62,6 +65,8 @@ export interface GtaSaWorldConfig {
   base: string;
   cellSize: number;
   datUrl: string;
+  /** Installed game mods (plan 039) — their `decoratePart` hooks run during cell builds. */
+  mods?: readonly WorldMod[];
 }
 
 /** Resolved carcol paint (RGB per slot); 3rd/4th present only for 4-colour cars. */
@@ -84,6 +89,8 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private readonly cellCache = new Map<string, Object3D[]>();
   private readonly colliderCache = new Map<string, ModelColliders[]>();
   private readonly config: GtaSaWorldConfig;
+  /** Composed mod build-hook (undefined when no mods) — see {@link GtaSaWorldConfig.mods}. */
+  private readonly decoratePart?: (def: IdeObjectDef, part: RenderPart) => void;
   private defs: MapDefinitions | null = null;
   private genericVehicleTextures: Map<string, Texture> | null = null;
   private grid: null | WorldGrid = null;
@@ -95,6 +102,15 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   constructor(config: GtaSaWorldConfig) {
     this.config = config;
     this.cellSize = config.cellSize;
+    const mods = config.mods ?? [];
+    this.decoratePart =
+      mods.length === 0
+        ? undefined
+        : (def, part): void => {
+            for (const mod of mods) {
+              mod.decoratePart?.(def, part);
+            }
+          };
   }
 
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo {
@@ -164,7 +180,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     let meshes = this.cellCache.get(key);
     if (!meshes) {
       // Native Z-up; the streaming root applies the −90°X (so no per-cell group).
-      meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod);
+      meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod, {
+        decoratePart: this.decoratePart,
+      });
       this.cellCache.set(key, meshes);
     }
 
