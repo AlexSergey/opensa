@@ -30,6 +30,8 @@ import {
   type LightsConfig,
   type MoonConfig,
   type NightConfig,
+  type ProcObjCategory,
+  type ProcObjTypeConfig,
   type ShadowsConfig,
   type SkyConfig,
   type SsaoConfig,
@@ -500,6 +502,17 @@ export class Game {
     this.adapter = adapter;
 
     return this;
+  }
+
+  /** Tune one procedural-clutter category (plan 042) at runtime; merges into `graphics.procobj`. */
+  setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void {
+    const procobj = this.config.graphics.procobj;
+    this.setConfig({
+      graphics: {
+        ...this.config.graphics,
+        procobj: { ...procobj, [category]: { ...procobj[category], ...patch } },
+      },
+    });
   }
 
   /** Tune the SA prelit world lighting (plan 038) at runtime; merges into `graphics.worldLight`. */

@@ -37,6 +37,16 @@ export class CollisionStreamingSystem implements System {
     this.config = config;
   }
 
+  /** Drop every loaded cell's physics bodies — the next `update` re-streams them through the
+   *  adapter (whose collider cache the caller invalidated first). Used when the procedural-clutter
+   *  knobs change, so collision always matches the rendered set (plan 042). */
+  reload(): void {
+    for (const handles of this.loaded.values()) {
+      this.physics.removeBodies(handles);
+    }
+    this.loaded.clear();
+  }
+
   update(): void {
     this.current = this.desiredKeys();
     for (const [key, handles] of this.loaded) {

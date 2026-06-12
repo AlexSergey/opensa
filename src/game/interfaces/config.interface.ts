@@ -109,6 +109,8 @@ export interface GraphicsConfig {
   moon: MoonConfig;
   /** Night ambient/atmosphere tuning (how dark + the moonlight tint). */
   night: NightConfig;
+  /** Procedural ground clutter (procobj.dat scatter; plan 042) — per-category tuning. */
+  procobj: ProcObjConfig;
   /** Sun shadows (directional shadow map). */
   shadows: ShadowsConfig;
   /** Sky/sun god-rays shader tuning (shaft look). */
@@ -223,6 +225,21 @@ export interface NightConfig {
   /** Night-vertex-colour glow strength — how strongly the SA baked night lighting (lit windows / signs /
    *  road lamp-pools) self-illuminates at night. */
   windowGlow: number;
+}
+
+/** Semantic groups of procobj.dat clutter models — each tuned independently (plan 042). */
+export type ProcObjCategory = 'bushes' | 'cacti' | 'flowers' | 'grass' | 'rocks' | 'trees' | 'underwater';
+
+/** Procedural ground clutter (procobj.dat) — one tuning block per {@link ProcObjCategory}. */
+export type ProcObjConfig = Record<ProcObjCategory, ProcObjTypeConfig>;
+
+/** Tuning of one clutter category. Pure decoration with a perf cost — all knobs are live. */
+export interface ProcObjTypeConfig {
+  /** Density multiplier on the authored spacing (1 = vanilla, 0.5 = half the objects). */
+  density: number;
+  /** Visibility distance (world units) for this category's scattered objects. */
+  drawDistance: number;
+  enabled: boolean;
 }
 
 /** Sun shadow (directional shadow map) tuning. */

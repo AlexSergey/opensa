@@ -1,4 +1,4 @@
-import { type AnimationClip, Group, type Object3D, type Texture } from 'three';
+import { type AnimationClip, Group, type InstancedMesh, Matrix4, type Object3D, type Texture, Vector3 } from 'three';
 
 import type { ModelColliders } from '../interfaces/collider.interface';
 import type {
@@ -22,6 +22,7 @@ import {
   buildColliders,
   buildCollisionIndex,
   buildCollisionWireframe,
+  buildProcObjMeshes,
   buildSkinnedClump,
   buildTextureMap,
   buildTimecyc,
@@ -29,6 +30,7 @@ import {
   buildWater,
   buildWorldGrid,
   convertTo24h,
+  groupRulesBySurface,
   type HandlingEntry,
   type IdeObjectDef,
   type ImgArchive,
@@ -40,14 +42,22 @@ import {
   parseDffCollision,
   parseHandling,
   parseIfp,
+  parseProcObj,
+  parseSurfaceNames,
   parseTimecyc,
   parseTxd,
   parseVehicleDefs,
   parseWater,
+  type ProcObjBatch,
+  type ProcObjCategoryName,
+  procObjColliders,
+  procObjLotteryCap,
+  type ProcObjRule,
   type RegionColliders,
   type RegionMeshData,
   type RenderPart,
   resolveMap,
+  scatterProcObjects,
   setTxdParents,
   type Timecyc,
   type VehicleColours,
@@ -65,8 +75,20 @@ export interface GtaSaWorldConfig {
   base: string;
   cellSize: number;
   datUrl: string;
+  /** Standalone script-gated binary IPL groups to load (plan 042) — the world-state choice
+   *  vanilla makes via mission-script LOAD_IPL/REMOVE_IPL (e.g. `truthsfarm`, `barriers1`). */
+  extraIpl?: readonly string[];
   /** Installed game mods (plan 039) — their `decoratePart` hooks run during cell builds. */
   mods?: readonly WorldMod[];
+  /** Hard cap on clutter instances per cell — over the limit, the highest-lottery placements
+   *  are simply not RENDERED and therefore not collided either (one budget drives both; lowest
+   *  lotteries win). The vanilla CProcObjectMan pools at ~300 for the same perf reason.
+   *  Default: unlimited. */
+  procObjLimit?: number;
+  /** Effective clutter density per category (0 when disabled) — keeps clutter COLLISION in sync
+   *  with the rendered set. On a knob change, call {@link GtaSaWorldAdapter.invalidateColliderCache}
+   *  and re-stream physics. Default: vanilla density 1 for every category. */
+  procObjDensityOf?: (category: ProcObjCategoryName) => number;
 }
 
 /** Resolved carcol paint (RGB per slot); 3rd/4th present only for 4-colour cars. */
@@ -91,11 +113,17 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private readonly config: GtaSaWorldConfig;
   /** Composed mod build-hook (undefined when no mods) — see {@link GtaSaWorldConfig.mods}. */
   private readonly decoratePart?: (def: IdeObjectDef, part: RenderPart) => void;
+  /** Catalog defs by lowercased model name — resolves procobj clutter models to their TXDs. */
+  private defByName: Map<string, IdeObjectDef> | null = null;
   private defs: MapDefinitions | null = null;
   private genericVehicleTextures: Map<string, Texture> | null = null;
   private grid: null | WorldGrid = null;
+  /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
+  private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Parsed `handling.cfg`, kept for the later vehicle-physics phase. */
   private handling: Map<string, HandlingEntry> | null = null;
+  /** Surface-name table from surfinfo.dat (index = COL material id); pairs with procObjRules. */
+  private surfaceNames: null | string[] = null;
   private vehicleColours: null | VehicleColours = null;
   private vehicleDefs: Map<string, VehicleDef> | null = null;
 
@@ -113,7 +141,21 @@ export class GtaSaWorldAdapter implements WorldAdapter {
           };
   }
 
+  /** Identify a picked object: placed map instances via `userData.region`, scattered clutter
+   *  via `userData.procObj` (position decomposed from the instance matrix). */
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo {
+    const proc = object.userData.procObj as undefined | { category: string; model: string };
+    if (proc && instanceId !== undefined) {
+      const matrix = new Matrix4();
+      (object as InstancedMesh).getMatrixAt(instanceId, matrix);
+      const position = new Vector3().setFromMatrixPosition(matrix);
+
+      return {
+        modelName: `${proc.model} [procobj: ${proc.category}]`,
+        position: [position.x, position.y, position.z],
+        txdName: this.defByName?.get(proc.model)?.txdName ?? '?',
+      };
+    }
     const data = object.userData.region as RegionMeshData | undefined;
     const instance = instanceId === undefined ? undefined : data?.instances[instanceId];
     if (!data || !instance) {
@@ -121,6 +163,12 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return { modelName: data.def.modelName, position: instance.position, txdName: data.def.txdName };
+  }
+
+  /** Drop the cached per-cell colliders (clutter knobs changed) — the collision streaming system
+   *  then re-streams physics via {@link loadCellColliders}, rebuilding with the new density. */
+  invalidateColliderCache(): void {
+    this.colliderCache.clear();
   }
 
   listCells(): CellCoord[] {
@@ -183,6 +231,18 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod, {
         decoratePart: this.decoratePart,
       });
+      // Procedural clutter (plan 042): deterministic scatter over the cell's collision faces.
+      // HD cells only — the clutter draw distances are far below the LOD ring anyway.
+      const batches = request.lod ? null : this.cellProcObjBatches(request.cx, request.cy);
+      if (batches && this.defByName) {
+        const defByName = this.defByName;
+        meshes.push(
+          ...buildProcObjMeshes(this.archive, batches, (model) => defByName.get(model), {
+            decoratePart: this.decoratePart,
+            lotteryCap: procObjLotteryCap(batches, this.config.procObjLimit),
+          }),
+        );
+      }
       this.cellCache.set(key, meshes);
     }
 
@@ -199,6 +259,17 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     if (!colliders) {
       const index = buildCollisionIndex(this.archive);
       colliders = buildCellColliders(index, this.defs, this.grid, cx, cy).map(toModelColliders);
+      // Clutter collision (plan 042): models that ship a COL collide (rocks/cacti/trees);
+      // grass and flower patches have none, so they stay walk-through — like vanilla. The
+      // collidable subset follows the live per-category density (no invisible obstacles).
+      const batches = this.cellProcObjBatches(cx, cy);
+      if (batches) {
+        const clutter = procObjColliders(index, batches, {
+          densityOf: this.config.procObjDensityOf,
+          lotteryCap: procObjLotteryCap(batches, this.config.procObjLimit),
+        });
+        colliders.push(...clutter.map(toModelColliders));
+      }
       this.colliderCache.set(key, colliders);
     }
 
@@ -324,10 +395,32 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       return;
     }
     this.archive = await loadArchive(this.config.archiveUrl);
-    this.defs = await resolveMap(this.config.datUrl, this.config.base);
+    this.defs = await resolveMap(this.config.datUrl, this.config.base, { extraIpl: this.config.extraIpl });
     setTxdParents(this.defs.txdParents ?? new Map<string, string>()); // wire txdp: area TXDs inherit *_gene parents
     this.grid = buildWorldGrid(this.defs, this.cellSize);
+    this.defByName = new Map([...this.defs.catalog.values()].map((def) => [def.modelName.toLowerCase(), def]));
+    // Procedural ground clutter (plan 042): both data files present → cells scatter; else skipped.
+    const [procObjText, surfInfoText] = await Promise.all([
+      tryFetchText(`${this.config.base}/data/procobj.dat`),
+      tryFetchText(`${this.config.base}/data/surfinfo.dat`),
+    ]);
+    if (procObjText !== null && surfInfoText !== null) {
+      this.procObjRules = groupRulesBySurface(parseProcObj(procObjText));
+      this.surfaceNames = parseSurfaceNames(surfInfoText);
+    }
     onProgress?.(1);
+  }
+
+  /** Deterministic clutter batches for one cell (plan 042), or null when the procobj data files
+   *  were absent. Shared by the render path (loadCell) and the collider path (loadCellColliders) —
+   *  same inputs give byte-identical batches, so visuals and collision always agree. */
+  private cellProcObjBatches(cx: number, cy: number): null | readonly ProcObjBatch[] {
+    if (!this.archive || !this.defs || !this.grid || !this.procObjRules || !this.surfaceNames) {
+      return null;
+    }
+    const colliders = buildCellColliders(buildCollisionIndex(this.archive), this.defs, this.grid, cx, cy);
+
+    return scatterProcObjects(colliders, this.procObjRules, this.surfaceNames, cx, cy);
   }
 
   /** Lazily fetch + parse vehicles.ide, carcols.dat and handling.cfg (cached). */
@@ -443,9 +536,14 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
-/** Fetch text, or null when the file is absent (for optional assets like `timecyc_24h.dat`). */
+/** Fetch text, or null when the file is absent or unreachable (optional assets like
+ *  `timecyc_24h.dat` / `procobj.dat` — a fetch failure means "feature off", never a crash). */
 async function tryFetchText(url: string): Promise<null | string> {
-  const response = await fetch(url);
+  try {
+    const response = await fetch(url);
 
-  return response.ok ? response.text() : null;
+    return response.ok ? response.text() : null;
+  } catch {
+    return null;
+  }
 }

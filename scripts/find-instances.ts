@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { datChildUrl, iplBasename, streamIplUrl } from '../src/renderware/archive/resolve-paths';
@@ -74,6 +74,19 @@ for (const iplPath of dat.ipl) {
       if (wantedIds.has(instance.id)) {
         report(`${basename}_stream${index}`, instance);
       }
+    }
+  }
+}
+
+// Standalone script-gated groups (plan 042) — not in gta.dat/manifest, scan the dir for them.
+for (const file of readdirSync(join(BASE, 'ipl_binary'))) {
+  if (!file.endsWith('.ipl') || file.includes('_stream')) {
+    continue;
+  }
+  const buffer = readFileSync(join(BASE, 'ipl_binary', file));
+  for (const instance of parseBinaryIpl(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))) {
+    if (wantedIds.has(instance.id)) {
+      report(file.replace('.ipl', ' (standalone)'), instance);
     }
   }
 }

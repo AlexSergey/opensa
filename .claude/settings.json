@@ -44,5 +44,15 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Edit(docs/plans/**)",
+      "Write(docs/plans/**)",
+      "Edit(src/**)",
+      "Write(src/**)",
+      "Edit(scripts/**)",
+      "Write(scripts/**)"
+    ]
   }
 }

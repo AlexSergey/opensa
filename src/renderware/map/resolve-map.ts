@@ -1,18 +1,34 @@
 import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text';
 
-import { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from '../archive';
+import { datChildUrl, iplBasename, normalizeDatPath, standaloneIplUrl, streamIplUrl } from '../archive';
 import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl, parseTimedObjects, parseTxdParents } from '../parsers/text';
 
 /** Stream-count manifest ({ basename: count }) so we load exactly the binary
  * stream IPLs that exist — no probe-by-404 (e.g. `map_stream0.ipl`). */
 type StreamManifest = Record<string, number>;
 
+export interface ResolveMapOptions {
+  /**
+   * Extra standalone binary IPLs to load from `ipl_binary/` (basenames, no extension). These are
+   * the script-gated placement groups vanilla toggles via LOAD_IPL/REMOVE_IPL (plan 042):
+   * `truthsfarm` (Truth's weed farm), `barriers1`/`barriers2` (the SF/LV unlock roadblocks),
+   * `carter`/`crack` (mission-state crack-palace pieces). They're not in gta.dat and carry no
+   * `_stream` suffix, so the manifest walk never finds them. Missing files are skipped.
+   */
+  extraIpl?: readonly string[];
+}
+
 /**
  * Resolve a whole map (framework-agnostic): parse gta.dat, merge all IDE object
  * definitions into a catalog, and concatenate all IPL instances (text + binary
- * streams). Missing IDE/IPL files are skipped rather than aborting the map.
+ * streams + configured standalone groups). Missing IDE/IPL files are skipped
+ * rather than aborting the map.
  */
-export async function resolveMap(datUrl: string, base: string): Promise<MapDefinitions> {
+export async function resolveMap(
+  datUrl: string,
+  base: string,
+  options: ResolveMapOptions = {},
+): Promise<MapDefinitions> {
   const dat = parseGtaDat(await fetchText(datUrl));
 
   const catalog: MapDefinitions['catalog'] = new Map();
@@ -46,6 +62,14 @@ export async function resolveMap(datUrl: string, base: string): Promise<MapDefin
     }
     // Full-detail placement lives in the matching binary stream IPLs.
     instances.push(...(await loadBinaryStreams(base, iplBasename(iplPath), manifest)));
+  }
+
+  // Standalone script-gated groups (plan 042) — the configured "world state" extras.
+  for (const name of options.extraIpl ?? []) {
+    const buffer = await fetchArrayBufferOrNull(standaloneIplUrl(base, name));
+    if (buffer !== null) {
+      instances.push(...parseBinaryIpl(buffer));
+    }
   }
 
   return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances, timedCatalog, txdParents };

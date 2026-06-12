@@ -17,6 +17,11 @@ export function normalizeDatPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
 }
 
+/** URL of a standalone binary IPL group (script-gated placements like `truthsfarm`; plan 042). */
+export function standaloneIplUrl(base: string, basename: string): string {
+  return joinUrl(base, `ipl_binary/${basename.toLowerCase()}.ipl`);
+}
+
 /** URL of the Nth binary stream IPL for a text IPL base name. */
 export function streamIplUrl(base: string, basename: string, index: number): string {
   return joinUrl(base, `ipl_binary/${basename}_stream${index}.ipl`);

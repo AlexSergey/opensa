@@ -3,4 +3,4 @@
 export { getClump, getIfp, getTextures, resolveTxdChain, setTxdParents } from './asset-cache';
 export { buildArchiveBuffer, buildVer2Buffer, type ImgArchive, loadArchive, openArchive } from './img-archive';
 export { modelKey } from './model-key';
-export { datChildUrl, iplBasename, normalizeDatPath, streamIplUrl } from './resolve-paths';
+export { datChildUrl, iplBasename, normalizeDatPath, standaloneIplUrl, streamIplUrl } from './resolve-paths';

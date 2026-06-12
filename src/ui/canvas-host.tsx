@@ -55,6 +55,7 @@ import {
   parseZones,
   sampleTimecycBlend,
   updateAnimatedObjects,
+  updateProcObjMeshes,
   updateUvAnimations,
   WEATHER_NAMES,
   windowGlowUniform,
@@ -313,6 +314,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
           skylight: 0.6,
           windowGlow: 1.0,
         },
+        // Procedural ground clutter (procobj.dat; plan 042) — per-category, live-tunable in debug → ProcObj.
+        procobj: {
+          bushes: { density: 1, drawDistance: 80, enabled: true },
+          cacti: { density: 1, drawDistance: 100, enabled: true },
+          flowers: { density: 1, drawDistance: 50, enabled: true },
+          grass: { density: 1, drawDistance: 50, enabled: true },
+          rocks: { density: 1, drawDistance: 80, enabled: true },
+          trees: { density: 1, drawDistance: 150, enabled: true },
+          underwater: { density: 1, drawDistance: 60, enabled: true },
+        },
         shadows: { enabled: true },
         sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
         ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -357,7 +368,21 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
+      // Script-gated placement groups (plan 042) — our permanent "world state". Available:
+      // truthsfarm (Truth's weed farm), barriers1/2 (SF+LV unlock roadblocks — left off: the map
+      // is fully open here), carter/crack (mission-state crack-palace pieces — left off).
+      extraIpl: ['truthsfarm'],
       mods: [windMod],
+      // Clutter cap per cell: over the limit, the highest-lottery placements are not rendered
+      // and therefore not collided either — one budget drives both (vanilla pools at ~300 for
+      // the same perf reason: physics bodies are the expensive part).
+      procObjLimit: 150,
+      // Clutter collision follows the live per-category knobs (0 when disabled) — see setProcObj.
+      procObjDensityOf: (category) => {
+        const setting = game.getConfig().graphics.procobj[category];
+
+        return setting.enabled ? setting.density : 0;
+      },
     });
 
     // Timecyc (sky/sun/light table by time of day) — loaded before the scene so the sky plugin has it.
@@ -530,6 +555,15 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       },
     });
 
+    // Procedural clutter gating (plan 042): apply the live per-category config — enabled /
+    // drawDistance (view distance in Z-up world space) / density (lottery count cutoff).
+    game.addSystem({
+      name: 'procobj',
+      update(): void {
+        updateProcObjMeshes(character.viewOf(), game.getConfig().graphics.procobj);
+      },
+    });
+
     game.addSystem({
       name: 'coronas',
       update(): void {
@@ -590,7 +624,23 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     });
 
     // Stream static collision (HD cells) around the player so it has ground everywhere.
-    game.addSystem(new CollisionStreamingSystem(adapter, character.physics, character.viewOf, game.getConfig()));
+    const collisionStreaming = new CollisionStreamingSystem(
+      adapter,
+      character.physics,
+      character.viewOf,
+      game.getConfig(),
+    );
+    game.addSystem(collisionStreaming);
+    // Clutter knob changes re-stream physics so collision matches the rendered set; debounced —
+    // a slider drag fires many config patches, and a full collider rebuild per tick would stutter.
+    let colliderReloadTimer: number | undefined;
+    const reloadClutterColliders = (): void => {
+      window.clearTimeout(colliderReloadTimer);
+      colliderReloadTimer = window.setTimeout(() => {
+        adapter.invalidateColliderCache();
+        collisionStreaming.reload();
+      }, 300);
+    };
 
     // Painted cars parked near the spawn (native Z-up under the −90°X root). Each is a
     // dynamic physics body whose chassis collider is the convex hull of its embedded COL
@@ -733,6 +783,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       moon: () => game.getConfig().graphics.moon,
       night: () => game.getConfig().graphics.night,
       playerCoords: () => character.viewOf(),
+      procObj: () => game.getConfig().graphics.procobj,
       respawnPlayer: () => {
         const [x, y, z] = character.viewOf();
         character.placePlayer([x, y, z + 1], true); // re-drop slightly above the current spot to unstick
@@ -748,6 +799,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setLights: (patch) => game.setLights(patch),
       setMoon: (patch) => game.setMoon(patch),
       setNight: (patch) => game.setNight(patch),
+      setProcObj: (category, patch) => {
+        game.setProcObj(category, patch);
+        if (patch.density !== undefined || patch.enabled !== undefined) {
+          reloadClutterColliders(); // keep clutter collision in sync with the rendered set
+        }
+      },
       setShadows: (patch) => game.setShadows(patch),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),

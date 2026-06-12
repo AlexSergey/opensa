@@ -8,6 +8,8 @@ export { interiorId, isInterior } from './interior';
 export { parseBinaryIpl } from './ipl-binary.parser';
 export { parseIpl } from './ipl.parser';
 export { isLodModel } from './lod';
+export { parseProcObj, type ProcObjRule } from './procobj.parser';
+export { parseSurfaceNames } from './surfinfo.parser';
 export {
   buildTimecyc,
   type Rgb,

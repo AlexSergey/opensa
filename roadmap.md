@@ -91,13 +91,16 @@
 - [✅] Add teleports
   - [✅] Vegas
   - [✅] San Fierro
-- [ ] Animation objects
-  - [ ] Animation textures
-  - [ ] Animation DFF
+- [✅] Animation objects
+  - [✅] Animation textures
+  - [✅] Animation DFF
 - [✅] Player camera enhancements
+- [✅] Procobj trash, rocks
+- [ ] Roadsigns
 - [ ] Fog enhanced
 - [ ] Increase test coverage
 - [ ] Fix car headlight
+- [ ] Verify all plans
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Add build scripts
@@ -131,6 +134,7 @@
 - [ ] Release v 0.1.0
 
 Known issues:
+- [ ] Country - Truth's Farm Problems with rendering
 - [✅] Vehicle's windscreen alpha channel bug [SilentPatch fix or SkyGFX]
 - [ ] Black roads on highway [SilentPatch fix or SkyGFX]
 - [ ] If the camera directly above on the scene, then Tommy only moves forward
@@ -143,7 +147,7 @@ Known issues:
 
 Next iterations:
 - [ ] Ugly shadows. A bug at dawn - white and black spots on objects
-- [ ] Procobj trash, rocks
+- [ ] Effects
 - [ ] Particles
   - [ ] Smoke from wheels
   - [ ] Fire
@@ -154,7 +158,6 @@ Next iterations:
     - [ ] Animation
     - [ ] Shooting
     - [ ] Damage
-- [ ] Effects
 - [ ] Peds spawning system
 - [ ] Veh paths
 - [ ] Destroyable objects
@@ -166,6 +169,7 @@ Next iterations:
 - [ ] Car damage
 - [ ] Car explosion
 - [ ] Car physic improvements
+  - [ ] surface.dat support - different behavior on different surface
   - [ ] Boarding through the passenger door
   - [ ] Jumping out of the car while it's moving
     - [ ] Jumping and rolling animations
@@ -177,8 +181,18 @@ Next iterations:
 - [ ] Health for Peds
 - [ ] Health for vehs
 - [ ] HUD
+  - [ ] Health Bar
+  - [ ] Radar
+  - [ ] Ammunition
 - [ ] Spotlights from lamps at night
 - [ ] Car sidelights, braking, light + vehiclelightson128
 - [ ] Trafficlights
 - [ ] Proper Fixes adaptation
 - [ ] GTA SA Like Camera
+- [ ] Sound
+  - [ ] surfaud.dat support - different sounds in different surface
+- [ ] Swimming
+- [ ] Bicycles
+- [ ] Bikes
+- [ ] Helicopter
+- [ ] Planes

@@ -10,6 +10,9 @@ import type {
   LightsConfig,
   MoonConfig,
   NightConfig,
+  ProcObjCategory,
+  ProcObjConfig,
+  ProcObjTypeConfig,
   ShadowsConfig,
   SkyConfig,
   SsaoConfig,
@@ -67,6 +70,8 @@ export interface DebugActions {
   night(): NightConfig;
   /** Live player position (native Z-up). */
   playerCoords(): Vec3;
+  /** Current procedural-clutter tuning (per category; plan 042). */
+  procObj(): ProcObjConfig;
   /** Re-drop Tommy at his current spot (to unstick). */
   respawnPlayer(): void;
   /** Tune bloom (enabled/intensity/threshold). */
@@ -91,6 +96,8 @@ export interface DebugActions {
   setMoon(patch: Partial<MoonConfig>): void;
   /** Tune night ambient/atmosphere (brightness/tint). */
   setNight(patch: Partial<NightConfig>): void;
+  /** Tune one procedural-clutter category (enabled/drawDistance/density). */
+  setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void;
   /** Toggle sun shadows. */
   setShadows(patch: Partial<ShadowsConfig>): void;
   /** Tune the god-rays shader (density/exposure/weight). */
@@ -162,6 +169,7 @@ type Screen =
   | 'map'
   | 'player'
   | 'position'
+  | 'procobj'
   | 'root'
   | 'time'
   | 'vehicles'
@@ -174,9 +182,21 @@ const MENU: { label: string; screen: Screen }[] = [
   { label: 'Atmosphere', screen: 'atmosphere' },
   { label: 'Camera', screen: 'camera' },
   { label: 'Graphics', screen: 'graphics' },
+  { label: 'ProcObj', screen: 'procobj' },
   { label: 'Weather', screen: 'weather' },
   { label: 'Position', screen: 'position' },
   { label: 'Map', screen: 'map' },
+];
+
+/** ProcObj screen rows — display order for the clutter categories (plan 042). */
+const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [
+  'grass',
+  'flowers',
+  'bushes',
+  'cacti',
+  'trees',
+  'rocks',
+  'underwater',
 ];
 
 /** Quick teleport destinations (native GTA Z-up world coords). */
@@ -192,6 +212,7 @@ const TELEPORTS: { coords: Vec3; label: string }[] = [
   { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
   { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
   { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
+  { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
 ];
 
 /**
@@ -225,6 +246,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
   const [night, setNight] = useState<NightConfig>(() => actions.night());
   const [worldLight, setWorldLight] = useState<WorldLightConfig>(() => actions.worldLight());
+  const [procObj, setProcObjState] = useState<ProcObjConfig>(() => actions.procObj());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -639,6 +661,52 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {screen === 'procobj' && (
+            <div style={styles.group}>
+              <div style={styles.groupLabel}>PROCEDURAL CLUTTER (procobj.dat — plan 042)</div>
+              {PROCOBJ_CATEGORIES.map((category) => {
+                const patch = (value: Partial<ProcObjTypeConfig>): void => {
+                  setProcObjState((prev) => ({ ...prev, [category]: { ...prev[category], ...value } }));
+                  actions.setProcObj(category, value);
+                };
+
+                return (
+                  <div key={category}>
+                    <label style={styles.label}>
+                      <input
+                        checked={procObj[category].enabled}
+                        onChange={() => patch({ enabled: !procObj[category].enabled })}
+                        style={styles.radio}
+                        type="checkbox"
+                      />
+                      <span style={procObj[category].enabled ? styles.optionActive : styles.option}>
+                        {category.toUpperCase()}
+                      </span>
+                    </label>
+                    <div style={styles.groupLabel}>DRAW DISTANCE: {procObj[category].drawDistance.toFixed(0)}</div>
+                    <input
+                      max={300}
+                      min={10}
+                      onChange={(e) => patch({ drawDistance: Number(e.target.value) })}
+                      step={10}
+                      type="range"
+                      value={procObj[category].drawDistance}
+                    />
+                    <div style={styles.groupLabel}>DENSITY: {procObj[category].density.toFixed(1)}</div>
+                    <input
+                      max={3}
+                      min={0}
+                      onChange={(e) => patch({ density: Number(e.target.value) })}
+                      step={0.1}
+                      type="range"
+                      value={procObj[category].density}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
 

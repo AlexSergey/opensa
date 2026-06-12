@@ -36,6 +36,15 @@ function config(collisionDrawDistance: number): Config {
         skylight: 0.6,
         windowGlow: 1,
       },
+      procobj: {
+        bushes: { density: 1, drawDistance: 80, enabled: true },
+        cacti: { density: 1, drawDistance: 100, enabled: true },
+        flowers: { density: 1, drawDistance: 50, enabled: true },
+        grass: { density: 1, drawDistance: 50, enabled: true },
+        rocks: { density: 1, drawDistance: 80, enabled: true },
+        trees: { density: 1, drawDistance: 150, enabled: true },
+        underwater: { density: 1, drawDistance: 60, enabled: true },
+      },
       shadows: { enabled: true },
       sky: { density: 0.96, exposure: 0.5, weight: 0.4 },
       ssao: { enabled: true, intensity: 1.5, radius: 0.2 },
@@ -131,6 +140,23 @@ describe('CollisionStreamingSystem', () => {
 
       expect(physics.removeBodies).toHaveBeenCalledWith([0]); // the old cell's handles freed
       expect(adapter.loadCellColliders).toHaveBeenCalledWith(400, 400);
+    });
+
+    it('reload drops every loaded cell and re-streams it on the next update', async () => {
+      const adapter = stubAdapter();
+      const physics = stubPhysics();
+      const system = new CollisionStreamingSystem(adapter, physics, () => [125, 125, 0] as Vec3, config(100));
+
+      system.update();
+      await flush();
+      expect(adapter.loadCellColliders).toHaveBeenCalledTimes(1);
+
+      system.reload(); // clutter knobs changed — physics must match the new rendered set
+      expect(physics.removeBodies).toHaveBeenCalledWith([0]);
+
+      system.update();
+      await flush();
+      expect(adapter.loadCellColliders).toHaveBeenCalledTimes(2); // same cell rebuilt
     });
   });
 });
