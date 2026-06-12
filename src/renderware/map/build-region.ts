@@ -1,6 +1,6 @@
 import type { MeshBasicMaterial, Object3D } from 'three';
 
-import { AdditiveBlending, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { AdditiveBlending, DoubleSide, InstancedMesh, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
 import type { IdeObjectDef, IplInstance } from '../parsers/text';
@@ -12,6 +12,7 @@ import { hasIdeFlag, IdeFlag } from '../parsers/text';
 import { registerAnimatedObject } from '../three/animated-objects';
 import { buildAnimatedClump } from '../three/build-animated-clump';
 import { buildClumpLights, buildClumpParts } from '../three/build-clump';
+import { buildRoadsignParts, getRoadsignFont } from '../three/build-roadsign';
 import { applyWorldWindowGlow } from '../three/world-material';
 
 /**
@@ -98,6 +99,36 @@ export function buildAnimatedObjects(archive: ImgArchive, groups: Iterable<Regio
   }
 
   return objects;
+}
+
+/**
+ * Build the road-sign text meshes for a set of model groups (plan 042 item 5): 2dfx ROADSIGN
+ * entries bake their positions in **world space**, so the glyph quads render as plain static
+ * meshes at identity — one per text colour per model — never through the instanced path.
+ * Empty while the `roadsignfont` glyph texture isn't installed.
+ */
+export function buildRoadsignMeshes(archive: ImgArchive, groups: Iterable<RegionMeshData>): Object3D[] {
+  const font = getRoadsignFont();
+  if (!font) {
+    return [];
+  }
+  const meshes: Object3D[] = [];
+  for (const group of groups) {
+    const clump = getClump(archive, group.def.modelName);
+    const roadsigns = clump.geometries.flatMap((geometry) => geometry.roadsigns ?? []);
+    if (roadsigns.length === 0) {
+      continue;
+    }
+    for (const part of buildRoadsignParts(roadsigns, font)) {
+      const mesh = new Mesh(part.geometry, part.material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.region = group; // picking reports the host road model
+      meshes.push(mesh);
+    }
+  }
+
+  return meshes;
 }
 
 /**

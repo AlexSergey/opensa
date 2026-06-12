@@ -24,6 +24,7 @@ export { updateAnimatedObjects } from './three/animated-objects';
 export { buildAnimationClip, type BuildAnimClipOptions } from './three/build-anim-clip';
 export { buildClump, buildClumpLights, buildClumpParts, type ClumpLight, type RenderPart } from './three/build-clump';
 export { buildCollisionWireframe } from './three/build-col-wireframe';
+export { buildRoadsignParts, roadsignGlyphIndex, setRoadsignFont } from './three/build-roadsign';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';
 export { buildTextureMap } from './three/build-texture';
 export {

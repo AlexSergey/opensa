@@ -43,6 +43,9 @@ export interface RWGeometry {
   positions: Float32Array;
   /** Prelit RGBA bytes if present, flattened (numVertices * 4), else null. */
   prelitColors: null | Uint8Array;
+  /** 2d-effect road signs (street-name plates whose text is baked into the model; plan 042) —
+   *  undefined when the model has none. */
+  roadsigns?: RWRoadsign[];
   /** Skin (bone weights / inverse-bind matrices) if the geometry is skinned, else undefined. */
   skin?: RWSkin;
   triangles: RWTriangle[];
@@ -148,6 +151,26 @@ export type RWTextureFormat = 'dxt1' | 'dxt3' | 'dxt5' | 'rgba8888';
 export interface RWTextureRef {
   maskName: string;
   name: string;
+}
+
+/**
+ * A 2d-effect ROADSIGN entry (type 7): a street-name/route plate whose text is baked into the
+ * model. Vanilla generates one textured quad per character from the `roadsignfont` glyph atlas
+ * (particle.txd). In the text, `_` is the space glyph and `<>^#%}~` are arrow/symbol glyphs.
+ */
+export interface RWRoadsign {
+  /** Characters drawn per line (16/2/4/8, from the flags). */
+  charsPerLine: number;
+  /** Text colour palette index (0 white, 1 black, 2 grey, 3 red). */
+  colour: number;
+  /** The plate's text lines (raw 16-char fields, count from the flags). */
+  lines: string[];
+  /** Plate width × height in metres. */
+  plateSize: [number, number];
+  /** Geometry-local position of the plate centre. */
+  position: Vec3;
+  /** Plate rotation in degrees (XYZ). */
+  rotation: Vec3;
 }
 
 /**

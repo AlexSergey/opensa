@@ -7,6 +7,7 @@ import type {
   RWLight2d,
   RWMaterial,
   RWMaterialEffects,
+  RWRoadsign,
   RWSkin,
   RWTriangle,
   RWUvAnimation,
@@ -20,6 +21,7 @@ import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 const CHUNK_HEADER_BYTES = 12;
 /** 2d-effect entry type for a light/corona (vs particle, ped attractor, …). */
 const LIGHT_EFFECT = 0;
+const ROADSIGN_EFFECT = 7;
 
 /**
  * Parse a RenderWare Clump (.dff) into a renderer-agnostic RWClump.
@@ -251,7 +253,7 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
     applyBinMeshMaterials(stream, header, triangles);
   }
 
-  const lights = parseLightEffects(stream, header);
+  const { lights, roadsigns } = parse2dEffects(stream, header);
   const nightColors = parseNightColors(stream, header, numVertices);
 
   return {
@@ -266,6 +268,7 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
     skin,
     triangles,
     uvLayers,
+    ...(roadsigns.length > 0 ? { roadsigns } : {}),
   };
 }
 
@@ -280,26 +283,35 @@ function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometr
   return geometries;
 }
 
+/** Decoded `flags` lookup tables (2 bits each): lines count and chars per line. */
+const ROADSIGN_LINES = [4, 1, 2, 3] as const;
+const ROADSIGN_CHARS = [16, 2, 4, 8] as const;
+
 /**
  * Parse the geometry's 2d Effect plugin (`0x253F2F8`) — the per-model light/corona definitions for
  * street lamps, signs, traffic lights, etc. Each entry is `position(3×f32), type(u32), size(u32), data`;
- * we read the **Light** entries (type 0) and skip the rest by `size`. The light data starts with the RGBA
- * colour + four floats (corona far-clip, point-light range, corona size, shadow size), five flag/mode bytes,
- * then the 24-char corona texture name. Returns [] when the model has no effects.
+ * we read the **Light** entries (type 0) and **Roadsign** entries (type 7 — street-name plates whose
+ * text is baked into the model; plan 042), skipping the rest by `size`. The light data starts with the
+ * RGBA colour + four floats (corona far-clip, point-light range, corona size, shadow size), five
+ * flag/mode bytes, then the 24-char corona texture name. The roadsign data (88 bytes, layout verified
+ * empirically against the Vegas motorway boards) is `plate size vec2, rotation vec3 (degrees), flags
+ * u16 (bits 0–1 lines: 0→4/1→1/2→2/3→3; bits 2–3 chars per line: 0→16/1→2/2→4/3→8; bits 4–5 colour
+ * palette), text 4×16 chars ('_' = space, `<>^#%}` = arrow/symbol glyphs), pad u16`.
  */
-function parseLightEffects(stream: BinaryStream, header: ChunkHeader): RWLight2d[] {
+function parse2dEffects(stream: BinaryStream, header: ChunkHeader): { lights: RWLight2d[]; roadsigns: RWRoadsign[] } {
+  const lights: RWLight2d[] = [];
+  const roadsigns: RWRoadsign[] = [];
   const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
   if (!extension) {
-    return [];
+    return { lights, roadsigns };
   }
   const fx = findChild(stream, extension.dataStart, extension.end, RwSection.TWO_D_EFFECT);
   if (!fx) {
-    return [];
+    return { lights, roadsigns };
   }
 
   stream.seek(fx.dataStart);
   const count = stream.u32();
-  const lights: RWLight2d[] = [];
   for (let i = 0; i < count; i += 1) {
     const position: [number, number, number] = [stream.f32(), stream.f32(), stream.f32()];
     const entryType = stream.u32();
@@ -315,11 +327,31 @@ function parseLightEffects(stream: BinaryStream, header: ChunkHeader): RWLight2d
       const flags = stream.u8(); // flags1 (corona checks / fog type)
       const coronaTexture = stream.string(24);
       lights.push({ color, coronaFarClip, coronaSize, coronaTexture, flags, position });
+    } else if (entryType === ROADSIGN_EFFECT) {
+      const plateSize: [number, number] = [stream.f32(), stream.f32()];
+      const rotation: [number, number, number] = [stream.f32(), stream.f32(), stream.f32()];
+      const flags = stream.u16();
+      const lineCount = ROADSIGN_LINES[flags & 3];
+      const lines: string[] = [];
+      for (let line = 0; line < 4; line += 1) {
+        const text = stream.string(16); // raw 16-char field; '_' is the space glyph, kept as-is
+        if (line < lineCount) {
+          lines.push(text);
+        }
+      }
+      roadsigns.push({
+        charsPerLine: ROADSIGN_CHARS[(flags >> 2) & 3],
+        colour: (flags >> 4) & 3,
+        lines,
+        plateSize,
+        position,
+        rotation,
+      });
     }
     stream.seek(entryEnd); // skip to the next entry regardless of type/size
   }
 
-  return lights;
+  return { lights, roadsigns };
 }
 
 function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {

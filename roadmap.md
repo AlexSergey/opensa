@@ -96,11 +96,11 @@
   - [✅] Animation DFF
 - [✅] Player camera enhancements
 - [✅] Procobj trash, rocks
-- [ ] Roadsigns
-- [ ] Fog enhanced
-- [ ] Increase test coverage
-- [ ] Fix car headlight
+- [✅] Roadsigns
 - [ ] Verify all plans
+- [ ] Fog enhanced
+- [ ] Fix car headlight
+- [ ] Increase test coverage
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Add build scripts

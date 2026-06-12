@@ -10,6 +10,7 @@ import {
   buildAnimatedObjects,
   buildInstancedMeshes,
   type BuildRegionOptions,
+  buildRoadsignMeshes,
   collectCoronas,
   type RegionMeshData,
 } from './build-region';
@@ -40,6 +41,10 @@ export function buildCell(
   // IDE anim objects (plan 041): per-instance frame hierarchies with a looping IFP clip —
   // animation mutates node transforms, so they can't ride the InstancedMesh path above.
   objects.push(...buildAnimatedObjects(archive, groups));
+  // Road-sign text (plan 042 item 5): world-space glyph quads, HD cells only (near-field text).
+  if (!lod) {
+    objects.push(...buildRoadsignMeshes(archive, groups));
+  }
   // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect). The ground
   // glow under lamps is the road's baked night vertex colours, not a projected pool.
   if (!lod) {

@@ -157,7 +157,82 @@ Two known classes of world content we silently don't load:
    the authored densities read well. `scripts/procobj-stats.ts` (+ surface histogram) is the
    offline sanity tool.
 
-**Plan complete (2026-06-12).**
+**Plan complete (2026-06-12): items 1–4 + the item 5 follow-up (road-sign text).**
+
+5. **Road-sign text (2dfx ROADSIGN, type 7).** Street-name plates / route signs carry their TEXT
+   inside the DFF: the geometry's 2d Effect plugin (`0x253F2F8`, the same section our corona
+   lights come from — `parseLightEffects` currently skips every non-light type by size) has
+   entry type 7. **Byte layout (verified empirically via `scripts/find-2dfx.ts` — the first
+   survey misread it and the garbage pinpointed the truth): `plate size vec2 (8B), rotation
+   vec3 (12B), flags u16 (2B), text 4 lines × 16 chars (64B), pad (2B)` = 88 bytes.** Plate
+   sizes read plausibly (5×2 m highway boards, 4×3 / 6×3 plates); flags to decode on the
+   corrected offsets (lines-count / chars-per-line / colour). Text alphabet: `_` = space,
+   `> < ^ # %` = arrow glyphs, `}` = airport symbol, `~` observed — the glyph atlas mapping must
+   cover them. Survey: **112 roadsign entries across 43 models** (Vegas motorway boards + street
+   plates; full 2dfx census: type 0 lights 436, 1 particles 58, 3 ped attractors 173, 6 enex 26,
+   7 roadsigns 112, 8 trigger 8, 9 cover points 3144). Vanilla `CCustomRoadsignMgr` generates one
+   textured quad per character from the **`roadsignfont`** glyph atlas — confirmed present in our
+   `models/particle.txd` (already loaded by canvas-host for the moon sprite). Text lives in the
+   MODEL, so all instances share it → the sign text becomes an extra static `RenderPart` and
+   stays on the instanced path.
+
+   Iterations:
+   - **5a — survey + parser.** `scripts/find-2dfx.ts` (done): raw-scan all extracted DFFs,
+     histogram 2dfx types, decode every roadsign entry (model/flags/text) — establishes corpus
+     and validates the byte layout. Extend the dff 2dfx parser: type 7 →
+     `RWRoadsign { position, rotation, flags: { lines, charsPerLine, colour }, lines: string[] }`
+     on `RWGeometry.roadsigns`; real-asset fixture + tests (negative: light-only models
+     unaffected).
+   - **5b — glyph atlas + mesh — DONE (2026-06-12).** `roadsignfont` decoded by eye via
+     `scripts/dump-texture.ts` (PNG dump, alpha-as-grayscale + reflow/zoom): 32×512, 4 columns ×
+     32 rows of 8×16 px cells; cells 0–81 = ASCII in order minus the command characters
+     (`!"&'()+,-./0-9:;?A-Z[\]a-z{|}`), 82+ = arrows ←→↑↓↖↗↙↘, fractions, ¢, airplane, skull,
+     special icons. Command chars map onto the appended cells (`<`→←, `>`→→, `^`→↑, `}`→plane,
+     `~`→skull, `#`/`%`→diagonal exit arrows — single `COMMAND_GLYPHS` table to adjust on visual
+     check). `src/renderware/three/build-roadsign.ts`: quad per glyph, plate layout from
+     plateSize/charsPerLine/lines, XYZ-degree rotation, colour-batched parts (palette
+     white/black/grey/red), alpha-tested DoubleSide font material; `setRoadsignFont` registry
+     fed by canvas-host from the already-loaded particle.txd.
+     **CRITICAL FINDING (first in-browser run showed nothing):** roadsign entry positions/
+     rotations are baked in **WORLD space** — unlike the geometry-local light entries (verified:
+     entries land on real city spots — Grove Street (2348, −1648) — while host chunks are placed
+     elsewhere; placement+entry would leave the map). So signs do NOT ride the instanced path:
+     `buildRoadsignMeshes` (build-region) emits static meshes at identity per HD cell;
+     `buildCell` appends them. Regression test pins the world coordinates.
+     **Orientation — final, solver-verified:** base plate flat (width +X, lines advance −Y,
+     text normal −Z), entry Euler applied **Z→X→Y**, angles as stored. Found by
+     `scripts/solve-roadsign.ts`: brute force over Euler orders × angle signs × angle→axis maps
+     × base triads, requiring every observed rotation family ((90,0,0), (−90,0,±180),
+     (±90,±90,±90), (0,±90,±90), (180,90,90), (90,−90,−90)) to come out upright, lines-down and
+     unmirrored — the unique solution class. Hand-guessed X→Y→Z looked right on the 90°-multiple
+     boards near the calibration site but rolled the (±90,±90,±90) family by 90° (exposed by the
+     PF-added vegasmotsignCJ gantry at (1790, 1934) — vanilla has no board there, so the floating
+     text's roll was invisible on the original archive). `TEXT_INSET = 0.85` keeps the
+     vanilla-style margin between the glyph grid and the board edge. Line slots are a FIXED
+     quarter of the plate height with the block centred vertically (dividing by the actual line
+     count stretched 1–2-line boards into giant letters). **Each glyph renders TWICE at ±0.05 m with
+     identical UVs (DoubleSide):** entry positions sit ON the board plane and the face direction
+     varies by rotation family — a single one-sided quad ended up buried inside thick boards
+     (desert `se_bit_17` signs invisible while the offline pipeline was provably clean; great
+     user catch that only later-streamed zones seemed affected — the actual variable was the
+     rotation family, not streaming). The copy on the visible side hugs the board, the other
+     stays buried; identical UVs overlap into one letterform (readable from the front, mirrored
+     from behind — vanilla behaviour). Dead ends, documented to avoid repeats: FrontSide
+     winding-culling culled everything; mirrored back-side UVs showed mirrored text where the
+     back quad was the visible one; ±0.12 m offsets made the text float off the face. Known PF data quirks (not our bugs,
+     reproduce in real SA+PF): some vegasmotsignCJ gantries sit slightly rotated/offset vs the
+     vanilla text entries (text sinks into the board / pokes out half-hidden), and boards with no
+     entry for one direction are blank on that side — vanilla-accurate.
+   - **NB (user-verified in vanilla): many boards are simply EMPTY in the original game too** —
+     a blank board in our port is not automatically a missing-text bug; check the 2dfx survey
+     (`scripts/find-2dfx.ts`) for an entry at that location before chasing it.
+   - **5c — verification — DONE (2026-06-12).** Julius Thruway boards verified against vanilla:
+     text readable with margins, plates vertical on their gantries, plane glyph on AIRPORT,
+     right/down arrows correct. Fixed by comparison: `~` = ↓ (lane indicators on the boards'
+     bottom row), not the skull guess. `scripts/find-2dfx.ts` now byte-steps (a 4-byte stride
+     missed unaligned 2dfx chunks — the survey undercounted; runtime parsing was always
+     complete). Remaining best-effort: `#`/`%` mapped to diagonal exit arrows ↗/↖ — adjust the
+     single `COMMAND_GLYPHS` table if a real board disagrees.
 
 ## Out of scope
 

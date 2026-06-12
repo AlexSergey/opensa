@@ -54,6 +54,7 @@ import {
   parseTxd,
   parseZones,
   sampleTimecycBlend,
+  setRoadsignFont,
   updateAnimatedObjects,
   updateProcObjMeshes,
   updateUvAnimations,
@@ -364,7 +365,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     const windMod = createWindMod();
     game.installMod(windMod);
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3-pf.img`,
+      archiveUrl: `${BASE}/models/gta3-original.img`,
       base: BASE,
       cellSize: CELL_SIZE,
       datUrl: `${BASE}/data/gta.dat`,
@@ -373,16 +374,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       // is fully open here), carter/crack (mission-state crack-palace pieces — left off).
       extraIpl: ['truthsfarm'],
       mods: [windMod],
-      // Clutter cap per cell: over the limit, the highest-lottery placements are not rendered
-      // and therefore not collided either — one budget drives both (vanilla pools at ~300 for
-      // the same perf reason: physics bodies are the expensive part).
-      procObjLimit: 150,
       // Clutter collision follows the live per-category knobs (0 when disabled) — see setProcObj.
       procObjDensityOf: (category) => {
         const setting = game.getConfig().graphics.procobj[category];
 
         return setting.enabled ? setting.density : 0;
       },
+      // Clutter cap per cell: over the limit, the highest-lottery placements are not rendered
+      // and therefore not collided either — one budget drives both (vanilla pools at ~300 for
+      // the same perf reason: physics bodies are the expensive part).
+      procObjLimit: 150,
     });
 
     // Timecyc (sky/sun/light table by time of day) — loaded before the scene so the sky plugin has it.
@@ -426,6 +427,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // The moon uses the SA `coronamoon` texture from particle.txd (alpha-shaped); null if it can't be loaded.
     const particleTextures = await loadTxd(`${BASE}/models/particle.txd`);
     const moonTexture = particleTextures?.get('coronamoon') ?? null;
+    // Road-sign text (plan 042 item 5): the glyph atlas the sign quads UV into. Installed before
+    // any cell builds, so every streamed sign model gets its text parts.
+    setRoadsignFont(particleTextures?.get('roadsignfont') ?? null);
     const sky = new SkyPlugin(skySample, () => game.getHours(), moonTexture); // sky dome + sun/moon + lights
     const reflection = new VehicleReflectionPlugin(() => game.getHours()); // sky-probe reflections on spawned cars
 
