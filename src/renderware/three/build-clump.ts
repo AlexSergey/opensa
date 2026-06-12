@@ -16,6 +16,7 @@ import {
 import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
+import { applyWorldUvAnim, getUvAnimUniform, registerUvAnimations } from './uv-anim';
 import { buildWorldMaterial } from './world-material';
 
 /**
@@ -124,6 +125,11 @@ export function buildClumpLights(clump: RWClump): ClumpLight[] {
  */
 export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>): RenderPart[] {
   const parts: RenderPart[] = [];
+  // UV-animated textures (plan 041): dict entries must be registered before the materials below
+  // look them up by name. Idempotent — re-building a streamed cell re-registers the same names.
+  if (clump.uvAnimations) {
+    registerUvAnimations(clump.uvAnimations);
+  }
   for (const atomic of clump.atomics) {
     const rw = clump.geometries[atomic.geometryIndex];
     if (!rw) {
@@ -173,6 +179,12 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
       // Unlit SA prelit blend (plan 038) — the night set is consumed by the material's dnBalance mix.
       const rwMaterial = rw.materials[materialIndex] ?? rw.materials[0];
       const material = buildWorldMaterial(rwMaterial ?? FALLBACK_RW_MATERIAL, rw, textures);
+      // UV Anim PLG: the material plays a dict entry (signs/waterfalls scroll their map UVs).
+      const uvAnimName = rwMaterial?.effects?.uvAnim?.names[0];
+      const uvAnimUniform = uvAnimName === undefined ? undefined : getUvAnimUniform(uvAnimName);
+      if (uvAnimUniform) {
+        applyWorldUvAnim(material, uvAnimUniform);
+      }
       parts.push({ geometry, material, ...(sway ? { swayAlphaMin: sway.minAlpha } : {}) });
     });
   }

@@ -15,6 +15,9 @@ export interface GtaDat {
 
 /** One object definition from an IDE `objs`/`anim`/`tobj` section. */
 export interface IdeObjectDef {
+  /** For `anim` (animated) objects: the IFP file (lowercased, no extension) holding the model's
+   *  looping clip — e.g. `counxref` for the oil-pump `nt_noddonkbase` (plan 041). */
+  anim?: string;
   drawDistance: number;
   flags: number;
   id: number;

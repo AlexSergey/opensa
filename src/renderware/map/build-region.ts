@@ -1,3 +1,5 @@
+import type { MeshBasicMaterial, Object3D } from 'three';
+
 import { AdditiveBlending, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
@@ -5,8 +7,10 @@ import type { IdeObjectDef, IplInstance } from '../parsers/text';
 import type { RenderPart } from '../three/build-clump';
 import type { CoronaEntry } from '../three/corona';
 
-import { getClump, getTextures, modelKey } from '../archive';
+import { getClump, getIfp, getTextures, modelKey } from '../archive';
 import { hasIdeFlag, IdeFlag } from '../parsers/text';
+import { registerAnimatedObject } from '../three/animated-objects';
+import { buildAnimatedClump } from '../three/build-animated-clump';
 import { buildClumpLights, buildClumpParts } from '../three/build-clump';
 import { applyWorldWindowGlow } from '../three/world-material';
 
@@ -60,6 +64,43 @@ export function addToGroup(groups: Map<string, RegionMeshData>, def: IdeObjectDe
 }
 
 /**
+ * Build IDE `anim`-section objects (plan 041): one frame-hierarchy `Group` **per instance**
+ * (animation mutates node transforms, so instancing is out — these are rare props: oil pumps,
+ * windmills, fans). Each group is placed by its IPL transform, gets the def's IDE-flag treatment,
+ * and registers its looping IFP clip with the mixer registry (driven by the game loop).
+ */
+export function buildAnimatedObjects(archive: ImgArchive, groups: Iterable<RegionMeshData>): Object3D[] {
+  const objects: Object3D[] = [];
+  for (const group of groups) {
+    if (group.def.anim === undefined) {
+      continue;
+    }
+    const clump = getClump(archive, group.def.modelName);
+    const textures = getTextures(archive, group.def.txdName);
+    const animations = getIfp(archive, group.def.anim);
+    const treatment = defTreatment(group.def);
+    for (const instance of group.instances) {
+      const built = buildAnimatedClump(clump, group.def.modelName, animations, textures);
+      for (const material of built.materials) {
+        applyTreatment(material, treatment, false);
+      }
+      built.root.position.set(instance.position[0], instance.position[1], instance.position[2]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
+      built.root.quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+      built.root.userData.region = { def: group.def, instances: [instance] } satisfies RegionMeshData;
+      if (built.clip) {
+        registerAnimatedObject(built.root, built.clip);
+      }
+      objects.push(built.root);
+    }
+  }
+
+  return objects;
+}
+
+/**
  * Build one `InstancedMesh` per single-material part for each model group, placing
  * every instance with its GTA world transform (IPL quaternion conjugated, unit
  * scale). `userData.region` carries the group for picking.
@@ -76,13 +117,16 @@ export function buildInstancedMeshes(
   const scale = new Vector3(1, 1, 1);
 
   for (const group of groups) {
+    if (group.def.anim !== undefined) {
+      continue; // IDE anim objects animate per instance — see buildAnimatedObjects
+    }
     const parts = buildClumpParts(getClump(archive, group.def.modelName), getTextures(archive, group.def.txdName));
     // Night-lit timed variants (lit-window / neon overlays, on across midnight) glow additively over
     // the world material's night blend so their bright window texels read in the dark.
     const nightLit = group.def.time !== undefined && isNightWindow(group.def.time.on, group.def.time.off);
     const treatment = defTreatment(group.def);
     for (const part of parts) {
-      applyTreatment(part, treatment, nightLit);
+      applyTreatment(part.material, treatment, nightLit);
       options.decoratePart?.(group.def, part); // game-layer mods (e.g. wind sway) — after vanilla
       const mesh = new InstancedMesh(part.geometry, part.material, group.instances.length);
       // The map neither casts nor uses the renderer's shadow receive (plan 038): only dynamics cast,
@@ -156,22 +200,22 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
   return coronas;
 }
 
-/** Apply a def's treatment to one part's material (mutates it; parts are built per group). */
-function applyTreatment(part: RenderPart, treatment: DefTreatment, nightLit: boolean): void {
+/** Apply a def's treatment to one part material (mutates it; materials are built per group/object). */
+function applyTreatment(material: MeshBasicMaterial, treatment: DefTreatment, nightLit: boolean): void {
   if (treatment.twoSided) {
-    part.material.side = DoubleSide;
+    material.side = DoubleSide;
   }
   if (treatment.drawLast) {
-    part.material.transparent = true; // three: moves the part into the sorted after-opaque list
+    material.transparent = true; // three: moves the part into the sorted after-opaque list
   }
   if (treatment.noDepthWrite) {
-    part.material.depthWrite = false;
+    material.depthWrite = false;
   }
   if (treatment.additive) {
-    part.material.blending = AdditiveBlending;
-    part.material.alphaTest = 0; // black texels add nothing — cutout testing only punches holes
-  } else if (nightLit && part.material.map) {
-    applyWorldWindowGlow(part.material); // non-additive timed overlays keep the glow injection
+    material.blending = AdditiveBlending;
+    material.alphaTest = 0; // black texels add nothing — cutout testing only punches holes
+  } else if (nightLit && material.map) {
+    applyWorldWindowGlow(material); // non-additive timed overlays keep the glow injection
   }
 }
 

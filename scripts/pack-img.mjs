@@ -2,19 +2,22 @@
 // same format the game (and mods shipped as .img, e.g. Proper Fixes) use, so our reader handles them
 // interchangeably. Streams file data so the ~600 MB output is never held in memory. Reads from multiple
 // source folders (comma-separated); later folders override earlier ones by (lowercased) name, so
-// `gta3additional` supplies models missing from the original `gta3` dump (e.g. the gym props).
+// `gta3additional` supplies models missing from the original `gta3` dump (e.g. the gym props) and
+// `gta3anim` supplies the zone IFPs (counxref/vegasw/… — map-object animations, plan 041; vanilla SA
+// keeps them in gta3.img too). Stream IPLs present in the source folders are NOT packed — they are
+// served from `static/ipl_binary/` instead (see gen:ipl-manifest).
 //
-//   node scripts/pack-img.mjs            # dff + txd (+ col) only (default)
+//   node scripts/pack-img.mjs            # dff + txd + col + ifp (default)
 //   node scripts/pack-img.mjs --all      # every file in the folders
 //   IMG_SRC=dirA,dirB IMG_OUT=/out.img node scripts/pack-img.mjs
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
-const SRCS = (process.env.IMG_SRC ?? 'static/img/gta3,static/img/gta3additional').split(',');
+const SRCS = (process.env.IMG_SRC ?? 'static/img/gta3,static/img/gta3additional,static/img/gta3anim').split(',');
 const OUT = process.env.IMG_OUT ?? 'static/models/gta3.img';
 const includeAll = process.argv.includes('--all');
-const KEEP = new Set(['.col', '.dff', '.txd']);
+const KEEP = new Set(['.col', '.dff', '.ifp', '.txd']);
 const SECTOR = 2048; // VER2 offsets + sizes are counted in 2048-byte sectors
 
 mkdirSync(dirname(OUT), { recursive: true });

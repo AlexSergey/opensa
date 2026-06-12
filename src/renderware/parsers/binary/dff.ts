@@ -9,6 +9,7 @@ import type {
   RWMaterialEffects,
   RWSkin,
   RWTriangle,
+  RWUvAnimation,
 } from './types';
 
 import { BinaryStream } from './binary-stream';
@@ -33,9 +34,13 @@ const LIGHT_EFFECT = 0;
 export function parseDff(buffer: ArrayBuffer): RWClump {
   const stream = new BinaryStream(buffer);
   // Some DFFs (UV-animated — waterfalls, scrolling signs) begin with a UVAnimDict
-  // (0x2B) chunk before the Clump; skip any leading non-Clump chunks to find it.
+  // (0x2B) chunk before the Clump; capture it, and skip any other leading chunks.
+  let uvAnimations: RWUvAnimation[] | undefined;
   let clumpHeader = readChunkHeader(stream);
   while (clumpHeader.type !== RwSection.CLUMP) {
+    if (clumpHeader.type === RwSection.UV_ANIM_DICT) {
+      uvAnimations = parseUvAnimDict(stream, clumpHeader);
+    }
     stream.seek(clumpHeader.end);
     if (stream.remaining < CHUNK_HEADER_BYTES) {
       throw new Error('Not a DFF: no Clump (0x10) chunk found');
@@ -63,7 +68,42 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
     }
   });
 
-  return { atomics, frames, geometries };
+  return { atomics, frames, geometries, ...(uvAnimations ? { uvAnimations } : {}) };
+}
+
+/**
+ * Parse the UVAnimDict (0x2B): Struct = count, then count × RtAnim (0x1B). Each RtAnim:
+ * `version (0x100), keyframeType (0x1C1 = linear UV), numFrames, flags, duration, u32 unused`,
+ * then custom data `name char[32] + nodeToUVChannelMap (32 bytes, skipped)`, then `numFrames`
+ * keyframes of `{ time f32, uv f32[6] (rot, sx, sy, skew, tx, ty), prevOffset i32 }` —
+ * layout verified byte-level on visagesign04 (3 anims, 2 keyframes, 3 s X-scroll).
+ */
+function parseUvAnimDict(stream: BinaryStream, header: ChunkHeader): RWUvAnimation[] {
+  const animations: RWUvAnimation[] = [];
+  forEachChild(stream, header.dataStart, header.end, (child) => {
+    if (child.type !== RwSection.ANIM_ANIMATION) {
+      return;
+    }
+    stream.seek(child.dataStart);
+    stream.u32(); // RtAnim version (0x100)
+    stream.u32(); // keyframe type (0x1C1 linear UV)
+    const numFrames = stream.u32();
+    stream.u32(); // flags
+    const duration = stream.f32();
+    stream.u32(); // unused
+    const name = stream.string(32);
+    stream.skip(32); // nodeToUVChannelMap
+    const keyframes: RWUvAnimation['keyframes'] = [];
+    for (let i = 0; i < numFrames; i += 1) {
+      const time = stream.f32();
+      const uv = [stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32()];
+      stream.skip(4); // prev-keyframe offset (irrelevant for our flat list)
+      keyframes.push({ time, uv });
+    }
+    animations.push({ duration, keyframes, name });
+  });
+
+  return animations;
 }
 
 /**
@@ -338,7 +378,22 @@ function parseMaterialEffects(stream: BinaryStream, ext: ChunkHeader): RWMateria
     effects.specular = { level, texture };
   }
 
-  return (effects.envMap ?? effects.reflection ?? effects.specular) ? effects : undefined;
+  // UV-animation plugin (0x135): Struct = channel mask (u32) + char[32] dict-entry name per set bit.
+  const uvAnim = findChild(stream, ext.dataStart, ext.end, RwSection.UV_ANIM_PLG);
+  if (uvAnim) {
+    const struct = findChild(stream, uvAnim.dataStart, uvAnim.end, RwSection.STRUCT);
+    if (struct) {
+      stream.seek(struct.dataStart);
+      const channelMask = stream.u32();
+      const names: string[] = [];
+      for (let mask = channelMask; mask !== 0 && stream.position + 32 <= struct.end; mask &= mask - 1) {
+        names.push(stream.string(32));
+      }
+      effects.uvAnim = { channelMask, names };
+    }
+  }
+
+  return (effects.envMap ?? effects.reflection ?? effects.specular ?? effects.uvAnim) ? effects : undefined;
 }
 
 function parseMaterialList(stream: BinaryStream, header: ChunkHeader): RWMaterial[] {

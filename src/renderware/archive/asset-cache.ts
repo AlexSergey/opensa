@@ -1,8 +1,10 @@
+import type { IfpAnimation } from '../parsers/binary/ifp';
 import type { RWClump } from '../parsers/binary/types';
 import type { TextureDictionary } from '../three/txd-loader';
 import type { ImgArchive } from './img-archive';
 
 import { parseDff } from '../parsers/binary/dff';
+import { parseIfp } from '../parsers/binary/ifp';
 import { parseTxd } from '../parsers/binary/txd';
 import { buildTextureMap } from '../three/build-texture';
 
@@ -16,6 +18,9 @@ import { buildTextureMap } from '../three/build-texture';
 const EMPTY_CLUMP: RWClump = { atomics: [], frames: [], geometries: [] };
 
 const clumpCache = new Map<string, RWClump>();
+
+/** Parsed IFP animation packages (zone object clips like `counxref.ifp`), by lowercased name. */
+const ifpCache = new Map<string, IfpAnimation[]>();
 
 /** A TXD's own (raw) parsed textures, by lowercased name (no extension). */
 const ownTextureCache = new Map<string, TextureDictionary>();
@@ -33,6 +38,19 @@ export function getClump(archive: ImgArchive, modelName: string): RWClump {
   }
 
   return clump;
+}
+
+/** An IFP package's animations (e.g. the zone object clips a map model's IDE `anim` row names),
+ *  cached by name. Absent/unparseable yields an empty list — the object renders static. */
+export function getIfp(archive: ImgArchive, ifpName: string): IfpAnimation[] {
+  const key = ifpName.toLowerCase();
+  let animations = ifpCache.get(key);
+  if (!animations) {
+    animations = parseOrEmpty(archive.get(`${key}.ifp`), parseIfp, []);
+    ifpCache.set(key, animations);
+  }
+
+  return animations;
 }
 
 /** A TXD's resolved textures: its own, overlaid on its `txdp` parent chain (child wins), cached by name. */

@@ -10,15 +10,34 @@ import { cleanLines, sectionedParse } from './text-lines';
  *   variant that inserts a mesh count + multiple draw distances by treating the
  *   first three cells as id/model/txd, the last as flags, and the numeric cells
  *   between as draw distances (max wins).
- * - `anim` (animated objects): `id, model, txd, animName, drawDistance, flags`;
- *   the non-numeric `animName` is filtered out by the draw-distance parsing.
+ * - `anim` (animated objects): `id, model, txd, animName, drawDistance, flags` —
+ *   `animName` is the IFP file holding the model's looping clip (plan 041), kept
+ *   on `def.anim`; the rest parses like `objs` (the non-numeric name is filtered
+ *   out by the draw-distance parsing).
  *
  * `tobj` (time-of-day objects) is a distinct kind handled separately — see
  * {@link parseTimedObjects}. Other sections (`path`, `2dfx`, `txdp`, …) are not
  * placeable and are ignored.
  */
 export function parseIde(text: string): IdeObjectDef[] {
-  return collectObjs(text, ['anim', 'objs']);
+  const objects: IdeObjectDef[] = [];
+  sectionedParse(cleanLines(text), {
+    anim: (row) => {
+      const def = parseObjsRow(row);
+      if (def && row[3]) {
+        def.anim = row[3].toLowerCase();
+        objects.push(def);
+      }
+    },
+    objs: (row) => {
+      const def = parseObjsRow(row);
+      if (def) {
+        objects.push(def);
+      }
+    },
+  });
+
+  return objects;
 }
 
 /**
@@ -67,20 +86,6 @@ export function parseTxdParents(text: string): [string, string][] {
   });
 
   return pairs;
-}
-
-function collectObjs(text: string, sections: readonly string[]): IdeObjectDef[] {
-  const objects: IdeObjectDef[] = [];
-  const handler = (row: string[]): void => {
-    const def = parseObjsRow(row);
-    if (def) {
-      objects.push(def);
-    }
-  };
-
-  sectionedParse(cleanLines(text), Object.fromEntries(sections.map((section) => [section, handler])));
-
-  return objects;
 }
 
 function parseObjsRow(cells: string[]): IdeObjectDef | null {

@@ -7,6 +7,7 @@ import type { GridCell, WorldGrid } from './world-grid';
 import { buildCoronaPoints } from '../three/corona';
 import {
   addToGroup,
+  buildAnimatedObjects,
   buildInstancedMeshes,
   type BuildRegionOptions,
   collectCoronas,
@@ -36,6 +37,9 @@ export function buildCell(
   }
   const groups = [...cellGroups(defs, cell, lod).values()];
   const objects: Object3D[] = buildInstancedMeshes(archive, groups, options);
+  // IDE anim objects (plan 041): per-instance frame hierarchies with a looping IFP clip —
+  // animation mutates node transforms, so they can't ride the InstancedMesh path above.
+  objects.push(...buildAnimatedObjects(archive, groups));
   // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect). The ground
   // glow under lamps is the road's baked night vertex colours, not a projected pool.
   if (!lod) {

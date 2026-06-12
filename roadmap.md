@@ -88,10 +88,12 @@
   - [✅] District decection
   - [✅] gxt parser
   - [✅] Show text
-- [ ] Add teleports
-  - [ ] Vegas
-  - [ ] San Fierro
-- [ ] Animation textures
+- [✅] Add teleports
+  - [✅] Vegas
+  - [✅] San Fierro
+- [ ] Animation objects
+  - [ ] Animation textures
+  - [ ] Animation DFF
 - [✅] Player camera enhancements
 - [ ] Fog enhanced
 - [ ] Increase test coverage
@@ -146,6 +148,7 @@ Next iterations:
   - [ ] Smoke from wheels
   - [ ] Fire
   - [ ] Car scratches
+  - [ ] Objects with effects (skulls' fire in pirate ship in Las Ventura)
 - [ ] Weapons
   - [ ] All types of weapons
     - [ ] Animation

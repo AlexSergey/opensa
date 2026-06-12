@@ -14,6 +14,9 @@ export interface RWClump {
   atomics: RWAtomic[];
   frames: RWFrame[];
   geometries: RWGeometry[];
+  /** UV animations from the DFF's leading UVAnimDict (signs/waterfalls; plan 041), if any.
+   *  Materials reference entries by name via their `uvAnim` effect. */
+  uvAnimations?: RWUvAnimation[];
 }
 
 /** A single frame: local transform + hierarchy link. */
@@ -94,6 +97,12 @@ export interface RWMaterialEffects {
     level: number;
     texture: string;
   };
+  /** UV-animation plugin (0x135): which UVAnimDict entries this material plays, per UV channel.
+   *  `names[i]` corresponds to the i-th set bit of `channelMask` (in practice mask = 1, one name). */
+  uvAnim?: {
+    channelMask: number;
+    names: string[];
+  };
 }
 
 export interface RWMipLevel {
@@ -138,6 +147,19 @@ export type RWTextureFormat = 'dxt1' | 'dxt3' | 'dxt5' | 'rgba8888';
 /** A material's diffuse/mask texture references (resolved against a TXD later). */
 export interface RWTextureRef {
   maskName: string;
+  name: string;
+}
+
+/**
+ * One UV animation from a UVAnimDict (RtAnim 0x1B, keyframe type 0x1C1 — linear UV transform).
+ * Keyframe `uv` params, in stream order: `[rotation, scaleX, scaleY, skew, translateX, translateY]`
+ * (verified on visagesign04: a 3 s loop translating X 0 → 1 — a horizontal scroll).
+ */
+export interface RWUvAnimation {
+  /** Loop duration in seconds. */
+  duration: number;
+  keyframes: { time: number; uv: number[] }[];
+  /** Dict-entry name materials reference (e.g. `DolSign`, `Money`). */
   name: string;
 }
 

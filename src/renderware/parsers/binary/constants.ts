@@ -2,6 +2,8 @@
 
 /** Chunk section type IDs. */
 export const RwSection = {
+  // RtAnim animation (one UV animation inside a UV_ANIM_DICT)
+  ANIM_ANIMATION: 0x1b,
   ATOMIC: 0x14,
   BIN_MESH_PLG: 0x50e,
   CLUMP: 0x10,
@@ -31,6 +33,10 @@ export const RwSection = {
   TEXTURE_NATIVE: 0x15,
   // 2d Effect plugin (per-geometry lights/coronas, particles, ped attractors, …)
   TWO_D_EFFECT: 0x253f2f8,
+  // UV-animation dictionary (precedes the Clump in UV-animated DFFs — signs/waterfalls)
+  UV_ANIM_DICT: 0x2b,
+  // Material UV-animation plugin: channel mask + dict-entry names the material plays
+  UV_ANIM_PLG: 0x135,
 } as const;
 
 /** RpMatFX material effect type (the env-map effect is what SA vehicles use for reflections). */

@@ -49,9 +49,30 @@ describe('parseIde', () => {
     expect(defs[0]).toEqual({ drawDistance: 300, flags: 0, id: 5000, modelName: 'gplane', txdName: 'basicmain' });
   });
 
-  it('parses anim rows, ignoring the non-numeric anim name', () => {
-    const defs = parseIde(['anim', '2, waterfall, water, wfall_anim, 150, 4', 'end'].join('\n'));
-    expect(defs[0]).toEqual({ drawDistance: 150, flags: 4, id: 2, modelName: 'waterfall', txdName: 'water' });
+  it('parses anim rows, capturing the IFP name (lowercased) on def.anim', () => {
+    const defs = parseIde(['anim', '2, waterfall, water, WFALL_anim, 150, 4', 'end'].join('\n'));
+    expect(defs[0]).toEqual({
+      anim: 'wfall_anim',
+      drawDistance: 150,
+      flags: 4,
+      id: 2,
+      modelName: 'waterfall',
+      txdName: 'water',
+    });
+  });
+
+  it('parses real counxref.ide anim rows (space-padded cells)', () => {
+    const defs = parseIde(
+      ['anim', '3426 ,nt_noddonkbase ,des_xoilfield ,counxref ,200 ,2097152', 'end'].join('\n'),
+    );
+    expect(defs[0]).toEqual({
+      anim: 'counxref',
+      drawDistance: 200,
+      flags: 2097152,
+      id: 3426,
+      modelName: 'nt_noddonkbase',
+      txdName: 'des_xoilfield',
+    });
   });
 
   it('handles the mesh-count + multiple draw-distance variant (max wins)', () => {

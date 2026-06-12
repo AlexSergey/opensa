@@ -54,6 +54,8 @@ import {
   parseTxd,
   parseZones,
   sampleTimecycBlend,
+  updateAnimatedObjects,
+  updateUvAnimations,
   WEATHER_NAMES,
   windowGlowUniform,
   worldDayTintUniform,
@@ -516,6 +518,17 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     if (shadowHelper) {
       game.getScene().add(shadowHelper);
     }
+
+    // Animated map objects (plan 041): UV-animated textures (signs/waterfalls scroll their map
+    // UVs via shared dict uniforms — every instance in sync, like vanilla) + IFP-animated clumps
+    // (oil pumps, windmills — per-object mixers; streamed-out objects pause automatically).
+    game.addSystem({
+      name: 'map-animations',
+      update(delta: number): void {
+        updateUvAnimations(performance.now() / 1000);
+        updateAnimatedObjects(delta);
+      },
+    });
 
     game.addSystem({
       name: 'coronas',
