@@ -2,7 +2,7 @@
 export { buildCell } from './build-cell';
 export { buildProcObjMeshes } from './build-procobj';
 export { type RegionMeshData } from './build-region';
-export { type ProcObjCategoryName, procObjCategory } from './procobj-categories';
+export { procObjCategory, type ProcObjCategoryName } from './procobj-categories';
 export { type ProcObjColliderOptions, procObjColliders } from './procobj-colliders';
 export { type ProcObjSettings, resetProcObjMeshes, updateProcObjMeshes } from './procobj-runtime';
 export {

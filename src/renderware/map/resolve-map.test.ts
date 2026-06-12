@@ -8,7 +8,12 @@ const DAT_URL = `${BASE}/data/gta.dat`;
 /** Minimal map: one IDE (ids 100 + 3261) and one text IPL placing id 100. */
 const FILES: Record<string, ArrayBuffer | string> = {
   [`${BASE}/data/gta.dat`]: 'IDE DATA\\MAPS\\test\\test.ide\nIPL DATA\\MAPS\\test\\test.ipl',
-  [`${BASE}/data/maps/test/test.ide`]: ['objs', '100, house, housetxd, 100, 0', '3261, grasshouse, grasshouse, 299, 4', 'end'].join('\n'),
+  [`${BASE}/data/maps/test/test.ide`]: [
+    'objs',
+    '100, house, housetxd, 100, 0',
+    '3261, grasshouse, grasshouse, 299, 4',
+    'end',
+  ].join('\n'),
   [`${BASE}/data/maps/test/test.ipl`]: ['inst', '100, house, 0, 10, 20, 5, 0, 0, 0, 1, -1', 'end'].join('\n'),
   [`${BASE}/ipl_binary/truthsfarm.ipl`]: binaryIpl([{ id: 3261, position: [-1023.1, -1632.5, 75.5] }]),
 };

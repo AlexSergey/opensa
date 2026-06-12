@@ -17,15 +17,6 @@ const CASE_DIR = 'tests/dff/trafficlight-backface-culling';
 
 const def: IdeObjectDef = { drawDistance: 80, flags: 0, id: 1315, modelName: 'trafficlight1', txdName: 'dyntraffic' };
 
-function caseArchive(): ReturnType<typeof openArchive> {
-  return openArchive(
-    buildArchiveBuffer([
-      { data: readFileSync(`${CASE_DIR}/trafficlight1.dff`), name: 'trafficlight1.dff' },
-      { data: readFileSync(`${CASE_DIR}/dyntraffic.txd`), name: 'dyntraffic.txd' },
-    ]),
-  );
-}
-
 function batch(partial: Partial<ProcObjBatch> = {}): ProcObjBatch {
   return {
     category: 'bushes',
@@ -52,6 +43,15 @@ function batch(partial: Partial<ProcObjBatch> = {}): ProcObjBatch {
     ],
     ...partial,
   };
+}
+
+function caseArchive(): ReturnType<typeof openArchive> {
+  return openArchive(
+    buildArchiveBuffer([
+      { data: readFileSync(`${CASE_DIR}/trafficlight1.dff`), name: 'trafficlight1.dff' },
+      { data: readFileSync(`${CASE_DIR}/dyntraffic.txd`), name: 'dyntraffic.txd' },
+    ]),
+  );
 }
 
 beforeEach(() => {

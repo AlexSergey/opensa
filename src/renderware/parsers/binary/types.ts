@@ -114,6 +114,26 @@ export interface RWMipLevel {
   width: number;
 }
 
+/**
+ * A 2d-effect ROADSIGN entry (type 7): a street-name/route plate whose text is baked into the
+ * model. Vanilla generates one textured quad per character from the `roadsignfont` glyph atlas
+ * (particle.txd). In the text, `_` is the space glyph and `<>^#%}~` are arrow/symbol glyphs.
+ */
+export interface RWRoadsign {
+  /** Characters drawn per line (16/2/4/8, from the flags). */
+  charsPerLine: number;
+  /** Text colour palette index (0 white, 1 black, 2 grey, 3 red). */
+  colour: number;
+  /** The plate's text lines (raw 16-char fields, count from the flags). */
+  lines: string[];
+  /** Plate width × height in metres. */
+  plateSize: [number, number];
+  /** Geometry-local position of the plate centre. */
+  position: Vec3;
+  /** Plate rotation in degrees (XYZ). */
+  rotation: Vec3;
+}
+
 /** Skinning data from a geometry's Skin plugin (skinned character meshes). */
 export interface RWSkin {
   /** Per-vertex bone indices (numVertices * 4), into the skin's bone list. */
@@ -153,24 +173,12 @@ export interface RWTextureRef {
   name: string;
 }
 
-/**
- * A 2d-effect ROADSIGN entry (type 7): a street-name/route plate whose text is baked into the
- * model. Vanilla generates one textured quad per character from the `roadsignfont` glyph atlas
- * (particle.txd). In the text, `_` is the space glyph and `<>^#%}~` are arrow/symbol glyphs.
- */
-export interface RWRoadsign {
-  /** Characters drawn per line (16/2/4/8, from the flags). */
-  charsPerLine: number;
-  /** Text colour palette index (0 white, 1 black, 2 grey, 3 red). */
-  colour: number;
-  /** The plate's text lines (raw 16-char fields, count from the flags). */
-  lines: string[];
-  /** Plate width × height in metres. */
-  plateSize: [number, number];
-  /** Geometry-local position of the plate centre. */
-  position: Vec3;
-  /** Plate rotation in degrees (XYZ). */
-  rotation: Vec3;
+/** A triangle as stored by RW: vertex indices + which material it uses. */
+export interface RWTriangle {
+  a: number;
+  b: number;
+  c: number;
+  materialIndex: number;
 }
 
 /**
@@ -184,14 +192,6 @@ export interface RWUvAnimation {
   keyframes: { time: number; uv: number[] }[];
   /** Dict-entry name materials reference (e.g. `DolSign`, `Money`). */
   name: string;
-}
-
-/** A triangle as stored by RW: vertex indices + which material it uses. */
-export interface RWTriangle {
-  a: number;
-  b: number;
-  c: number;
-  materialIndex: number;
 }
 
 export type Vec2 = [number, number];

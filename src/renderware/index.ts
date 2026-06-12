@@ -26,7 +26,7 @@ export { buildClump, buildClumpLights, buildClumpParts, type ClumpLight, type Re
 export { buildCollisionWireframe } from './three/build-col-wireframe';
 export { buildRoadsignParts, roadsignGlyphIndex, setRoadsignFont } from './three/build-roadsign';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';
-export { buildTextureMap } from './three/build-texture';
+export { buildTextureMap, type TextureDictionary } from './three/build-texture';
 export {
   buildVehicle,
   type BuiltDoor,
@@ -36,9 +36,7 @@ export {
 } from './three/build-vehicle';
 export { buildWater, oceanFrame } from './three/build-water';
 export { type CoronaEntry, coronaMaterial, GLOW_LAYER } from './three/corona';
-export { DFFLoader } from './three/dff-loader';
 export { nightFillRim, nightFillUniform } from './three/night-fill';
-export { type TextureDictionary, TXDLoader } from './three/txd-loader';
 export { updateUvAnimations } from './three/uv-anim';
 export {
   buildWorldMaterial,

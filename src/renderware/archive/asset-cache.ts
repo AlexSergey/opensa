@@ -1,6 +1,6 @@
 import type { IfpAnimation } from '../parsers/binary/ifp';
 import type { RWClump } from '../parsers/binary/types';
-import type { TextureDictionary } from '../three/txd-loader';
+import type { TextureDictionary } from '../three/build-texture';
 import type { ImgArchive } from './img-archive';
 
 import { parseDff } from '../parsers/binary/dff';

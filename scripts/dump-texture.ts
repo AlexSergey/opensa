@@ -1,8 +1,8 @@
-import type { RWTexture } from '../src/renderware/parsers/binary/types';
-
-import { deflateSync } from 'node:zlib';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { deflateSync } from 'node:zlib';
+
+import type { RWTexture } from '../src/renderware/parsers/binary/types';
 
 import { parseTxd } from '../src/renderware/parsers/binary/txd';
 
@@ -44,7 +44,7 @@ if (mode === 'alpha') {
     const reflowed = new Uint8Array(outWidth * strips * stripHeight * 4);
     for (let strip = 0; strip < strips; strip += 1) {
       for (let y = 0; y < stripHeight; y += 1) {
-        const src = ((strip * stripHeight + y) * outWidth) * 4;
+        const src = (strip * stripHeight + y) * outWidth * 4;
         const dst = (y * outWidth * strips + strip * outWidth) * 4;
         reflowed.set(rgba.subarray(src, src + outWidth * 4), dst);
       }
@@ -57,7 +57,7 @@ if (mode === 'alpha') {
   const zoomed = new Uint8Array(outWidth * zoom * outHeight * zoom * 4);
   for (let y = 0; y < outHeight * zoom; y += 1) {
     for (let x = 0; x < outWidth * zoom; x += 1) {
-      const src = ((Math.floor(y / zoom) * outWidth + Math.floor(x / zoom)) * 4);
+      const src = (Math.floor(y / zoom) * outWidth + Math.floor(x / zoom)) * 4;
       zoomed.set(rgba.subarray(src, src + 4), (y * outWidth * zoom + x) * 4);
     }
   }
@@ -68,53 +68,6 @@ if (mode === 'alpha') {
 console.log(`${texture.name}: ${texture.width}x${texture.height} ${texture.format} alpha=${texture.hasAlpha}`);
 writeFileSync(join(ROOT, outPath ?? `${textureName}.png`), encodePng(outWidth, outHeight, rgba));
 console.log(`written ${outPath ?? `${textureName}.png`} (${outWidth}x${outHeight})`);
-
-/** Decode the base mip to RGBA8888 (DXT1/3/5 software decode; rgba passes through). */
-function decodeToRgba(rw: RWTexture): Uint8Array {
-  const mip = rw.mipmaps[0];
-  if (rw.format === 'rgba8888') {
-    return mip.data;
-  }
-  const out = new Uint8Array(rw.width * rw.height * 4);
-  const blockBytes = rw.format === 'dxt1' ? 8 : 16;
-  const blocksWide = Math.ceil(rw.width / 4);
-  for (let by = 0; by < Math.ceil(rw.height / 4); by += 1) {
-    for (let bx = 0; bx < blocksWide; bx += 1) {
-      const offset = (by * blocksWide + bx) * blockBytes;
-      decodeBlock(rw, mip.data, offset, out, bx * 4, by * 4);
-    }
-  }
-
-  return out;
-}
-
-function decodeBlock(rw: RWTexture, data: Uint8Array, offset: number, out: Uint8Array, px: number, py: number): void {
-  const colorOffset = rw.format === 'dxt1' ? offset : offset + 8;
-  const c0 = data[colorOffset] | (data[colorOffset + 1] << 8);
-  const c1 = data[colorOffset + 2] | (data[colorOffset + 3] << 8);
-  const palette = [rgb565(c0), rgb565(c1), [0, 0, 0], [0, 0, 0]] as number[][];
-  if (rw.format !== 'dxt1' || c0 > c1) {
-    palette[2] = palette[0].map((v, i) => Math.round((2 * v + palette[1][i]) / 3));
-    palette[3] = palette[0].map((v, i) => Math.round((v + 2 * palette[1][i]) / 3));
-  } else {
-    palette[2] = palette[0].map((v, i) => Math.round((v + palette[1][i]) / 2));
-    palette[3] = [0, 0, 0]; // 1-bit-alpha mode: index 3 = transparent black
-  }
-  for (let y = 0; y < 4; y += 1) {
-    const rowBits = data[colorOffset + 4 + y];
-    for (let x = 0; x < 4; x += 1) {
-      if (px + x >= rw.width || py + y >= rw.height) {
-        continue;
-      }
-      const index = (rowBits >> (x * 2)) & 3;
-      const dst = ((py + y) * rw.width + px + x) * 4;
-      out[dst] = palette[index][0];
-      out[dst + 1] = palette[index][1];
-      out[dst + 2] = palette[index][2];
-      out[dst + 3] = alphaOf(rw, data, offset, x, y, index, c0 <= c1);
-    }
-  }
-}
 
 function alphaOf(
   rw: RWTexture,
@@ -159,27 +112,6 @@ function alphaOf(
   return Math.round(((6 - index) * a0 + (index - 1) * a1) / 5);
 }
 
-function rgb565(value: number): number[] {
-  return [((value >> 11) & 31) * 8.226, ((value >> 5) & 63) * 4.048, (value & 31) * 8.226].map(Math.round);
-}
-
-/** Minimal PNG encoder: 8-bit RGBA, one IDAT, filter 0 per scanline. */
-function encodePng(width: number, height: number, pixels: Uint8Array): Buffer {
-  const raw = Buffer.alloc((width * 4 + 1) * height);
-  for (let y = 0; y < height; y += 1) {
-    raw[y * (width * 4 + 1)] = 0; // filter: none
-    raw.set(pixels.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type RGBA
-  const chunks = [chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))];
-
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), ...chunks]);
-}
-
 function chunk(type: string, data: Buffer): Buffer {
   const out = Buffer.alloc(data.length + 12);
   out.writeUInt32BE(data.length, 0);
@@ -200,4 +132,72 @@ function crc32(data: Buffer): number {
   }
 
   return (crc ^ 0xffffffff) >>> 0;
+}
+
+function decodeBlock(rw: RWTexture, data: Uint8Array, offset: number, out: Uint8Array, px: number, py: number): void {
+  const colorOffset = rw.format === 'dxt1' ? offset : offset + 8;
+  const c0 = data[colorOffset] | (data[colorOffset + 1] << 8);
+  const c1 = data[colorOffset + 2] | (data[colorOffset + 3] << 8);
+  const palette = [rgb565(c0), rgb565(c1), [0, 0, 0], [0, 0, 0]] as number[][];
+  if (rw.format !== 'dxt1' || c0 > c1) {
+    palette[2] = palette[0].map((v, i) => Math.round((2 * v + palette[1][i]) / 3));
+    palette[3] = palette[0].map((v, i) => Math.round((v + 2 * palette[1][i]) / 3));
+  } else {
+    palette[2] = palette[0].map((v, i) => Math.round((v + palette[1][i]) / 2));
+    palette[3] = [0, 0, 0]; // 1-bit-alpha mode: index 3 = transparent black
+  }
+  for (let y = 0; y < 4; y += 1) {
+    const rowBits = data[colorOffset + 4 + y];
+    for (let x = 0; x < 4; x += 1) {
+      if (px + x >= rw.width || py + y >= rw.height) {
+        continue;
+      }
+      const index = (rowBits >> (x * 2)) & 3;
+      const dst = ((py + y) * rw.width + px + x) * 4;
+      out[dst] = palette[index][0];
+      out[dst + 1] = palette[index][1];
+      out[dst + 2] = palette[index][2];
+      out[dst + 3] = alphaOf(rw, data, offset, x, y, index, c0 <= c1);
+    }
+  }
+}
+
+/** Decode the base mip to RGBA8888 (DXT1/3/5 software decode; rgba passes through). */
+function decodeToRgba(rw: RWTexture): Uint8Array {
+  const mip = rw.mipmaps[0];
+  if (rw.format === 'rgba8888') {
+    return mip.data;
+  }
+  const out = new Uint8Array(rw.width * rw.height * 4);
+  const blockBytes = rw.format === 'dxt1' ? 8 : 16;
+  const blocksWide = Math.ceil(rw.width / 4);
+  for (let by = 0; by < Math.ceil(rw.height / 4); by += 1) {
+    for (let bx = 0; bx < blocksWide; bx += 1) {
+      const offset = (by * blocksWide + bx) * blockBytes;
+      decodeBlock(rw, mip.data, offset, out, bx * 4, by * 4);
+    }
+  }
+
+  return out;
+}
+
+/** Minimal PNG encoder: 8-bit RGBA, one IDAT, filter 0 per scanline. */
+function encodePng(width: number, height: number, pixels: Uint8Array): Buffer {
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    raw[y * (width * 4 + 1)] = 0; // filter: none
+    raw.set(pixels.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // colour type RGBA
+  const chunks = [chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))];
+
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), ...chunks]);
+}
+
+function rgb565(value: number): number[] {
+  return [((value >> 11) & 31) * 8.226, ((value >> 5) & 63) * 4.048, (value & 31) * 8.226].map(Math.round);
 }

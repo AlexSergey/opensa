@@ -1,8 +1,8 @@
 /**
  * Standalone object viewer (map models) — a dev tool, isolated from the map/streaming/
- * instancing layers. It reuses the real asset path (TXDLoader -> parseTxd ->
- * build-texture, DFFLoader -> parseDff -> build-clump), so what you see here is
- * exactly what the parser + three build layer produce for one model.
+ * instancing layers. It reuses the real asset path (fetch -> parseTxd -> build-texture,
+ * fetch -> parseDff -> build-clump), so what you see here is exactly what the parser +
+ * three build layer produce for one model.
  *
  * Purpose: diagnose whether a model's look (e.g. "too dark") comes from the DFF
  * parser/build (this view) or from the map pipeline (instancing/lighting in the
@@ -33,11 +33,13 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import type { ColModel } from '../renderware/parsers/binary/col-types';
-import type { TextureDictionary } from '../renderware/three/txd-loader';
+import type { TextureDictionary } from '../renderware/three/build-texture';
 
+import { parseDff } from '../renderware/parsers/binary/dff';
+import { parseTxd } from '../renderware/parsers/binary/txd';
+import { buildClump } from '../renderware/three/build-clump';
 import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe';
-import { DFFLoader } from '../renderware/three/dff-loader';
-import { TXDLoader } from '../renderware/three/txd-loader';
+import { buildTextureMap } from '../renderware/three/build-texture';
 
 /** Serialised COL (from scripts/extract-viewer-collision.ts) — vertices as a plain array. */
 type ColJson = Omit<ColModel, 'vertices'> & { vertices: number[] };
@@ -183,7 +185,7 @@ function frameObject(object: Group): void {
   controls.update();
 }
 
-/** Show the model's COL (pre-extracted JSON), wrapped −90°X to match the DFFLoader's Y-up convert. */
+/** Show the model's COL (pre-extracted JSON), wrapped −90°X to match buildClump's Y-up convert. */
 async function loadCollision(model: ModelEntry): Promise<void> {
   if (collision) {
     scene.remove(collision);
@@ -206,10 +208,8 @@ async function loadCollision(model: ModelEntry): Promise<void> {
 
 async function loadModel(model: ModelEntry): Promise<void> {
   const textures = await loadTextures(model.txd);
-  const loader = new DFFLoader().setTextures(textures);
-  const group = await new Promise<Group>((resolve, reject) => {
-    loader.load(`${BASE}/viewer/${model.dff}`, resolve, undefined, reject);
-  });
+  const buffer = await fetch(`${BASE}/viewer/${model.dff}`).then((response) => response.arrayBuffer());
+  const group = buildClump(parseDff(buffer), textures);
 
   if (current) {
     scene.remove(current);
@@ -230,9 +230,9 @@ async function loadModel(model: ModelEntry): Promise<void> {
 function loadTextures(txd: string): Promise<TextureDictionary> {
   let promise = txdCache.get(txd);
   if (!promise) {
-    promise = new Promise<TextureDictionary>((resolve, reject) => {
-      new TXDLoader().load(`${BASE}/viewer/${txd}`, resolve, undefined, reject);
-    });
+    promise = fetch(`${BASE}/viewer/${txd}`)
+      .then((response) => response.arrayBuffer())
+      .then((buffer) => buildTextureMap(parseTxd(buffer)));
     txdCache.set(txd, promise);
   }
 

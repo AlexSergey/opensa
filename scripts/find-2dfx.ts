@@ -50,6 +50,31 @@ for (const [type, count] of [...typeHistogram.entries()].sort((a, b) => a[0] - b
 }
 console.log(`\nmodels with ROADSIGN entries: ${roadsignModels}`);
 
+/** Decode one roadsign entry. Layout (verified against the first survey run — the leading pair
+ *  of floats is the PLATE SIZE, not rotation): pos(12) type(4) size(4) | plate vec2(8)
+ *  rotation vec3(12) flags u16(2) text 4×16(64) pad(2) = 88 bytes of data. */
+function dumpRoadsign(buffer: Buffer, model: string, entryStart: number): void {
+  const pos = [buffer.readFloatLE(entryStart), buffer.readFloatLE(entryStart + 4), buffer.readFloatLE(entryStart + 8)];
+  const data = entryStart + 20;
+  const plate = [buffer.readFloatLE(data), buffer.readFloatLE(data + 4)];
+  const rotation = [buffer.readFloatLE(data + 8), buffer.readFloatLE(data + 12), buffer.readFloatLE(data + 16)];
+  const flags = buffer.readUInt16LE(data + 20);
+  const lines: string[] = [];
+  for (let line = 0; line < 4; line += 1) {
+    const raw = buffer.subarray(data + 22 + line * 16, data + 22 + (line + 1) * 16);
+    const text = raw
+      .toString('latin1')
+      .replace(/[_\0]+$/g, '')
+      .trimEnd();
+    if (text.length > 0) {
+      lines.push(text);
+    }
+  }
+  console.log(
+    `${model.padEnd(24)} flags 0x${flags.toString(16).padStart(4, '0')} plate(${plate.map((v) => v.toFixed(1)).join('x')}) rot(${rotation.map((v) => v.toFixed(0)).join(',')}) pos(${pos.map((v) => v.toFixed(1)).join(',')}) | ${lines.join(' / ')}`,
+  );
+}
+
 /** Walk every 2dfx chunk in the raw DFF bytes (no full parse — chunk ids are unique enough).
  *  Byte-stepped: RW chunks are NOT 4-aligned, a 4-byte stride missed real entries. */
 function scan(buffer: Buffer, model: string): void {
@@ -82,26 +107,4 @@ function scan(buffer: Buffer, model: string): void {
   if (hasRoadsign) {
     roadsignModels += 1;
   }
-}
-
-/** Decode one roadsign entry. Layout (verified against the first survey run — the leading pair
- *  of floats is the PLATE SIZE, not rotation): pos(12) type(4) size(4) | plate vec2(8)
- *  rotation vec3(12) flags u16(2) text 4×16(64) pad(2) = 88 bytes of data. */
-function dumpRoadsign(buffer: Buffer, model: string, entryStart: number): void {
-  const pos = [buffer.readFloatLE(entryStart), buffer.readFloatLE(entryStart + 4), buffer.readFloatLE(entryStart + 8)];
-  const data = entryStart + 20;
-  const plate = [buffer.readFloatLE(data), buffer.readFloatLE(data + 4)];
-  const rotation = [buffer.readFloatLE(data + 8), buffer.readFloatLE(data + 12), buffer.readFloatLE(data + 16)];
-  const flags = buffer.readUInt16LE(data + 20);
-  const lines: string[] = [];
-  for (let line = 0; line < 4; line += 1) {
-    const raw = buffer.subarray(data + 22 + line * 16, data + 22 + (line + 1) * 16);
-    const text = raw.toString('latin1').replace(/[_\0]+$/g, '').trimEnd();
-    if (text.length > 0) {
-      lines.push(text);
-    }
-  }
-  console.log(
-    `${model.padEnd(24)} flags 0x${flags.toString(16).padStart(4, '0')} plate(${plate.map((v) => v.toFixed(1)).join('x')}) rot(${rotation.map((v) => v.toFixed(0)).join(',')}) pos(${pos.map((v) => v.toFixed(1)).join(',')}) | ${lines.join(' / ')}`,
-  );
 }

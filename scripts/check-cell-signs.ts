@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import type { IdeObjectDef, IplInstance, MapDefinitions } from '../src/renderware/parsers/text/types';
+
 import { openArchive } from '../src/renderware/archive/img-archive';
 import { datChildUrl, iplBasename, streamIplUrl } from '../src/renderware/archive/resolve-paths';
 import { buildWorldGrid, cellKey } from '../src/renderware/map/world-grid';
@@ -9,8 +11,6 @@ import { parseGtaDat } from '../src/renderware/parsers/text/gta-dat.parser';
 import { parseIde, parseTimedObjects } from '../src/renderware/parsers/text/ide.parser';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
-
-import type { IdeObjectDef, IplInstance, MapDefinitions } from '../src/renderware/parsers/text/types';
 
 /**
  * Reproduce the cell build's roadsign path offline (plan 042 item 5 debugging): for a world

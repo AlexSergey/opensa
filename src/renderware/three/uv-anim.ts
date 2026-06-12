@@ -13,13 +13,13 @@ import type { RWUvAnimation } from '../parsers/binary/types';
  * instance in sync), so one uniform per animation matches SA exactly.
  */
 
-type UvAnimEntry = {
+interface UvAnimEntry {
   readonly duration: number;
   /** Sorted by time. `uv` order is the RtAnim stream order — see {@link RWUvAnimation}. */
   readonly keyframes: readonly { readonly time: number; readonly uv: readonly number[] }[];
   /** (offsetX, offsetY, scaleX, scaleY) applied to the map UV by the shader variant. */
   readonly uniform: { value: Vector4 };
-};
+}
 
 /** Indices into a keyframe's `uv` params: (rotation, scaleX, scaleY, skew, translateX, translateY). */
 const UV_SCALE_X = 1;
@@ -30,6 +30,34 @@ const UV_TRANSLATE_Y = 5;
 /** Dict entries by name. Module-level on purpose: SA dict-entry names are global identifiers
  *  (materials in any DFF may reference them), mirroring RW's single UV-anim dictionary. */
 const registry = new Map<string, UvAnimEntry>();
+
+/**
+ * Patch a world material to play a UV animation: `mapUv = mapUv * scale + offset` from the shared
+ * uniform, injected after the stock UV transform. Composes with the material's existing
+ * `onBeforeCompile` like `applyWorldWindowGlow` (rotation/skew params are unused by known assets).
+ */
+export function applyWorldUvAnim(material: MeshBasicMaterial, uniform: { value: Vector4 }): void {
+  const previousCompile = material.onBeforeCompile.bind(material);
+  const previousKey = material.customProgramCacheKey.bind(material);
+  material.customProgramCacheKey = (): string => `${previousKey()}|uvAnim`;
+  material.onBeforeCompile = (shader, renderer): void => {
+    previousCompile(shader, renderer);
+    shader.uniforms.uUvAnim = uniform;
+    shader.vertexShader =
+      'uniform vec4 uUvAnim;\n' +
+      shader.vertexShader.replace(
+        '#include <uv_vertex>',
+        '#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv = vMapUv * uUvAnim.zw + uUvAnim.xy;\n#endif',
+      );
+  };
+  material.needsUpdate = true;
+}
+
+/** The shared transform uniform for a registered animation, or undefined if the name is unknown
+ *  (material plugin referencing a dict the DFF didn't carry — render static rather than crash). */
+export function getUvAnimUniform(name: string): undefined | { value: Vector4 } {
+  return registry.get(name)?.uniform;
+}
 
 /** Register a clump's UVAnimDict entries (idempotent by name; empty-keyframe entries are skipped). */
 export function registerUvAnimations(animations: readonly RWUvAnimation[]): void {
@@ -43,12 +71,6 @@ export function registerUvAnimations(animations: readonly RWUvAnimation[]): void
       uniform: { value: new Vector4(0, 0, 1, 1) },
     });
   }
-}
-
-/** The shared transform uniform for a registered animation, or undefined if the name is unknown
- *  (material plugin referencing a dict the DFF didn't carry — render static rather than crash). */
-export function getUvAnimUniform(name: string): undefined | { value: Vector4 } {
-  return registry.get(name)?.uniform;
 }
 
 /** Test hook: drop all registered animations (the registry is module-level shared state). */
@@ -78,26 +100,4 @@ export function updateUvAnimations(seconds: number): void {
       k0.uv[UV_SCALE_Y] + (k1.uv[UV_SCALE_Y] - k0.uv[UV_SCALE_Y]) * f,
     );
   }
-}
-
-/**
- * Patch a world material to play a UV animation: `mapUv = mapUv * scale + offset` from the shared
- * uniform, injected after the stock UV transform. Composes with the material's existing
- * `onBeforeCompile` like `applyWorldWindowGlow` (rotation/skew params are unused by known assets).
- */
-export function applyWorldUvAnim(material: MeshBasicMaterial, uniform: { value: Vector4 }): void {
-  const previousCompile = material.onBeforeCompile.bind(material);
-  const previousKey = material.customProgramCacheKey.bind(material);
-  material.customProgramCacheKey = (): string => `${previousKey()}|uvAnim`;
-  material.onBeforeCompile = (shader, renderer): void => {
-    previousCompile(shader, renderer);
-    shader.uniforms.uUvAnim = uniform;
-    shader.vertexShader =
-      'uniform vec4 uUvAnim;\n' +
-      shader.vertexShader.replace(
-        '#include <uv_vertex>',
-        '#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv = vMapUv * uUvAnim.zw + uUvAnim.xy;\n#endif',
-      );
-  };
-  material.needsUpdate = true;
 }

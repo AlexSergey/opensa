@@ -18,7 +18,11 @@ import {
 const SIGN_DFF = 'tests/dff/uv-anim/visagesign04.dff';
 
 /** uv params order: (rotation, scaleX, scaleY, skew, translateX, translateY). */
-function scrollAnim(name: string, duration: number, keyframes: { time: number; tx: number; ty?: number }[]): RWUvAnimation {
+function scrollAnim(
+  name: string,
+  duration: number,
+  keyframes: { time: number; tx: number; ty?: number }[],
+): RWUvAnimation {
   return {
     duration,
     keyframes: keyframes.map((k) => ({ time: k.time, uv: [0, 1, 1, 0, k.tx, k.ty ?? 0] })),
@@ -48,7 +52,12 @@ describe('uv-anim registry', () => {
 
   describe('positive cases', () => {
     it('interpolates a linear scroll between keyframes', () => {
-      registerUvAnimations([scrollAnim('scroll', 3, [{ time: 0, tx: 0 }, { time: 3, tx: 1 }])]);
+      registerUvAnimations([
+        scrollAnim('scroll', 3, [
+          { time: 0, tx: 0 },
+          { time: 3, tx: 1 },
+        ]),
+      ]);
       updateUvAnimations(1.5);
       const uniform = getUvAnimUniform('scroll');
       expect(uniform?.value.x).toBeCloseTo(0.5, 5); // offsetX
@@ -58,7 +67,12 @@ describe('uv-anim registry', () => {
     });
 
     it('loops over the duration', () => {
-      registerUvAnimations([scrollAnim('loop', 3, [{ time: 0, tx: 0 }, { time: 3, tx: 1 }])]);
+      registerUvAnimations([
+        scrollAnim('loop', 3, [
+          { time: 0, tx: 0 },
+          { time: 3, tx: 1 },
+        ]),
+      ]);
       updateUvAnimations(4.5); // 4.5 % 3 = 1.5
       expect(getUvAnimUniform('loop')?.value.x).toBeCloseTo(0.5, 5);
     });
@@ -79,9 +93,19 @@ describe('uv-anim registry', () => {
     });
 
     it('re-registering the same name keeps the original uniform (idempotent across cell rebuilds)', () => {
-      registerUvAnimations([scrollAnim('same', 3, [{ time: 0, tx: 0 }, { time: 3, tx: 1 }])]);
+      registerUvAnimations([
+        scrollAnim('same', 3, [
+          { time: 0, tx: 0 },
+          { time: 3, tx: 1 },
+        ]),
+      ]);
       const first = getUvAnimUniform('same');
-      registerUvAnimations([scrollAnim('same', 9, [{ time: 0, tx: 0 }, { time: 9, tx: 1 }])]);
+      registerUvAnimations([
+        scrollAnim('same', 9, [
+          { time: 0, tx: 0 },
+          { time: 9, tx: 1 },
+        ]),
+      ]);
       expect(getUvAnimUniform('same')).toBe(first);
     });
 

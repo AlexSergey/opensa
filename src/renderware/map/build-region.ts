@@ -102,36 +102,6 @@ export function buildAnimatedObjects(archive: ImgArchive, groups: Iterable<Regio
 }
 
 /**
- * Build the road-sign text meshes for a set of model groups (plan 042 item 5): 2dfx ROADSIGN
- * entries bake their positions in **world space**, so the glyph quads render as plain static
- * meshes at identity — one per text colour per model — never through the instanced path.
- * Empty while the `roadsignfont` glyph texture isn't installed.
- */
-export function buildRoadsignMeshes(archive: ImgArchive, groups: Iterable<RegionMeshData>): Object3D[] {
-  const font = getRoadsignFont();
-  if (!font) {
-    return [];
-  }
-  const meshes: Object3D[] = [];
-  for (const group of groups) {
-    const clump = getClump(archive, group.def.modelName);
-    const roadsigns = clump.geometries.flatMap((geometry) => geometry.roadsigns ?? []);
-    if (roadsigns.length === 0) {
-      continue;
-    }
-    for (const part of buildRoadsignParts(roadsigns, font)) {
-      const mesh = new Mesh(part.geometry, part.material);
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.userData.region = group; // picking reports the host road model
-      meshes.push(mesh);
-    }
-  }
-
-  return meshes;
-}
-
-/**
  * Build one `InstancedMesh` per single-material part for each model group, placing
  * every instance with its GTA world transform (IPL quaternion conjugated, unit
  * scale). `userData.region` carries the group for picking.
@@ -180,6 +150,36 @@ export function buildInstancedMeshes(
         mesh.userData.timed = group.def.time; // { on, off } hour window — gated by TimedObjectSystem
         mesh.visible = false; // hidden until the system applies the current hour (avoids a wrong-time flash)
       }
+      meshes.push(mesh);
+    }
+  }
+
+  return meshes;
+}
+
+/**
+ * Build the road-sign text meshes for a set of model groups (plan 042 item 5): 2dfx ROADSIGN
+ * entries bake their positions in **world space**, so the glyph quads render as plain static
+ * meshes at identity — one per text colour per model — never through the instanced path.
+ * Empty while the `roadsignfont` glyph texture isn't installed.
+ */
+export function buildRoadsignMeshes(archive: ImgArchive, groups: Iterable<RegionMeshData>): Object3D[] {
+  const font = getRoadsignFont();
+  if (!font) {
+    return [];
+  }
+  const meshes: Object3D[] = [];
+  for (const group of groups) {
+    const clump = getClump(archive, group.def.modelName);
+    const roadsigns = clump.geometries.flatMap((geometry) => geometry.roadsigns ?? []);
+    if (roadsigns.length === 0) {
+      continue;
+    }
+    for (const part of buildRoadsignParts(roadsigns, font)) {
+      const mesh = new Mesh(part.geometry, part.material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.region = group; // picking reports the host road model
       meshes.push(mesh);
     }
   }

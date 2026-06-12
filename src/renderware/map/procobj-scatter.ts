@@ -49,6 +49,21 @@ export const PROC_OBJ_MAX_DENSITY = 3;
 
 const DEG_TO_RAD = Math.PI / 180;
 
+/** Index `procobj.dat` rules by their (lowercased) surface name — the scatter's lookup shape. */
+export function groupRulesBySurface(rules: readonly ProcObjRule[]): Map<string, ProcObjRule[]> {
+  const bySurface = new Map<string, ProcObjRule[]>();
+  for (const rule of rules) {
+    const list = bySurface.get(rule.surface);
+    if (list) {
+      list.push(rule);
+    } else {
+      bySurface.set(rule.surface, [rule]);
+    }
+  }
+
+  return bySurface;
+}
+
 /**
  * The cell's `procObjLimit` as a lottery threshold: the lottery value below which exactly
  * `limit` placements fall, across ALL of the cell's batches (lowest lotteries win — the
@@ -72,21 +87,6 @@ export function procObjLotteryCap(batches: readonly ProcObjBatch[], limit?: numb
   lotteries.sort((a, b) => a - b);
 
   return lotteries[limit]; // first excluded value — `< cap` keeps exactly `limit` placements
-}
-
-/** Index `procobj.dat` rules by their (lowercased) surface name — the scatter's lookup shape. */
-export function groupRulesBySurface(rules: readonly ProcObjRule[]): Map<string, ProcObjRule[]> {
-  const bySurface = new Map<string, ProcObjRule[]>();
-  for (const rule of rules) {
-    const list = bySurface.get(rule.surface);
-    if (list) {
-      list.push(rule);
-    } else {
-      bySurface.set(rule.surface, [rule]);
-    }
-  }
-
-  return bySurface;
 }
 
 /**

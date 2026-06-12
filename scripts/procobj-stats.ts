@@ -1,7 +1,7 @@
-import type { IdeObjectDef, IplInstance, MapDefinitions } from '../src/renderware/parsers/text/types';
-
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import type { IdeObjectDef, IplInstance, MapDefinitions } from '../src/renderware/parsers/text/types';
 
 import { openArchive } from '../src/renderware/archive/img-archive';
 import { datChildUrl, iplBasename, streamIplUrl } from '../src/renderware/archive/resolve-paths';

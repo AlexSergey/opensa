@@ -43,6 +43,44 @@ const ANGLE_MAPS: [number, number, number][] = [
   [2, 1, 0],
 ];
 
+function apply(order: string, sign: number, map: [number, number, number], angles: Vec, v: Vec): Vec {
+  let out = v;
+  for (const axis of order) {
+    const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+    out = rot(axis as 'x' | 'y' | 'z', angles[map[axisIndex]] * sign, out);
+  }
+
+  return out;
+}
+
+function cross(a: Vec, b: Vec): Vec {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+
+function familyOk(
+  order: string,
+  sign: number,
+  map: [number, number, number],
+  baseW: Vec,
+  baseL: Vec,
+  baseN: Vec,
+  angles: Vec,
+): boolean {
+  const w = apply(order, sign, map, angles, baseW);
+  const l = apply(order, sign, map, angles, baseL);
+  const n = apply(order, sign, map, angles, baseN);
+  const linesDown = near(l, [0, 0, -1]);
+  const widthHorizontal = Math.abs(w[2]) < 1e-6;
+  const faceHorizontal = Math.abs(n[2]) < 1e-6;
+  const readable = near(cross(w, l), n);
+
+  return linesDown && widthHorizontal && faceHorizontal && readable;
+}
+
+function near(a: Vec, b: Vec): boolean {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-6;
+}
+
 function rot(axis: 'x' | 'y' | 'z', deg: number, v: Vec): Vec {
   const r = (deg * Math.PI) / 180;
   const c = Math.cos(r);
@@ -56,36 +94,6 @@ function rot(axis: 'x' | 'y' | 'z', deg: number, v: Vec): Vec {
   }
 
   return [x * c - y * s, x * s + y * c, z];
-}
-
-function cross(a: Vec, b: Vec): Vec {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-function near(a: Vec, b: Vec): boolean {
-  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-6;
-}
-
-function apply(order: string, sign: number, map: [number, number, number], angles: Vec, v: Vec): Vec {
-  let out = v;
-  for (const axis of order) {
-    const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
-    out = rot(axis as 'x' | 'y' | 'z', angles[map[axisIndex]] * sign, out);
-  }
-
-  return out;
-}
-
-function familyOk(order: string, sign: number, map: [number, number, number], baseW: Vec, baseL: Vec, baseN: Vec, angles: Vec): boolean {
-  const w = apply(order, sign, map, angles, baseW);
-  const l = apply(order, sign, map, angles, baseL);
-  const n = apply(order, sign, map, angles, baseN);
-  const linesDown = near(l, [0, 0, -1]);
-  const widthHorizontal = Math.abs(w[2]) < 1e-6;
-  const faceHorizontal = Math.abs(n[2]) < 1e-6;
-  const readable = near(cross(w, l), n);
-
-  return linesDown && widthHorizontal && faceHorizontal && readable;
 }
 
 let best = -1;
@@ -106,7 +114,9 @@ for (const order of ORDERS) {
             }
             if (count >= FAMILIES.length - 1) {
               console.log(
-                `order=${order} sign=${sign} map=(${map.join(',')}) W=(${baseW.join(',')}) L=(${baseL.join(',')}) N=(${baseN.join(',')}) passes=${count}/${FAMILIES.length} fails=[${FAMILIES.filter((_, i) => !passes[i])
+                `order=${order} sign=${sign} map=(${map.join(',')}) W=(${baseW.join(',')}) L=(${baseL.join(',')}) N=(${baseN.join(',')}) passes=${count}/${FAMILIES.length} fails=[${FAMILIES.filter(
+                  (_, i) => !passes[i],
+                )
                   .map((f) => f.join(','))
                   .join(' | ')}]`,
               );

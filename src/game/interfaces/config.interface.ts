@@ -121,7 +121,8 @@ export interface GraphicsConfig {
   stars: StarsConfig;
   /** Sun disc + god-rays source/toggle. */
   sun: SunConfig;
-  /** ACES tone mapping. Off by default — the content is LDR (no HDR range), so it just washes it out. */
+  /** ACES tone mapping. ON by design since the SA prelit pipeline (plan 038) — the night blend
+   *  and world tints are calibrated against it; the toggle remains as a debug/perf escape hatch. */
   toneMapping: boolean;
   /** Vehicle env-map reflections (preset-driven; see plan 030). */
   vehicleReflection: VehicleReflectionConfig;

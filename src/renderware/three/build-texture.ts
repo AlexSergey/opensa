@@ -21,8 +21,11 @@ const DXT_FORMAT = {
   dxt5: RGBA_S3TC_DXT5_Format,
 } as const;
 
+/** A TXD's textures by lowercased name — the shape every texture consumer works with. */
+export type TextureDictionary = Map<string, Texture>;
+
 /** Build a name-keyed (lowercased) map of three.js textures from a TXD. */
-export function buildTextureMap(dict: RWTextureDictionary): Map<string, Texture> {
+export function buildTextureMap(dict: RWTextureDictionary): TextureDictionary {
   const map = new Map<string, Texture>();
   for (const rw of dict.textures) {
     map.set(rw.name.toLowerCase(), buildTexture(rw));

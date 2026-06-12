@@ -74,41 +74,6 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
 }
 
 /**
- * Parse the UVAnimDict (0x2B): Struct = count, then count × RtAnim (0x1B). Each RtAnim:
- * `version (0x100), keyframeType (0x1C1 = linear UV), numFrames, flags, duration, u32 unused`,
- * then custom data `name char[32] + nodeToUVChannelMap (32 bytes, skipped)`, then `numFrames`
- * keyframes of `{ time f32, uv f32[6] (rot, sx, sy, skew, tx, ty), prevOffset i32 }` —
- * layout verified byte-level on visagesign04 (3 anims, 2 keyframes, 3 s X-scroll).
- */
-function parseUvAnimDict(stream: BinaryStream, header: ChunkHeader): RWUvAnimation[] {
-  const animations: RWUvAnimation[] = [];
-  forEachChild(stream, header.dataStart, header.end, (child) => {
-    if (child.type !== RwSection.ANIM_ANIMATION) {
-      return;
-    }
-    stream.seek(child.dataStart);
-    stream.u32(); // RtAnim version (0x100)
-    stream.u32(); // keyframe type (0x1C1 linear UV)
-    const numFrames = stream.u32();
-    stream.u32(); // flags
-    const duration = stream.f32();
-    stream.u32(); // unused
-    const name = stream.string(32);
-    stream.skip(32); // nodeToUVChannelMap
-    const keyframes: RWUvAnimation['keyframes'] = [];
-    for (let i = 0; i < numFrames; i += 1) {
-      const time = stream.f32();
-      const uv = [stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32()];
-      stream.skip(4); // prev-keyframe offset (irrelevant for our flat list)
-      keyframes.push({ time, uv });
-    }
-    animations.push({ duration, keyframes, name });
-  });
-
-  return animations;
-}
-
-/**
  * Recover per-face material indices from the geometry's BinMeshPLG split when the
  * triangle list left them all zero. Each triangle is keyed by its (order-
  * independent) vertex triple and assigned the material of the split it belongs to.
@@ -281,6 +246,41 @@ function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometr
   });
 
   return geometries;
+}
+
+/**
+ * Parse the UVAnimDict (0x2B): Struct = count, then count × RtAnim (0x1B). Each RtAnim:
+ * `version (0x100), keyframeType (0x1C1 = linear UV), numFrames, flags, duration, u32 unused`,
+ * then custom data `name char[32] + nodeToUVChannelMap (32 bytes, skipped)`, then `numFrames`
+ * keyframes of `{ time f32, uv f32[6] (rot, sx, sy, skew, tx, ty), prevOffset i32 }` —
+ * layout verified byte-level on visagesign04 (3 anims, 2 keyframes, 3 s X-scroll).
+ */
+function parseUvAnimDict(stream: BinaryStream, header: ChunkHeader): RWUvAnimation[] {
+  const animations: RWUvAnimation[] = [];
+  forEachChild(stream, header.dataStart, header.end, (child) => {
+    if (child.type !== RwSection.ANIM_ANIMATION) {
+      return;
+    }
+    stream.seek(child.dataStart);
+    stream.u32(); // RtAnim version (0x100)
+    stream.u32(); // keyframe type (0x1C1 linear UV)
+    const numFrames = stream.u32();
+    stream.u32(); // flags
+    const duration = stream.f32();
+    stream.u32(); // unused
+    const name = stream.string(32);
+    stream.skip(32); // nodeToUVChannelMap
+    const keyframes: RWUvAnimation['keyframes'] = [];
+    for (let i = 0; i < numFrames; i += 1) {
+      const time = stream.f32();
+      const uv = [stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32(), stream.f32()];
+      stream.skip(4); // prev-keyframe offset (irrelevant for our flat list)
+      keyframes.push({ time, uv });
+    }
+    animations.push({ duration, keyframes, name });
+  });
+
+  return animations;
 }
 
 /** Decoded `flags` lookup tables (2 bits each): lines count and chars per line. */

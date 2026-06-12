@@ -62,9 +62,7 @@ describe('parseIde', () => {
   });
 
   it('parses real counxref.ide anim rows (space-padded cells)', () => {
-    const defs = parseIde(
-      ['anim', '3426 ,nt_noddonkbase ,des_xoilfield ,counxref ,200 ,2097152', 'end'].join('\n'),
-    );
+    const defs = parseIde(['anim', '3426 ,nt_noddonkbase ,des_xoilfield ,counxref ,200 ,2097152', 'end'].join('\n'));
     expect(defs[0]).toEqual({
       anim: 'counxref',
       drawDistance: 200,

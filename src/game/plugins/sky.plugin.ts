@@ -218,7 +218,7 @@ export class SkyPlugin implements Plugin {
   private readonly getHour: () => number;
   private readonly material: ShaderMaterial;
   private readonly moonDisc: Sprite;
-  private night = 0; // 0 day → 1 deep night (sun height); drives stars, moon, skylight + the night grade
+  private night = 0; // 0 day → 1 deep night (sun height); drives stars, moon, skylight + world tints/shadows
   private readonly sample: (hour: number) => SkySample;
   /** Night "skylight" — a hemisphere fill from above, faded in at night for form (intensity set per frame). */
   private readonly skylight = new HemisphereLight(NIGHT_SKY_COLOR, NIGHT_GROUND_COLOR, 0);

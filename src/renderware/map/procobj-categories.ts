@@ -7,7 +7,17 @@ export type ProcObjCategoryName = 'bushes' | 'cacti' | 'flowers' | 'grass' | 'ro
 
 /** Every model `procobj.dat` references, grouped by category (names lowercased). */
 const CATEGORY_MODELS: readonly [ProcObjCategoryName, readonly string[]][] = [
-  ['grass', ['gen_tallgrsnew', 'genveg_tallgrass04', 'genveg_tallgrass12', 'veg_procfpatch', 'veg_procfpatch01', 'veg_procgrasspatch']],
+  [
+    'grass',
+    [
+      'gen_tallgrsnew',
+      'genveg_tallgrass04',
+      'genveg_tallgrass12',
+      'veg_procfpatch',
+      'veg_procfpatch01',
+      'veg_procgrasspatch',
+    ],
+  ],
   ['flowers', ['veg_pflowers02', 'veg_pflowers03', 'veg_pflowers04']],
   [
     'bushes',
@@ -64,7 +74,9 @@ const CATEGORY_MODELS: readonly [ProcObjCategoryName, readonly string[]][] = [
 ];
 
 const MODEL_CATEGORY: ReadonlyMap<string, ProcObjCategoryName> = new Map(
-  CATEGORY_MODELS.flatMap(([category, models]) => models.map((model): [string, ProcObjCategoryName] => [model, category])),
+  CATEGORY_MODELS.flatMap(([category, models]) =>
+    models.map((model): [string, ProcObjCategoryName] => [model, category]),
+  ),
 );
 
 /**

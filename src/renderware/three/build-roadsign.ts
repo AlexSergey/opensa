@@ -55,30 +55,6 @@ const DEG_TO_RAD = Math.PI / 180;
  *  while unset, sign text simply doesn't build (boards render bare, nothing crashes). */
 let roadsignFont: null | Texture = null;
 
-/** Install the `roadsignfont` glyph texture (call when particle.txd is loaded). */
-export function setRoadsignFont(font: null | Texture): void {
-  roadsignFont = font;
-}
-
-/** The installed glyph texture, or null when unavailable. */
-export function getRoadsignFont(): null | Texture {
-  return roadsignFont;
-}
-
-/** Glyph cell for a character, or null when it draws nothing (`_` = space) / is unknown. */
-export function roadsignGlyphIndex(char: string): null | number {
-  if (char === '_' || char === ' ') {
-    return null;
-  }
-  const command = COMMAND_GLYPHS[char];
-  if (command !== undefined) {
-    return command;
-  }
-  const index = ATLAS_ORDER.indexOf(char);
-
-  return index >= 0 ? index : null;
-}
-
 /**
  * Build the text quads for a model's road signs as render parts, batched by text colour (one
  * geometry + one alpha-tested font material per colour). Quads live in geometry-local space:
@@ -131,6 +107,30 @@ export function buildRoadsignParts(roadsigns: readonly RWRoadsign[], font: Textu
   return parts;
 }
 
+/** The installed glyph texture, or null when unavailable. */
+export function getRoadsignFont(): null | Texture {
+  return roadsignFont;
+}
+
+/** Glyph cell for a character, or null when it draws nothing (`_` = space) / is unknown. */
+export function roadsignGlyphIndex(char: string): null | number {
+  if (char === '_' || char === ' ') {
+    return null;
+  }
+  const command = COMMAND_GLYPHS[char];
+  if (command !== undefined) {
+    return command;
+  }
+  const index = ATLAS_ORDER.indexOf(char);
+
+  return index >= 0 ? index : null;
+}
+
+/** Install the `roadsignfont` glyph texture (call when particle.txd is loaded). */
+export function setRoadsignFont(font: null | Texture): void {
+  roadsignFont = font;
+}
+
 /** Append one sign's character quads (positions + UVs) to its colour batch. */
 function appendSignQuads(sign: RWRoadsign, positions: number[], uvs: number[]): void {
   const [plateWidth, plateHeight] = sign.plateSize;
@@ -176,7 +176,16 @@ function appendSignQuads(sign: RWRoadsign, positions: number[], uvs: number[]): 
         const cellU = (glyph % ATLAS_COLS) / ATLAS_COLS;
         const cellV = Math.floor(glyph / ATLAS_COLS) / ATLAS_ROWS;
         // DFF-style v-down UVs (same convention the TXD pipeline renders everywhere else).
-        uvs.push(cellU, cellV, cellU, cellV + 1 / ATLAS_ROWS, cellU + 1 / ATLAS_COLS, cellV + 1 / ATLAS_ROWS, cellU + 1 / ATLAS_COLS, cellV);
+        uvs.push(
+          cellU,
+          cellV,
+          cellU,
+          cellV + 1 / ATLAS_ROWS,
+          cellU + 1 / ATLAS_COLS,
+          cellV + 1 / ATLAS_ROWS,
+          cellU + 1 / ATLAS_COLS,
+          cellV,
+        );
       }
     }
   }
@@ -184,7 +193,11 @@ function appendSignQuads(sign: RWRoadsign, positions: number[], uvs: number[]): 
 
 /** Rotation Z→X→Y (radians) as a point transformer — allocation-free per corner.
  *  The order is solver-verified (scripts/solve-roadsign.ts) across every observed sign family. */
-function composeRotation(rx: number, ry: number, rz: number): (x: number, y: number, z: number) => [number, number, number] {
+function composeRotation(
+  rx: number,
+  ry: number,
+  rz: number,
+): (x: number, y: number, z: number) => [number, number, number] {
   const [sx, cx] = [Math.sin(rx), Math.cos(rx)];
   const [sy, cy] = [Math.sin(ry), Math.cos(ry)];
   const [sz, cz] = [Math.sin(rz), Math.cos(rz)];

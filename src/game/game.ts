@@ -430,6 +430,17 @@ export class Game {
     this.setConfig({ graphics: { ...this.config.graphics, night: { ...this.config.graphics.night, ...patch } } });
   }
 
+  /** Tune one procedural-clutter category (plan 042) at runtime; merges into `graphics.procobj`. */
+  setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void {
+    const procobj = this.config.graphics.procobj;
+    this.setConfig({
+      graphics: {
+        ...this.config.graphics,
+        procobj: { ...procobj, [category]: { ...procobj[category], ...patch } },
+      },
+    });
+  }
+
   /** Toggle sun shadows at runtime; merges into `graphics.shadows`. */
   setShadows(patch: Partial<ShadowsConfig>): void {
     this.setConfig({ graphics: { ...this.config.graphics, shadows: { ...this.config.graphics.shadows, ...patch } } });
@@ -502,17 +513,6 @@ export class Game {
     this.adapter = adapter;
 
     return this;
-  }
-
-  /** Tune one procedural-clutter category (plan 042) at runtime; merges into `graphics.procobj`. */
-  setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void {
-    const procobj = this.config.graphics.procobj;
-    this.setConfig({
-      graphics: {
-        ...this.config.graphics,
-        procobj: { ...procobj, [category]: { ...procobj[category], ...patch } },
-      },
-    });
   }
 
   /** Tune the SA prelit world lighting (plan 038) at runtime; merges into `graphics.worldLight`. */

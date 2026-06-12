@@ -80,15 +80,15 @@ export interface GtaSaWorldConfig {
   extraIpl?: readonly string[];
   /** Installed game mods (plan 039) — their `decoratePart` hooks run during cell builds. */
   mods?: readonly WorldMod[];
+  /** Effective clutter density per category (0 when disabled) — keeps clutter COLLISION in sync
+   *  with the rendered set. On a knob change, call {@link GtaSaWorldAdapter.invalidateColliderCache}
+   *  and re-stream physics. Default: vanilla density 1 for every category. */
+  procObjDensityOf?: (category: ProcObjCategoryName) => number;
   /** Hard cap on clutter instances per cell — over the limit, the highest-lottery placements
    *  are simply not RENDERED and therefore not collided either (one budget drives both; lowest
    *  lotteries win). The vanilla CProcObjectMan pools at ~300 for the same perf reason.
    *  Default: unlimited. */
   procObjLimit?: number;
-  /** Effective clutter density per category (0 when disabled) — keeps clutter COLLISION in sync
-   *  with the rendered set. On a knob change, call {@link GtaSaWorldAdapter.invalidateColliderCache}
-   *  and re-stream physics. Default: vanilla density 1 for every category. */
-  procObjDensityOf?: (category: ProcObjCategoryName) => number;
 }
 
 /** Resolved carcol paint (RGB per slot); 3rd/4th present only for 4-colour cars. */
@@ -118,10 +118,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private defs: MapDefinitions | null = null;
   private genericVehicleTextures: Map<string, Texture> | null = null;
   private grid: null | WorldGrid = null;
-  /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
-  private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Parsed `handling.cfg`, kept for the later vehicle-physics phase. */
   private handling: Map<string, HandlingEntry> | null = null;
+  /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
+  private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Surface-name table from surfinfo.dat (index = COL material id); pairs with procObjRules. */
   private surfaceNames: null | string[] = null;
   private vehicleColours: null | VehicleColours = null;
@@ -284,7 +284,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     const index = buildCollisionIndex(this.archive);
     const colliders = buildColliders(index, this.defs, { center: request.center, radius: request.radius });
     const root = new Group();
-    root.rotation.x = -Math.PI / 2; // GTA Z-up → three.js Y-up (matches loadRegion)
+    root.rotation.x = -Math.PI / 2; // GTA Z-up → three.js Y-up (matches the streaming root)
     root.add(buildCollisionWireframe(colliders));
 
     return [root];

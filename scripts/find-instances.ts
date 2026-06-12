@@ -84,7 +84,9 @@ for (const file of readdirSync(join(BASE, 'ipl_binary'))) {
     continue;
   }
   const buffer = readFileSync(join(BASE, 'ipl_binary', file));
-  for (const instance of parseBinaryIpl(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))) {
+  for (const instance of parseBinaryIpl(
+    buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+  )) {
     if (wantedIds.has(instance.id)) {
       report(file.replace('.ipl', ' (standalone)'), instance);
     }

@@ -19,9 +19,9 @@ const NAMES: Record<number, string> = {
   0x14: 'Atomic',
   0x1a: 'GeometryList',
   0x1f: 'TexDictionary',
+  0x050e: 'BinMeshPLG',
   0x0253f2f8: '2dEffect',
   0x0253f2fe: 'NodeName',
-  0x050e: 'BinMeshPLG',
 };
 
 const [path, filter] = process.argv.slice(2);
@@ -36,7 +36,7 @@ walk(0, buffer.length, 0);
 
 /** Containers whose data is a sequence of child chunks. */
 function hasChildren(type: number): boolean {
-  return [0x03, 0x08, 0x0e, 0x0f, 0x10, 0x14, 0x1a, 0x1f, 0x07, 0x06].includes(type);
+  return [0x03, 0x06, 0x07, 0x08, 0x0e, 0x0f, 0x10, 0x14, 0x1a, 0x1f].includes(type);
 }
 
 function walk(start: number, end: number, depth: number): void {
@@ -44,7 +44,7 @@ function walk(start: number, end: number, depth: number): void {
   while (offset + 12 <= end) {
     const type = buffer.readUInt32LE(offset);
     const size = buffer.readUInt32LE(offset + 4);
-    if (size > end - offset - 12 || !(type in NAMES) && depth === 0) {
+    if (size > end - offset - 12 || (!(type in NAMES) && depth === 0)) {
       return; // not a chunk boundary
     }
     const name = NAMES[type] ?? `0x${type.toString(16)}`;

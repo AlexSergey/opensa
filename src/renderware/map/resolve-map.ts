@@ -3,10 +3,6 @@ import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text'
 import { datChildUrl, iplBasename, normalizeDatPath, standaloneIplUrl, streamIplUrl } from '../archive';
 import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl, parseTimedObjects, parseTxdParents } from '../parsers/text';
 
-/** Stream-count manifest ({ basename: count }) so we load exactly the binary
- * stream IPLs that exist — no probe-by-404 (e.g. `map_stream0.ipl`). */
-type StreamManifest = Record<string, number>;
-
 export interface ResolveMapOptions {
   /**
    * Extra standalone binary IPLs to load from `ipl_binary/` (basenames, no extension). These are
@@ -17,6 +13,10 @@ export interface ResolveMapOptions {
    */
   extraIpl?: readonly string[];
 }
+
+/** Stream-count manifest ({ basename: count }) so we load exactly the binary
+ * stream IPLs that exist — no probe-by-404 (e.g. `map_stream0.ipl`). */
+type StreamManifest = Record<string, number>;
 
 /**
  * Resolve a whole map (framework-agnostic): parse gta.dat, merge all IDE object
