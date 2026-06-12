@@ -66,8 +66,9 @@ describe('buildAnimatedObjects', () => {
       expect(objects).toHaveLength(2);
       expect(objects[0].position.x).toBeCloseTo(628.1, 5);
       expect(objects[1].position.x).toBeCloseTo(640, 5);
-      expect(objects[0].userData.region.def).toBe(pumpDef);
-      expect(objects[0].userData.region.instances).toEqual([pumpInstance]);
+      const region = objects[0].userData.region as { def: IdeObjectDef; instances: IplInstance[] };
+      expect(region.def).toBe(pumpDef);
+      expect(region.instances).toEqual([pumpInstance]);
     });
 
     it('applies the IDE-flag treatment to the animated meshes (real 0x200000 = double-sided)', () => {

@@ -81,6 +81,15 @@ export interface DynamicObjectsFillConfig {
   strength: number;
 }
 
+/** World 2dfx particle effects (fires/smoke/fountains; plan 044) — live-tunable. */
+export interface EffectsConfig {
+  /** Visibility distance (world units; fade-out over the last 20%). Replaces each FX system's
+   *  authored CULLDIST (vanilla culls e.g. fire at 35 m — too close), so it works both ways. */
+  drawDistance: number;
+  /** Master toggle (off = no particle emitters render). */
+  enabled: boolean;
+}
+
 /** Distance fog tuning. */
 export interface FogConfig {
   /** Distance (world units) at which the world is fully fogged (the horizon); fog ramps in before it. */
@@ -101,6 +110,8 @@ export interface GraphicsConfig {
   bloom: BloomConfig;
   /** Procedural clouds on the sky dome. */
   clouds: CloudsConfig;
+  /** World 2dfx particle effects (fires/smoke/fountains; plan 044). */
+  effects: EffectsConfig;
   /** Vehicle headlights (the occupied car's night beams). */
   headlights: HeadlightConfig;
   /** Night light sources (2d-effect coronas — street lamps etc.). */

@@ -19,6 +19,25 @@ export interface RWClump {
   uvAnimations?: RWUvAnimation[];
 }
 
+/**
+ * A 2d-effect ESCALATOR entry (type 10): moving-step path baked into the host model (plan 044).
+ * The step path runs `position → bottom` (lower landing), `bottom → top` (incline),
+ * `top → end` (upper landing); all points are geometry-local. Six entries exist in the map
+ * (LA mall pairs + the LV casino travelators).
+ */
+export interface RWEscalator {
+  /** Start of the incline (end of the lower landing). */
+  bottom: Vec3;
+  /** 1 = steps move up (position → end), 0 = down (end → position). */
+  direction: number;
+  /** End of the upper landing (step exit). */
+  end: Vec3;
+  /** Start of the lower landing (step entry). */
+  position: Vec3;
+  /** End of the incline (start of the upper landing). */
+  top: Vec3;
+}
+
 /** A single frame: local transform + hierarchy link. */
 export interface RWFrame {
   name: string;
@@ -29,6 +48,8 @@ export interface RWFrame {
 }
 
 export interface RWGeometry {
+  /** 2d-effect escalators (geometry-local path points; plan 044) — undefined when none. */
+  escalators?: RWEscalator[];
   flags: number;
   /** 2d-effect lights/coronas (geometry-local positions) for street lamps, signs, etc. — empty if none. */
   lights: RWLight2d[];
@@ -39,6 +60,9 @@ export interface RWGeometry {
   /** Vertex normals if stored, else null (compute downstream). */
   normals: Float32Array | null;
   numUVLayers: number;
+  /** 2d-effect particle emitters (geometry-local positions; plan 044) — undefined when none.
+   *  `effectName` keys an FX system in `effects.fxp` (e.g. `fire`, `water_fountain`). */
+  particles?: RWParticle2d[];
   /** Vertex positions, flattened (numVertices * 3). */
   positions: Float32Array;
   /** Prelit RGBA bytes if present, flattened (numVertices * 4), else null. */
@@ -112,6 +136,15 @@ export interface RWMipLevel {
   data: Uint8Array;
   height: number;
   width: number;
+}
+
+/** A 2d-effect PARTICLE entry (type 1): an FX-system emitter baked into the model (plan 044).
+ *  The name keys a system in `effects.fxp` (skull-torch `fire`, `water_fountain`, vents…). */
+export interface RWParticle2d {
+  /** FX system name (lowercased), char[24] in the entry. */
+  effectName: string;
+  /** Geometry-local emitter position (transformed by each instance placement). */
+  position: Vec3;
 }
 
 /**

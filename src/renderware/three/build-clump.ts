@@ -36,12 +36,26 @@ export interface BuildClumpOptions {
 /** Stand-in for the rare geometry slice whose material table is empty (renders plain white). */
 const FALLBACK_RW_MATERIAL: RWMaterial = { color: [255, 255, 255, 255], texture: null, textured: false };
 
+/** A model's 2dfx escalator in clump-local space (frame transform applied; plan 044).
+ *  `points` is the step path: start → bottom (lower landing) → top (incline) → end (upper landing). */
+export interface ClumpEscalator {
+  /** 1 = steps move up (start → end), 0 = down. */
+  direction: number;
+  points: [[number, number, number], [number, number, number], [number, number, number], [number, number, number]];
+}
+
 /** A model's 2d-effect light in clump-local space (frame transform applied; still native Z-up). */
 export interface ClumpLight {
   color: [number, number, number];
   farClip: number;
   position: [number, number, number];
   size: number;
+}
+
+/** A model's 2dfx particle emitter in clump-local space (frame transform applied; plan 044). */
+export interface ClumpParticle {
+  effectName: string;
+  position: [number, number, number];
 }
 
 /** A single-material renderable slice of a clump (for InstancedMesh). */
@@ -87,6 +101,33 @@ export function buildClump(clump: RWClump, textures?: Map<string, Texture>, opti
 }
 
 /**
+ * Extract a clump's 2dfx escalators, every path point frame-transformed into clump-local space
+ * (native Z-up) like the lights/particles. Empty when the model has none.
+ */
+export function buildClumpEscalators(clump: RWClump): ClumpEscalator[] {
+  const escalators: ClumpEscalator[] = [];
+  const point = new Vector3();
+  for (const atomic of clump.atomics) {
+    const rw = clump.geometries[atomic.geometryIndex];
+    if (!rw?.escalators || rw.escalators.length === 0) {
+      continue;
+    }
+    const frame = clump.frames[atomic.frameIndex];
+    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+    for (const escalator of rw.escalators) {
+      const points = [escalator.position, escalator.bottom, escalator.top, escalator.end].map((p) => {
+        point.set(p[0], p[1], p[2]).applyMatrix4(matrix);
+
+        return [point.x, point.y, point.z] as [number, number, number];
+      });
+      escalators.push({ direction: escalator.direction, points: points as ClumpEscalator['points'] });
+    }
+  }
+
+  return escalators;
+}
+
+/**
  * Extract a clump's 2d-effect lights/coronas, each placed by its atomic's frame transform into
  * clump-local space (native Z-up — the streaming root applies the Z-up→Y-up rotation, like the parts).
  * Empty when the model has no lights. The caller multiplies these by each instance transform.
@@ -113,6 +154,29 @@ export function buildClumpLights(clump: RWClump): ClumpLight[] {
   }
 
   return lights;
+}
+
+/**
+ * Extract a clump's 2dfx particle emitters, frame-transformed into clump-local space (native
+ * Z-up) like the lights. Empty when the model has none; the caller applies instance transforms.
+ */
+export function buildClumpParticles(clump: RWClump): ClumpParticle[] {
+  const particles: ClumpParticle[] = [];
+  const point = new Vector3();
+  for (const atomic of clump.atomics) {
+    const rw = clump.geometries[atomic.geometryIndex];
+    if (!rw?.particles || rw.particles.length === 0) {
+      continue;
+    }
+    const frame = clump.frames[atomic.frameIndex];
+    const matrix = frame ? frameMatrix(frame.rotation, frame.position) : new Matrix4();
+    for (const particle of rw.particles) {
+      point.set(particle.position[0], particle.position[1], particle.position[2]).applyMatrix4(matrix);
+      particles.push({ effectName: particle.effectName, position: [point.x, point.y, point.z] });
+    }
+  }
+
+  return particles;
 }
 
 /**

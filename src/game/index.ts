@@ -11,6 +11,7 @@ export type {
   CameraConfig,
   CloudsConfig,
   Config,
+  EffectsConfig,
   HeadlightConfig,
   LightsConfig,
   MoonConfig,

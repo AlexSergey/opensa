@@ -14,9 +14,12 @@ import { openArchive } from '../src/renderware/archive/img-archive';
 const ROOT = join(import.meta.dirname, '..');
 const DIRS = ['static/img/gta3', 'static/img/gta3additional'];
 const TWO_D_EFFECT = 0x0253f2f8;
+const PARTICLE = 1;
 const ROADSIGN = 7;
+const ESCALATOR = 10;
 
 const typeHistogram = new Map<number, number>();
+const particleNames = new Map<string, number>();
 let roadsignModels = 0;
 
 const imgFlag = process.argv.indexOf('--img');
@@ -49,6 +52,33 @@ for (const [type, count] of [...typeHistogram.entries()].sort((a, b) => a[0] - b
   console.log(`  type ${type}: ${count}`);
 }
 console.log(`\nmodels with ROADSIGN entries: ${roadsignModels}`);
+if (particleNames.size > 0) {
+  console.log('\nPARTICLE effect names:');
+  for (const [name, count] of [...particleNames.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${name.padEnd(24)} ${count}`);
+  }
+}
+
+/** Decode one ESCALATOR entry (gtamods): bottom vec3, top vec3, end vec3, direction u32 = 40 bytes. */
+function dumpEscalator(buffer: Buffer, model: string, entryStart: number, entrySize: number): void {
+  const vec = (at: number): string =>
+    [buffer.readFloatLE(at), buffer.readFloatLE(at + 4), buffer.readFloatLE(at + 8)].map((v) => v.toFixed(2)).join(',');
+  const direction = entrySize >= 40 ? buffer.readUInt32LE(entryStart + 20 + 36) : -1;
+  console.log(
+    `ESCALATOR ${model.padEnd(24)} size=${entrySize} pos(${vec(entryStart)}) bottom(${vec(entryStart + 20)}) top(${vec(entryStart + 32)}) end(${vec(entryStart + 44)}) dir=${direction}`,
+  );
+}
+
+/** Decode one PARTICLE entry: char[24] effect name + the entry position. */
+function dumpParticle(buffer: Buffer, model: string, entryStart: number, entrySize: number): void {
+  const name = buffer
+    .subarray(entryStart + 20, entryStart + 20 + Math.min(24, entrySize))
+    .toString('latin1')
+    .replace(/\0.*$/, '');
+  particleNames.set(name, (particleNames.get(name) ?? 0) + 1);
+  const pos = [buffer.readFloatLE(entryStart), buffer.readFloatLE(entryStart + 4), buffer.readFloatLE(entryStart + 8)];
+  console.log(`PARTICLE ${model.padEnd(24)} "${name}" pos(${pos.map((v) => v.toFixed(1)).join(',')})`);
+}
 
 /** Decode one roadsign entry. Layout (verified against the first survey run — the leading pair
  *  of floats is the PLATE SIZE, not rotation): pos(12) type(4) size(4) | plate vec2(8)
@@ -94,17 +124,33 @@ function scan(buffer: Buffer, model: string): void {
     }
     let cursor = dataStart + 4;
     for (let i = 0; i < count && cursor + 20 <= dataStart + size; i += 1) {
-      const entryType = buffer.readUInt32LE(cursor + 12);
-      const entrySize = buffer.readUInt32LE(cursor + 16);
-      typeHistogram.set(entryType, (typeHistogram.get(entryType) ?? 0) + 1);
-      if (entryType === ROADSIGN && cursor + 20 + entrySize <= dataStart + size) {
-        hasRoadsign = true;
-        dumpRoadsign(buffer, model, cursor);
-      }
-      cursor += 20 + entrySize;
+      hasRoadsign = scanEntry(buffer, model, cursor, dataStart + size) || hasRoadsign;
+      cursor += 20 + buffer.readUInt32LE(cursor + 16);
     }
   }
   if (hasRoadsign) {
     roadsignModels += 1;
   }
+}
+
+/** Histogram + decode one 2dfx entry; returns true when it was a ROADSIGN (model counting). */
+function scanEntry(buffer: Buffer, model: string, cursor: number, blockEnd: number): boolean {
+  const entryType = buffer.readUInt32LE(cursor + 12);
+  const entrySize = buffer.readUInt32LE(cursor + 16);
+  typeHistogram.set(entryType, (typeHistogram.get(entryType) ?? 0) + 1);
+  if (cursor + 20 + entrySize > blockEnd) {
+    return false; // truncated entry — histogram only
+  }
+  if (entryType === ROADSIGN) {
+    dumpRoadsign(buffer, model, cursor);
+
+    return true;
+  }
+  if (entryType === PARTICLE) {
+    dumpParticle(buffer, model, cursor, entrySize);
+  } else if (entryType === ESCALATOR) {
+    dumpEscalator(buffer, model, cursor, entrySize);
+  }
+
+  return false;
 }

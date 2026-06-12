@@ -39,13 +39,26 @@
 - Frame transforms are deliberately ignored for map models (SA re-frames atomic model infos);
   kept for vehicles/characters/`anim`-section clump objects.
 
-## Known gaps / candidates
+## Coverage (audit 2026-06-12, `scripts/audit-rw-coverage.ts`)
 
-- 2dfx types 1/3/4/6/8/10 (particles, ped attractors, sun glare, enex, escalators) unparsed.
-- Only the first UV layer is used downstream (second layer = lightmaps/detail in some assets).
-- UV anim rotation/skew params parsed but not applied by the renderer (no asset found needing
-  them yet).
-- Morph targets beyond the first are ignored.
+**13126 DFFs, 0 parse failures.** Full 2dfx census: lights 1664 (done), particles 113,
+ped attractors 820, sun glare 2, enex 75, roadsigns 516 (done), trigger 30, cover points 13900,
+escalators 6. Notable unparsed chunks present in data: HAnimPLG ×10948, **Breakable**
+(`0x253F2FD`, gtamods-confirmed) ×1724, PipelineSet ×27, Right To Render ×56k (pipeline hint —
+harmless skip), RW core Light sections ×912 (SA ignores them); 316 models carry a second UV
+layer.
+
+## Known gaps / candidates (prioritized in plan 043)
+
+- 2dfx type 1 particles (fountains/smoke/fires) and type 10 escalators — **plan 044 (world
+  effects)**, split out because they need an emitter/animation system, not just parsing.
+- Second UV layer unused downstream (suspected MatFX dual-pass dirt/detail — investigate).
+- HAnim PLG unparsed — bones bind by frame name (works for shipped data; IDs are more robust).
+- Breakable (`0x253F2FD`) unparsed — smashable furniture mesh data (windows, tables); gets its
+  own dedicated plan (parse + gameplay together).
+- 2dfx types 3/4/6/8/9 — explicitly N/A (gameplay/AI/interiors out of scope).
+- UV anim rotation/skew params parsed but not applied (no shipped asset animates them).
+- Morph targets beyond the first ignored (MorphPLG absent from shipped data).
 
 ## Test coverage anchors
 

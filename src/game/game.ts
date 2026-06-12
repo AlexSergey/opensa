@@ -25,6 +25,7 @@ import {
   type CameraConfig,
   type CloudsConfig,
   type Config,
+  type EffectsConfig,
   type GameState,
   type HeadlightConfig,
   type LightsConfig,
@@ -358,6 +359,11 @@ export class Game {
   setConfig(patch: Partial<Config>): void {
     Object.assign(this.config, patch); // mutate in place so PluginContext.config stays live
     this.broadcastConfigChanged();
+  }
+
+  /** Tune world 2dfx particle effects (plan 044) at runtime; merges into `graphics.effects`. */
+  setEffects(patch: Partial<EffectsConfig>): void {
+    this.setConfig({ graphics: { ...this.config.graphics, effects: { ...this.config.graphics.effects, ...patch } } });
   }
 
   /** Swing the follow camera to a given orbit azimuth (yaw about world up). */

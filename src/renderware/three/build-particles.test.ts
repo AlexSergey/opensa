@@ -1,0 +1,160 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { AdditiveBlending, Group, type ShaderMaterial } from 'three';
+import { describe, expect, it } from 'vitest';
+
+import { parseDff } from '../parsers/binary/dff';
+import { parseTxd } from '../parsers/binary/txd';
+import { parseFxp } from '../parsers/text/fxp.parser';
+import { toArrayBuffer } from '../test-utils';
+import { buildClumpParticles } from './build-clump';
+import {
+  buildParticleEmitters,
+  particleDrawDistanceUniform,
+  type ParticleEmitterEntry,
+  resetParticleEffects,
+  setFxLibrary,
+  updateParticleEffects,
+} from './build-particles';
+import { buildTextureMap } from './build-texture';
+import { GLOW_LAYER } from './corona';
+
+const FXP_PATH = join(process.cwd(), 'static', 'models', 'effects.fxp');
+const TXD_PATH = join(process.cwd(), 'static', 'models', 'effectsPC.txd');
+const SKULL_DFF = 'tests/dff/particle/skullpillar01_lvs.dff';
+const libraryExists = existsSync(FXP_PATH) && existsSync(TXD_PATH) && existsSync(SKULL_DFF);
+
+function loadLibrary(): void {
+  setFxLibrary(
+    parseFxp(readFileSync(FXP_PATH, 'utf8')),
+    buildTextureMap(parseTxd(toArrayBuffer(readFileSync(TXD_PATH)))),
+  );
+}
+
+/** The real skull-pillar fire entry, placed at two world points (the pirate-ship pillars pattern). */
+function skullEntries(): ParticleEmitterEntry[] {
+  const clump = parseDff(toArrayBuffer(readFileSync(SKULL_DFF)));
+  const locals = buildClumpParticles(clump);
+  expect(locals).toHaveLength(1);
+  expect(locals[0].effectName).toBe('fire');
+
+  return [
+    { effectName: locals[0].effectName, position: [2030, 1480, 12] },
+    { effectName: locals[0].effectName, position: [2035, 1485, 12] },
+  ];
+}
+
+describe('buildParticleEmitters', () => {
+  describe('negative cases', () => {
+    it('builds nothing while the FX library is not set', () => {
+      expect(buildParticleEmitters([{ effectName: 'fire', position: [0, 0, 0] }])).toEqual([]);
+    });
+
+    it.skipIf(!libraryExists)('builds nothing for empty entries or unknown effect names', () => {
+      loadLibrary();
+      expect(buildParticleEmitters([])).toEqual([]);
+      expect(buildParticleEmitters([{ effectName: 'no_such_effect', position: [0, 0, 0] }])).toEqual([]);
+    });
+  });
+
+  describe.skipIf(!libraryExists)('positive cases (real effects.fxp + effectsPC.txd + skullpillar01_lvs)', () => {
+    it('builds the fire layers for the skull-pillar entries', () => {
+      loadLibrary();
+      const entries = skullEntries();
+      const points = buildParticleEmitters(entries);
+
+      // fire has 3 prims; the heat-haze layer is skipped, so flame + smoke (when sprites resolve).
+      expect(points.length).toBeGreaterThanOrEqual(1);
+      expect(points.length).toBeLessThanOrEqual(2);
+      for (const layer of points) {
+        expect(layer.name.startsWith('fx:fire:')).toBe(true);
+        expect(layer.name.toLowerCase()).not.toContain('haze');
+        // SSAO safety: every point sprite lives on the glow layer (normal prepass skips it).
+        expect(layer.layers.mask).toBe(1 << GLOW_LAYER);
+        const material = layer.material as ShaderMaterial;
+        expect(material.depthWrite).toBe(false);
+        expect(material.transparent).toBe(true);
+        // Each placed entry contributes the same particle budget.
+        const count = layer.geometry.getAttribute('position').count;
+        expect(count).toBeGreaterThan(0);
+        expect(count % entries.length).toBe(0);
+        expect(layer.geometry.boundingSphere).not.toBeNull();
+      }
+
+      // The wjet6 flame prim is additive (SRCBLENDID 4 / DSTBLENDID 1).
+      const flame = points.find((layer) => (layer.material as ShaderMaterial).blending === AdditiveBlending);
+      expect(flame).toBeDefined();
+      const uniforms = (flame!.material as ShaderMaterial).uniforms;
+      // Every layer shares the config draw-distance uniform (it replaces the authored CULLDIST).
+      expect(uniforms.uDrawDistance).toBe(particleDrawDistanceUniform);
+      expect(uniforms.uMap.value).toBeTruthy();
+      // fire colours live in COLOURBRIGHT tracks with a 0 → peak@0.75 → 0 envelope: the mid
+      // sample must carry the flame (born transparent, orange at half-life).
+      const alpha = uniforms.uAlpha.value as [number, number, number];
+      expect(alpha[0]).toBeCloseTo(0, 3);
+      expect(alpha[1]).toBeGreaterThan(0.5);
+      const mid = uniforms.uColor1.value as [number, number, number];
+      expect(mid[0]).toBeGreaterThan(mid[2]); // red-dominant, not the white fallback
+    });
+
+    it('keeps rebuilt cells deterministic (same entries, identical velocities)', () => {
+      loadLibrary();
+      const entries = skullEntries();
+      const first = buildParticleEmitters(entries);
+      const second = buildParticleEmitters(entries);
+      expect(second.map((layer) => layer.name)).toEqual(first.map((layer) => layer.name));
+      const a = first[0].geometry.getAttribute('aVelocity').array;
+      const b = second[0].geometry.getAttribute('aVelocity').array;
+      expect(Array.from(b)).toEqual(Array.from(a));
+    });
+  });
+});
+
+describe('updateParticleEffects', () => {
+  describe('negative cases', () => {
+    it.skipIf(!libraryExists)('hides attached layers when effects are disabled', () => {
+      resetParticleEffects();
+      loadLibrary();
+      const points = buildParticleEmitters(skullEntries());
+      const root = new Group();
+      for (const layer of points) {
+        root.add(layer);
+      }
+      updateParticleEffects([2030, 1480, 12], { drawDistance: 150, enabled: false });
+      expect(points.every((layer) => !layer.visible)).toBe(true);
+    });
+
+    it.skipIf(!libraryExists)('hides layers beyond the configured draw distance', () => {
+      resetParticleEffects();
+      loadLibrary();
+      const points = buildParticleEmitters(skullEntries());
+      const root = new Group();
+      for (const layer of points) {
+        root.add(layer);
+      }
+      // The fire cloud sits around (2030..2035, 1480..1485); view it from 100 m away, cap at 20 m.
+      updateParticleEffects([2030, 1380, 12], { drawDistance: 20, enabled: true });
+      expect(points.every((layer) => !layer.visible)).toBe(true);
+    });
+  });
+
+  describe.skipIf(!libraryExists)('positive cases', () => {
+    it('keeps nearby layers visible and skips detached (streamed-out) ones', () => {
+      resetParticleEffects();
+      loadLibrary();
+      const attached = buildParticleEmitters(skullEntries());
+      const detached = buildParticleEmitters(skullEntries());
+      const root = new Group();
+      for (const layer of attached) {
+        root.add(layer);
+        layer.visible = false; // prove the update turns them back on
+      }
+      updateParticleEffects([2030, 1480, 12], { drawDistance: 150, enabled: true });
+      expect(attached.every((layer) => layer.visible)).toBe(true);
+      // Detached layers keep their default visibility — the update never touches them.
+      expect(detached.every((layer) => layer.visible)).toBe(true);
+      updateParticleEffects([2030, 1480, 12], { drawDistance: 150, enabled: false });
+      expect(detached.every((layer) => layer.visible)).toBe(true);
+    });
+  });
+});

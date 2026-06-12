@@ -3,15 +3,18 @@ import type { MeshBasicMaterial, Object3D } from 'three';
 import { AdditiveBlending, DoubleSide, InstancedMesh, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
 
 import type { ImgArchive } from '../archive';
-import type { IdeObjectDef, IplInstance } from '../parsers/text';
+import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text';
 import type { RenderPart } from '../three/build-clump';
+import type { EscalatorPathEntry } from '../three/build-escalator';
+import type { ParticleEmitterEntry } from '../three/build-particles';
 import type { CoronaEntry } from '../three/corona';
 
 import { getClump, getIfp, getTextures, modelKey } from '../archive';
 import { hasIdeFlag, IdeFlag } from '../parsers/text';
 import { registerAnimatedObject } from '../three/animated-objects';
 import { buildAnimatedClump } from '../three/build-animated-clump';
-import { buildClumpLights, buildClumpParts } from '../three/build-clump';
+import { buildClumpEscalators, buildClumpLights, buildClumpParticles, buildClumpParts } from '../three/build-clump';
+import { buildEscalatorSteps } from '../three/build-escalator';
 import { buildRoadsignParts, getRoadsignFont } from '../three/build-roadsign';
 import { applyWorldWindowGlow } from '../three/world-material';
 
@@ -231,6 +234,94 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
   return coronas;
 }
 
+/**
+ * Gather the world-space 2dfx particle emitters for a set of model groups (plan 044): each
+ * model's clump-local emitters placed by every instance transform — same walk as the coronas.
+ */
+export function collectParticleEmitters(archive: ImgArchive, groups: Iterable<RegionMeshData>): ParticleEmitterEntry[] {
+  const entries: ParticleEmitterEntry[] = [];
+  const placement = new Matrix4();
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3(1, 1, 1);
+  const point = new Vector3();
+
+  for (const group of groups) {
+    const particles = buildClumpParticles(getClump(archive, group.def.modelName));
+    if (particles.length === 0) {
+      continue;
+    }
+    for (const instance of group.instances) {
+      position.set(instance.position[0], instance.position[1], instance.position[2]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
+      quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+      placement.compose(position, quaternion, scale);
+      for (const particle of particles) {
+        point.set(particle.position[0], particle.position[1], particle.position[2]).applyMatrix4(placement);
+        entries.push({ effectName: particle.effectName, position: [point.x, point.y, point.z] });
+      }
+    }
+  }
+
+  return entries;
+}
+
+/** The step model SA's escalator code hardcodes (ModelIndices); its textures live in escstep.txd. */
+const ESCALATOR_STEP_MODEL = 'esc_step';
+
+/**
+ * Build the moving steps for any 2dfx escalators in a set of model groups (plan 044): clump-local
+ * path points placed by every instance transform (same walk as the particles), steps instanced
+ * from the vanilla `esc_step` model. Nothing for the (vast majority of) escalator-free groups.
+ */
+export function buildEscalatorMeshes(
+  archive: ImgArchive,
+  defs: MapDefinitions,
+  groups: Iterable<RegionMeshData>,
+): Object3D[] {
+  const entries: EscalatorPathEntry[] = [];
+  const placement = new Matrix4();
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3(1, 1, 1);
+  const point = new Vector3();
+
+  for (const group of groups) {
+    const escalators = buildClumpEscalators(getClump(archive, group.def.modelName));
+    if (escalators.length === 0) {
+      continue;
+    }
+    for (const instance of group.instances) {
+      position.set(instance.position[0], instance.position[1], instance.position[2]);
+      quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+      placement.compose(position, quaternion, scale);
+      for (const escalator of escalators) {
+        const points = escalator.points.map((p) => {
+          point.set(p[0], p[1], p[2]).applyMatrix4(placement);
+
+          return [point.x, point.y, point.z] as [number, number, number];
+        });
+        entries.push({ direction: escalator.direction, points: points as EscalatorPathEntry['points'] });
+      }
+    }
+  }
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const stepDef = findDefByModel(defs, ESCALATOR_STEP_MODEL);
+  const parts = buildClumpParts(
+    getClump(archive, ESCALATOR_STEP_MODEL),
+    getTextures(archive, stepDef?.txdName ?? 'escstep'),
+  );
+
+  return buildEscalatorSteps(parts, entries);
+}
+
 /** Apply a def's treatment to one part material (mutates it; materials are built per group/object). */
 function applyTreatment(material: MeshBasicMaterial, treatment: DefTreatment, nightLit: boolean): void {
   if (treatment.twoSided) {
@@ -260,6 +351,17 @@ function defTreatment(def: IdeObjectDef): DefTreatment {
     noDepthWrite: additive || hasIdeFlag(def, IdeFlag.NO_ZBUFFER_WRITE),
     twoSided: hasIdeFlag(def, IdeFlag.DISABLE_BACKFACE_CULLING),
   };
+}
+
+/** Find an object def by model name (escalator cells only — a rare linear scan is fine). */
+function findDefByModel(defs: MapDefinitions, modelName: string): IdeObjectDef | undefined {
+  for (const def of defs.catalog.values()) {
+    if (def.modelName.toLowerCase() === modelName) {
+      return def;
+    }
+  }
+
+  return undefined;
 }
 
 /** Whether a timed window `[on, off)` is a night-lit variant (visible across midnight → glowing). */

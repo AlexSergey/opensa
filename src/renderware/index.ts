@@ -22,8 +22,35 @@ export * from './parsers/text';
 // three.js adapter layer
 export { updateAnimatedObjects } from './three/animated-objects';
 export { buildAnimationClip, type BuildAnimClipOptions } from './three/build-anim-clip';
-export { buildClump, buildClumpLights, buildClumpParts, type ClumpLight, type RenderPart } from './three/build-clump';
+export {
+  buildClump,
+  buildClumpEscalators,
+  buildClumpLights,
+  buildClumpParticles,
+  buildClumpParts,
+  type ClumpEscalator,
+  type ClumpLight,
+  type ClumpParticle,
+  type RenderPart,
+} from './three/build-clump';
 export { buildCollisionWireframe } from './three/build-col-wireframe';
+export {
+  buildEscalatorSteps,
+  type EscalatorPathEntry,
+  resetEscalators,
+  updateEscalators,
+} from './three/build-escalator';
+export {
+  buildParticleEmitters,
+  particleDrawDistanceUniform,
+  type ParticleEffectsSettings,
+  type ParticleEmitterEntry,
+  particleTimeUniform,
+  particleViewportUniform,
+  resetParticleEffects,
+  setFxLibrary,
+  updateParticleEffects,
+} from './three/build-particles';
 export { buildRoadsignParts, roadsignGlyphIndex, setRoadsignFont } from './three/build-roadsign';
 export { buildSkinnedClump, type SkinnedClump } from './three/build-skinned-clump';
 export { buildTextureMap, type TextureDictionary } from './three/build-texture';

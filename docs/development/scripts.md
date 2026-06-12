@@ -13,6 +13,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
   - [stretch-night.mjs](#stretch-nightmjs)
 - [Debugging / auditing](#debugging--auditing)
+  - [audit-rw-coverage.ts](#audit-rw-coveragets)
   - [inspect-area.ts](#inspect-areats)
   - [find-instances.ts](#find-instancests)
   - [model-bbox.ts](#model-bboxts)
@@ -20,6 +21,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [find-2dfx.ts](#find-2dfxts)
   - [dump-chunks.ts](#dump-chunksts)
   - [dump-texture.ts](#dump-texturets)
+  - [dump-fx-system.ts](#dump-fx-systemts)
   - [solve-roadsign.ts](#solve-roadsignts)
   - [procobj-stats.ts](#procobj-statsts)
   - [wind-coverage.ts](#wind-coveragets)
@@ -102,6 +104,20 @@ node scripts/stretch-night.mjs
 
 All of these mirror `resolveMap` offline (fs instead of fetch) over `static/`, so they see
 exactly what the game would.
+
+### audit-rw-coverage.ts
+
+Full RenderWare coverage audit: walks every DFF/TXD in the extracted model folders and reports
+what the data ACTUALLY contains vs what the parsers handle — DFF chunk-type histogram, the
+complete 2dfx entry census, multi-UV-layer model count, parse failures; TXD format histogram and
+how many textures the classifier drops. The ground truth behind plan 043.
+
+```sh
+npx tsx scripts/audit-rw-coverage.ts
+```
+
+Real use: established 13126/0-failure DFF coverage, the 36 dropped 16-bit textures, and the
+prioritized parser gap list (particles, escalators, Breakable, HAnim, dual UV).
 
 ### inspect-area.ts
 
@@ -193,6 +209,17 @@ that is how the `roadsignfont` atlas layout was read by eye.
 
 ```sh
 npx tsx scripts/dump-texture.ts static/models/particle.txd roadsignfont out.png alpha
+```
+
+### dump-fx-system.ts
+
+Dumps one `effects.fxp` system: emitter prims with textures/blend ids and every keyframed
+track. This is how the fire system's COLOURBRIGHT tracks (vs the usual COLOUR) and its
+0→peak→0 alpha envelope were discovered (plan 044).
+
+```sh
+npx tsx scripts/dump-fx-system.ts fire
+npx tsx scripts/dump-fx-system.ts water_fountain static/models/effects.fxp
 ```
 
 ### solve-roadsign.ts

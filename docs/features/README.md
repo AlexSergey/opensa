@@ -19,5 +19,6 @@ implemented ones, and assembling the release changelog.
 | Animated map objects (UV + IFP) | [animated-map-objects.md](animated-map-objects.md) |
 | Procedural ground clutter (procobj) | [procobj.md](procobj.md) |
 | Road-sign text (2dfx type 7) | [roadsign-text.md](roadsign-text.md) |
+| World effects (2dfx particles) | [world-effects.md](world-effects.md) |
 | Game mods (WorldMod) + wind | [mods.md](mods.md) |
 | Zones, HUD, debug tooling | [zones-hud-debug.md](zones-hud-debug.md) |

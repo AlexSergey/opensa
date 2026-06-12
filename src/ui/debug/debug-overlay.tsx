@@ -5,6 +5,7 @@ import type {
   CameraConfig,
   City,
   CloudsConfig,
+  EffectsConfig,
   Game,
   HeadlightConfig,
   LightsConfig,
@@ -50,6 +51,8 @@ export interface DebugActions {
   city(): City;
   /** Current cloud tuning. */
   clouds(): CloudsConfig;
+  /** Current world 2dfx particle-effects tuning (plan 044). */
+  effects(): EffectsConfig;
   /** Flip the occupied car (on wheels → roof, on roof → wheels). No-op on foot. */
   flipVehicle(): void;
   /** Current fog distance (world units to full fog). */
@@ -80,6 +83,8 @@ export interface DebugActions {
   setCamera(patch: Partial<CameraConfig>): void;
   /** Tune clouds (coverage/opacity). */
   setClouds(patch: Partial<CloudsConfig>): void;
+  /** Tune world 2dfx particle effects (enabled/drawDistance; plan 044). */
+  setEffects(patch: Partial<EffectsConfig>): void;
   /** Set the fog distance (world units to full fog). */
   setFogDistance(distance: number): void;
   /** Set the in-game time (minutes since midnight). */
@@ -199,6 +204,38 @@ const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [
   'underwater',
 ];
 
+/** Graphics-screen block for the world 2dfx particle effects (plan 044): master toggle + the
+ *  draw distance that replaces the systems' authored CULLDIST. */
+function WorldEffectsControls(props: {
+  effects: EffectsConfig;
+  onPatch: (patch: Partial<EffectsConfig>) => void;
+}): ReactElement {
+  const { effects, onPatch } = props;
+
+  return (
+    <>
+      <label style={styles.label}>
+        <input
+          checked={effects.enabled}
+          onChange={() => onPatch({ enabled: !effects.enabled })}
+          style={styles.radio}
+          type="checkbox"
+        />
+        <span style={effects.enabled ? styles.optionActive : styles.option}>World effects</span>
+      </label>
+      <div style={styles.groupLabel}>EFFECTS DISTANCE: {effects.drawDistance.toFixed(0)}</div>
+      <input
+        max={300}
+        min={10}
+        onChange={(e) => onPatch({ drawDistance: Number(e.target.value) })}
+        step={10}
+        type="range"
+        value={effects.drawDistance}
+      />
+    </>
+  );
+}
+
 /** Quick teleport destinations (native GTA Z-up world coords). */
 const TELEPORTS: { coords: Vec3; label: string }[] = [
   { coords: PLAYER_SPAWN, label: 'LS - Ganton' },
@@ -213,6 +250,7 @@ const TELEPORTS: { coords: Vec3; label: string }[] = [
   { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
   { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
   { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
+  { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
 ];
 
 /**
@@ -246,7 +284,8 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [moon, setMoon] = useState<MoonConfig>(() => actions.moon());
   const [night, setNight] = useState<NightConfig>(() => actions.night());
   const [worldLight, setWorldLight] = useState<WorldLightConfig>(() => actions.worldLight());
-  const [procObj, setProcObjState] = useState<ProcObjConfig>(() => actions.procObj());
+  const [procObj, setProcObj] = useState<ProcObjConfig>(() => actions.procObj());
+  const [effects, setEffects] = useState<EffectsConfig>(() => actions.effects());
   const [sky, setSky] = useState<SkyConfig>(() => actions.sky());
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
@@ -669,7 +708,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
               <div style={styles.groupLabel}>PROCEDURAL CLUTTER (procobj.dat — plan 042)</div>
               {PROCOBJ_CATEGORIES.map((category) => {
                 const patch = (value: Partial<ProcObjTypeConfig>): void => {
-                  setProcObjState((prev) => ({ ...prev, [category]: { ...prev[category], ...value } }));
+                  setProcObj((prev) => ({ ...prev, [category]: { ...prev[category], ...value } }));
                   actions.setProcObj(category, value);
                 };
 
@@ -912,6 +951,13 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 />
                 <span style={shadows.enabled ? styles.optionActive : styles.option}>Sun shadows</span>
               </label>
+              <WorldEffectsControls
+                effects={effects}
+                onPatch={(patch) => {
+                  setEffects((prev) => ({ ...prev, ...patch }));
+                  actions.setEffects(patch);
+                }}
+              />
               <div style={styles.groupLabel}>HEADLIGHT POWER: {headlights.intensity.toFixed(1)}</div>
               <input
                 max={30}

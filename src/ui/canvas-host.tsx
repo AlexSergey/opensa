@@ -50,12 +50,18 @@ import {
   type MapZone,
   nightFillRim,
   nightFillUniform,
+  parseFxp,
   parseGxt,
   parseTxd,
   parseZones,
+  particleTimeUniform,
+  particleViewportUniform,
   sampleTimecycBlend,
+  setFxLibrary,
   setRoadsignFont,
   updateAnimatedObjects,
+  updateEscalators,
+  updateParticleEffects,
   updateProcObjMeshes,
   updateUvAnimations,
   WEATHER_NAMES,
@@ -305,6 +311,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       graphics: {
         bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
         clouds: { coverage: 0.5, opacity: 0.85 },
+        // World 2dfx particle effects (plan 044) — drawDistance replaces the systems' authored
+        // CULLDIST (vanilla culls fire at 35 m — too close).
+        effects: { drawDistance: 150, enabled: true },
         headlights: { angle: Math.PI / 7, distance: 60, glow: 0.68, intensity: 13 },
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
@@ -375,7 +384,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       extraIpl: ['truthsfarm'],
       mods: [windMod],
       // Clutter collision follows the live per-category knobs (0 when disabled) — see setProcObj.
-      procObjDensityOf: (category) => {
+      procObjDensityOf: (category): number => {
         const setting = game.getConfig().graphics.procobj[category];
 
         return setting.enabled ? setting.density : 0;
@@ -430,6 +439,17 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Road-sign text (plan 042 item 5): the glyph atlas the sign quads UV into. Installed before
     // any cell builds, so every streamed sign model gets its text parts.
     setRoadsignFont(particleTextures?.get('roadsignfont') ?? null);
+    // 2dfx particle effects (plan 044): the FX library — systems from effects.fxp + sprites from
+    // effectsPC.txd. Both absent-tolerant: no files, no particles.
+    const [fxpText, fxSprites] = await Promise.all([
+      fetch(`${BASE}/models/effects.fxp`)
+        .then((response) => (response.ok ? response.text() : null))
+        .catch(() => null),
+      loadTxd(`${BASE}/models/effectsPC.txd`),
+    ]);
+    if (fxpText && fxSprites) {
+      setFxLibrary(parseFxp(fxpText), fxSprites);
+    }
     const sky = new SkyPlugin(skySample, () => game.getHours(), moonTexture); // sky dome + sun/moon + lights
     const reflection = new VehicleReflectionPlugin(() => game.getHours()); // sky-probe reflections on spawned cars
 
@@ -556,6 +576,10 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       update(delta: number): void {
         updateUvAnimations(performance.now() / 1000);
         updateAnimatedObjects(delta);
+        // 2dfx particle emitters (plan 044): lifecycle lives in the vertex shader off this clock.
+        particleTimeUniform.value = performance.now() / 1000;
+        // 2dfx escalators (plan 044): step rows loop along their baked paths off the same clock.
+        updateEscalators(performance.now() / 1000);
       },
     });
 
@@ -568,6 +592,15 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       },
     });
 
+    // World 2dfx particle effects gating (plan 044): enabled toggle + draw distance (replaces
+    // the systems' authored CULLDIST; the shader fade uses the same distance — no popping).
+    game.addSystem({
+      name: 'effects',
+      update(): void {
+        updateParticleEffects(character.viewOf(), game.getConfig().graphics.effects);
+      },
+    });
+
     game.addSystem({
       name: 'coronas',
       update(): void {
@@ -575,6 +608,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         const nightFactor = (sky.godraysSource.userData.night as number | undefined) ?? 0;
         coronaMaterial.uniforms.uOn.value = lights.enabled ? nightFactor : 0;
         coronaMaterial.uniforms.uViewportHeight.value = canvas.height || canvas.clientHeight;
+        particleViewportUniform.value = canvas.height || canvas.clientHeight;
         coronaMaterial.uniforms.uDrawDistance.value = night.coronaDrawDistance;
         // Timed window overlays glow additively over the world material's night blend; the existing
         // `night.windowGlow` debug knob keeps scaling them (1.0 = the authored 1.2 base inside the uniform).
@@ -777,6 +811,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       cameraDistance: () => game.getCameraDistance(),
       city: () => game.getCity(),
       clouds: () => game.getConfig().graphics.clouds,
+      effects: () => game.getConfig().graphics.effects,
       flipVehicle,
       fogDistance: () => game.getConfig().fog.distance,
       gameTime: () => game.getTime(),
@@ -795,6 +830,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       setBloom: (patch) => game.setBloom(patch),
       setCamera: (patch) => game.setCamera(patch),
       setClouds: (patch) => game.setClouds(patch),
+      setEffects: (patch) => game.setEffects(patch),
       setFogDistance: (distance) => game.setFogDistance(distance),
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),

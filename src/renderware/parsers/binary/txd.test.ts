@@ -8,6 +8,7 @@ import { parseTxd } from './txd';
 
 interface NativeOptions {
   d3dFormat: number;
+  depth?: number;
   flags: number;
   height: number;
   mip: Uint8Array;
@@ -33,7 +34,7 @@ function texNative(options: NativeOptions): Uint8Array {
     u32(options.d3dFormat),
     u16(options.width),
     u16(options.height),
-    u8(8), // depth
+    u8(options.depth ?? 8), // depth
     u8(1), // numLevels
     u8(4), // rasterType
     u8(options.flags),
@@ -89,20 +90,76 @@ describe('parseTxd (synthetic)', () => {
     width: 1,
   });
 
+  // 16-bit rasters (plan 043): R5G6B5 pure red, A1R5G5B5 opaque green, A4R4G4B4 half-alpha blue.
+  const rgb565 = texNative({
+    d3dFormat: 0,
+    depth: 16,
+    flags: 0x00,
+    height: 1,
+    mip: u8(0x00, 0xf8), // 0xF800 = R=31 G=0 B=0
+    name: 'rgb565',
+    rasterFormat: RasterFormat.C565,
+    width: 1,
+  });
+
+  const argb1555 = texNative({
+    d3dFormat: 0,
+    depth: 16,
+    flags: 0x01,
+    height: 1,
+    mip: u8(0xe0, 0x83), // 0x83E0 = A=1 R=0 G=31 B=0
+    name: 'argb1555',
+    rasterFormat: RasterFormat.C1555,
+    width: 1,
+  });
+
+  const argb4444 = texNative({
+    d3dFormat: 0,
+    depth: 16,
+    flags: 0x01,
+    height: 1,
+    mip: u8(0x0f, 0x80), // 0x800F = A=8 R=0 G=0 B=15
+    name: 'argb4444',
+    rasterFormat: RasterFormat.C4444,
+    width: 1,
+  });
+
   const unsupported = texNative({
     d3dFormat: 0,
     flags: 0x00,
     height: 2,
-    mip: new Uint8Array(8),
-    name: 'rgb565',
-    rasterFormat: RasterFormat.C565,
+    mip: new Uint8Array(4),
+    name: 'lum8',
+    rasterFormat: RasterFormat.LUM8,
     width: 2,
   });
 
-  const dict = parseTxd(buildSyntheticTxd([dxt5, uncompressed, x8r8g8b8, palettized, unsupported]));
+  const dict = parseTxd(
+    buildSyntheticTxd([dxt5, uncompressed, x8r8g8b8, palettized, rgb565, argb1555, argb4444, unsupported]),
+  );
 
   it('skips textures with unsupported pixel formats but keeps the rest', () => {
-    expect(dict.textures.map((t) => t.name)).toEqual(['compressed', 'raw32', 'raw32x', 'paletted']);
+    expect(dict.textures.map((t) => t.name)).toEqual([
+      'compressed',
+      'raw32',
+      'raw32x',
+      'paletted',
+      'rgb565',
+      'argb1555',
+      'argb4444',
+    ]);
+  });
+
+  it('expands 16-bit rasters to RGBA8888 (plan 043: previously dropped)', () => {
+    const red = dict.textures.find((t) => t.name === 'rgb565')!;
+    expect(red.format).toBe('rgba8888');
+    expect(Array.from(red.mipmaps[0].data)).toEqual([255, 0, 0, 255]);
+
+    const green = dict.textures.find((t) => t.name === 'argb1555')!;
+    expect(Array.from(green.mipmaps[0].data)).toEqual([0, 255, 0, 255]);
+
+    const blue = dict.textures.find((t) => t.name === 'argb4444')!;
+    expect(Array.from(blue.mipmaps[0].data)).toEqual([0, 0, 255, 8 * 17]);
   });
 
   it('keeps 32-bit X8R8G8B8 / C888 textures (regression: palm trunks went white)', () => {

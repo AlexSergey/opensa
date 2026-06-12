@@ -9,7 +9,8 @@ import { D3dCompression, RasterFormat, RwSection } from './constants';
  * Parse a RenderWare Texture Dictionary (.txd) into RWTextureDictionary.
  *
  * Supports the GTA SA D3D8/D3D9 Texture Native layout. Pixel formats handled:
- * DXT1/3/5 (kept as raw blocks), uncompressed 32-bit (8888), and 8-/4-bit
+ * DXT1/3/5 (kept as raw blocks), uncompressed 32-bit (8888/888), 16-bit
+ * (R5G6B5 / A1R5G5B5 / A4R4G4B4 — expanded to RGBA here, plan 043), and 8-/4-bit
  * palettized (expanded to RGBA here). Textures whose format is not understood
  * are skipped rather than aborting the whole dictionary.
  */
@@ -46,14 +47,45 @@ function classifyFormat(d3dFormat: number, rasterFormat: number, depth: number):
     return 'rgba8888'; // expanded from palette below
   }
   // Uncompressed 32-bit: A8R8G8B8 (raster C8888) and X8R8G8B8 (raster C888) are
-  // both 4 bytes/pixel — classify by depth so neither is dropped. 16-bit / other
-  // depths are still unsupported.
+  // both 4 bytes/pixel — classify by depth so neither is dropped.
   const pixelFormat = rasterFormat & RasterFormat.PIXEL_FORMAT_MASK;
   if (depth === 32 || pixelFormat === RasterFormat.C8888 || pixelFormat === RasterFormat.C888) {
     return 'rgba8888';
   }
+  // Uncompressed 16-bit (R5G6B5 / A1R5G5B5 / A4R4G4B4) — expanded to RGBA8888 in readMipmaps.
+  if (pixelFormat === RasterFormat.C565 || pixelFormat === RasterFormat.C1555 || pixelFormat === RasterFormat.C4444) {
+    return 'rgba8888';
+  }
 
   return null;
+}
+
+/** Expand 16-bit D3D pixels (R5G6B5 / A1R5G5B5 / A4R4G4B4, little-endian) to RGBA8888. */
+function expand16(raw: Uint8Array, pixelFormat: number): Uint8Array {
+  const out = new Uint8Array(raw.length * 2);
+  for (let i = 0; i < raw.length; i += 2) {
+    const value = raw[i] | (raw[i + 1] << 8);
+    const o = i * 2;
+    if (pixelFormat === RasterFormat.C565) {
+      out[o] = Math.round(((value >> 11) & 31) * (255 / 31));
+      out[o + 1] = Math.round(((value >> 5) & 63) * (255 / 63));
+      out[o + 2] = Math.round((value & 31) * (255 / 31));
+      out[o + 3] = 255;
+    } else if (pixelFormat === RasterFormat.C1555) {
+      out[o] = Math.round(((value >> 10) & 31) * (255 / 31));
+      out[o + 1] = Math.round(((value >> 5) & 31) * (255 / 31));
+      out[o + 2] = Math.round((value & 31) * (255 / 31));
+      out[o + 3] = value & 0x8000 ? 255 : 0;
+    } else {
+      // C4444: A4R4G4B4 — 4-bit channels scale by 17 (0xF → 255).
+      out[o] = ((value >> 8) & 15) * 17;
+      out[o + 1] = ((value >> 4) & 15) * 17;
+      out[o + 2] = (value & 15) * 17;
+      out[o + 3] = ((value >> 12) & 15) * 17;
+    }
+  }
+
+  return out;
 }
 
 /** Expand 8-bit palette indices to RGBA using a BGRA colour table. */
@@ -104,7 +136,8 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | R
     palette = stream.bytes(16 * 4);
   }
 
-  const mipmaps = readMipmaps(stream, width, height, numLevels, format, palette);
+  const pixelFormat = rasterFormat & RasterFormat.PIXEL_FORMAT_MASK;
+  const mipmaps = readMipmaps(stream, width, height, numLevels, format, palette, depth, pixelFormat);
   if (mipmaps.length === 0) {
     return null;
   }
@@ -138,6 +171,8 @@ function readMipmaps(
   numLevels: number,
   format: RWTextureFormat,
   palette: null | Uint8Array,
+  depth: number,
+  pixelFormat: number,
 ): RWMipLevel[] {
   const mipmaps: RWMipLevel[] = [];
   let w = width;
@@ -152,7 +187,7 @@ function readMipmaps(
       if (palette) {
         data = expandPalette(raw, palette);
       } else if (format === 'rgba8888') {
-        data = swizzleBgraToRgba(raw);
+        data = depth === 16 ? expand16(raw, pixelFormat) : swizzleBgraToRgba(raw);
       }
       mipmaps.push({ data, height: Math.max(1, h), width: Math.max(1, w) });
     }

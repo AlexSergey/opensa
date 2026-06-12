@@ -4,14 +4,17 @@ import type { ImgArchive } from '../archive';
 import type { MapDefinitions } from '../parsers/text';
 import type { GridCell, WorldGrid } from './world-grid';
 
+import { buildParticleEmitters } from '../three/build-particles';
 import { buildCoronaPoints } from '../three/corona';
 import {
   addToGroup,
   buildAnimatedObjects,
+  buildEscalatorMeshes,
   buildInstancedMeshes,
   type BuildRegionOptions,
   buildRoadsignMeshes,
   collectCoronas,
+  collectParticleEmitters,
   type RegionMeshData,
 } from './build-region';
 import { cellKey } from './world-grid';
@@ -44,6 +47,10 @@ export function buildCell(
   // Road-sign text (plan 042 item 5): world-space glyph quads, HD cells only (near-field text).
   if (!lod) {
     objects.push(...buildRoadsignMeshes(archive, groups));
+    // 2dfx particle emitters (plan 044): fires, fountains, smoke — near-field, HD cells only.
+    objects.push(...buildParticleEmitters(collectParticleEmitters(archive, groups)));
+    // 2dfx escalators (plan 044): moving step rows instanced from the vanilla esc_step model.
+    objects.push(...buildEscalatorMeshes(archive, defs, groups));
   }
   // Coronas only on HD cells (LOD models carry no lights and the glow is a near-field effect). The ground
   // glow under lamps is the road's baked night vertex colours, not a projected pool.

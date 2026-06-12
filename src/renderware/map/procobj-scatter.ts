@@ -1,6 +1,9 @@
+import type { Matrix4 } from 'three';
+
 import { Vector3 } from 'three';
 
 import type { RegionColliders } from '../collision';
+import type { ColFace } from '../parsers/binary/col-types';
 import type { ProcObjRule } from '../parsers/text';
 import type { ProcObjCategoryName } from './procobj-categories';
 
@@ -48,6 +51,16 @@ export interface ProcObjPlacement {
 export const PROC_OBJ_MAX_DENSITY = 3;
 
 const DEG_TO_RAD = Math.PI / 180;
+
+/** Reused triangle temporaries (one allocation per cell, not per face). */
+interface TriangleScratch {
+  a: Vector3;
+  ab: Vector3;
+  ac: Vector3;
+  b: Vector3;
+  c: Vector3;
+  normal: Vector3;
+}
 
 /** Index `procobj.dat` rules by their (lowercased) surface name — the scatter's lookup shape. */
 export function groupRulesBySurface(rules: readonly ProcObjRule[]): Map<string, ProcObjRule[]> {
@@ -103,42 +116,20 @@ export function scatterProcObjects(
 ): ProcObjBatch[] {
   const random = mulberry32(cellSeed(cx, cy));
   const batches = new Map<string, ProcObjBatch>();
-  const a = new Vector3();
-  const b = new Vector3();
-  const c = new Vector3();
-  const ab = new Vector3();
-  const ac = new Vector3();
-  const normal = new Vector3();
+  const scratch: TriangleScratch = {
+    a: new Vector3(),
+    ab: new Vector3(),
+    ac: new Vector3(),
+    b: new Vector3(),
+    c: new Vector3(),
+    normal: new Vector3(),
+  };
 
   for (const collider of colliders) {
     const { faces, vertices } = collider.col;
     for (const transform of collider.transforms) {
       for (const face of faces) {
-        const surface: string | undefined = surfaceNames[face.material];
-        if (surface === undefined) {
-          continue;
-        }
-        const rules = rulesBySurface.get(surface);
-        if (!rules || rules.length === 0) {
-          continue;
-        }
-        a.fromArray(vertices, face.a * 3).applyMatrix4(transform);
-        b.fromArray(vertices, face.b * 3).applyMatrix4(transform);
-        c.fromArray(vertices, face.c * 3).applyMatrix4(transform);
-        normal.copy(ab.subVectors(b, a)).cross(ac.subVectors(c, a));
-        const area = normal.length() / 2;
-        if (area < 1e-6) {
-          continue;
-        }
-        normal.normalize();
-        // COL winding is not consistent for ground faces — clutter must grow OUT of the surface,
-        // so a downward normal (align rules would plant bushes upside-down, buried) is flipped up.
-        if (normal.z < 0) {
-          normal.negate();
-        }
-        for (const rule of rules) {
-          scatterFace(batches, random, rule, surface, a, b, c, normal, area);
-        }
+        scatterTriangle(batches, random, rulesBySurface, surfaceNames, face, vertices, transform, scratch);
       }
     }
   }
@@ -212,5 +203,45 @@ function scatterFace(
       scale: rule.minScale + random() * (rule.maxScale - rule.minScale),
       scaleZ: rule.minScaleZ + random() * (rule.maxScaleZ - rule.minScaleZ),
     });
+  }
+}
+
+/** Scatter one collision face: resolve its surface rules, build the world triangle + upward
+ *  normal, and roll the placements for every matching rule. */
+function scatterTriangle(
+  batches: Map<string, ProcObjBatch>,
+  random: () => number,
+  rulesBySurface: ReadonlyMap<string, readonly ProcObjRule[]>,
+  surfaceNames: readonly string[],
+  face: ColFace,
+  vertices: Float32Array,
+  transform: Matrix4,
+  scratch: TriangleScratch,
+): void {
+  const surface: string | undefined = surfaceNames[face.material];
+  if (surface === undefined) {
+    return;
+  }
+  const rules = rulesBySurface.get(surface);
+  if (!rules || rules.length === 0) {
+    return;
+  }
+  const { a, ab, ac, b, c, normal } = scratch;
+  a.fromArray(vertices, face.a * 3).applyMatrix4(transform);
+  b.fromArray(vertices, face.b * 3).applyMatrix4(transform);
+  c.fromArray(vertices, face.c * 3).applyMatrix4(transform);
+  normal.copy(ab.subVectors(b, a)).cross(ac.subVectors(c, a));
+  const area = normal.length() / 2;
+  if (area < 1e-6) {
+    return;
+  }
+  normal.normalize();
+  // COL winding is not consistent for ground faces — clutter must grow OUT of the surface,
+  // so a downward normal (align rules would plant bushes upside-down, buried) is flipped up.
+  if (normal.z < 0) {
+    normal.negate();
+  }
+  for (const rule of rules) {
+    scatterFace(batches, random, rule, surface, a, b, c, normal, area);
   }
 }

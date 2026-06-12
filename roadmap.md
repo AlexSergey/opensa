@@ -97,7 +97,10 @@
 - [✅] Player camera enhancements
 - [✅] Procobj trash, rocks
 - [✅] Roadsigns
-- [ ] Verify all plans
+- [✅] Verify all plans
+- [✅] Effects Basic
+- [✅] Particles Basic
+- [ ] Destroyable objects Basic
 - [ ] Fog enhanced
 - [ ] Fix car headlight
 - [ ] Increase test coverage
@@ -147,8 +150,8 @@ Known issues:
 
 Next iterations:
 - [ ] Ugly shadows. A bug at dawn - white and black spots on objects
-- [ ] Effects
-- [ ] Particles
+- [ ] Effects Enhancements
+- [ ] Particles Enhancements
   - [ ] Smoke from wheels
   - [ ] Fire
   - [ ] Car scratches
@@ -160,7 +163,7 @@ Next iterations:
     - [ ] Damage
 - [ ] Peds spawning system
 - [ ] Veh paths
-- [ ] Destroyable objects
+- [ ] Destroyable objects Enhancements
 - [ ] Birds
 - [ ] Weather
   - [ ] Rain
