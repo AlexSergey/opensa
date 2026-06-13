@@ -1,6 +1,12 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { parseWater } from './water.parser';
+
+// A 20-quad slice of the real water.dat, committed to ./tests.
+const realPath = join(process.cwd(), 'tests', 'data', 'water.dat');
+const realExists = existsSync(realPath);
 
 /** A water.dat vertex: x y z + 4 normal/flow params. */
 function vertex(x: number, y: number, z: number): string {
@@ -31,6 +37,19 @@ describe('parseWater', () => {
       const [quad] = parseWater(`processed\n${line}`);
       expect(quad.vertices).toHaveLength(3);
       expect(quad.vertices[2]).toEqual([0, 1, 1]);
+    });
+
+    it.skipIf(!realExists)('reads the real water.dat slice (4-corner quads, leading row)', () => {
+      const quads = parseWater(readFileSync(realPath, 'utf8'));
+      expect(quads.length).toBeGreaterThan(0);
+      expect(quads.every((quad) => quad.vertices.length === 3 || quad.vertices.length === 4)).toBe(true);
+      // First row of water.dat is the -1584/-1826 .. -1360/-1642 sea quad.
+      expect(quads[0].vertices).toEqual([
+        [-1584, -1826, 0],
+        [-1360, -1826, 0],
+        [-1584, -1642, 0],
+        [-1360, -1642, 0],
+      ]);
     });
   });
 });

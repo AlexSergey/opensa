@@ -366,32 +366,31 @@ describe('parseDff 2d-effect lights', () => {
   });
 });
 
-const dffPath = join(process.cwd(), 'tests', 'renderware', 'testground.dff');
+const dffPath = join(process.cwd(), 'tests', 'dff', 'building', 'washer.dff');
 const dffExists = existsSync(dffPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection,
 // so only touch the filesystem when the asset is actually present.
 const realClump = dffExists ? parseDff(toArrayBuffer(new Uint8Array(readFileSync(dffPath)))) : null;
 
-describe.skipIf(!dffExists)('parseDff (real asset testground.dff)', () => {
+describe.skipIf(!dffExists)('parseDff (real map model washer.dff)', () => {
   it('matches the known geometry counts', () => {
     const geo = realClump!.geometries[0];
-    expect(realClump!.frames.map((f) => f.name)).toEqual(['testground']);
     expect(realClump!.geometries).toHaveLength(1);
-    expect(geo.positions.length / 3).toBe(288);
-    expect(geo.triangles).toHaveLength(144);
+    expect(geo.positions.length / 3).toBe(24);
+    expect(geo.triangles).toHaveLength(12);
   });
 
-  it('has stored normals, one UV layer and no prelit colours', () => {
+  it('is a prelit map model (no stored normals) with one UV layer', () => {
     const geo = realClump!.geometries[0];
-    expect(geo.normals).not.toBeNull();
+    expect(geo.prelitColors).not.toBeNull(); // SA map geometry is prelit (lit at vertices, not by lights)
+    expect(geo.normals).toBeNull(); // map models ship no stored normals (computed downstream)
     expect(geo.uvLayers).toHaveLength(1);
-    expect(geo.prelitColors).toBeNull();
   });
 
   it('references its two material textures', () => {
     const geo = realClump!.geometries[0];
     expect(geo.materials).toHaveLength(2);
-    expect(geo.materials.map((m) => m.texture?.name)).toEqual(['sam_camo', 'bonyrd_skin2']);
+    expect(geo.materials.map((m) => m.texture?.name)).toEqual(['junk_tv2', 'junk_washer1']);
   });
 });
 

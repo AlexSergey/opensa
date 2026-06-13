@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import { parseFxp, sampleFxTrack } from './fxp.parser';
 
-const FXP_PATH = join(process.cwd(), 'static', 'models', 'effects.fxp');
+// A 16-system slice of the real effects.fxp (the systems these tests reference), committed to ./tests.
+const FXP_PATH = join(process.cwd(), 'tests', 'data', 'effects.fxp');
 const fxpExists = existsSync(FXP_PATH);
 
 describe('sampleFxTrack', () => {
@@ -45,11 +46,11 @@ describe('parseFxp', () => {
     });
   });
 
-  describe.skipIf(!fxpExists)('positive cases (real effects.fxp)', () => {
+  describe.skipIf(!fxpExists)('positive cases (real effects.fxp slice)', () => {
     const systems = parseFxp(readFileSync(FXP_PATH, 'utf8'));
 
-    it('parses the full project (80+ systems, all named)', () => {
-      expect(systems.size).toBeGreaterThan(80);
+    it('parses every system in the slice, all named', () => {
+      expect(systems.size).toBe(16);
       for (const [name, system] of systems) {
         expect(name.length).toBeGreaterThan(0);
         expect(system.name).toBe(name);

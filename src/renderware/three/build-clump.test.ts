@@ -1,6 +1,6 @@
 import type { MeshStandardMaterial } from 'three';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { DoubleSide, FrontSide, Mesh, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
@@ -9,7 +9,7 @@ import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 import { GeometryFlag } from '../parsers/binary/constants';
 import { parseDff } from '../parsers/binary/dff';
 import { toArrayBuffer } from '../test-utils';
-import { buildClump } from './build-clump';
+import { buildClump, buildClumpParts } from './build-clump';
 
 function alphaTextureMap(): Map<string, Texture> {
   const tex = new Texture();
@@ -168,6 +168,35 @@ describe('stored-normal sanitization (casroyale zero-normals case)', () => {
       const normals = new Float32Array([NaN, NaN, NaN, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
       const mesh = buildClump(clumpWith(geometry({ normals }))).children[0] as Mesh;
       expect(degenerateCount(mesh.geometry.attributes.normal.array as Float32Array)).toBe(0);
+    });
+  });
+});
+
+// Real prelit map model that ships BOTH day prelit and SA night (extra) vertex colours (plan 038).
+const WASHER_DFF = 'tests/dff/building/washer.dff';
+
+describe.skipIf(!existsSync(WASHER_DFF))('day/night vertex colours (real washer.dff)', () => {
+  const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(WASHER_DFF))));
+
+  describe('positive cases', () => {
+    it('the fixture ships both prelit and night vertex colours (the input)', () => {
+      expect(clump.geometries[0].prelitColors).not.toBeNull();
+      expect(clump.geometries[0].nightColors).not.toBeNull();
+    });
+
+    it('builds a nightColor attribute (the dnBalance day↔night blend set) alongside the day color', () => {
+      // The map pipeline (buildClumpParts) carries the night set the unlit world material's dnBalance mix consumes.
+      const [part] = buildClumpParts(clump);
+      const day = part.geometry.getAttribute('color');
+      const night = part.geometry.getAttribute('nightColor');
+      expect(day).toBeDefined();
+      expect(night).toBeDefined();
+      expect(night.itemSize).toBe(3);
+      expect(night.count).toBe(part.geometry.getAttribute('position').count);
+      for (const value of night.array as Float32Array) {
+        expect(value).toBeGreaterThanOrEqual(0);
+        expect(value).toBeLessThanOrEqual(1); // bytes normalised to 0..1
+      }
     });
   });
 });

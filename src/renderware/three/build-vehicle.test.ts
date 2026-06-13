@@ -1,11 +1,14 @@
 import type { Mesh, MeshStandardMaterial } from 'three';
 
+import { existsSync, readFileSync } from 'node:fs';
 import { BackSide, FrontSide, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
+import { parseDff } from '../parsers/binary/dff';
+import { toArrayBuffer } from '../test-utils';
 import { buildVehicle, type VehicleOptions } from './build-vehicle';
 
 const OPTIONS: VehicleOptions = {
@@ -336,6 +339,74 @@ describe('buildVehicle', () => {
       clump.geometries[0].materials[2].texture = { maskName: '', name: 'carbody' };
       const materials = bodyMaterials(buildVehicle(clump, new Map([['carbody', tex]]), OPTIONS));
       expect(materials[2].map?.name).toBe('carbody');
+    });
+  });
+});
+
+// A real SA vehicle (admiral.dff): full dummy rig, vehiclelights, prelit-free dynamic model.
+const ADMIRAL = 'tests/dff/vehicle/admiral.dff';
+
+describe.skipIf(!existsSync(ADMIRAL))('buildVehicle (real admiral.dff)', () => {
+  const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(ADMIRAL))), new Map(), OPTIONS);
+
+  /** Every MeshStandardMaterial reachable under the vehicle root. */
+  function allMaterials(): MeshStandardMaterial[] {
+    const out: MeshStandardMaterial[] = [];
+    vehicle.root.traverse((child) => {
+      const mesh = child as Mesh;
+      if (!mesh.geometry) {
+        return;
+      }
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      out.push(...(mats as MeshStandardMaterial[]));
+    });
+
+    return out;
+  }
+
+  describe('positive cases', () => {
+    it('builds the full dummy rig (4 wheels, 4 doors) under an RWVehicle root', () => {
+      expect(vehicle.root.name).toBe('RWVehicle');
+      expect(vehicle.wheels).toHaveLength(4);
+      expect(vehicle.doors).toHaveLength(4);
+      expect(vehicle.parts.length).toBeGreaterThan(0);
+    });
+
+    it('extracts head/tail lamp dummies — front +Y, rear −Y, |x| kept for ±X mirroring', () => {
+      const head = vehicle.root.userData.headlightDummy as number[];
+      const tail = vehicle.root.userData.taillightDummy as number[];
+      expect(head).toHaveLength(3);
+      expect(tail).toHaveLength(3);
+      expect(head.every(Number.isFinite)).toBe(true);
+      expect(tail.every(Number.isFinite)).toBe(true);
+      expect(head[1]).toBeGreaterThan(0); // headlights at the front (+Y)
+      expect(tail[1]).toBeLessThan(0); // taillights at the rear (−Y)
+      expect(head[0]).toBeGreaterThanOrEqual(0); // side offset stored as |x|
+      expect(tail[0]).toBeGreaterThanOrEqual(0);
+    });
+
+    it('tags the vehiclelights materials by position (both head and tail present)', () => {
+      const tags = allMaterials()
+        .map((m) => m.userData.lightType as string | undefined)
+        .filter(Boolean);
+      expect(tags).toContain('head');
+      expect(tags).toContain('tail');
+    });
+
+    it('leaves no non-finite vertex positions on any built mesh (sanitization invariant)', () => {
+      let bad = 0;
+      vehicle.root.traverse((child) => {
+        const mesh = child as Mesh;
+        const position = mesh.geometry?.getAttribute('position');
+        if (position) {
+          for (const value of position.array) {
+            if (!Number.isFinite(value)) {
+              bad += 1;
+            }
+          }
+        }
+      });
+      expect(bad).toBe(0);
     });
   });
 });

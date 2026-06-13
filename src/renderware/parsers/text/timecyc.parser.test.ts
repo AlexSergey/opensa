@@ -32,6 +32,17 @@ describe('parseTimecyc', () => {
       const rows = parseTimecyc(base);
       expect(rows[0][ROW_SIZE - 1]).toBe(1); // dirMult absent in vanilla → default 1
     });
+
+    it('reads sky from fixed columns, ignoring trailing extras (modded-timecyc robustness)', () => {
+      // Modded timecyc files append non-time-based extra columns; the parser walks a fixed FIELDS
+      // layout, so trailing tokens must not shift or corrupt the sky columns. (The grey-sky case.)
+      const firstRow = base.split(/\r?\n/).find((line) => line.trim() && !line.startsWith('//'))!;
+      const clean = parseTimecyc(firstRow);
+      const withExtras = parseTimecyc(`${firstRow}   777 888 999 111 222`);
+      expect(withExtras[0]).toHaveLength(ROW_SIZE); // extras don't grow the row
+      // skyTop = field 3 (values 9..11), skyBot = field 4 (values 12..14): untouched by trailing extras.
+      expect(withExtras[0].slice(9, 15)).toEqual(clean[0].slice(9, 15));
+    });
   });
 });
 

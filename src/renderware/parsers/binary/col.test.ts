@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync, readSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -254,36 +254,15 @@ describe('parseDffCollision', () => {
   });
 });
 
-const archivePath = join(process.cwd(), 'static', 'models', 'gta3.img');
-const archiveExists = existsSync(archivePath);
+const COL2_PATH = join(process.cwd(), 'tests', 'col', 'barriers.col');
+const COL3_PATH = join(process.cwd(), 'tests', 'col', 'countn2_17.col');
+const colFixtures = existsSync(COL2_PATH) && existsSync(COL3_PATH);
+const loadCol = (path: string): ReturnType<typeof parseColLibrary> =>
+  parseColLibrary(toArrayBuffer(new Uint8Array(readFileSync(path))));
 
-/** Read a single entry out of the WIMG archive without loading the whole 758 MB file. */
-function readArchiveEntry(name: string): ArrayBuffer | null {
-  const fd = openSync(archivePath, 'r');
-  try {
-    const header = Buffer.alloc(12);
-    readSync(fd, header, 0, 12, 0);
-    const directoryLength = header.readUInt32LE(8);
-    const directory = Buffer.alloc(directoryLength);
-    readSync(fd, directory, 0, directoryLength, 12);
-    const files = (JSON.parse(directory.toString('utf8')) as { files: Record<string, [number, number]> }).files;
-    const entry = files[name.toLowerCase()];
-    if (!entry) {
-      return null;
-    }
-    const [offset, size] = entry;
-    const out = Buffer.alloc(size);
-    readSync(fd, out, 0, size, 12 + directoryLength + offset);
-
-    return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
-  } finally {
-    closeSync(fd);
-  }
-}
-
-describe.skipIf(!archiveExists)('parseColLibrary (real archive .col)', () => {
+describe.skipIf(!colFixtures)('parseColLibrary (real .col libraries)', () => {
   it('parses the COL2 library barriers.col and binds box/mesh models', () => {
-    const models = parseColLibrary(readArchiveEntry('barriers.col')!);
+    const models = loadCol(COL2_PATH);
     expect(models.length).toBeGreaterThan(0);
 
     const gate = models.find((m) => m.name === 'bar_gatebar01');
@@ -295,10 +274,10 @@ describe.skipIf(!archiveExists)('parseColLibrary (real archive .col)', () => {
     expect(meshModel!.vertices.length).toBe((Math.max(...meshModel!.faces.flatMap((f) => [f.a, f.b, f.c])) + 1) * 3);
   });
 
-  it('parses a COL3 library with a decompressed mesh inside its bounds', () => {
-    const model = parseColLibrary(readArchiveEntry('countn2_1.col')!).find((m) => m.name === 'cen_bit_18');
+  it('parses a COL3 model with a decompressed mesh inside its bounds', () => {
+    const model = loadCol(COL3_PATH).find((m) => m.name === 's_bit_13');
     expect(model?.version).toBe(3);
-    expect(model?.faces).toHaveLength(118);
+    expect(model?.faces).toHaveLength(308);
 
     const { bounds, vertices } = model!;
     for (let i = 0; i < vertices.length; i += 3) {

@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import {
   CompressedTexture,
   DataTexture,
@@ -11,6 +12,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { RWTexture, RWTextureDictionary } from '../parsers/binary/types';
 
+import { parseTxd } from '../parsers/binary/txd';
+import { toArrayBuffer } from '../test-utils';
 import { buildTextureMap } from './build-texture';
 
 function dictionary(textures: RWTexture[]): RWTextureDictionary {
@@ -80,5 +83,26 @@ describe('buildTextureMap', () => {
     ).get('many')!;
     expect(multi.minFilter).toBe(LinearMipmapLinearFilter);
     expect(single.minFilter).toBe(single.magFilter);
+  });
+});
+
+// Real TXD (junk.txd): two 64x64 DXT1 tyre textures, opaque.
+const JUNK_TXD = 'tests/txd/junk.txd';
+
+describe.skipIf(!existsSync(JUNK_TXD))('buildTextureMap (real junk.txd)', () => {
+  const dict = parseTxd(toArrayBuffer(new Uint8Array(readFileSync(JUNK_TXD))));
+
+  describe('positive cases', () => {
+    it('builds DXT1 CompressedTextures keyed by lowercased name, sRGB and opaque', () => {
+      const map = buildTextureMap(dict);
+      expect([...map.keys()].sort()).toEqual(['junk_tyre', 'tyretread_64h']);
+      const tex = map.get('junk_tyre') as CompressedTexture;
+      expect(tex).toBeInstanceOf(CompressedTexture);
+      expect(tex.format).toBe(RGBA_S3TC_DXT1_Format);
+      expect(tex.colorSpace).toBe(SRGBColorSpace);
+      expect(tex.image.width).toBe(64);
+      expect(tex.image.height).toBe(64);
+      expect(tex.userData.hasAlpha).toBe(false);
+    });
   });
 });

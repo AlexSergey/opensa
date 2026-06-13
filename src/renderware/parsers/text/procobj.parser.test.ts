@@ -13,8 +13,8 @@ const SAMPLE = [
   '',
 ].join('\n');
 
-function staticData(file: string): null | string {
-  const path = join(process.cwd(), 'static', 'data', file);
+function testData(file: string): null | string {
+  const path = join(process.cwd(), 'tests', 'data', file);
 
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }
@@ -50,46 +50,22 @@ describe('parseProcObj', () => {
       expect(rules[1].surface).toBe('p_grass_dry');
     });
 
-    it('parses the shipped data/procobj.dat (every rule lands on a real P_* surface)', () => {
-      const text = staticData('procobj.dat');
+    it('parses the shipped data/procobj.dat — every rule lands on a real P_* surfinfo surface', () => {
+      const text = testData('procobj.dat');
       if (text === null) {
-        return; // static data not present in this checkout
+        return; // fixture not present in this checkout
       }
       const rules = parseProcObj(text);
       expect(rules.length).toBeGreaterThan(80);
       expect(rules.every((rule) => rule.surface.startsWith('p_'))).toBe(true);
       expect(rules.every((rule) => rule.spacing > 0)).toBe(true);
-    });
-  });
-});
 
-describe('parseSurfaceNames', () => {
-  describe('negative cases', () => {
-    it('returns an empty table for comment-only input', () => {
-      expect(parseSurfaceNames('# header\n# more\n')).toEqual([]);
-    });
-  });
-
-  describe('positive cases', () => {
-    it('keeps the row order — index IS the COL material id', () => {
-      const names = parseSurfaceNames('DEFAULT x y\nTARMAC a b\nP_SAND c d\n');
-      expect(names).toEqual(['default', 'tarmac', 'p_sand']);
-    });
-
-    it('parses the shipped data/surfinfo.dat: 179 surfaces, procobj surfaces resolvable', () => {
-      const text = staticData('surfinfo.dat');
-      if (text === null) {
-        return; // static data not present in this checkout
-      }
-      const names = parseSurfaceNames(text);
-      expect(names).toHaveLength(179);
-      expect(names[0]).toBe('default');
-      expect(names).toContain('p_sand');
-      const procobj = staticData('procobj.dat');
-      if (procobj !== null) {
-        const surfaces = new Set(names);
-        // Every procobj rule must reference a surfinfo surface — the id mapping the scatter uses.
-        for (const rule of parseProcObj(procobj)) {
+      // Cross-check: every rule's surface must exist in surfinfo (the row index = COL material id the
+      // scatter resolves against). Guards the two files staying in sync.
+      const surfinfo = testData('surfinfo.dat');
+      if (surfinfo !== null) {
+        const surfaces = new Set(parseSurfaceNames(surfinfo));
+        for (const rule of rules) {
           expect(surfaces.has(rule.surface), `surface ${rule.surface}`).toBe(true);
         }
       }

@@ -103,7 +103,7 @@
 - [✅] Destroyable objects Basic
 - [✅] Fog enhanced
 - [✅] Fix car headlight
-- [ ] Increase test coverage
+- [✅] Increase test coverage
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files
   - [ ] Add build scripts
@@ -137,19 +137,17 @@
 - [ ] Release v 0.1.0
 
 Known issues:
-- [ ] Country - Truth's Farm Problems with rendering
+- [✅] Country - Truth's Farm Problems with rendering
 - [✅] Vehicle's windscreen alpha channel bug [SilentPatch fix or SkyGFX]
-- [ ] Black roads on highway [SilentPatch fix or SkyGFX]
 - [ ] If the camera directly above on the scene, then Tommy only moves forward
 - [ ] Rigging models bug
 - [✅] Water in whole map (flooded tunnels)
 - [ ] Exiting a car that's flipped over while already in it—Tommy emerges from the wrong side (the door calculation only takes into account yaw). We'll come back when you decide.
 - [ ] Ugly water foam
-- [ ] Shadow acne on small objects (temporal solution: disable shadows for smal objects)
-- [ ] Streaming is blinking
+- [✅] Shadow acne on small objects (temporal solution: disable shadows for smal objects)
+- [✅] Streaming is blinking
 
 Next iterations:
-- [ ] Ugly shadows. A bug at dawn - white and black spots on objects
 - [ ] Effects Enhancements
 - [ ] Particles Enhancements
   - [ ] Smoke from wheels

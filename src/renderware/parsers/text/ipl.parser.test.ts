@@ -2,28 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { parseGtaDat } from './gta-dat.parser';
 import { parseIpl } from './ipl.parser';
-
-/** Resolve the first real `.ipl` file referenced by static/data/gta.dat (skip .zon). */
-function referencedIpl(): null | string {
-  const datPath = join(process.cwd(), 'static', 'data', 'gta.dat');
-  if (!existsSync(datPath)) {
-    return null;
-  }
-  for (const relative of parseGtaDat(readFileSync(datPath, 'utf8')).ipl) {
-    const normalized = relative.replace(/\\/g, '/').toLowerCase();
-    if (!normalized.endsWith('.ipl')) {
-      continue;
-    }
-    const resolved = join(process.cwd(), 'static', normalized);
-    if (existsSync(resolved)) {
-      return resolved;
-    }
-  }
-
-  return null;
-}
 
 describe('parseIpl', () => {
   it('parses inst rows and ignores other sections', () => {
@@ -53,16 +32,18 @@ describe('parseIpl', () => {
   });
 });
 
-const iplPath = referencedIpl();
+const iplPath = join(process.cwd(), 'tests', 'data', 'int_cont.ipl');
+const iplExists = existsSync(iplPath);
 
-// Map-agnostic: parses whichever IPL the current gta.dat references.
-describe.skipIf(!iplPath)('parseIpl (real IPL from gta.dat)', () => {
+describe.skipIf(!iplExists)('parseIpl (real int_cont.ipl)', () => {
   it('parses placed instances with finite positions and quaternions', () => {
-    const instances = parseIpl(readFileSync(iplPath!, 'utf8'));
+    const instances = parseIpl(readFileSync(iplPath, 'utf8'));
     expect(instances.length).toBeGreaterThan(0);
     const first = instances[0];
     expect(first.modelName.length).toBeGreaterThan(0);
     expect(first.position.every(Number.isFinite)).toBe(true);
     expect(first.rotation).toHaveLength(4);
+    // First inst row: 14650, trukstp04, interior 1, lod -1.
+    expect(first).toMatchObject({ id: 14650, interior: 1, lod: -1, modelName: 'trukstp04' });
   });
 });

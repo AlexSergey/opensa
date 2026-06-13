@@ -1,9 +1,12 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { LineSegments, Matrix4 } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RegionColliders } from '../collision';
 import type { ColModel } from '../parsers/binary/col-types';
 
+import { parseColLibrary } from '../parsers/binary/col';
+import { toArrayBuffer } from '../test-utils';
 import { buildCollisionWireframe } from './build-col-wireframe';
 
 function colModel(partial: Partial<ColModel>): ColModel {
@@ -79,6 +82,32 @@ describe('buildCollisionWireframe', () => {
       const transforms = [new Matrix4(), new Matrix4().makeTranslation(5, 0, 0)];
 
       expect(positionsOf([{ col, name: 'col', transforms }])).toHaveLength(36); // 18 per placement * 2
+    });
+  });
+});
+
+// Real COL libraries: a 308-face trimesh (countn2_17) and a box-based model (barriers).
+const TRIMESH_COL = 'tests/col/countn2_17.col';
+const BOX_COL = 'tests/col/barriers.col';
+
+describe.skipIf(!existsSync(TRIMESH_COL) || !existsSync(BOX_COL))('buildCollisionWireframe (real COL)', () => {
+  function firstModel(path: string): ColModel {
+    return parseColLibrary(toArrayBuffer(new Uint8Array(readFileSync(path))))[0];
+  }
+
+  describe('positive cases', () => {
+    it('wires every face of a real trimesh (3 edges * 2 endpoints * 3 components each)', () => {
+      const col = firstModel(TRIMESH_COL); // s_bit_13: 308 faces, no boxes
+      expect(col.faces.length).toBe(308);
+      const positions = positionsOf([{ col, name: col.name, transforms: [new Matrix4()] }]);
+      expect(positions).toHaveLength(col.faces.length * 18);
+    });
+
+    it('wires the 12 edges of each box in a real box collider', () => {
+      const col = firstModel(BOX_COL); // bar_gatebar01: box-based, no faces
+      expect(col.boxes.length).toBeGreaterThan(0);
+      const positions = positionsOf([{ col, name: col.name, transforms: [new Matrix4()] }]);
+      expect(positions).toHaveLength(col.boxes.length * 72);
     });
   });
 });

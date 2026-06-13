@@ -1,8 +1,11 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { SkinnedMesh } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWClump, RWFrame, RWGeometry } from '../parsers/binary/types';
 
+import { parseDff } from '../parsers/binary/dff';
+import { toArrayBuffer } from '../test-utils';
 import { buildSkinnedClump } from './build-skinned-clump';
 
 const IDENTITY_ROTATION = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -64,6 +67,32 @@ describe('buildSkinnedClump', () => {
     it('exposes bones keyed by their frame name', () => {
       const skinned = buildSkinnedClump(clump(geometry(2)));
       expect([...(skinned?.bonesByName.keys() ?? [])].sort()).toEqual(['Bone', 'Root']);
+    });
+  });
+});
+
+// A real skinned player model (tommy.dff): a full 32-bone skeleton.
+const TOMMY_DFF = 'tests/dff/skinned/tommy.dff';
+
+describe.skipIf(!existsSync(TOMMY_DFF))('buildSkinnedClump (real tommy.dff)', () => {
+  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(TOMMY_DFF))));
+
+  describe('positive cases', () => {
+    it('builds a SkinnedMesh whose skeleton matches the DFF skin bone count', () => {
+      const boneCount = parsed.geometries[0].skin?.numBones;
+      const skinned = buildSkinnedClump(parsed);
+      expect(skinned).not.toBeNull();
+      expect(boneCount).toBe(32);
+      expect(skinned!.skeleton.bones).toHaveLength(boneCount!);
+      expect(skinned!.bonesByName.size).toBe(boneCount!);
+      expect(skinned!.root.getObjectByProperty('type', 'SkinnedMesh')).toBeInstanceOf(SkinnedMesh);
+    });
+
+    it('names the standard SA biped bones (Root/Pelvis/Spine/Head)', () => {
+      const { bonesByName } = buildSkinnedClump(parsed)!;
+      for (const bone of ['Root', 'Pelvis', 'Spine', 'Head']) {
+        expect(bonesByName.has(bone)).toBe(true);
+      }
     });
   });
 });

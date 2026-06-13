@@ -216,26 +216,27 @@ describe('parseTxd (synthetic)', () => {
   });
 });
 
-const txdPath = join(process.cwd(), 'tests', 'renderware', 'testground.txd');
+const txdPath = join(process.cwd(), 'tests', 'txd', 'junk.txd');
 const txdExists = existsSync(txdPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection.
 const realDict = txdExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(txdPath)))) : null;
 
-describe.skipIf(!txdExists)('parseTxd (real asset testground.txd)', () => {
+describe.skipIf(!txdExists)('parseTxd (real asset junk.txd)', () => {
   it('parses its two textures', () => {
     expect(realDict!.textures).toHaveLength(2);
   });
 
-  it('only contains DXT-compressed formats', () => {
+  it('only contains DXT1-compressed formats', () => {
     const formats = new Set(realDict!.textures.map((t) => t.format));
     expect([...formats]).toEqual(['dxt1']);
   });
 
-  it('exposes sam_camo as a 512x512 DXT1 texture', () => {
-    expect(realDict!.textures.map((t) => t.name).sort()).toEqual(['bonyrd_skin2', 'sam_camo']);
-    const tex = realDict!.textures.find((t) => t.name === 'sam_camo')!;
-    expect([tex.width, tex.height]).toEqual([512, 512]);
+  it('exposes junk_tyre as a 64x64 opaque DXT1 texture', () => {
+    expect(realDict!.textures.map((t) => t.name).sort()).toEqual(['junk_tyre', 'tyretread_64H']);
+    const tex = realDict!.textures.find((t) => t.name === 'junk_tyre')!;
+    expect([tex.width, tex.height]).toEqual([64, 64]);
     expect(tex.format).toBe('dxt1');
+    expect(tex.hasAlpha).toBe(false);
     expect(tex.mipmaps.length).toBeGreaterThan(0);
   });
 });

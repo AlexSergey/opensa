@@ -1,8 +1,10 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { MeshBasicMaterial, RepeatWrapping, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { WaterQuad } from '../parsers/text/water.parser';
 
+import { parseWater } from '../parsers/text/water.parser';
 import { buildWater, oceanFrame } from './build-water';
 
 function quad(): WaterQuad {
@@ -78,6 +80,24 @@ describe('oceanFrame', () => {
       // The left strip fills from -half to the data's minX.
       expect(frame[0].vertices[0][0]).toBe(-100);
       expect(frame[0].vertices[1][0]).toBe(-10);
+    });
+  });
+});
+
+// Real water.dat slice → builder: ties the parser's quads to a single merged mesh.
+const WATER_DAT = 'tests/data/water.dat';
+
+describe.skipIf(!existsSync(WATER_DAT))('buildWater (real water.dat slice)', () => {
+  describe('positive cases', () => {
+    it('merges every parsed quad into one indexed mesh (3/4 verts → 1/2 tris each)', () => {
+      const quads = parseWater(readFileSync(WATER_DAT, 'utf8'));
+      const mesh = buildWater(quads, new Texture());
+      const expectedVerts = quads.reduce((n, q) => n + q.vertices.length, 0);
+      const expectedIndices = quads.reduce((n, q) => n + (q.vertices.length === 4 ? 6 : 3), 0);
+      expect(quads.length).toBeGreaterThan(0);
+      expect(mesh.geometry.getAttribute('position').count).toBe(expectedVerts);
+      expect(mesh.geometry.getIndex()?.count).toBe(expectedIndices);
+      expect(mesh.material).toBeInstanceOf(MeshBasicMaterial);
     });
   });
 });

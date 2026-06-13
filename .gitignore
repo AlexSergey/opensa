@@ -20,6 +20,12 @@ lerna-debug.log*
 /coverage-e2e
 /.nyc_output
 
+# Playwright (the e2e/**-snapshots/ baselines stay committed)
+/test-results
+/playwright-report
+/blob-report
+/.last-run.json
+
 # IDEs and editors
 /.idea
 .project
