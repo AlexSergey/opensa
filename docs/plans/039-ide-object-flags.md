@@ -141,3 +141,17 @@ copy
 into `static/img/gta3` — the existing weight rule then picks it up with zero renderer changes.
 The
 same tool covers any other MISSING entries from the coverage audit.
+
+## Follow-up (done): NO_ZBUFFER_WRITE restricted to alpha materials
+
+`NO_ZBUFFER_WRITE` (0x40) is now applied (`depthWrite=false`) **only to transparent materials**, not
+opaque ones (`applyTreatment` gates on `material.transparent`). Why: big countryside/desert/Vegas
+TERRAIN tiles ship a bare 0x40 (e.g. `VegasSland40`, `cuntwland54b` — flags 64, opaque DXT1). SA's
+`VisibilityPlugins.cpp` disables z-write for ANY 0x40 model (incl. that terrain) + sets
+`ALPHATESTFUNCTIONREF=0`, but it only looks right under SA's fixed chase camera; with our free / orbit
+/ top-down camera a non-z-writing opaque ground can't occlude overlapping tiles, so the painter order
+flips with the angle → angle-dependent see-through holes. Genuine decals/shadows/glass that actually
+need no-z-write always also carry DRAW_LAST (e.g. `grnd_alpha*` 2097348, `des_rdalpha*`/`trackshad*`
+68), so they're transparent and keep the behaviour. The flag parse/mapping is unchanged — only the
+application is gated. (Confirmed user fix: deleting the unconditional `depthWrite=false` removed the
+artifact; this is the precise version.)

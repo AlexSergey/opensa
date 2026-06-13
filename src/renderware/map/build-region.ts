@@ -399,7 +399,16 @@ function applyTreatment(material: MeshBasicMaterial, treatment: DefTreatment, ni
   if (treatment.drawLast) {
     material.transparent = true; // three: moves the part into the sorted after-opaque list
   }
-  if (treatment.noDepthWrite) {
+  // SA-DEVIATION: NO_ZBUFFER_WRITE (0x40) applied only to ALPHA materials, not opaque (SA applies it
+  // to any 0x40 model, but our free camera then shows terrain through — see below).
+  // We apply it only to ALPHA materials (decals / shadows / glass — which
+  // always also carry DRAW_LAST, so they're transparent here), NOT to opaque geometry. SA itself
+  // (VisibilityPlugins.cpp) disables z-write for ANY model with the flag, incl. opaque terrain that
+  // ships a bare 0x40 (VegasSland40, cuntwland54b…) — but that only looks right under SA's fixed
+  // chase camera. With our free / orbit / top-down camera a non-z-writing opaque ground can't occlude
+  // overlapping tiles, so the painter order flips with the angle → see-through holes. Restricting it
+  // to alpha keeps the decals/shadows that actually need it and renders terrain solid.
+  if (treatment.noDepthWrite && material.transparent) {
     material.depthWrite = false;
   }
   if (treatment.additive) {

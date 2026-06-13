@@ -11,6 +11,9 @@
   kept on `def.anim`), `tobj` (time windows), `txdp` (TXD parents). Other sections ignored.
 - IDE flags (`ide-flags.ts`): DRAW_LAST, ADDITIVE, NO_ZBUFFER_WRITE, no-shadow (moot),
   IS_TREE/IS_PALM, DISABLE_BACKFACE_CULLING — full render-relevant set per the flag histogram.
+  NO_ZBUFFER_WRITE (0x40) is applied only to **transparent** materials (decals/shadows/glass, which
+  always also carry DRAW_LAST) — opaque geometry keeps depth writes, else bare-0x40 countryside
+  terrain tiles show through under a free camera (plan 039 follow-up).
 - IPL `inst` (11 columns), interior **area codes** (`interior & 0xFF`, world ids {0, 13}).
 - Binary `bnry` IPL streams (full-detail placement) + **standalone script-gated groups**
   (`resolveMap({ extraIpl })`, default `['truthsfarm']`; barriers/carter/crack deliberately

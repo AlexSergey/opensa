@@ -108,10 +108,23 @@ describe('buildInstancedMeshes (SA IDE render flags, plan 039)', () => {
       }
     });
 
-    it('NO_ZBUFFER_WRITE stops the parts writing depth (ground decals)', () => {
+    it('NO_ZBUFFER_WRITE on OPAQUE geometry still writes depth (terrain fix)', () => {
+      // SA disables z-write for any 0x40 model, but a non-writing opaque ground tile (bare 0x40 on
+      // big countryside terrain) shows through under a free camera. So opaque keeps depth writes.
       const built = materials(IdeFlag.NO_ZBUFFER_WRITE);
       expect(built.length).toBeGreaterThan(0);
       for (const { material } of built) {
+        expect(material.transparent).toBe(false);
+        expect(material.depthWrite).toBe(true);
+      }
+    });
+
+    it('NO_ZBUFFER_WRITE on a transparent decal (with DRAW_LAST) drops depth writes', () => {
+      // Real decals/shadows always pair 0x40 with DRAW_LAST (e.g. grnd_alpha* 2097348, trackshad 68).
+      const built = materials(IdeFlag.NO_ZBUFFER_WRITE | IdeFlag.DRAW_LAST);
+      expect(built.length).toBeGreaterThan(0);
+      for (const { material } of built) {
+        expect(material.transparent).toBe(true);
         expect(material.depthWrite).toBe(false);
       }
     });
