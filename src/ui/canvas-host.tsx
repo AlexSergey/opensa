@@ -345,7 +345,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         sun: { godrays: true, godraysSize: 30, sunSize: 15 },
         toneMapping: true,
         vehicleReflection: { intensity: 0.25, preset: 'enhanced' },
-        water: { darkness: 0.75, glint: 0.9, reflection: 0.35 },
+        water: { darkness: 0.9, glint: 0.5, reflection: 0.2 },
         // SA prelit world (plan 038) calibration — live-tunable in debug → Atmosphere.
         worldLight: {
           dayBrightness: 0.85,

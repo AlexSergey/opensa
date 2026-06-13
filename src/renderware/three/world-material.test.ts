@@ -1,15 +1,19 @@
 import type { MeshBasicMaterial } from 'three';
 
+import { readFileSync } from 'node:fs';
 import { DoubleSide, FrontSide, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { RWGeometry, RWMaterial } from '../parsers/binary/types';
 
 import { GeometryFlag } from '../parsers/binary/constants';
+import { parseDff } from '../parsers/binary/dff';
+import { toArrayBuffer } from '../test-utils';
 import {
   applyWorldWindowGlow,
   buildWorldMaterial,
   dnBalanceUniform,
+  isVertexAlphaBeam,
   windowGlowUniform,
   worldDayTintUniform,
   worldShadowUniforms,
@@ -75,6 +79,15 @@ describe('buildWorldMaterial', () => {
       expect(shader.fragmentShader).toContain('#include <color_fragment>'); // stock day prelit multiply
       expect(shader.uniforms.uWorldTint).toBe(worldTintUniform); // tint still applies
     });
+
+    it('does not treat a white-textured part with opaque prelit (alpha 255) as a beam', () => {
+      const built = buildWorldMaterial(
+        material({ texture: { maskName: '', name: 'white' } }),
+        geometry({ prelitColors: new Uint8Array(12).fill(255) }),
+      );
+      expect(built.transparent).toBe(false);
+      expect(built.customProgramCacheKey()).not.toContain('beam');
+    });
   });
 
   describe('positive cases', () => {
@@ -99,7 +112,7 @@ describe('buildWorldMaterial', () => {
       built.onBeforeCompile(shader, undefined as never);
       expect(shader.uniforms.uDnBalance).toBe(dnBalanceUniform);
       expect(shader.vertexShader).toContain('vNightColor = nightColor');
-      expect(shader.fragmentShader).toContain('mix( vColor, vNightColor, uDnBalance )');
+      expect(shader.fragmentShader).toContain('mix( vColor.rgb, vNightColor, uDnBalance )');
       // The night prelit set already encodes the night look, so this variant rides the day-only tint
       // (driven to white as dnBalance → 1) — NOT the no-night tint that darkens into the night ambient.
       expect(shader.uniforms.uWorldTint).toBe(worldDayTintUniform);
@@ -147,6 +160,37 @@ describe('buildWorldMaterial', () => {
       expect(shader.uniforms.uWindowGlow).toBe(windowGlowUniform);
       expect(shader.uniforms.uDnBalance).toBe(dnBalanceUniform); // composed, not clobbered
       expect(shader.fragmentShader).toContain('uWindowGlow');
+    });
+
+    it('renders a floodlight beam (white texture + prelit vertex alpha) alpha-blended with the cone alpha', () => {
+      const built = buildWorldMaterial(
+        material({ texture: { maskName: '', name: 'white' } }),
+        geometry({ nightColors: new Uint8Array(12) }), // real floodbeams carry night colours
+      );
+      expect(built.transparent).toBe(true);
+      expect(built.alphaTest).toBe(0); // NOT 0.5 — the cone alpha (~0.2) would be clipped away
+      expect(built.depthWrite).toBe(false);
+      expect(built.side).toBe(DoubleSide);
+      expect(built.customProgramCacheKey()).toBe('saWorld|night|beam');
+      const shader = shaderStub();
+      built.onBeforeCompile(shader, undefined as never);
+      expect(shader.fragmentShader).toContain('diffuseColor.a *= vColor.a'); // cone alpha → blended alpha
+    });
+
+    it('detects + alpha-blends the real SF stadium floodbeam DFF', () => {
+      // Real model (SF stadium floodlights) — its lamp material uses the `white` placeholder texture with the
+      // beam cone baked into the prelit vertex alpha. See tests/dff/floodbeams/ws_floodbeams.dff.
+      const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync('tests/dff/floodbeams/ws_floodbeams.dff'))));
+      const geom = clump.geometries[0];
+      const beamMaterial = geom.materials.find((m) => isVertexAlphaBeam(m, geom));
+      if (!beamMaterial) {
+        throw new Error('expected a vertex-alpha beam material in ws_floodbeams.dff');
+      }
+      const built = buildWorldMaterial(beamMaterial, geom);
+      expect(built.transparent).toBe(true);
+      expect(built.alphaTest).toBe(0);
+      expect(built.depthWrite).toBe(false);
+      expect(built.side).toBe(DoubleSide);
     });
   });
 });

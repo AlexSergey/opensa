@@ -17,7 +17,7 @@ import type { RWClump, RWGeometry, RWMaterial, RWTriangle } from '../parsers/bin
 
 import { GeometryFlag } from '../parsers/binary/constants';
 import { applyWorldUvAnim, getUvAnimUniform, registerUvAnimations } from './uv-anim';
-import { buildWorldMaterial } from './world-material';
+import { buildWorldMaterial, isVertexAlphaBeam } from './world-material';
 
 /**
  * Convert a parsed RWClump into a renderable three.js Group.
@@ -207,7 +207,9 @@ export function buildClumpParts(clump: RWClump, textures?: Map<string, Texture>)
 
     const position = new BufferAttribute(rw.positions, 3);
     const uv = rw.uvLayers.length > 0 ? new BufferAttribute(rw.uvLayers[0], 2) : null;
-    const color = rw.prelitColors ? prelitColorAttribute(rw.prelitColors) : null;
+    // Floodlight beams carry their cone in the prelit ALPHA → keep it (vec4) so the material can blend it.
+    const beam = rw.materials.some((m) => isVertexAlphaBeam(m, rw));
+    const color = rw.prelitColors ? prelitColorAttribute(rw.prelitColors, beam) : null;
     // SA night (extra) vertex colours — bright warm texels are lit windows; added as emissive at night.
     const nightColor = rw.nightColors ? prelitColorAttribute(rw.nightColors) : null;
     const normal = vertexNormalAttribute(position, rw);
@@ -422,7 +424,17 @@ function installSaReflection(material: MeshPhysicalMaterial, saEnvMap: Texture):
   material.needsUpdate = true;
 }
 
-function prelitColorAttribute(prelit: Uint8Array): BufferAttribute {
+function prelitColorAttribute(prelit: Uint8Array, withAlpha = false): BufferAttribute {
+  // `withAlpha` keeps the RGBA (vec4) — used for floodlight beams whose cone lives in the prelit alpha; the
+  // default drops alpha (vec3), which is all the day/night prelit blend needs for normal geometry.
+  if (withAlpha) {
+    const rgba = new Float32Array(prelit.length);
+    for (let i = 0; i < prelit.length; i += 1) {
+      rgba[i] = prelit[i] / 255;
+    }
+
+    return new BufferAttribute(rgba, 4);
+  }
   const colors = new Float32Array((prelit.length / 4) * 3);
   for (let i = 0, j = 0; i < prelit.length; i += 4, j += 3) {
     colors[j] = prelit[i] / 255;

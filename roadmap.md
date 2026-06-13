@@ -100,9 +100,9 @@
 - [✅] Verify all plans
 - [✅] Effects Basic
 - [✅] Particles Basic
-- [ ] Destroyable objects Basic
-- [ ] Fog enhanced
-- [ ] Fix car headlight
+- [✅] Destroyable objects Basic
+- [✅] Fog enhanced
+- [✅] Fix car headlight
 - [ ] Increase test coverage
 - [ ] Optimizing game archives
   - [ ] Drop unuzed files

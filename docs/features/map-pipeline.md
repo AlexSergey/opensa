@@ -29,6 +29,14 @@
   (HD only), animated `anim`-section objects (per-instance groups), road-sign text meshes,
   procobj clutter.
 - Map meshes ignore DFF frame transforms (SA re-frames atomic model infos — junk-frame proof).
+- **Floodlight beams** (`ws_floodbeams`, Vegas site lights): a `white` placeholder texture whose soft cone is
+  baked into the per-vertex prelit ALPHA (the only transparency signal). `world-material.isVertexAlphaBeam`
+  detects them and `build-clump` keeps the alpha as a vec4 `color` attribute; `buildWorldMaterial` renders them
+  alpha-BLENDED (alphaTest 0 — the cone is ~0.2 alpha; no depth write). Without this they were opaque white
+  blocks. **ASSUMPTION** (heuristic, not from SA — grep `ASSUMPTION`): "white texture + prelit alpha < 255 =
+  beam". A full-map scan verified it matches only the genuine beams (never terrain blends — real textures — or
+  foliage — texture alpha); tighten in `isVertexAlphaBeam` if a future model trips it. Tested against the real
+  `tests/dff/floodbeams/ws_floodbeams.dff`.
 - `StreamingSystem`: HD ring within `hdDrawDistance`, LOD ring to `lodDrawDistance`, async cell
   loads cached by the adapter, manual cell selection for the map viewer. **Seamless LOD↔HD swap**: the
   old detail level is kept until its same-cell replacement loads, then removed in the same step (no

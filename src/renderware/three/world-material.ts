@@ -103,13 +103,6 @@ export function applyWorldWindowGlow(material: MeshBasicMaterial): void {
   material.needsUpdate = true;
 }
 
-/**
- * Build the unlit SA world material for one map part. Param parity with `buildMaterial`:
- * texture-alpha → transparent + alphaTest + DoubleSide; untextured → the RW material colour;
- * prelit → vertex colours. When the geometry carries SA night colours (`nightColor` attribute,
- * set by `buildClumpParts`) the day prelit is blended toward them by {@link dnBalanceUniform};
- * everything is then multiplied by {@link worldTintUniform}.
- */
 export function buildWorldMaterial(
   rw: RWMaterial,
   geometry: RWGeometry,
@@ -117,11 +110,18 @@ export function buildWorldMaterial(
 ): MeshBasicMaterial {
   const map = rw.texture && textures ? (textures.get(rw.texture.name.toLowerCase()) ?? null) : null;
   const hasVertexColors = (geometry.flags & GeometryFlag.PRELIT) !== 0;
-  const transparent = map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255;
+  // SA "floodlight beam" geometry: a `white` placeholder texture whose soft cone is baked into the per-vertex
+  // (prelit) ALPHA — the only transparency signal (neither the texture nor the material colour is translucent).
+  // Render it alpha-BLENDED, not alpha-tested (the cone alpha is ~0.2 max; a 0.5 test would clip the whole
+  // beam). build-clump feeds the vertex alpha as a vec4 `color` attribute for these. SF stadium floodbeams +
+  // Vegas East building-site lights; the signature is self-contained (no IDE flag needed) — see plan 032.
+  const beam = isVertexAlphaBeam(rw, geometry);
+  const transparent = beam || (map ? Boolean(map.userData.hasAlpha) : rw.color[3] < 255);
 
   const material = new MeshBasicMaterial({
-    alphaTest: transparent ? 0.5 : 0,
+    alphaTest: transparent && !beam ? 0.5 : 0,
     color: map ? 0xffffff : (rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2],
+    depthWrite: !beam,
     map,
     side: transparent ? DoubleSide : FrontSide,
     transparent,
@@ -134,7 +134,7 @@ export function buildWorldMaterial(
   // ambient); night-prelit geometry rides `worldDayTintUniform`, which relaxes to WHITE at night —
   // its night prelit set already IS the night picture, tinting it on top double-darkens it to black.
   const nightBlend = hasVertexColors && geometry.nightColors !== null;
-  material.customProgramCacheKey = (): string => (nightBlend ? 'saWorld|night' : 'saWorld');
+  material.customProgramCacheKey = (): string => `${nightBlend ? 'saWorld|night' : 'saWorld'}${beam ? '|beam' : ''}`;
   material.onBeforeCompile = (shader): void => {
     shader.uniforms.uWorldShadowBias = worldShadowUniforms.uWorldShadowBias;
     shader.uniforms.uWorldShadowDebug = worldShadowUniforms.uWorldShadowDebug;
@@ -168,9 +168,11 @@ export function buildWorldMaterial(
         '#include <begin_vertex>\n\tvNightColor = nightColor;',
       );
       fragmentPars += 'uniform float uDnBalance;\nvarying vec3 vNightColor;\n';
+      // `vColor.rgb` works whether vColor is vec3 (normal geometry) or vec4 (beam, USE_COLOR_ALPHA); the beam
+      // also needs its per-vertex alpha (the cone) carried into the blended alpha.
       fragmentBody = fragmentBody.replace(
         '#include <color_fragment>',
-        '\tdiffuseColor.rgb *= mix( vColor, vNightColor, uDnBalance );',
+        `\tdiffuseColor.rgb *= mix( vColor.rgb, vNightColor, uDnBalance );${beam ? '\n\tdiffuseColor.a *= vColor.a;' : ''}`,
       );
     }
 
@@ -179,4 +181,32 @@ export function buildWorldMaterial(
   };
 
   return material;
+}
+
+/**
+ * Build the unlit SA world material for one map part. Param parity with `buildMaterial`:
+ * texture-alpha → transparent + alphaTest + DoubleSide; untextured → the RW material colour;
+ * prelit → vertex colours. When the geometry carries SA night colours (`nightColor` attribute,
+ * set by `buildClumpParts`) the day prelit is blended toward them by {@link dnBalanceUniform};
+ * everything is then multiplied by {@link worldTintUniform}.
+ */
+/**
+ * ASSUMPTION: a `white` placeholder texture + any prelit vertex with alpha < 255 means a "floodlight beam"
+ * whose soft cone lives in the per-vertex prelit ALPHA (its only transparency signal). This is a HEURISTIC,
+ * not read from SA — but verified by a full-map scan to match ONLY genuine beams (SF stadium floodbeams +
+ * Vegas East site lights), never terrain blends (real textures) or foliage (texture alpha). build-clump emits
+ * a vec4 `color` attribute for these so the cone alpha survives; `buildWorldMaterial` renders them
+ * alpha-blended. If a future model trips this wrongly, tighten here (grep `ASSUMPTION`).
+ */
+export function isVertexAlphaBeam(material: RWMaterial, geometry: RWGeometry): boolean {
+  if (material.texture?.name.toLowerCase() !== 'white' || !geometry.prelitColors) {
+    return false;
+  }
+  for (let i = 3; i < geometry.prelitColors.length; i += 4) {
+    if (geometry.prelitColors[i] < 255) {
+      return true;
+    }
+  }
+
+  return false;
 }
