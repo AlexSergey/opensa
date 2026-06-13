@@ -204,3 +204,23 @@ each frame, so changes apply next frame (new cells stream in, surplus stream out
 Debug **Map** screen (`DrawDistanceControls`, plan 023): **Draw Distance** (`lodDrawDistance`) and
 **HD Distance** (`hdDrawDistance`) sliders (HD clamped ≤ LOD). The Draw Distance slider also drives the
 fog so the LOD cull edge stays hidden (`fog ≈ lod × 0.8` — see plan 024). Camera far stays 100000.
+
+## Follow-up (done): seamless LOD↔HD swap + hysteresis
+
+Fixed the LOD→HD "blink" (model vanished, then faded back in). Root cause: `update()` removed the old
+level immediately, then loaded the new level **async** and faded it from `opacity 0` — so the cell was
+empty for ≥1 frame (gap) and then ghosted in. Fix in `streaming.system.ts`:
+
+- **Defer removal:** a cell's old detail level is kept rendering until its same-`(cx,cy)` replacement
+  has loaded and been added. The removal loop skips a left-behind level while its replacement is in
+  `loading`; the load handler adds the new level (full opacity) FIRST, then removes the old in the
+  same step → no empty frame.
+- **No fade on a swap:** the new level appears at full opacity (silhouette already on screen from the
+  old level). `CellFader` now runs only for genuinely new cells (first appearance), never on LOD↔HD.
+- **Hysteresis dead-band** (`HYSTERESIS = 0.25 × cellSize`): a cell holds its current level until the
+  view moves a margin past the ring boundary (sticky on what's loaded/loading) — no flip-flop when
+  straddling `hdDrawDistance`. (Implements the "throttle/hysteresis" decision noted above.)
+  `grid.ts` exports `cellDistanceSq` for the per-cell distance the dead-band needs.
+
+Tests: `streaming.system.test.ts` — LOD held until HD loads then swaps (no empty frame); dead-band
+holds the level across the boundary.

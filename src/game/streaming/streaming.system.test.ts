@@ -79,6 +79,20 @@ function config(overrides: Partial<Config> = {}): Config {
   };
 }
 
+/** Adapter whose loaded objects are named by their full stream key, so a specific cell+level is
+ *  findable in the root (`0,0,hd` / `0,0,lod`). */
+function keyedAdapter(): { cellSize: number; loadCell: Mock<(request: CellRequest) => Promise<Object3D[]>> } {
+  return {
+    cellSize: 250,
+    loadCell: vi.fn((request: CellRequest): Promise<Object3D[]> => {
+      const object = new Object3D();
+      object.name = `${request.cx},${request.cy},${request.lod ? 'lod' : 'hd'}`;
+
+      return Promise.resolve([object]);
+    }),
+  };
+}
+
 function stubAdapter(): { cellSize: number; loadCell: Mock<(request: CellRequest) => Promise<Object3D[]>> } {
   return {
     cellSize: 250,
@@ -90,6 +104,8 @@ function stubAdapter(): { cellSize: number; loadCell: Mock<(request: CellRequest
     }),
   };
 }
+
+const has = (root: Object3D, key: string): boolean => root.children.some((c) => c.name === key);
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -139,6 +155,47 @@ describe('StreamingSystem', () => {
 
       expect(root.children.some((c) => firstChildren.includes(c))).toBe(false); // old gone
       expect(root.children).toHaveLength(firstChildren.length); // same ring size elsewhere
+    });
+
+    it('keeps the LOD cell until its HD replacement loads, then swaps (no empty frame)', async () => {
+      const adapter = keyedAdapter();
+      const root = new Object3D();
+      let view: Vec3 = [125, 400, 0]; // cell (0,0) is ~150 away → LOD
+      const system = new StreamingSystem(adapter, root, () => view, config());
+
+      system.update();
+      await flush();
+      expect(has(root, '0,0,lod')).toBe(true);
+      expect(has(root, '0,0,hd')).toBe(false);
+
+      view = [125, 125, 0]; // now inside cell (0,0) → HD desired
+      system.update(); // HD load STARTED but not resolved yet
+      expect(has(root, '0,0,lod')).toBe(true); // LOD held → no hole while HD loads
+      expect(has(root, '0,0,hd')).toBe(false);
+
+      await flush(); // HD resolves → added, LOD removed in the same step
+      expect(has(root, '0,0,hd')).toBe(true);
+      expect(has(root, '0,0,lod')).toBe(false);
+    });
+
+    it('holds the current level across the hysteresis dead-band (no flip-flop at the boundary)', async () => {
+      const adapter = keyedAdapter();
+      const root = new Object3D();
+      let view: Vec3 = [125, 125, 0]; // inside cell (0,0) → HD
+      const system = new StreamingSystem(adapter, root, () => view, config());
+
+      system.update();
+      await flush();
+      expect(has(root, '0,0,hd')).toBe(true);
+
+      // Move to ~130 from cell (0,0): past hdDrawDistance (100) but within the dead-band
+      // (hd 100 + 250×0.25 = 162.5), so an already-HD cell stays HD instead of downgrading to LOD.
+      view = [125, 380, 0];
+      system.update();
+      await flush();
+      expect(has(root, '0,0,hd')).toBe(true);
+      expect(has(root, '0,0,lod')).toBe(false);
+      expect(adapter.loadCell.mock.calls.some(([r]) => r.cx === 0 && r.cy === 0 && r.lod)).toBe(false);
     });
 
     it('renders only the manual cells while in debug mode', async () => {

@@ -30,7 +30,11 @@
   procobj clutter.
 - Map meshes ignore DFF frame transforms (SA re-frames atomic model infos — junk-frame proof).
 - `StreamingSystem`: HD ring within `hdDrawDistance`, LOD ring to `lodDrawDistance`, async cell
-  loads cached by the adapter, `CellFader` fade-in, manual cell selection for the map viewer.
+  loads cached by the adapter, manual cell selection for the map viewer. **Seamless LOD↔HD swap**: the
+  old detail level is kept until its same-cell replacement loads, then removed in the same step (no
+  empty frame), and the new level appears at full opacity — `CellFader` fade-in runs only for
+  genuinely new cells, never on a swap (fixed the LOD→HD "blink"). A hysteresis dead-band
+  (`0.25 × cellSize`) holds a cell's level across the ring boundary so it doesn't flip-flop.
 - Picking/describe: `userData.region` (instanced map), `userData.procObj` (clutter).
 
 ## Known gaps / candidates

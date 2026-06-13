@@ -29,7 +29,7 @@ export function cellsWithin(position: Vec3, radius: number, cellSize: number): C
     for (let dx = -reach; dx <= reach; dx += 1) {
       const cx = vx + dx;
       const cy = vy + dy;
-      if (nearestDistanceSq(position, cx, cy, cellSize) <= radiusSq) {
+      if (cellDistanceSq(position, cx, cy, cellSize) <= radiusSq) {
         cells.push([cx, cy]);
       }
     }
@@ -38,12 +38,8 @@ export function cellsWithin(position: Vec3, radius: number, cellSize: number): C
   return cells;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-/** Squared distance from `position` to the nearest point of cell `(cx,cy)`'s square. */
-function nearestDistanceSq(position: Vec3, cx: number, cy: number, cellSize: number): number {
+/** Squared distance from `position` to the nearest point of cell `(cx,cy)`'s square (Z ignored). */
+export function cellDistanceSq(position: Vec3, cx: number, cy: number, cellSize: number): number {
   const minX = cx * cellSize;
   const minY = cy * cellSize;
   const nx = clamp(position[0], minX, minX + cellSize);
@@ -52,4 +48,8 @@ function nearestDistanceSq(position: Vec3, cx: number, cy: number, cellSize: num
   const dy = position[1] - ny;
 
   return dx * dx + dy * dy;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
