@@ -116,4 +116,15 @@ test fixtures (`character-controller`, `collision-streaming`, `streaming`, `phys
 - Persisting panel state; draggable/resizable panel; gamepad.
 - New vehicle models beyond admiral/camper; spawning NPCs.
 - Saved coord history (only current coords + copy).
-```
+
+## Follow-up (done): Map screen — Show Normals + draw-distance/fog sliders
+
+The Map screen gained two extras (rendered while the map viewer is OFF; `MapScreen` /
+`DrawDistanceControls` in `debug-overlay.tsx`):
+
+- **Show Normals** — a scene-wide `MeshNormalMaterial` override (`game.setShowNormals`), drawn
+  **straight to the screen, bypassing the post-FX pipeline** (in `Game`'s render loop) so the normals
+  read clean. Auto-resets via `resetTo` (Back / × / F2) and when entering the map viewer.
+- **Draw Distance / HD Distance / Fog** sliders — `game.setStreaming` (live `config.streaming`, plan
+  009) + `game.setFogDistance` (plan 024). Fog moved here from Atmosphere; the Draw Distance slider
+  couples fog to the LOD cull edge (`fog ≈ lod × 0.8`).

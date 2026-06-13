@@ -24,6 +24,11 @@
 - **Show Normals** (Map screen): scene-wide `MeshNormalMaterial` override (`game.setShowNormals`),
   drawn straight to the screen bypassing post-FX so the normals read clean. Auto-resets when leaving
   the screen / closing the panel (`resetTo`) or entering the map viewer.
+- **Draw-distance controls** (Map screen): live sliders for the streaming **Draw Distance** (LOD
+  ring) + **HD Distance** + **Fog** (`game.setStreaming` / `setFogDistance`; systems read config live
+  so they apply next frame). Fog moved here from Atmosphere and **coupled** to the LOD ring — the
+  Draw Distance slider sets `fog ≈ lod × 0.8` (FogExp2 saturates at ~1.25× its distance) so the LOD
+  cull edge is always hidden; the Fog slider can only pull fog closer (thicker), never expose the edge.
 - Picking: instanced map objects (`userData.region`), procobj clutter (`userData.procObj`),
   road-sign text meshes report their host model.
 - Debug URL params: `?nocull=1`, `?shadowdebug=1`.

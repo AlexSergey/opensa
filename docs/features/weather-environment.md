@@ -17,9 +17,12 @@
   (coverage/opacity profiles), stars, moon; night factor exported to every consumer
   (tints/shadows/fill).
 - **Water**: `water.dat` quads + infinite ocean ring at sea level; shader with reflection, sun
-  glint, darkness knobs; shoreline handled by the quads' alpha.
+  glint, darkness knobs; shoreline handled by the quads' alpha. The custom water shader applies the
+  scene fog itself (the map's `FogExp2` doesn't reach a raw ShaderMaterial) — fades the far ocean into
+  the horizon colour by the live `scene.fog` density, so it dissolves like the terrain.
 - **Fog**: distance fog blended into the sky horizon colour (FogPlugin reads the timecyc sky
-  bottom), `fog.distance` knob + debug slider.
+  bottom), `fog.distance` knob. Slider lives in the **debug Map screen**, coupled to draw distance
+  (`fog ≈ lod × 0.8`) so the LOD cull edge stays hidden — see zones-hud-debug.
 
 ## Known gaps / candidates
 

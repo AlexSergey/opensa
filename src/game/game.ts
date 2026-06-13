@@ -495,6 +495,12 @@ export class Game {
     this.setConfig({ graphics: { ...this.config.graphics, stars: { ...this.config.graphics.stars, ...patch } } });
   }
 
+  /** Tune the map streaming draw distances at runtime (HD / LOD / collision rings); merges into
+   *  `config.streaming`. The streaming + collision systems read it live, so it applies next frame. */
+  setStreaming(patch: Partial<Config['streaming']>): void {
+    this.setConfig({ streaming: { ...this.config.streaming, ...patch } });
+  }
+
   /** Register the streaming system so the engine can drive it (view cell, manual cells). */
   setStreamingSystem(system: StreamingSystem): void {
     this.streamingSystem = system;

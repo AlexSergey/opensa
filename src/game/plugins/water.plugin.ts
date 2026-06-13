@@ -1,4 +1,4 @@
-import { Color, DoubleSide, type Mesh, type MeshBasicMaterial, ShaderMaterial, type Vector3 } from 'three';
+import { Color, DoubleSide, FogExp2, type Mesh, type MeshBasicMaterial, ShaderMaterial, type Vector3 } from 'three';
 
 import type { Plugin, PluginContext } from './plugin';
 
@@ -37,6 +37,7 @@ const FRAGMENT = `
   uniform float uReflection;
   uniform float uWaterAlpha;
   uniform float uDarkness;
+  uniform float uFogDensity;
   varying vec3 vWorldPos;
   varying vec2 vUv;
 
@@ -74,8 +75,16 @@ const FRAGMENT = `
     vec3 refl = reflect(-uSunDir, n);
     float spec = pow(max(dot(refl, viewDir), 0.0), SHININESS);
     vec3 col = base + uSunColor * spec * uGlint;
+    float alpha = mix(uWaterAlpha, 1.0, fres); // timecyc opacity, fully opaque at the horizon
 
-    gl_FragColor = vec4(col, mix(uWaterAlpha, 1.0, fres)); // timecyc opacity, fully opaque at the horizon
+    // Distance fog (the map's FogExp2 doesn't reach this custom shader): fade the far ocean into the
+    // horizon colour (= the fog colour) so it dissolves like the terrain instead of staying sharp.
+    float fogDist = distance(cameraPosition, vWorldPos);
+    float fogFactor = 1.0 - exp(-fogDist * fogDist * uFogDensity * uFogDensity);
+    col = mix(col, uHorizonColor, fogFactor);
+    alpha = mix(alpha, 1.0, fogFactor);
+
+    gl_FragColor = vec4(col, alpha);
   }
 `;
 
@@ -117,6 +126,7 @@ export class WaterPlugin implements Plugin {
       transparent: true,
       uniforms: {
         uDarkness: { value: context.config.graphics.water.darkness },
+        uFogDensity: { value: 0 },
         uGlint: { value: context.config.graphics.water.glint },
         uHorizonColor: { value: new Color() },
         uMap: { value: map },
@@ -140,6 +150,8 @@ export class WaterPlugin implements Plugin {
     const sky = this.sample(this.getHour());
     const u = this.material.uniforms;
     u.uTime.value = context.clock.elapsed;
+    // Match the scene fog the FogPlugin set (FogExp2 density; 0 when off, e.g. map viewer).
+    u.uFogDensity.value = context.scene.fog instanceof FogExp2 ? context.scene.fog.density : 0;
     u.uDarkness.value = context.config.graphics.water.darkness;
     u.uGlint.value = context.config.graphics.water.glint;
     u.uReflection.value = context.config.graphics.water.reflection;

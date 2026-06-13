@@ -193,5 +193,14 @@ feel). All live-tunable via `setConfig` (the StreamingSystem reads them and re-e
 
 - **Collision streaming** (load COL per HD cell on the same grid) — pairs naturally with this but is a
   follow-up; for now collision stays the fixed area around spawn (plan 008).
-- Occlusion culling, interiors streaming, time-of-day model swaps (`tobj`), draw-distance slider scaling,
+- Occlusion culling, interiors streaming, time-of-day model swaps (`tobj`),
   texture streaming (we hold everything in memory), and swapping the cube for a real DFF character (separate).
+
+## Follow-up (done): runtime draw-distance controls
+
+The "draw-distance slider scaling" item above is implemented. `Game.setStreaming(patch)` merges into
+`config.streaming`; `StreamingSystem` and `CollisionStreamingSystem` already read the config **live**
+each frame, so changes apply next frame (new cells stream in, surplus stream out) with no reload.
+Debug **Map** screen (`DrawDistanceControls`, plan 023): **Draw Distance** (`lodDrawDistance`) and
+**HD Distance** (`hdDrawDistance`) sliders (HD clamped ≤ LOD). The Draw Distance slider also drives the
+fog so the LOD cull edge stays hidden (`fog ≈ lod × 0.8` — see plan 024). Camera far stays 100000.

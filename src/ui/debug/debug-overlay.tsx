@@ -18,6 +18,7 @@ import type {
   SkyConfig,
   SsaoConfig,
   StarsConfig,
+  StreamingConfig,
   Vec3,
   VehicleReflectionConfig,
   WaterConfig,
@@ -115,6 +116,8 @@ export interface DebugActions {
   setSsao(patch: Partial<SsaoConfig>): void;
   /** Toggle night stars. */
   setStars(patch: Partial<StarsConfig>): void;
+  /** Tune the map streaming draw distances (HD / LOD rings). */
+  setStreaming(patch: Partial<StreamingConfig>): void;
   /** Set the sun disc base size (world units). */
   setSunSize(size: number): void;
   /** Toggle ACES tone mapping. */
@@ -137,6 +140,8 @@ export interface DebugActions {
   ssao(): SsaoConfig;
   /** Whether night stars are on. */
   stars(): StarsConfig;
+  /** Current map streaming draw distances (HD / LOD rings). */
+  streaming(): StreamingConfig;
   /** Current sun disc base size (world units). */
   sunSize(): number;
   /** Teleport the player to a world position (native Z-up). */
@@ -270,7 +275,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [city, setCity] = useState<City>(() => actions.city());
   const [mapActive, setMapActive] = useState(false);
   const [normals, setNormals] = useState(false);
-  const [fog, setFog] = useState(() => actions.fogDistance());
   const [time, setTime] = useState(() => actions.gameTime());
   const [godrays, setGodrays] = useState(() => actions.godrays());
   const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
@@ -539,19 +543,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   />
                 </div>
               ))}
-              <div style={styles.groupLabel}>FOG: {fog} m</div>
-              <input
-                max={2000}
-                min={10}
-                onChange={(e) => {
-                  const distance = Number(e.target.value);
-                  setFog(distance);
-                  actions.setFogDistance(distance);
-                }}
-                step={10}
-                type="range"
-                value={fog}
-              />
               <div style={styles.groupLabel}>CLOUD COVER: {clouds.coverage.toFixed(2)}</div>
               <input
                 max={1}
@@ -1180,6 +1171,7 @@ function MapScreen({
           {normals ? 'Hide Normals' : 'Show Normals'}
         </button>
       )}
+      {!mapActive && <DrawDistanceControls actions={actions} />}
       {mapActive && (
         <button onClick={() => actions.topDownView()} style={styles.actionButton} type="button">
           Top (reset view)
@@ -1187,5 +1179,69 @@ function MapScreen({
       )}
       {mapActive && <MapInspector game={game} />}
     </div>
+  );
+}
+
+/** Fog fully saturates at ~1.25× its distance, so pinning fog at lod × this hides the LOD cull edge
+ *  (no skyline poking through). Raising draw distance moves fog out with it; the fog slider can only
+ *  pull it closer (thicker), never past this — so the edge always stays hidden. */
+const FOG_TO_LOD = 0.8;
+
+/** Map draw-distance controls: one Draw Distance slider that drives the LOD ring + couples fog to
+ *  hide its cull edge, plus HD-ring and Fog fine-tuning. Reads live config on mount. */
+function DrawDistanceControls({ actions }: { actions: DebugActions }): ReactElement {
+  const initial = actions.streaming();
+  const [lod, setLod] = useState(initial.lodDrawDistance);
+  const [hd, setHd] = useState(initial.hdDrawDistance);
+  const [fog, setFog] = useState(() => actions.fogDistance());
+  const fogMax = Math.round(lod * FOG_TO_LOD);
+
+  return (
+    <>
+      <div style={styles.groupLabel}>DRAW DISTANCE: {lod} m</div>
+      <input
+        max={4000}
+        min={500}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          const nextHd = Math.min(hd, next);
+          const nextFog = Math.round(next * FOG_TO_LOD);
+          setLod(next);
+          setHd(nextHd);
+          setFog(nextFog);
+          actions.setStreaming({ hdDrawDistance: nextHd, lodDrawDistance: next });
+          actions.setFogDistance(nextFog); // keep fog saturating at the new cull edge
+        }}
+        step={100}
+        type="range"
+        value={lod}
+      />
+      <div style={styles.groupLabel}>HD DISTANCE: {hd} m</div>
+      <input
+        max={lod}
+        min={150}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          setHd(next);
+          actions.setStreaming({ hdDrawDistance: next });
+        }}
+        step={50}
+        type="range"
+        value={hd}
+      />
+      <div style={styles.groupLabel}>FOG: {Math.min(fog, fogMax)} m</div>
+      <input
+        max={fogMax}
+        min={50}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          setFog(next);
+          actions.setFogDistance(next);
+        }}
+        step={50}
+        type="range"
+        value={Math.min(fog, fogMax)}
+      />
+    </>
   );
 }

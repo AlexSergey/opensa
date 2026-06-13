@@ -23,6 +23,7 @@ export type {
   SkyConfig,
   SsaoConfig,
   StarsConfig,
+  StreamingConfig,
   VehicleReflectionConfig,
   WaterConfig,
   WorldLightConfig,
