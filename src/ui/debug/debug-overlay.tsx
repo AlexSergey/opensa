@@ -43,6 +43,8 @@ const TIME_PRESETS: [string, number][] = [
 export interface DebugActions {
   /** Current bloom tuning. */
   bloom(): BloomConfig;
+  /** Smash the nearest breakable prop to the player (plan 045) — debugger trigger. No-op when none near. */
+  breakNearest(): void;
   /** Current follow-camera tuning (distance / angle / responsiveness / zoom range). */
   camera(): CameraConfig;
   /** Live follow distance (includes wheel zoom) — polled for the "current" readout. */
@@ -384,6 +386,9 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
               </button>
               <button onClick={() => actions.teleportToGanton()} style={styles.actionButton} type="button">
                 To Ganton
+              </button>
+              <button onClick={() => actions.breakNearest()} style={styles.actionButton} type="button">
+                Break nearest prop
               </button>
             </div>
           )}

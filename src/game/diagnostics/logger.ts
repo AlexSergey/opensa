@@ -18,7 +18,7 @@ export interface LogEntry {
  * Category of a diagnostic entry so subscribers can filter by area (e.g. only
  * `'enter-vehicle'`). Extend this union when a new system starts logging.
  */
-export type LogType = 'damage' | 'enter-vehicle' | 'physics' | 'streaming' | 'time' | 'vehicle';
+export type LogType = 'breakable' | 'damage' | 'enter-vehicle' | 'physics' | 'streaming' | 'time' | 'vehicle';
 
 /**
  * Structured, level-gated diagnostics routed through the game event bus. Silent

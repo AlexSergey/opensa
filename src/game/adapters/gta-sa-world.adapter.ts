@@ -15,6 +15,7 @@ import type { CellCoord } from '../streaming/grid';
 
 // game/adapters/** (and game/mods/**) are the only places allowed to import renderware.
 import {
+  breakableInstanceKey,
   buildAnimationClip,
   buildCell,
   buildCellColliders,
@@ -29,19 +30,23 @@ import {
   buildVehicle,
   buildWater,
   buildWorldGrid,
+  ColDamageEffect,
   convertTo24h,
+  getBreakable,
   groupRulesBySurface,
   type HandlingEntry,
   type IdeObjectDef,
   type ImgArchive,
   loadArchive,
   type MapDefinitions,
+  type ObjectDatEntry,
   oceanFrame,
   parseCarcols,
   parseDff,
   parseDffCollision,
   parseHandling,
   parseIfp,
+  parseObjectDat,
   parseProcObj,
   parseSurfaceNames,
   parseTimecyc,
@@ -69,6 +74,16 @@ import { VehicleRig } from '../vehicle/vehicle-rig';
 /** Sea level (Z) + a large background plane half-size so the ocean reaches the horizon. */
 const SEA_LEVEL = 0;
 const SEA_HALF = 16000;
+
+/** object.dat collision-damage effects that smash a prop on impact (plan 045). Props with one of
+ *  these but no RW Breakable atomic shatter their render geometry; props WITH an atomic break
+ *  regardless. `none`/`changeModel` are excluded (not a shatter). */
+const BREAKABLE_EFFECTS = new Set<number>([
+  ColDamageEffect.breakable,
+  ColDamageEffect.breakableThenRemoved,
+  ColDamageEffect.changeThenSmash,
+  ColDamageEffect.smashCompletely,
+]);
 
 export interface GtaSaWorldConfig {
   archiveUrl: string;
@@ -108,6 +123,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   readonly cellSize: number;
 
   private archive: ImgArchive | null = null;
+  /** Lowercased model names that "smash" per object.dat but carry no RW Breakable atomic (plan 045) —
+   *  their shatter mesh is synthesized from the render geometry. Built in {@link prepare}. */
+  private readonly breakableModels = new Set<string>();
   private readonly cellCache = new Map<string, Object3D[]>();
   private readonly colliderCache = new Map<string, ModelColliders[]>();
   private readonly config: GtaSaWorldConfig;
@@ -120,6 +138,8 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private grid: null | WorldGrid = null;
   /** Parsed `handling.cfg`, kept for the later vehicle-physics phase. */
   private handling: Map<string, HandlingEntry> | null = null;
+  /** Parsed `object.dat` collision-damage tuning by lowercased model (plan 045); null when absent. */
+  private objectDat: Map<string, ObjectDatEntry> | null = null;
   /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
   private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Surface-name table from surfinfo.dat (index = COL material id); pairs with procObjRules. */
@@ -139,6 +159,13 @@ export class GtaSaWorldAdapter implements WorldAdapter {
               mod.decoratePart?.(def, part);
             }
           };
+  }
+
+  /** `object.dat` collision-damage tuning for a model (plan 045), or undefined when absent. The
+   *  break system gates on RW Breakable mesh data; this only tunes the impact threshold + marks
+   *  indestructible (huge-mass) props. */
+  breakableInfo(modelName: string): ObjectDatEntry | undefined {
+    return this.objectDat?.get(modelName.toLowerCase());
   }
 
   /** Identify a picked object: placed map instances via `userData.region`, scattered clutter
@@ -229,6 +256,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     if (!meshes) {
       // Native Z-up; the streaming root applies the −90°X (so no per-cell group).
       meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod, {
+        breakableModels: this.breakableModels,
         decoratePart: this.decoratePart,
       });
       // Procedural clutter (plan 042): deterministic scatter over the cell's collision faces.
@@ -258,7 +286,17 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     let colliders = this.colliderCache.get(key);
     if (!colliders) {
       const index = buildCollisionIndex(this.archive);
-      colliders = buildCellColliders(index, this.defs, this.grid, cx, cy).map(toModelColliders);
+      const archive = this.archive;
+      const breakableModels = this.breakableModels;
+      colliders = buildCellColliders(index, this.defs, this.grid, cx, cy).map((region) =>
+        // Tag breakable-prop placements with their instance keys (plan 045) so a smashed prop's one
+        // static body can be dropped — keyed the same way the render registry keys the prop. Matches
+        // the render gate: a RW Breakable atomic OR an object.dat smash effect (render-geometry shatter).
+        tagBreakable(
+          toModelColliders(region),
+          getBreakable(archive, region.name) !== undefined || breakableModels.has(region.name),
+        ),
+      );
       // Clutter collision (plan 042): models that ship a COL collide (rocks/cacti/trees);
       // grass and flower patches have none, so they stay walk-through — like vanilla. The
       // collidable subset follows the live per-category density (no invisible obstacles).
@@ -408,6 +446,17 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       this.procObjRules = groupRulesBySurface(parseProcObj(procObjText));
       this.surfaceNames = parseSurfaceNames(surfInfoText);
     }
+    // Breakable-prop tuning (plan 045) — absent-tolerant: no file, props still break at the default
+    // threshold (the break gate is the RW Breakable mesh, not this table).
+    const objectDatText = await tryFetchText(`${this.config.base}/data/object.dat`);
+    if (objectDatText !== null) {
+      this.objectDat = parseObjectDat(objectDatText);
+      for (const [name, entry] of this.objectDat) {
+        if (BREAKABLE_EFFECTS.has(entry.colDamageEffect)) {
+          this.breakableModels.add(name); // render-geometry shatter for atomic-less smash props
+        }
+      }
+    }
     onProgress?.(1);
   }
 
@@ -534,6 +583,19 @@ async function fetchText(url: string): Promise<string> {
   }
 
   return response.text();
+}
+
+/** Tag a model's collider placements with breakable instance keys (plan 045); a pass-through for
+ *  non-breakable models. The key matches the render registry's (model + cm-rounded translation). */
+function tagBreakable(model: ModelColliders, isBreakable: boolean): ModelColliders {
+  if (!isBreakable) {
+    return model;
+  }
+  const instanceKeys = model.transforms.map((matrix) =>
+    breakableInstanceKey(model.name, [matrix.elements[12], matrix.elements[13], matrix.elements[14]]),
+  );
+
+  return { ...model, instanceKeys };
 }
 
 /** Fetch text, or null when the file is absent or unreachable (optional assets like

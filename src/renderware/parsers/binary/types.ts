@@ -10,6 +10,36 @@ export interface RWAtomic {
   frameIndex: number;
   geometryIndex: number;
 }
+/**
+ * The SA Breakable plugin (0x253F2FD; plan 045): a complete secondary "shatter" mesh the
+ * engine turns into flying per-triangle debris when the prop is smashed. Model space, layout
+ * byte-verified (binnt08_la / trafficlight1: header + packed arrays sum to the chunk size
+ * exactly). Present only when the chunk's magic is non-zero (a runtime pointer fixup — most
+ * models ship a 4-byte `magic = 0` marker meaning "not breakable").
+ */
+export interface RWBreakable {
+  /** Per-vertex RGBA (numVertices × 4). */
+  colours: Uint8Array;
+  materials: RWBreakableMaterial[];
+  /** Vertex positions, flattened (numVertices × 3). */
+  positions: Float32Array;
+  /** Per-triangle material index (numTriangles). */
+  triangleMaterials: Uint16Array;
+  /** Triangle vertex indices, flattened (numTriangles × 3). */
+  triangles: Uint16Array;
+  /** Vertex UVs, flattened (numVertices × 2). */
+  uvs: Float32Array;
+}
+
+/** One material of a breakable mesh (texture names resolve against the model's TXD). */
+export interface RWBreakableMaterial {
+  /** Ambient colour multiplier (RGB 0–1). */
+  ambient: [number, number, number];
+  /** Mask texture name ('' when none; exporters leave garbage after the NUL — already trimmed). */
+  mask: string;
+  texture: string;
+}
+
 export interface RWClump {
   atomics: RWAtomic[];
   frames: RWFrame[];
@@ -48,6 +78,8 @@ export interface RWFrame {
 }
 
 export interface RWGeometry {
+  /** SA Breakable shatter mesh (plan 045) — undefined when the model isn't breakable. */
+  breakable?: RWBreakable;
   /** 2d-effect escalators (geometry-local path points; plan 044) — undefined when none. */
   escalators?: RWEscalator[];
   flags: number;

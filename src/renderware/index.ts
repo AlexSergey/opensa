@@ -21,6 +21,18 @@ export * from './parsers/text';
 
 // three.js adapter layer
 export { updateAnimatedObjects } from './three/animated-objects';
+export {
+  breakableFromGeometry,
+  type BreakableInstance,
+  breakableInstanceKey,
+  breakBreakable,
+  type BreakOptions,
+  getBreakable,
+  getBreakableByKey,
+  nearestBreakable,
+  registerBreakable,
+  resetBreakables,
+} from './three/breakable';
 export { buildAnimationClip, type BuildAnimClipOptions } from './three/build-anim-clip';
 export {
   buildClump,
@@ -34,6 +46,15 @@ export {
   type RenderPart,
 } from './three/build-clump';
 export { buildCollisionWireframe } from './three/build-col-wireframe';
+export {
+  buildDebrisMesh,
+  DEBRIS_LIFETIME,
+  type DebrisImpact,
+  debrisTimeUniform,
+  resetDebris,
+  spawnDebris,
+  updateDebris,
+} from './three/build-debris';
 export {
   buildEscalatorSteps,
   type EscalatorPathEntry,

@@ -1,6 +1,8 @@
 import type { ChunkHeader } from './chunks';
 import type {
   RWAtomic,
+  RWBreakable,
+  RWBreakableMaterial,
   RWClump,
   RWEscalator,
   RWFrame,
@@ -224,6 +226,7 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
 
   const { escalators, lights, particles, roadsigns } = parse2dEffects(stream, header);
   const nightColors = parseNightColors(stream, header, numVertices);
+  const breakable = parseBreakable(stream, header);
 
   return {
     flags,
@@ -237,6 +240,7 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
     skin,
     triangles,
     uvLayers,
+    ...(breakable ? { breakable } : {}),
     ...(escalators.length > 0 ? { escalators } : {}),
     ...(particles.length > 0 ? { particles } : {}),
     ...(roadsigns.length > 0 ? { roadsigns } : {}),
@@ -375,6 +379,62 @@ function parse2dEffects(
   }
 
   return { escalators, lights, particles, roadsigns };
+}
+
+/**
+ * Parse the geometry's SA Breakable plugin (`0x253F2FD`) — the secondary "shatter" mesh debris is
+ * built from (plan 045). Layout (byte-verified — header + packed arrays sum to the chunk size
+ * exactly): `magic u32` (0 = 4-byte "not breakable" marker; non-zero = a runtime pointer fixup,
+ * data follows), `u32` (observed 1), `vertexCount u32`, 3 zeroed pointers, `triangleCount u32`,
+ * 2 zeroed pointers, `materialCount u32`, 4 zeroed pointers, then packed arrays: positions
+ * `f32×3×V`, UVs `f32×2×V`, colours `u8×4×V`, triangles `u16×3×T`, per-triangle material `u16×T`,
+ * texture names `char[32]×M`, mask names `char[32]×M`, ambient `f32×3×M`. Undefined when absent,
+ * marker-only, or the sizes don't add up (data-tolerant).
+ */
+function parseBreakable(stream: BinaryStream, header: ChunkHeader): RWBreakable | undefined {
+  const extension = findChild(stream, header.dataStart, header.end, RwSection.EXTENSION);
+  if (!extension) {
+    return undefined;
+  }
+  const chunk = findChild(stream, extension.dataStart, extension.end, RwSection.BREAKABLE);
+  if (!chunk || chunk.end - chunk.dataStart < 56) {
+    return undefined;
+  }
+  stream.seek(chunk.dataStart);
+  if (stream.u32() === 0) {
+    return undefined; // marker only — model is not breakable
+  }
+  stream.u32(); // unknown (observed 1)
+  const vertexCount = stream.u32();
+  stream.skip(12); // zeroed runtime pointers (positions/uvs/colours)
+  const triangleCount = stream.u32();
+  stream.skip(8); // zeroed pointers (triangles/material assignment)
+  const materialCount = stream.u32();
+  stream.skip(16); // zeroed pointers (textures/names/masks/ambient)
+  const expected = 56 + vertexCount * 24 + triangleCount * 8 + materialCount * 76;
+  if (chunk.end - chunk.dataStart !== expected) {
+    return undefined; // unknown layout variant — refuse rather than misread
+  }
+
+  const positions = readFloat32Array(stream, vertexCount * 3);
+  const uvs = readFloat32Array(stream, vertexCount * 2);
+  const colours = stream.bytes(vertexCount * 4);
+  const triangles = readUint16Array(stream, triangleCount * 3);
+  const triangleMaterials = readUint16Array(stream, triangleCount);
+  const textures: string[] = [];
+  for (let i = 0; i < materialCount; i += 1) {
+    textures.push(stream.string(32).toLowerCase());
+  }
+  const masks: string[] = [];
+  for (let i = 0; i < materialCount; i += 1) {
+    masks.push(stream.string(32).toLowerCase());
+  }
+  const materials: RWBreakableMaterial[] = [];
+  for (let i = 0; i < materialCount; i += 1) {
+    materials.push({ ambient: [stream.f32(), stream.f32(), stream.f32()], mask: masks[i], texture: textures[i] });
+  }
+
+  return { colours, materials, positions, triangleMaterials, triangles, uvs };
 }
 
 function parseMaterial(stream: BinaryStream, header: ChunkHeader): RWMaterial {
@@ -598,6 +658,15 @@ function readTriangles(stream: BinaryStream, numTriangles: number): RWTriangle[]
   }
 
   return triangles;
+}
+
+function readUint16Array(stream: BinaryStream, count: number): Uint16Array {
+  const out = new Uint16Array(count);
+  for (let i = 0; i < count; i += 1) {
+    out[i] = stream.u16();
+  }
+
+  return out;
 }
 
 function readUVLayers(stream: BinaryStream, numUVLayers: number, numVertices: number): Float32Array[] {

@@ -87,6 +87,8 @@ type RapierWorld = InstanceType<Rapier['World']>;
  * integer handle, which the `RigidBody` component stores per entity.
  */
 export class PhysicsWorld {
+  /** Contact-force impacts for the breakable trigger (drained by {@link takeBreakableImpacts}). */
+  private breakableImpacts: Impact[] = [];
   private readonly events: InstanceType<Rapier['EventQueue']>;
   /** Contact-force impacts collected during the last {@link step} (drained by {@link takeImpacts}). */
   private impacts: Impact[] = [];
@@ -242,16 +244,21 @@ export class PhysicsWorld {
    * placement (Z-up translation + rotation decomposed from its matrix) carrying
    * the model's trimesh + box + sphere shapes (model space). Returns the created
    * body **handles** (for {@link removeBodies} when a cell unloads); placements
-   * whose shapes were all degenerate create no body.
+   * whose shapes were all degenerate create no body. `onBreakable` (plan 045) is
+   * called with each created breakable-prop body's instance key + handle, so the
+   * caller can drop that one body when the prop is smashed.
    */
-  createStaticColliders(models: readonly ModelColliders[]): number[] {
+  createStaticColliders(
+    models: readonly ModelColliders[],
+    onBreakable?: (key: string, handle: number) => void,
+  ): number[] {
     const translation = new Vector3();
     const rotation = new Quaternion();
     const scale = new Vector3();
     const handles: number[] = [];
 
     for (const model of models) {
-      for (const matrix of model.transforms) {
+      model.transforms.forEach((matrix, index) => {
         matrix.decompose(translation, rotation, scale);
         const body = this.world.createRigidBody(
           this.rapier.RigidBodyDesc.fixed()
@@ -260,10 +267,14 @@ export class PhysicsWorld {
         );
         if (this.addShapes(body, model.shape) > 0) {
           handles.push(body.handle);
+          const key = model.instanceKeys?.[index];
+          if (key !== undefined) {
+            onBreakable?.(key, body.handle);
+          }
         } else {
           this.world.removeRigidBody(body); // no usable shape — don't keep an empty body
         }
-      }
+      });
     }
 
     return handles;
@@ -433,13 +444,25 @@ export class PhysicsWorld {
           point = [p.x, p.y, p.z];
         }
       });
-      this.impacts.push({
+      const impact: Impact = {
         bodyA: c1.parent()?.handle ?? null,
         bodyB: c2.parent()?.handle ?? null,
         force: event.maxForceMagnitude(),
         point,
-      });
+      };
+      // Two independent buffers so the vehicle-damage and breakable triggers each drain the same
+      // contact-force events without one starving the other (no inter-system ordering coupling).
+      this.impacts.push(impact);
+      this.breakableImpacts.push(impact);
     });
+  }
+
+  /** Drain the impacts collected since the last call (breakable props read these — plan 045). */
+  takeBreakableImpacts(): readonly Impact[] {
+    const impacts = this.breakableImpacts;
+    this.breakableImpacts = [];
+
+    return impacts;
   }
 
   /** Drain the impacts collected since the last call (vehicle collision damage reads these). */

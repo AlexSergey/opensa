@@ -6,6 +6,8 @@ export const RwSection = {
   ANIM_ANIMATION: 0x1b,
   ATOMIC: 0x14,
   BIN_MESH_PLG: 0x50e,
+  // SA Breakable plugin — the secondary "shatter" mesh debris is built from (plan 045)
+  BREAKABLE: 0x253f2fd,
   CLUMP: 0x10,
   // Embedded collision model plugin (COL2/COL3 wrapped in the clump extension)
   COLLISION: 0x253f2fa,

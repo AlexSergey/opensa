@@ -34,6 +34,9 @@ export interface ColliderSphere {
 
 /** One model's collision shape + the world placements of every instance of it. */
 export interface ModelColliders {
+  /** Breakable-prop instance keys aligned with {@link transforms} (plan 045) — present only for
+   *  smashable models, so the physics layer can drop one instance's body when the prop is broken. */
+  instanceKeys?: readonly string[];
   name: string;
   shape: ColliderShape;
   /** World transforms (GTA Z-up; same convention as the render). */

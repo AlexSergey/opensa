@@ -13,6 +13,7 @@ import {
   buildInstancedMeshes,
   type BuildRegionOptions,
   buildRoadsignMeshes,
+  collectBreakables,
   collectCoronas,
   collectParticleEmitters,
   type RegionMeshData,
@@ -40,7 +41,14 @@ export function buildCell(
     return [];
   }
   const groups = [...cellGroups(defs, cell, lod).values()];
-  const objects: Object3D[] = buildInstancedMeshes(archive, groups, options);
+  const instancedMeshes = buildInstancedMeshes(archive, groups, options);
+  const objects: Object3D[] = [...instancedMeshes];
+  // Breakable props (plan 045): register the cell's smashable instances (HD only — props are
+  // near-field and have no LOD collision/break). Registration is keyed by placement, so the cached
+  // cell rebuild replaces stale entries rather than duplicating them.
+  if (!lod) {
+    collectBreakables(archive, instancedMeshes, options.breakableModels);
+  }
   // IDE anim objects (plan 041): per-instance frame hierarchies with a looping IFP clip —
   // animation mutates node transforms, so they can't ride the InstancedMesh path above.
   objects.push(...buildAnimatedObjects(archive, groups));

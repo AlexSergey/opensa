@@ -28,10 +28,21 @@
 
 **2d Effect plugin (`0x253F2F8`, geometry extension)**
 - Type 0 **Light**: colour, corona far-clip/size, flags, corona texture → street-lamp coronas.
+- Type 1 **Particle**: char[24] FX-system name (effects.fxp) + geometry-local position →
+  data-driven emitters (plan 044).
 - Type 7 **Roadsign**: plate size, rotation (world-space!), flags (lines/chars/colour),
   4×16-char text → sign text rendering.
-- Other types (1 particle, 3 ped attractor, 6 enex, 8 trigger, 9 cover point) are skipped by
+- Type 10 **Escalator**: geometry-local path (start/bottom/top/end) + direction → moving step
+  rows (plan 044).
+- Other types (3 ped attractor, 6 enex, 8 trigger, 9 cover point) are skipped by
   size — counted in the survey but intentionally unused.
+
+**Breakable plugin (`0x253F2FD`, geometry extension; plan 045)**
+- `RWGeometry.breakable`: the secondary "shatter" mesh (positions/UVs/colours, triangles +
+  per-triangle material, materials with texture/mask/ambient). Magic 0 = 4-byte marker, not
+  breakable (1695 models carry the chunk, 238 have real data); non-zero magic is a raw runtime
+  pointer, not a flag. Layout byte-verified: header + packed arrays sum to the chunk size
+  exactly — anything else is refused (data-tolerant undefined).
 
 **Data repair (mod re-exports)**
 - `sanitizeDegenerateNormals` (build side): zero-length/NaN stored OR computed normals replaced
@@ -50,18 +61,18 @@ layer.
 
 ## Known gaps / candidates (prioritized in plan 043)
 
-- 2dfx type 1 particles (fountains/smoke/fires) and type 10 escalators — **plan 044 (world
-  effects)**, split out because they need an emitter/animation system, not just parsing.
 - Second UV layer unused downstream (suspected MatFX dual-pass dirt/detail — investigate).
 - HAnim PLG unparsed — bones bind by frame name (works for shipped data; IDs are more robust).
-- Breakable (`0x253F2FD`) unparsed — smashable furniture mesh data (windows, tables); gets its
-  own dedicated plan (parse + gameplay together).
+- Breakable parsed (plan 045 iteration 1); the break gameplay (debris, triggers) is the rest
+  of plan 045.
 - 2dfx types 3/4/6/8/9 — explicitly N/A (gameplay/AI/interiors out of scope).
 - UV anim rotation/skew params parsed but not applied (no shipped asset animates them).
 - Morph targets beyond the first ignored (MorphPLG absent from shipped data).
 
 ## Test coverage anchors
 
-Real-asset fixtures under `tests/dff/`: trafficlight (backface/no normals), casroyale (zero
-normals), frame-offset-ignored (junk frame), uv-anim (visagesign04), anim-clump
-(nt_noddonkbase + counxref.ifp), roadsign (vegasnroad19, se_bit_17).
+Real-asset fixtures under `tests/dff/`: trafficlight (backface/no normals + raw-pointer-magic
+breakable), casroyale (zero normals), frame-offset-ignored (junk frame), uv-anim
+(visagesign04), anim-clump (nt_noddonkbase + counxref.ifp), roadsign (vegasnroad19 — also the
+zero-magic breakable marker, se_bit_17), particle (skullpillar01_lvs), escalator (escl_la +
+esc_step), breakable (binnt08_la).

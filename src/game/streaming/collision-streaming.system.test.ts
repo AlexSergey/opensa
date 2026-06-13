@@ -99,13 +99,25 @@ function stubAdapter(): {
 }
 
 function stubPhysics(): {
-  createStaticColliders: Mock<(models: readonly ModelColliders[]) => number[]>;
+  createStaticColliders: Mock<
+    (models: readonly ModelColliders[], onBreakable?: (key: string, handle: number) => void) => number[]
+  >;
   removeBodies: Mock<(handles: readonly number[]) => void>;
 } {
   let nextHandle = 0;
 
   return {
-    createStaticColliders: vi.fn((models: readonly ModelColliders[]): number[] => models.map(() => nextHandle++)),
+    createStaticColliders: vi.fn(
+      (models: readonly ModelColliders[], onBreakable?: (key: string, handle: number) => void): number[] =>
+        models.map((model) => {
+          const handle = nextHandle++;
+          for (const key of model.instanceKeys ?? []) {
+            onBreakable?.(key, handle);
+          }
+
+          return handle;
+        }),
+    ),
     removeBodies: vi.fn<(handles: readonly number[]) => void>(),
   };
 }
@@ -113,7 +125,38 @@ function stubPhysics(): {
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('CollisionStreamingSystem', () => {
+  describe('negative cases', () => {
+    it('removeBreakable is a no-op for an unknown key', () => {
+      const system = new CollisionStreamingSystem(stubAdapter(), stubPhysics(), () => [0, 0, 0] as Vec3, config(100));
+      expect(system.removeBreakable('nope')).toBe(false);
+    });
+
+    it('breakableKeyOf returns undefined for a null or unknown body handle', () => {
+      const system = new CollisionStreamingSystem(stubAdapter(), stubPhysics(), () => [0, 0, 0] as Vec3, config(100));
+      expect(system.breakableKeyOf(null)).toBeUndefined();
+      expect(system.breakableKeyOf(999)).toBeUndefined();
+    });
+  });
+
   describe('positive cases', () => {
+    it('drops a smashed breakable body without disturbing the rest of the cell', async () => {
+      const adapter = stubAdapter();
+      adapter.loadCellColliders.mockImplementation((cx, cy) =>
+        Promise.resolve([{ ...modelColliders(`${cx},${cy}`), instanceKeys: ['bin@0'] }]),
+      );
+      const physics = stubPhysics();
+      const system = new CollisionStreamingSystem(adapter, physics, () => [125, 125, 0] as Vec3, config(100));
+
+      system.update();
+      await flush();
+
+      expect(system.breakableKeyOf(0)).toBe('bin@0'); // contact-force impact resolves the prop
+      expect(system.removeBreakable('bin@0')).toBe(true);
+      expect(physics.removeBodies).toHaveBeenCalledWith([0]); // only the prop's body
+      expect(system.breakableKeyOf(0)).toBeUndefined(); // reverse lookup cleared
+      expect(system.removeBreakable('bin@0')).toBe(false); // already gone
+    });
+
     it('creates static colliders for cells within the radius', async () => {
       const adapter = stubAdapter();
       const physics = stubPhysics();

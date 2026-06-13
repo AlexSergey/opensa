@@ -52,7 +52,20 @@
       "Edit(src/**)",
       "Write(src/**)",
       "Edit(scripts/**)",
-      "Write(scripts/**)"
+      "Write(scripts/**)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(od:*)",
+      "Bash(sed -n:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)"
     ]
   }
 }

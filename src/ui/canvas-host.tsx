@@ -42,12 +42,15 @@ import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
 import { CityZoneSystem } from '../game/zones/city-zone.system';
 import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
 import {
+  breakBreakable,
   buildTextureMap,
   coronaMaterial,
   dnBalanceUniform,
+  getBreakableByKey,
   GLOW_LAYER,
   gxtKeyHash,
   type MapZone,
+  nearestBreakable,
   nightFillRim,
   nightFillUniform,
   parseFxp,
@@ -60,6 +63,7 @@ import {
   setFxLibrary,
   setRoadsignFont,
   updateAnimatedObjects,
+  updateDebris,
   updateEscalators,
   updateParticleEffects,
   updateProcObjMeshes,
@@ -711,6 +715,56 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       ),
     );
 
+    // Breakable props (plan 045): debris lifecycle clock + the smash triggers. Smashing collapses
+    // the prop's InstancedMesh slots, flies its shatter mesh as debris, and drops its static body so
+    // the car drives through (the cell rebuild respawns it). Shared by the impact + debugger triggers.
+    const streamingRoot = game.getStreamingRoot();
+    const breakProp = (entry: ReturnType<typeof nearestBreakable>, impact?: Vec3): void => {
+      if (entry && breakBreakable(entry, streamingRoot, { impact })) {
+        collisionStreaming.removeBreakable(entry.key);
+      }
+    };
+    // Vehicle impact uses the REAL collision (like SA's CObject::ObjectDamage): the chassis collider
+    // follows the COL contour and Rapier emits contact-force events for it, so we break the prop a
+    // car actually touches — at the real contact point, with the real impact force. Each event whose
+    // static body is a registered breakable prop breaks it when the force clears the threshold.
+    // object.dat tunes the per-prop threshold (higher damage multiplier → breaks easier) and marks
+    // huge-mass props indestructible. (Contact-force events fire only for chassis colliders, so the
+    // on-foot player can't smash props — matching vanilla.)
+    const BREAK_FORCE = 3000; // base contact force (N) to smash a prop — calibrate via `showLogs:'debug'`
+    // Truly indestructible cutscene/fixed props are mass 99999; breakable fences sit at 50000 (uproot
+    // tuning, not "indestructible"), so the cutoff must clear 50000.
+    const INDESTRUCTIBLE_MASS = 90000;
+    const logger = game.getLogger();
+    game.addSystem({
+      name: 'breakables',
+      update(): void {
+        updateDebris(performance.now() / 1000);
+        for (const impact of character.physics.takeBreakableImpacts()) {
+          const keyA = collisionStreaming.breakableKeyOf(impact.bodyA);
+          const key = keyA ?? collisionStreaming.breakableKeyOf(impact.bodyB);
+          if (key === undefined) {
+            continue; // contact didn't involve a breakable prop
+          }
+          const entry = getBreakableByKey(key);
+          if (!entry) {
+            continue;
+          }
+          logger.debug('breakable', `hit ${entry.modelName} force=${impact.force.toFixed(0)}`, impact);
+          const info = adapter.breakableInfo(entry.modelName);
+          if (info && info.mass >= INDESTRUCTIBLE_MASS) {
+            continue; // tuned indestructible (cutscene/fixed prop)
+          }
+          if (impact.force < BREAK_FORCE / Math.min(3, Math.max(0.5, info?.colDamageMultiplier ?? 1))) {
+            continue;
+          }
+          // Fling the shards along the hitter's (the car's) velocity — the non-breakable body.
+          const hitter = keyA ? impact.bodyB : impact.bodyA;
+          breakProp(entry, hitter === null ? undefined : character.physics.getLinvel(hitter));
+        }
+      },
+    });
+
     // Spawn one car: load it, place it, make it a dynamic body, and register it with the vehicle
     // systems. With `anchor`, the position is computed just in front of it (clear of its body, sized
     // from the car's COL bounds). Returns how to despawn it (used by the LOD system / debug menu).
@@ -807,6 +861,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
+      breakNearest: () => breakProp(nearestBreakable(character.viewOf(), 8)),
       camera: () => game.getConfig().camera,
       cameraDistance: () => game.getCameraDistance(),
       city: () => game.getCity(),

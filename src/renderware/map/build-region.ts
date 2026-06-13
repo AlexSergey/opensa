@@ -12,6 +12,7 @@ import type { CoronaEntry } from '../three/corona';
 import { getClump, getIfp, getTextures, modelKey } from '../archive';
 import { hasIdeFlag, IdeFlag } from '../parsers/text';
 import { registerAnimatedObject } from '../three/animated-objects';
+import { breakableFromGeometry, breakableInstanceKey, registerBreakable } from '../three/breakable';
 import { buildAnimatedClump } from '../three/build-animated-clump';
 import { buildClumpEscalators, buildClumpLights, buildClumpParticles, buildClumpParts } from '../three/build-clump';
 import { buildEscalatorSteps } from '../three/build-escalator';
@@ -34,6 +35,10 @@ const SUPPRESS_LIGHT_MODELS = /traffic/i;
 
 /** Options threaded from the adapter into the per-cell mesh builders. */
 export interface BuildRegionOptions {
+  /** Lowercased model names that "smash" on impact per object.dat but carry no RW Breakable atomic
+   *  (plan 045) — their shatter mesh is synthesized from the render geometry. Models WITH a shatter
+   *  atomic break regardless of this set. */
+  breakableModels?: ReadonlySet<string>;
   /** Game-layer mod hook (plan 039): called once per built part, AFTER the vanilla treatment, so a
    *  mod (e.g. vegetation wind) can patch the part's material based on its object def. */
   decoratePart?: (def: IdeObjectDef, part: RenderPart) => void;
@@ -188,6 +193,70 @@ export function buildRoadsignMeshes(archive: ImgArchive, groups: Iterable<Region
   }
 
   return meshes;
+}
+
+/**
+ * Register every breakable prop among a cell's freshly built InstancedMeshes (plan 045 item 3):
+ * group the part meshes by their model group, and for each group whose model carries RW Breakable
+ * shatter data — OR whose model `breakableModels` marks "smash" (object.dat collision-damage; the
+ * shatter mesh is then synthesized from the render geometry) — register one entry per instance with
+ * its world transform + a handle (the group's part meshes + slot) used to collapse the prop on break.
+ * The render registry drives the smash; the matching static collider is dropped by the game layer.
+ */
+export function collectBreakables(
+  archive: ImgArchive,
+  meshes: readonly InstancedMesh[],
+  breakableModels?: ReadonlySet<string>,
+): void {
+  const byGroup = new Map<RegionMeshData, InstancedMesh[]>();
+  for (const mesh of meshes) {
+    const group = mesh.userData.region as RegionMeshData | undefined;
+    if (!group) {
+      continue;
+    }
+    const list = byGroup.get(group);
+    if (list) {
+      list.push(mesh);
+    } else {
+      byGroup.set(group, [mesh]);
+    }
+  }
+
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3(1, 1, 1);
+  for (const [group, groupMeshes] of byGroup) {
+    const clump = getClump(archive, group.def.modelName);
+    const real = clump.geometries.find((geometry) => geometry.breakable)?.breakable;
+    // Fallback: a "smash" prop with no shatter atomic shatters its visible mesh (≤ 65535 verts so the
+    // u16 triangle indices don't overflow — props are tiny).
+    const synthetic =
+      breakableModels?.has(group.def.modelName.toLowerCase()) && clump.geometries[0]?.positions.length / 3 <= 65535
+        ? breakableFromGeometry(clump.geometries[0])
+        : undefined;
+    const breakable = real ?? synthetic;
+    if (!breakable || breakable.triangleMaterials.length === 0) {
+      continue;
+    }
+    const textures = getTextures(archive, group.def.txdName);
+    group.instances.forEach((instance, slot) => {
+      position.set(instance.position[0], instance.position[1], instance.position[2]);
+      // GTA SA IPL quaternions are the inverse of three.js's convention — conjugate (matches the meshes).
+      quaternion
+        .set(instance.rotation[0], instance.rotation[1], instance.rotation[2], instance.rotation[3])
+        .conjugate();
+      registerBreakable({
+        breakable,
+        key: breakableInstanceKey(group.def.modelName, instance.position),
+        meshes: groupMeshes,
+        modelName: group.def.modelName,
+        position: instance.position,
+        slot,
+        textures,
+        transform: new Matrix4().compose(position, quaternion, scale),
+      });
+    });
+  }
 }
 
 /**

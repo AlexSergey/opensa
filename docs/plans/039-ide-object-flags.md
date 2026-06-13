@@ -81,7 +81,7 @@ trafficlight1 method).
    shared `windUniform` driven from the existing per-frame driver in canvas-host; program-cache-key
    variants (`saWorld|tree` etc.). Calibration constants local first; config knob only if needed.
 
-5. **Docs + закрытие.** Plan status note; `hardcoded-fixes` untouched (these are general,
+5. **Docs + closeout.** Plan status note; `hardcoded-fixes` untouched (these are general,
    data-driven); update plan 004's since-note to point here; memory note if any non-obvious
    semantics were discovered empirically.
 
