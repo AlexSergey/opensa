@@ -27,7 +27,11 @@ function config(overrides: Partial<Config> = {}): Config {
       bloom: { enabled: true, intensity: 0.7, threshold: 0.7 },
       clouds: { coverage: 0.5, opacity: 0.85 },
       effects: { drawDistance: 150, enabled: true },
-      headlights: { angle: Math.PI / 7, distance: 35, glow: 0.15, intensity: 8 },
+      headlights: {
+        coronaIntensity: 0.8,
+        coronaSize: 0.28,
+        intensity: 1,
+      },
       lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
       moon: { brightness: 1, elevationDeg: 35, size: 150 },
       night: {

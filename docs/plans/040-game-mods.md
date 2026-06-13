@@ -62,7 +62,7 @@ writes prelit alphas by material/texture selection (cloth vs pole) and saves the
 
 - **PS2 trails** (post-effect — would need an `installPass`-style hook on PostFxPlugin, an easy
   contract extension);
-- **traffic-light cycling** (would own the corona sequencing and lift `SUPPRESS_LIGHT_MODELS`);
+- **traffic-light cycling** (would own the corona sequencing — light only the active phase's bulb);
 - **adapt-wind authored assets** (above).
 
 ## Testing pattern

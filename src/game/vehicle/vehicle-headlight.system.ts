@@ -1,14 +1,12 @@
 import {
   AdditiveBlending,
+  type Camera,
   CanvasTexture,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
-  type Quaternion,
-  SpotLight,
   Sprite,
   SpriteMaterial,
-  type Texture,
   Vector3,
 } from 'three';
 
@@ -16,126 +14,155 @@ import type { System } from '../core/system';
 import type { HeadlightConfig } from '../interfaces/config.interface';
 import type { EnterableVehicle, EnterVehicleSystem } from './enter-vehicle.system';
 
-/** Spotlight look (warm white cone). Intensity/reach/angle + glow size are config (live); these stay fixed. */
-const SPOT_COLOR = 0xfff0d0;
-const SPOT_PENUMBRA = 0.5;
-const SPOT_DECAY = 1.5;
+/** Glow / corona colours by light type (rendered colour, not the marker colour): warm-white head, red tail. */
+const HEAD_COLOR = 0xfff2d0;
+const TAIL_COLOR = 0xff1808;
+/** Lamp-glass emissive strengths (× config `intensity`). Modest so bloom gives a tight halo, not a wash. */
+const HEAD_EMISSIVE = 1.2;
+const TAIL_RUN_EMISSIVE = 0.6;
+const TAIL_BRAKE_EMISSIVE = 2;
+/** Rear corona/glass is dim "running" at night, full when braking (× config). */
+const REAR_RUNNING = 0.4;
 
 /**
- * Turns the **occupied** car's headlights on at night: swaps the front-light texture to its lit variant
- * (`vehiclelights128 → vehiclelightson128`, tagged on the materials by `build-vehicle`), shows an additive
- * glow **corona** at each lamp, and aims two warm `SpotLight`s (one per lamp, at the model's `headlights`
- * dummy) forward-and-down onto the road. Gated on `seated && isNight()` (occupant-agnostic — generalises to
- * NPC traffic once it exists). The spotlights live permanently in the scene (constant light count → no shader
- * recompiles); only their position/intensity (and the coronas' visibility) change as the player drives.
+ * ⚠️ MVP — to be redone properly. Turns the **occupied** car's headlights on at night with two cheap parts:
+ * (1) the lamp **glass glows** (head/tail materials tagged near the light dummies self-illuminate — head warm-
+ * white, tail red dim/brake — bloom makes the halo); (2) a small **corona** flare at each lamp, faded by
+ * viewing angle. Gated on `seated && isNight()` (occupant-agnostic — generalises to NPC traffic).
+ *
+ * Known MVP limitations (see plan 033): no light on the road/world (it's unlit/prelit), so no headlight beam
+ * trail on the asphalt. A proper redo would project the beam onto the road polygons (SA `CShadows`-style
+ * decal). Rejected dead-ends (do NOT retry as-is): flat ground decal/pool (sliced by geometry, reads badly),
+ * a real SpotLight (can't light the unlit world; barely visible on dynamics).
  */
 export class VehicleHeadlightSystem implements System {
   readonly name = 'vehicle-headlights';
 
+  private readonly camera: Camera;
+  /** Camera position in the streaming root's local (GTA Z-up) space — for the per-lamp corona facing fade. */
+  private readonly camLocal = new Vector3();
   private readonly config: () => HeadlightConfig;
+  /** Lamp coronas: [frontLeft, frontRight, rearLeft, rearRight]. */
+  private readonly coronas: Sprite[];
+  private readonly dir = new Vector3();
   private readonly enter: EnterVehicleSystem;
-  /** One additive glow corona per lamp (the visible "on" flare), hidden when the lights are off. */
-  private readonly glows: Sprite[];
+  private readonly forward = new Vector3();
   private readonly isNight: () => boolean;
   private lit: EnterableVehicle | null = null;
-  /** One spotlight per lamp (left/right), placed at the model's headlight dummy positions. */
-  private readonly spots: SpotLight[];
-  /** Scratch for transforming local lamp offsets by the car's world transform. */
+  private readonly root: Object3D;
+  /** The lit car's tail/brake glass materials — their emissive brightens per-frame while braking. */
+  private tails: MeshStandardMaterial[] = [];
   private readonly tmp = new Vector3();
 
-  constructor(enter: EnterVehicleSystem, isNight: () => boolean, root: Object3D, config: () => HeadlightConfig) {
+  constructor(
+    enter: EnterVehicleSystem,
+    isNight: () => boolean,
+    root: Object3D,
+    config: () => HeadlightConfig,
+    glowLayer: number,
+    camera: Camera,
+  ) {
     this.enter = enter;
     this.isNight = isNight;
+    this.root = root;
     this.config = config;
-    const glowMap = glowTexture(); // shared by both lamps
-    this.spots = [0, 1].map(() => {
-      const spot = new SpotLight(SPOT_COLOR, 0, 0, Math.PI / 7, SPOT_PENUMBRA, SPOT_DECAY);
-      spot.castShadow = false; // headlight shadows are too costly for the payoff
-      spot.name = 'Headlight';
-      root.add(spot, spot.target); // persistent: keeps the world's light count constant
+    this.camera = camera;
 
-      return spot;
-    });
-    this.glows = [0, 1].map(() => {
-      const glow = new Sprite(
-        new SpriteMaterial({
-          blending: AdditiveBlending,
-          color: SPOT_COLOR,
-          depthWrite: false,
-          fog: false,
-          map: glowMap,
-        }),
+    const map = coronaTexture(); // soft round glow
+    this.coronas = [HEAD_COLOR, HEAD_COLOR, TAIL_COLOR, TAIL_COLOR].map((color) => {
+      const corona = new Sprite(
+        new SpriteMaterial({ blending: AdditiveBlending, color, depthWrite: false, fog: false, map }),
       );
-      glow.visible = false;
-      glow.name = 'HeadlightGlow';
-      root.add(glow);
+      corona.visible = false;
+      corona.name = 'HeadlightCorona';
+      corona.layers.set(glowLayer); // excluded from the SSAO normal prepass (see GLOW_LAYER)
+      root.add(corona);
 
-      return glow;
+      return corona;
     });
   }
 
   update(): void {
     const active = this.enter.getActive();
     const target = active && this.enter.isSeated() && this.isNight() ? active : null;
+    const cfg = this.config();
     if (target !== this.lit) {
       if (this.lit) {
-        setHeadlights(this.lit, false);
+        this.tails = [];
+        setLamps(this.lit, false, cfg.intensity);
       }
       if (target) {
-        setHeadlights(target, true);
+        this.tails = setLamps(target, true, cfg.intensity);
       }
       this.lit = target;
     }
-    if (target) {
-      this.aim(target);
+    if (!target) {
+      for (const corona of this.coronas) {
+        corona.visible = false;
+      }
+
+      return;
     }
-    const cfg = this.config(); // live: beam strength / reach / cone size + lamp glow size
-    for (const spot of this.spots) {
-      spot.intensity = target ? cfg.intensity : 0;
-      spot.distance = cfg.distance;
-      spot.angle = cfg.angle;
+    const braking = this.enter.isBraking();
+    const tail = (braking ? TAIL_BRAKE_EMISSIVE : TAIL_RUN_EMISSIVE) * cfg.intensity;
+    for (const mat of this.tails) {
+      mat.emissiveIntensity = tail;
     }
-    for (const glow of this.glows) {
-      glow.visible = target !== null;
-      glow.scale.setScalar(cfg.glow);
-    }
+    this.placeCoronas(target, cfg, braking);
   }
 
-  /** Place the two spotlights at the lamps (the model's `headlights` dummy, mirrored ±X; else front of the
-   *  body from half-extents) and aim each forward + down. Lamp offsets are transformed by the car's **full**
-   *  world orientation (`object.quaternion`), so the lamps + beams tilt with the body on slopes (not just yaw). */
-  private aim(vehicle: EnterableVehicle): void {
+  /** Place + fade the four lamp coronas at the model's `headlights`/`taillights` dummies (mirrored ±X), each
+   *  dimmed by how much its lamp faces the camera (front +Y, rear −Y) so it only shows from the right side.
+   *  Rear coronas run dim and brighten on braking. */
+  private placeCoronas(vehicle: EnterableVehicle, cfg: HeadlightConfig, braking: boolean): void {
     const [hx, hy, hz] = vehicle.halfExtents;
-    const dummy = vehicle.object.userData.headlightDummy as [number, number, number] | null | undefined;
-    const lx = dummy ? dummy[0] : hx * 0.7; // lamp side offset
-    const ly = dummy ? dummy[1] : hy * 0.9; // front (+Y)
-    const lz = dummy ? dummy[2] : -hz * 0.3; // lamp height (low)
+    const front = (vehicle.object.userData.headlightDummy as [number, number, number] | null) ?? [
+      hx * 0.7,
+      hy * 0.9,
+      -hz * 0.3,
+    ];
+    const rear = (vehicle.object.userData.taillightDummy as [number, number, number] | null) ?? [
+      hx * 0.7,
+      -hy * 0.9,
+      -hz * 0.3,
+    ];
     const { position, quaternion } = vehicle.object;
-    this.spots.forEach((spot, i) => {
-      const sx = i === 0 ? lx : -lx; // left / right lamp
-      // Each point is a car-local offset rotated into the world by the body quaternion (incl. pitch/roll).
-      this.toWorld(sx, ly, lz, quaternion, position, spot.position); // lamp
-      this.toWorld(sx, ly + 9, lz - hz * 1.6, quaternion, position, spot.target.position); // forward + down
-      this.toWorld(sx, ly + 0.15, lz, quaternion, position, this.glows[i].position); // glow just ahead of lamp
-    });
-  }
-
-  /** Write car-local `(x, y, z)` rotated by `quaternion` and offset by `position` into `out` (world space). */
-  private toWorld(x: number, y: number, z: number, quaternion: Quaternion, position: Vector3, out: Vector3): void {
-    out.copy(this.tmp.set(x, y, z).applyQuaternion(quaternion)).add(position);
+    this.camLocal.copy(this.camera.getWorldPosition(this.tmp));
+    this.root.worldToLocal(this.camLocal); // camera in root-local (Z-up) space, where the lamps live
+    const rearIntensity = cfg.coronaIntensity * (braking ? 1 : REAR_RUNNING);
+    // [localX, localY, localZ, index, isRear]
+    const lamps: [number, number, number, number, boolean][] = [
+      [front[0], front[1], front[2], 0, false],
+      [-front[0], front[1], front[2], 1, false],
+      [rear[0], rear[1], rear[2], 2, true],
+      [-rear[0], rear[1], rear[2], 3, true],
+    ];
+    for (const [lx, ly, lz, index, isRear] of lamps) {
+      const corona = this.coronas[index];
+      this.tmp.set(lx, ly, lz).applyQuaternion(quaternion);
+      corona.position.set(position.x + this.tmp.x, position.y + this.tmp.y, position.z + this.tmp.z);
+      this.forward.set(0, isRear ? -1 : 1, 0).applyQuaternion(quaternion);
+      this.dir.copy(this.camLocal).sub(corona.position).normalize();
+      const facing = Math.max(this.forward.dot(this.dir), 0);
+      const fade = facing * facing; // sharpen so the corona is clearly off from the side/behind
+      corona.material.opacity = (isRear ? rearIntensity : cfg.coronaIntensity) * fade;
+      corona.visible = fade > 0.01;
+      corona.scale.setScalar(cfg.coronaSize * (isRear && braking ? 1.25 : 1));
+    }
   }
 }
 
-/** A soft radial glow (white centre → transparent) for the additive headlight corona sprites. */
-function glowTexture(): CanvasTexture {
-  const size = 64;
+/** A soft round corona (gentle glow, faint halo — NOT a solid disc) for the additive lamp flares. */
+function coronaTexture(): CanvasTexture {
+  const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.3, 'rgba(255,255,255,0.7)');
+  gradient.addColorStop(0, 'rgba(255,255,255,0.95)');
+  gradient.addColorStop(0.18, 'rgba(255,255,255,0.45)');
+  gradient.addColorStop(0.5, 'rgba(255,255,255,0.12)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
@@ -144,12 +171,11 @@ function glowTexture(): CanvasTexture {
 }
 
 /**
- * Swap the tagged front-light materials between their day (`lightsOffMap`) and lit (`lightsOnMap`) variant,
- * like SA. Only the **map** is swapped — no material emissive: `vehiclelights128` is a shared atlas (head/tail
- * lights, indicators, even mirrors on some cars), so an emissive boost lit up non-light regions (e.g. the
- * camper's mirrors). The actual glow comes from the two spotlights; the lit texture reads as "on".
+ * Glow (or clear) the car's tagged lamp glass. Head goes warm-white at full; tail goes red at its dim running
+ * level (returned so the caller brightens it while braking). Off resets emissive. Returns the tail materials.
  */
-function setHeadlights(vehicle: EnterableVehicle, on: boolean): void {
+function setLamps(vehicle: EnterableVehicle, on: boolean, intensity: number): MeshStandardMaterial[] {
+  const tails: MeshStandardMaterial[] = [];
   vehicle.object.traverse((object) => {
     const mesh = object as Mesh;
     if (!mesh.isMesh) {
@@ -157,12 +183,22 @@ function setHeadlights(vehicle: EnterableVehicle, on: boolean): void {
     }
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       const mat = material as MeshStandardMaterial;
-      const onMap = mat.userData.lightsOnMap as Texture | undefined;
-      const offMap = mat.userData.lightsOffMap as Texture | undefined;
-      if (onMap && offMap) {
-        mat.map = on ? onMap : offMap;
-        mat.needsUpdate = true;
+      const type = mat.userData.lightType as 'head' | 'tail' | undefined;
+      if (!type) {
+        continue;
+      }
+      if (!on) {
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 1;
+        continue;
+      }
+      mat.emissive.setHex(type === 'head' ? HEAD_COLOR : TAIL_COLOR);
+      mat.emissiveIntensity = (type === 'head' ? HEAD_EMISSIVE : TAIL_RUN_EMISSIVE) * intensity;
+      if (type === 'tail') {
+        tails.push(mat);
       }
     }
   });
+
+  return tails;
 }

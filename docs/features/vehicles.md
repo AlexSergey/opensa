@@ -20,12 +20,13 @@ plans 015–021/025/030/033.
   (suspension), handling.cfg parsed (kept for tuning), enter/exit flow with seat alignment
   (plan 016), damage system (plan 019) using the full COL.
 - **LOD/streaming** (plan 021): HD/LOD/unload distances per vehicle, placements respawn.
-- **Headlights v1** (plan 033): see night-and-time.md.
+- **Headlights** (plan 033, ⚠️ MVP — redo later): glowing lamp glass + coronas at the lamp dummies; lamps
+  found by position near the `headlights`/`taillights` dummies; no road beam yet. See night-and-time.md.
 - Spawn tooling: debug Vehicles screen (admiral/camper), parked placements at Ganton.
 
 ## Known gaps / candidates
 
-- Headlights v2 (2dfx vehicle lights) pending.
+- Headlights proper redo (road beam projected onto the asphalt; per-lamp brake/indicator/reverse) — MVP has none.
 - No NPC traffic (headlight gating already generalizes via `seated`).
 - Damage is collision-driven deformation state, not visual mesh swaps for every panel.
 - No vehicle audio.

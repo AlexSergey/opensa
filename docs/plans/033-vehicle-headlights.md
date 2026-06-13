@@ -125,3 +125,47 @@ fixed constants. (Defaults: angle π/7, distance 35, glow 0.15, intensity 8.)
 Taillights/brake lights as a separate state, volumetric beam cones, per-car 2dfx-accurate light positions,
 headlight damage (broken lamp). **NPC/traffic headlights come for free** once traffic exists (the system keys
 on occupancy, not the player) — just register their cars with the headlight system.
+
+---
+
+# v2 — shipped, ⚠️ MVP (REDO PROPERLY LATER)
+
+What actually ships now (replaces the v1 corona+spotlight look). **This is an MVP — good enough to show, not
+final.** It does NOT light the road.
+
+## How it works now
+
+- **Lamp glass glows** (the main effect): the head/tail lamp materials self-illuminate via `emissive`
+  (head warm-white, tail red — dim "running" + bright on braking via `EnterVehicleSystem.isBraking()`); the
+  scene **bloom** turns the bright glass into a soft halo.
+- **Small coronas** at each lamp dummy (`headlights`/`taillights`, ±X), additive sprites faded by viewing
+  angle (front only from the front, rear from behind).
+- Gated on `seated && isNight()` (occupant-agnostic → NPC traffic gets it free).
+- Config `graphics.headlights = { intensity, coronaIntensity, coronaSize }` (debug sliders HEADLIGHT GLOW /
+  CORONA POWER / CORONA SIZE).
+
+## How a lamp is identified (the hard-won bit)
+
+SA lamp materials use the `vehiclelights*` texture and carry **per-lamp "magic" marker colours** (e.g.
+`185,255,0`, `255,60,0`, `0,255,200`, …) that are **per-lamp ids, NOT front/rear and NOT the glow colour**
+(and they collide with carcol paint markers, so they're rendered untinted = white). Front vs rear and "is this
+even a lamp?" are decided by **position**: `build-vehicle` tags a `vehiclelights*` material `head`/`tail` only
+if its centroid is within `LAMP_DUMMY_RADIUS` (0.5 m) of the `headlights`/`taillights` dummy (nearest wins).
+That excludes mirrors / indicators / reverse / grille / badges (offset from the dummies) — which otherwise
+lit up white. Tagged onto `material.userData.lightType`.
+
+## Rejected dead-ends (do NOT retry as-is — all looked bad)
+
+- Whole-atlas/colour-based lamp classification (lit mirrors, white-washed everything, garish green/red zones).
+- Per-pixel `emissiveMap` from `vehiclelightson128` (dim; lit mirrors).
+- **Road light pool / beam decal** — flat ground quad (round `headlight` texture, procedural beam, etc.):
+  gets sliced by road geometry even with `depthTest:false`, reads as a detached blob. **Worst offender.**
+- A real **SpotLight** at the lamp: the world is unlit (`MeshBasicMaterial`, plan 038) so it can't light the
+  road, and it's barely visible on dynamics. Removed.
+
+## The proper redo (future)
+
+Light the **road** with a beam, the SA `CShadows` way: project the headlight texture onto the actual road
+**polygons** (a conforming decal / `DecalGeometry`-style), not a flat quad — so it follows slopes/kerbs and
+isn't sliced. Optionally a custom world-material light term (the world is unlit). Plus per-lamp tail/brake/
+indicator/reverse split, volumetric cones. Until then: MVP glass-glow + coronas.

@@ -92,6 +92,11 @@ const WHEEL_SCALE_BOOST = 1.25;
 const GLASS_BACK_ORDER = 1;
 const GLASS_FRONT_ORDER = 2;
 
+/** Max distance (m) a lamp material may sit from a head/tail dummy to count as that light. Tight: the real
+ *  head/tail lamps sit right on the dummy; this excludes the grille/badge/mirror/indicator/reverse lamps that
+ *  share the `vehiclelights` atlas but are offset from the dummy. */
+const LAMP_DUMMY_RADIUS = 0.5;
+
 /** Shared inputs for building one body atomic (door / damageable panel / plain mesh). */
 interface BodyBuild {
   clump: RWClump;
@@ -170,12 +175,29 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     backseat: seatMatrix(clump, 'ped_backseat', worldCache),
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
   };
-  // The `headlights` dummy sits at one front lamp; SA mirrors it to both sides. Keep `|x|` (the lamp's side
-  // offset), front (Y) and height (Z) so the headlight spotlights sit at the real lamps, not on the bonnet.
+  // The `headlights`/`taillights` dummies each sit at one lamp; SA mirrors them ±X to both sides. Keep `|x|`
+  // (the lamp's side offset), front/back (Y) and height (Z). These are the authoritative lamp positions — the
+  // headlight system glows only the lamp materials sitting near them (see tagLamps), so mirrors/indicators/
+  // reverse lights (offset from the dummies) stay dark.
   const headlights = seatMatrix(clump, 'headlights', worldCache);
-  root.userData.headlightDummy = headlights
-    ? [Math.abs(headlights.elements[12]), headlights.elements[13], headlights.elements[14]]
+  const headDummy = headlights
+    ? ([Math.abs(headlights.elements[12]), headlights.elements[13], headlights.elements[14]] as [
+        number,
+        number,
+        number,
+      ])
     : null;
+  const taillights = seatMatrix(clump, 'taillights', worldCache);
+  const tailDummy = taillights
+    ? ([Math.abs(taillights.elements[12]), taillights.elements[13], taillights.elements[14]] as [
+        number,
+        number,
+        number,
+      ])
+    : null;
+  root.userData.headlightDummy = headDummy;
+  root.userData.taillightDummy = tailDummy;
+  tagLamps(root, headDummy, tailDummy);
 
   root.traverse((object) => {
     object.castShadow = true; // body/wheels/parts cast + receive sun shadows
@@ -336,7 +358,7 @@ function addWheels(
 ): BuiltWheel[] {
   const wheelGeometry = clump.geometries[geometryIndex];
   const geometry = buildGeometry(wheelGeometry);
-  const materials = wheelGeometry.materials.map((m) => buildVehicleMaterial(m, wheelGeometry, textures, options));
+  const materials = wheelGeometry.materials.map((m, i) => buildVehicleMaterial(m, wheelGeometry, textures, options, i));
   const baseRadius = geometry.boundingSphere?.radius ?? 0.5;
   const wheels: BuiltWheel[] = [];
 
@@ -387,17 +409,31 @@ function buildVehicleMaterial(
   geometry: RWGeometry,
   textures: Map<string, Texture>,
   options: VehicleOptions,
+  materialIndex: number,
 ): MeshStandardMaterial {
   const material = buildMaterial(rw, geometry, textures);
-  const paint = paintFor(rw.color, options);
-  if (paint) {
-    // setHex (sRGB), matching buildMaterial — setRGB would treat it as linear and wash the paint out.
-    material.color.setHex((paint[0] << 16) | (paint[1] << 8) | paint[2]);
-  } else if (material.map) {
-    // RenderWare modulates the texture by the material colour. The shared builder forces white for
-    // textured materials (fine for map geometry), but vehicles rely on it: interiors tint a light
-    // fabric/leather texture with dark grey material colours. Restore the modulate.
-    material.color.setHex((rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2]);
+  const isLight = (rw.texture?.name.toLowerCase() ?? '').startsWith('vehiclelights');
+  if (isLight) {
+    // Lamp materials (`vehiclelights*`) carry SA per-lamp "magic" marker colours that ALSO collide with carcol
+    // markers — never render them (else garish flat green/red patches): show the lamp texture untinted. The
+    // marker colour is a per-lamp id (NOT front/rear/colour), so stash the lamp's centroid and let `tagLamps`
+    // decide head/tail by which dummy it sits at (mirrors/indicators/reverse, offset from a dummy, stay dark).
+    material.color.setHex(0xffffff);
+    const centroid = lightCentroid(geometry, materialIndex);
+    if (centroid) {
+      material.userData.lightCentroid = centroid;
+    }
+  } else {
+    const paint = paintFor(rw.color, options);
+    if (paint) {
+      // setHex (sRGB), matching buildMaterial — setRGB would treat it as linear and wash the paint out.
+      material.color.setHex((paint[0] << 16) | (paint[1] << 8) | paint[2]);
+    } else if (material.map) {
+      // RenderWare modulates the texture by the material colour. The shared builder forces white for
+      // textured materials (fine for map geometry), but vehicles rely on it: interiors tint a light
+      // fabric/leather texture with dark grey material colours. Restore the modulate.
+      material.color.setHex((rw.color[0] << 16) | (rw.color[1] << 8) | rw.color[2]);
+    }
   }
 
   // Glass/translucent parts encode their opacity in the material colour's alpha,
@@ -409,8 +445,8 @@ function buildVehicleMaterial(
     material.alphaTest = 0;
     material.depthWrite = false;
     material.side = DoubleSide;
-  } else {
-    applyNightFill(material); // plan 034: self-illuminate the car body at night (skip glass)
+  } else if (!isLight) {
+    applyNightFill(material); // plan 034: self-illuminate the car body at night (skip glass + lights)
   }
 
   return material;
@@ -448,6 +484,14 @@ function collectReflectiveMaterials(root: Object3D): MeshStandardMaterial[] {
   return [...found];
 }
 
+/** Distance from a lamp centroid to a dummy, taking the nearer of the dummy's ±X mirror (SA mirrors lamps). */
+function dummyDistance(c: readonly number[], dummy: readonly number[]): number {
+  const dy = c[1] - dummy[1];
+  const dz = c[2] - dummy[2];
+
+  return Math.min(Math.hypot(c[0] - dummy[0], dy, dz), Math.hypot(c[0] + dummy[0], dy, dz));
+}
+
 /** One glass render pass: the glass groups drawn single-sided (cloned materials) at a fixed order. */
 function glassPass(
   geometry: BufferGeometry,
@@ -469,6 +513,48 @@ function glassPass(
   mesh.renderOrder = renderOrder;
 
   return mesh;
+}
+
+/** Which light a lamp centroid belongs to: the nearer of the head/tail dummy within {@link LAMP_DUMMY_RADIUS},
+ *  or null if it's too far from both (mirror / indicator / reverse / chrome). Falls back to the Y sign when the
+ *  model has no light dummies. */
+function lampSide(
+  c: readonly number[],
+  head: null | readonly number[],
+  tail: null | readonly number[],
+): 'head' | 'tail' | null {
+  const dHead = head ? dummyDistance(c, head) : Infinity;
+  const dTail = tail ? dummyDistance(c, tail) : Infinity;
+  if (dHead === Infinity && dTail === Infinity) {
+    return c[1] >= 0 ? 'head' : 'tail';
+  }
+  if (Math.min(dHead, dTail) > LAMP_DUMMY_RADIUS) {
+    return null;
+  }
+
+  return dHead <= dTail ? 'head' : 'tail';
+}
+
+/** Geometry-local centroid (vehicle space, frames here are ~identity) of the vertices a material's triangles
+ *  use, or null if it has none. Used to match a lamp material against the headlight/taillight dummy. */
+function lightCentroid(geometry: RWGeometry, materialIndex: number): [number, number, number] | null {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let count = 0;
+  for (const triangle of geometry.triangles) {
+    if (triangle.materialIndex !== materialIndex) {
+      continue;
+    }
+    for (const vertex of [triangle.a, triangle.b, triangle.c]) {
+      x += geometry.positions[vertex * 3];
+      y += geometry.positions[vertex * 3 + 1];
+      z += geometry.positions[vertex * 3 + 2];
+      count += 1;
+    }
+  }
+
+  return count === 0 ? null : [x / count, y / count, z / count];
 }
 
 /** Map a material colour to the paint it represents, or null if it is not a marker. */
@@ -526,6 +612,30 @@ function tagHeadlights(root: Object3D, textures: Map<string, Texture>): void {
   });
 }
 
+/**
+ * Tag each candidate lamp material (those with a stashed `lightCentroid`) with `userData.lightType` by which
+ * dummy it sits nearest — so the headlight system glows only real head/tail lamps, not mirrors/indicators/
+ * reverse lights (which are offset from the dummies and left untagged).
+ */
+function tagLamps(root: Object3D, head: null | readonly number[], tail: null | readonly number[]): void {
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const centroid = material.userData.lightCentroid as readonly number[] | undefined;
+      if (!centroid) {
+        continue;
+      }
+      const type = lampSide(centroid, head, tail);
+      if (type) {
+        material.userData.lightType = type;
+      }
+    }
+  });
+}
+
 /** A vehicle body mesh: geometry + painted/glass materials. */
 /**
  * A vehicle body node. With no glass it's a plain multi-material `Mesh`; when an
@@ -536,7 +646,7 @@ function tagHeadlights(root: Object3D, textures: Map<string, Texture>): void {
  * callers (panels/doors/`_vlo`/damage) keep treating it as a single `Object3D`.
  */
 function vehicleMesh(geometry: RWGeometry, textures: Map<string, Texture>, options: VehicleOptions): Object3D {
-  const materials = geometry.materials.map((m) => buildVehicleMaterial(m, geometry, textures, options));
+  const materials = geometry.materials.map((m, i) => buildVehicleMaterial(m, geometry, textures, options, i));
   const glass = new Set(materials.flatMap((material, index) => (material.transparent ? [index] : [])));
   if (glass.size === 0) {
     return new Mesh(buildGeometry(geometry), materials);

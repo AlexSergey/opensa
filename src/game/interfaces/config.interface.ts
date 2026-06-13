@@ -143,15 +143,14 @@ export interface GraphicsConfig {
   worldLight: WorldLightConfig;
 }
 
-/** Vehicle headlight tuning (the occupied car's night beams; plan 033). */
+/** Vehicle headlight tuning (the occupied car's night lamps; plan 033). MVP: glowing lamp glass + coronas
+ *  only — no road beam yet (to be redone properly). */
 export interface HeadlightConfig {
-  /** Spot cone half-angle (radians) — wider = a bigger light pool on the road. */
-  angle: number;
-  /** Beam reach (world units) — how far the light pool extends ahead. */
-  distance: number;
-  /** Glow sprite size at each lamp (world units) — the bright flare on the headlight itself. */
-  glow: number;
-  /** Spotlight intensity (brightness/strength of the beam). */
+  /** Lamp corona brightness (additive flare opacity at each lamp). */
+  coronaIntensity: number;
+  /** Lamp corona size (world units) — the small flare on each lamp. */
+  coronaSize: number;
+  /** Lamp-glass glow strength (emissive multiplier on the lit lamp glass; bloom turns it into the halo). */
   intensity: number;
 }
 

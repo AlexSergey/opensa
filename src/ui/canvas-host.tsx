@@ -318,7 +318,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         // World 2dfx particle effects (plan 044) — drawDistance replaces the systems' authored
         // CULLDIST (vanilla culls fire at 35 m — too close).
         effects: { drawDistance: 150, enabled: true },
-        headlights: { angle: Math.PI / 7, distance: 60, glow: 0.68, intensity: 13 },
+        headlights: { coronaIntensity: 0.8, coronaSize: 0.28, intensity: 1 },
         lights: { enabled: true, nightEndHour: 6, nightStartHour: 20 },
         moon: { brightness: 1, elevationDeg: 5, size: 55 },
         night: {
@@ -483,14 +483,14 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Corona Points live on GLOW_LAYER (excluded from the SSAO normal prepass) — the camera must see it.
     game.getCamera().layers.enable(GLOW_LAYER);
     // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
-    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
+    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 0, weather: DEFAULT_WEATHER });
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
     const model = await adapter.loadCharacter(`${BASE}/player/tommy.dff`, `${BASE}/player/tommy.txd`);
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
-    const character = await setupCharacter(game, player, [2031.09, 1539.7, 15.0], {
+    const character = await setupCharacter(game, player, PLAYER_SPAWN, {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,
       skeleton: model.skeleton,
@@ -705,13 +705,16 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       game.getLogger(),
     );
     game.addSystem(enterVehicle);
-    // Night headlights on the occupied car (texture swap + a forward-down spotlight), gated on seated + night.
+    // Night headlights on the occupied car: glowing lamp glass + small coronas at the lamp dummies + two
+    // forward-down spotlights (light dynamic objects ahead; the unlit road stays dark). Gated on seated+night.
     game.addSystem(
       new VehicleHeadlightSystem(
         enterVehicle,
         () => game.isNight(),
         game.getStreamingRoot(),
         () => game.getConfig().graphics.headlights,
+        GLOW_LAYER,
+        game.getCamera(),
       ),
     );
 

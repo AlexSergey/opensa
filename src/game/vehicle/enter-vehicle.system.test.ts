@@ -190,6 +190,15 @@ describe('EnterVehicleSystem', () => {
       expect(h.phys.engine).toBe(0);
       expect(h.phys.brake).toBeGreaterThan(0); // light idle brake
     });
+
+    it('does not report braking on foot or while merely coasting off-throttle', () => {
+      const h = setup();
+      expect(h.system.isBraking()).toBe(false); // on foot
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.phys.speed = 5; // rolling forward, no keys → idle coast brake, not real braking
+      h.system.fixedUpdate(0.1);
+      expect(h.system.isBraking()).toBe(false);
+    });
   });
 
   describe('positive cases', () => {
@@ -349,6 +358,15 @@ describe('EnterVehicleSystem', () => {
       h.phys.speed = 0; // now stopped
       h.system.fixedUpdate(0.016); // → startExit
       expect(h.phys.parked).toBeGreaterThan(0);
+    });
+
+    it('reports braking when pressing back while rolling forward (brake lights on)', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      h.phys.speed = 5; // rolling forward
+      h.hold(CONTROLS.back, true); // S while moving forward → full brake
+      h.system.fixedUpdate(0.1);
+      expect(h.system.isBraking()).toBe(true);
     });
   });
 });

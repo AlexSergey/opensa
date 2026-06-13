@@ -101,6 +101,8 @@ export class EnterVehicleSystem implements System {
   private active: EnterableVehicle | null = null;
   private readonly aimCamera: (azimuth: number) => void;
   private readonly animation: CharacterAnimationSystem;
+  /** Whether the driver is actively braking (handbrake or braking forward motion) — for the brake lights. */
+  private braking = false;
   private readonly config: Readonly<Config>;
   private readonly controller: CharacterControllerSystem;
   private readonly doors = new Map<EnterableVehicle, number>(); // current door angle
@@ -182,6 +184,11 @@ export class EnterVehicleSystem implements System {
   /** The car the player is currently in/entering (for debug actions like flip), or null on foot. */
   getActive(): EnterableVehicle | null {
     return this.active;
+  }
+
+  /** Whether the seated driver is braking right now (for the brake lights). False unless actively driving. */
+  isBraking(): boolean {
+    return this.isSeated() && this.braking;
   }
 
   /** Whether the player is seated in (driving) the active car — distinct from merely approaching/exiting. */
@@ -378,6 +385,9 @@ export class EnterVehicleSystem implements System {
     } else {
       brake = brakeForce * IDLE_BRAKE_FRACTION; // coast to a stop off-throttle
     }
+    // Brake lights: full braking only (handbrake / braking forward motion sets brake = brakeForce), not the
+    // light idle-coast brake or reverse (which drives the engine, leaving brake at 0).
+    this.braking = brake === brakeForce;
 
     // Ramp the engine force toward its target so sudden throttle doesn't jolt the
     // suspension (a visible launch hop); braking stays instant.

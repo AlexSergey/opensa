@@ -234,11 +234,10 @@ lit windows pop. Our blocker is the **prelit** day-bake.
      soft-particle depth fade), so a steep camera angle shows a hard edge where it meets a wall. Real budgeted
      **point lights** remain the deferred higher-fidelity option. The night grade may cool the warm pool
      slightly (mask keys on luma).
-   - **Traffic lights temporarily suppressed.** `SUPPRESS_LIGHT_MODELS = /traffic/i` in `build-region` skips
-     **all** 2d-effect lights (coronas + pools) for traffic-light models (`trafficlight1`, `cj_traffic_light*`,
-     `gay_traffic_light`, `mtraffic*`) — we don't sequence them, so every bulb lit at once + cast odd pools.
-     **Re-enable** (drop/relax the filter) once traffic-light cycling exists; then only the active phase's bulb
-     should light. Street lamps don't match `traffic`, so they're unaffected.
+   - **Traffic lights** light all their bulbs at once (no signal sequencing yet) — every traffic-light model
+     (`trafficlight1`, `cj_traffic_light*`, …) shows red/amber/green coronas together. We used to suppress them
+     (`SUPPRESS_LIGHT_MODELS = /traffic/i` in `build-region`) but that's been **removed** — they render like any
+     other 2d-effect light. Proper signal cycling (only the active phase's bulb lit) is a future item.
    - **Traffic-light housing see-through on pf (hardcoded fix, currently rolled back).** Separate from the
      corona suppression: on `gta3-pf.img` the traffic-light housings ship with inconsistent face winding + no
      stored normals, so single-sided culling made the solid metal box **see-through from one side**. A

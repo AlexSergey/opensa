@@ -66,7 +66,7 @@ export interface DebugActions {
   godrays(): boolean;
   /** Current god-rays light-source size (shaft strength). */
   godraysSize(): number;
-  /** Current vehicle-headlight config (beam strength/reach/cone size + lamp glow). */
+  /** Current vehicle-headlight config (lamp corona size + brightness). */
   headlights(): HeadlightConfig;
   /** Current night-lights (street-lamp coronas) config. */
   lights(): LightsConfig;
@@ -96,7 +96,7 @@ export interface DebugActions {
   setGodrays(enabled: boolean): void;
   /** Set the god-rays light-source size (shaft strength). */
   setGodraysSize(size: number): void;
-  /** Tune vehicle headlights (beam strength/reach/cone size + lamp glow). */
+  /** Tune vehicle headlights (lamp corona size + brightness). */
   setHeadlights(patch: Partial<HeadlightConfig>): void;
   /** Toggle night street-lamp lights (coronas). */
   setLights(patch: Partial<LightsConfig>): void;
@@ -959,57 +959,44 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                   actions.setEffects(patch);
                 }}
               />
-              <div style={styles.groupLabel}>HEADLIGHT POWER: {headlights.intensity.toFixed(1)}</div>
+              <div style={styles.groupLabel}>HEADLIGHT GLOW: {headlights.intensity.toFixed(2)}</div>
               <input
-                max={30}
+                max={4}
                 min={0}
                 onChange={(e) => {
                   const intensity = Number(e.target.value);
                   setHeadlights((prev) => ({ ...prev, intensity }));
                   actions.setHeadlights({ intensity });
                 }}
-                step={0.5}
+                step={0.1}
                 type="range"
                 value={headlights.intensity}
               />
-              <div style={styles.groupLabel}>HEADLIGHT DISTANCE: {headlights.distance.toFixed(0)}</div>
-              <input
-                max={80}
-                min={5}
-                onChange={(e) => {
-                  const distance = Number(e.target.value);
-                  setHeadlights((prev) => ({ ...prev, distance }));
-                  actions.setHeadlights({ distance });
-                }}
-                step={1}
-                type="range"
-                value={headlights.distance}
-              />
-              <div style={styles.groupLabel}>HEADLIGHT CONE: {headlights.angle.toFixed(2)}</div>
-              <input
-                max={1}
-                min={0.1}
-                onChange={(e) => {
-                  const angle = Number(e.target.value);
-                  setHeadlights((prev) => ({ ...prev, angle }));
-                  actions.setHeadlights({ angle });
-                }}
-                step={0.02}
-                type="range"
-                value={headlights.angle}
-              />
-              <div style={styles.groupLabel}>HEADLIGHT GLOW: {headlights.glow.toFixed(2)}</div>
+              <div style={styles.groupLabel}>HEADLIGHT CORONA POWER: {headlights.coronaIntensity.toFixed(2)}</div>
               <input
                 max={1}
                 min={0}
                 onChange={(e) => {
-                  const glow = Number(e.target.value);
-                  setHeadlights((prev) => ({ ...prev, glow }));
-                  actions.setHeadlights({ glow });
+                  const coronaIntensity = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, coronaIntensity }));
+                  actions.setHeadlights({ coronaIntensity });
                 }}
                 step={0.02}
                 type="range"
-                value={headlights.glow}
+                value={headlights.coronaIntensity}
+              />
+              <div style={styles.groupLabel}>HEADLIGHT CORONA SIZE: {headlights.coronaSize.toFixed(2)}</div>
+              <input
+                max={1}
+                min={0.05}
+                onChange={(e) => {
+                  const coronaSize = Number(e.target.value);
+                  setHeadlights((prev) => ({ ...prev, coronaSize }));
+                  actions.setHeadlights({ coronaSize });
+                }}
+                step={0.01}
+                type="range"
+                value={headlights.coronaSize}
               />
               <label style={styles.label}>
                 <input

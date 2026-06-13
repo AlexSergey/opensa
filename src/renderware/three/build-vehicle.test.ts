@@ -96,6 +96,8 @@ function vehicleClump(): RWClump {
       { name: 'door_lf_ok', parentIndex: 9, position: [0, 0, 0], rotation: id },
       { name: 'door_lf_dam', parentIndex: 9, position: [0, 0, 0], rotation: id },
       { name: 'ped_frontseat', parentIndex: 0, position: [0.5, 0, 0.2], rotation: id },
+      { name: 'headlights', parentIndex: 0, position: [0.8, 2, 0.5], rotation: id }, // one front lamp
+      { name: 'taillights', parentIndex: 0, position: [-0.7, -2, 0.4], rotation: id }, // one rear lamp (−X)
     ],
     geometries: [bodyGeometry, wheelGeometry],
   };
@@ -140,6 +142,98 @@ describe('buildVehicle', () => {
         'wheel_rb_dummy',
         'wheel_rf_dummy',
       ]);
+    });
+
+    it('extracts the headlight/taillight lamp dummies, keeping |x| so SA can mirror them ±X', () => {
+      const { root } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
+      expect(root.userData.headlightDummy).toEqual([0.8, 2, 0.5]);
+      expect(root.userData.taillightDummy).toEqual([0.7, -2, 0.4]); // |−0.7| side offset, rear (−Y)
+    });
+
+    it('untints lamp materials and tags head/tail by POSITION (front +Y = head, rear −Y = tail)', () => {
+      const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      const lights: RWGeometry = {
+        ...triangleGeometry([
+          material({ color: [0, 255, 200, 255], texture: { maskName: '', name: 'vehiclelights128' } }), // front lamp
+          material({ color: [255, 60, 0, 255], texture: { maskName: '', name: 'vehiclelights128' } }), // rear lamp
+        ]),
+        // verts 0-2 at +Y (front), 3-5 at −Y (rear); the marker colour is a per-lamp id, not head/tail.
+        positions: new Float32Array([0, 5, 0, 1, 5, 0, 0, 5, 1, 0, -5, 0, 1, -5, 0, 0, -5, 1]),
+        triangles: [
+          { a: 0, b: 1, c: 2, materialIndex: 0 },
+          { a: 3, b: 4, c: 5, materialIndex: 1 },
+        ],
+      };
+      const clump: RWClump = {
+        atomics: [{ frameIndex: 1, geometryIndex: 0 }],
+        frames: [
+          { name: 'root', parentIndex: -1, position: [0, 0, 0], rotation: id },
+          { name: 'model_lights', parentIndex: 0, position: [0, 0, 0], rotation: id },
+        ],
+        geometries: [lights],
+      };
+      const mats = (buildVehicle(clump, new Map(), OPTIONS).root.children[0] as Mesh)
+        .material as MeshStandardMaterial[];
+      expect(mats.map((m) => m.color.getHex())).toEqual([0xffffff, 0xffffff]); // untinted (marker not rendered)
+      expect(mats.map((m) => m.userData.lightType as string)).toEqual(['head', 'tail']); // by position, not colour
+    });
+
+    it('glows only lamps near a head/tail dummy — mirrors/offset lamps stay untagged', () => {
+      const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      const lights: RWGeometry = {
+        ...triangleGeometry([
+          material({ color: [0, 255, 200, 255], texture: { maskName: '', name: 'vehiclelights128' } }), // at headlights
+          material({ color: [185, 255, 0, 255], texture: { maskName: '', name: 'vehiclelights128' } }), // at taillights
+          material({ color: [255, 255, 255, 255], texture: { maskName: '', name: 'vehiclelights128' } }), // mirror (far)
+        ]),
+        positions: new Float32Array([
+          0.8,
+          2,
+          0,
+          0.9,
+          2,
+          0,
+          0.8,
+          2,
+          0.1, // verts 0-2 at the headlights dummy
+          0.7,
+          -2,
+          0,
+          0.8,
+          -2,
+          0,
+          0.7,
+          -2,
+          0.1, // verts 3-5 at the taillights dummy
+          0.9,
+          0.5,
+          0.8,
+          1,
+          0.5,
+          0.8,
+          0.9,
+          0.5,
+          0.9, // verts 6-8 by the mirror, far from both dummies
+        ]),
+        triangles: [
+          { a: 0, b: 1, c: 2, materialIndex: 0 },
+          { a: 3, b: 4, c: 5, materialIndex: 1 },
+          { a: 6, b: 7, c: 8, materialIndex: 2 },
+        ],
+      };
+      const clump: RWClump = {
+        atomics: [{ frameIndex: 1, geometryIndex: 0 }],
+        frames: [
+          { name: 'root', parentIndex: -1, position: [0, 0, 0], rotation: id },
+          { name: 'model_lights', parentIndex: 0, position: [0, 0, 0], rotation: id },
+          { name: 'headlights', parentIndex: 0, position: [0.8, 2, 0], rotation: id },
+          { name: 'taillights', parentIndex: 0, position: [0.7, -2, 0], rotation: id },
+        ],
+        geometries: [lights],
+      };
+      const mats = (buildVehicle(clump, new Map(), OPTIONS).root.children[0] as Mesh)
+        .material as MeshStandardMaterial[];
+      expect(mats.map((m) => m.userData.lightType as string | undefined)).toEqual(['head', 'tail', undefined]);
     });
 
     it('groups the _vlo atoms into a hidden lod group', () => {

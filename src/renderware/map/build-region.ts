@@ -20,14 +20,6 @@ import { buildRoadsignParts, getRoadsignFont } from '../three/build-roadsign';
 import { applyWorldWindowGlow } from '../three/world-material';
 
 /**
- * Models whose 2d-effect lights (coronas + ground pools) are **temporarily suppressed**: traffic lights
- * (`trafficlight1`, `cj_traffic_light*`, `gay_traffic_light`, `mtraffic*`). We don't sequence them yet, so
- * every bulb (red/amber/green) lights at once and casts pools — odd-looking. Remove this filter once
- * traffic-light cycling lands (see plan 032). Street lamps etc. don't match `traffic`, so they're unaffected.
- */
-const SUPPRESS_LIGHT_MODELS = /traffic/i;
-
-/**
  * Shared instancing for the streamed map: grouping instances by model+txd and
  * building one `InstancedMesh` per single-material part. Used by the per-cell
  * builder ({@link buildCell}); the map renders through the streaming system.
@@ -274,9 +266,6 @@ export function collectCoronas(archive: ImgArchive, groups: Iterable<RegionMeshD
   const point = new Vector3();
 
   for (const group of groups) {
-    if (SUPPRESS_LIGHT_MODELS.test(group.def.modelName)) {
-      continue; // traffic lights — temporarily off (no sequencing yet); see SUPPRESS_LIGHT_MODELS
-    }
     const lights = buildClumpLights(getClump(archive, group.def.modelName));
     if (lights.length === 0) {
       continue;
