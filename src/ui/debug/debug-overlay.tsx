@@ -107,6 +107,8 @@ export interface DebugActions {
   setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void;
   /** Toggle sun shadows. */
   setShadows(patch: Partial<ShadowsConfig>): void;
+  /** Toggle the debug normals view (scene-wide normal-colour override, bypasses post-FX). */
+  setShowNormals(enabled: boolean): void;
   /** Tune the god-rays shader (density/exposure/weight). */
   setSky(patch: Partial<SkyConfig>): void;
   /** Tune SSAO (enabled/intensity/radius). */
@@ -267,6 +269,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
   const [city, setCity] = useState<City>(() => actions.city());
   const [mapActive, setMapActive] = useState(false);
+  const [normals, setNormals] = useState(false);
   const [fog, setFog] = useState(() => actions.fogDistance());
   const [time, setTime] = useState(() => actions.gameTime());
   const [godrays, setGodrays] = useState(() => actions.godrays());
@@ -345,6 +348,8 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
     setScreen(next);
     setShowCoords(false);
     setMapActive(false);
+    setNormals(false);
+    actions.setShowNormals(false); // leaving the screen / closing always drops the debug normals view
   }
 
   if (!visible) {
@@ -1117,20 +1122,70 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
           )}
 
           {screen === 'map' && (
-            <div style={styles.group}>
-              <button onClick={() => setMapActive((previous) => !previous)} style={styles.actionButton} type="button">
-                {mapActive ? 'Deactivate Map Viewer' : 'Activate Map Viewer'}
-              </button>
-              {mapActive && (
-                <button onClick={() => actions.topDownView()} style={styles.actionButton} type="button">
-                  Top (reset view)
-                </button>
-              )}
-              {mapActive && <MapInspector game={game} />}
-            </div>
+            <MapScreen
+              actions={actions}
+              game={game}
+              mapActive={mapActive}
+              normals={normals}
+              setMapActive={setMapActive}
+              setNormals={setNormals}
+            />
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** The Map debug screen: normals override + the top-down map viewer (extracted to keep the panel's
+ *  render simple). */
+function MapScreen({
+  actions,
+  game,
+  mapActive,
+  normals,
+  setMapActive,
+  setNormals,
+}: {
+  actions: DebugActions;
+  game: Game;
+  mapActive: boolean;
+  normals: boolean;
+  setMapActive: (update: (previous: boolean) => boolean) => void;
+  setNormals: (value: boolean) => void;
+}): ReactElement {
+  return (
+    <div style={styles.group}>
+      <button
+        onClick={() => {
+          setMapActive((previous) => !previous);
+          setNormals(false);
+          actions.setShowNormals(false); // entering/leaving the map viewer resets normals
+        }}
+        style={styles.actionButton}
+        type="button"
+      >
+        {mapActive ? 'Deactivate Map Viewer' : 'Activate Map Viewer'}
+      </button>
+      {!mapActive && (
+        <button
+          onClick={() => {
+            const next = !normals;
+            setNormals(next);
+            actions.setShowNormals(next);
+          }}
+          style={styles.actionButton}
+          type="button"
+        >
+          {normals ? 'Hide Normals' : 'Show Normals'}
+        </button>
+      )}
+      {mapActive && (
+        <button onClick={() => actions.topDownView()} style={styles.actionButton} type="button">
+          Top (reset view)
+        </button>
+      )}
+      {mapActive && <MapInspector game={game} />}
     </div>
   );
 }

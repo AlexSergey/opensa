@@ -1,6 +1,8 @@
 import {
+  DoubleSide,
   Group,
   type Mesh,
+  MeshNormalMaterial,
   type Object3D,
   type PerspectiveCamera,
   Raycaster,
@@ -91,11 +93,16 @@ export class Game {
   private readonly gameClock = new GameClock();
   private lastRequest: null | RegionRequest = null;
   private readonly logger: Logger;
+  /** Debug normals view (plan: Map → Show Normals): scene-wide MeshNormalMaterial override, rendered
+   *  straight to the screen (bypassing post-FX) so the normals read clean. Lazily created. */
+  private normalMaterial: MeshNormalMaterial | null = null;
   private pipeline!: RenderPipeline;
   private readonly plugins: Plugin[] = [];
   private readonly raycaster = new Raycaster();
   private renderer!: WebGLRenderer;
   private scene!: Scene;
+  /** Whether the debug normals override is active (render path bypasses post-FX while on). */
+  private showNormalsMode = false;
   private started = false;
   private readonly streamingRoot = new Group();
   private streamingSystem: null | StreamingSystem = null;
@@ -421,6 +428,9 @@ export class Game {
   }
 
   setMapViewer(enabled: boolean): void {
+    if (enabled) {
+      this.setShowNormals(false); // the map viewer is a normal view — drop the debug normals override
+    }
     this.setConfig({ mapViewer: enabled });
     this.cameraController.setMode(enabled ? 'debug' : 'follow');
     this.events.emit('map-viewer', { enabled });
@@ -456,6 +466,18 @@ export class Game {
   setShowCollision(enabled: boolean): void {
     this.setConfig({ showCollision: enabled });
     void this.refreshCollision();
+  }
+
+  /** Debug: render every object with a normals override (scene-wide), straight to the screen so the
+   *  normals aren't reshaped by post-FX. Off restores the normal pipeline. */
+  setShowNormals(enabled: boolean): void {
+    this.showNormalsMode = enabled;
+    if (enabled && !this.normalMaterial) {
+      // DoubleSide so back-facing cutout/foliage triangles also show; raw colours (no tone mapping).
+      this.normalMaterial = new MeshNormalMaterial({ side: DoubleSide });
+      this.normalMaterial.toneMapped = false;
+    }
+    this.scene.overrideMaterial = enabled ? this.normalMaterial : null;
   }
 
   /** Tune the god-rays shader (density/exposure/weight) at runtime; merges into `graphics.sky`. */
@@ -601,7 +623,13 @@ export class Game {
           plugin.update?.(this.context);
         }
       }
-      this.pipeline.render();
+      if (this.showNormalsMode) {
+        // Debug normals: skip the post-FX pipeline and draw the (override-material) scene to screen.
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.scene, this.camera);
+      } else {
+        this.pipeline.render();
+      }
     });
   }
 }

@@ -20,7 +20,10 @@
   SSAO, tonemapping, reflections, water, sun/god-rays, clouds, stars, fog), **ProcObj**
   (per-category clutter knobs), Weather selector, Position (live coords + teleports incl.
   Truth's Farm), Map (map-viewer mode with manual cell selection, collision overlay,
-  click-to-describe picking).
+  click-to-describe picking, **Show Normals**).
+- **Show Normals** (Map screen): scene-wide `MeshNormalMaterial` override (`game.setShowNormals`),
+  drawn straight to the screen bypassing post-FX so the normals read clean. Auto-resets when leaving
+  the screen / closing the panel (`resetTo`) or entering the map viewer.
 - Picking: instanced map objects (`userData.region`), procobj clutter (`userData.procObj`),
   road-sign text meshes report their host model.
 - Debug URL params: `?nocull=1`, `?shadowdebug=1`.

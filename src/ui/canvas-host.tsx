@@ -901,6 +901,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
         }
       },
       setShadows: (patch) => game.setShadows(patch),
+      setShowNormals: (enabled) => game.setShowNormals(enabled),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),
       setStars: (patch) => game.setStars(patch),
