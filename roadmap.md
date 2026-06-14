@@ -124,7 +124,7 @@
 - [ ] Testing
   - [ ] Map
   - [ ] Mods
-- [ ] Rename project
+- [✅] Rename project
 - [ ] Routine deals
   - [ ] Readme
   - [ ] Dev Docs

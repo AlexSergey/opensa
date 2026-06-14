@@ -67,7 +67,7 @@ export class TimecycManager {
 
             return false;
           });
-
+          console.log(toMerge);
           // We override some props
           if (toMerge && toMerge.timecyc) {
             merged[w][t][p] = toMerge.timecyc.getParsed()[w][t][p];

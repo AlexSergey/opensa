@@ -1,4 +1,7 @@
-# GTA San Andreas map renderer
+# OpenSA
+
+[![Website](https://img.shields.io/badge/site-opensa.cc-2a7ae2)](https://opensa.cc)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey)](./LICENSE.md)
 
 A TypeScript / three.js renderer for GTA San Andreas assets (RenderWare DFF/TXD, COL
 collision, IMG archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles.

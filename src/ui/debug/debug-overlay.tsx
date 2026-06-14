@@ -189,7 +189,10 @@ type Screen =
   | 'vehicles'
   | 'weather';
 
-const MENU: { label: string; screen: Screen }[] = [
+/** Authoring / live-tuning screens hidden only in the deploy build (`build:prod` sets `__DEBUGGER_HIDE__`). */
+const DEV_ONLY_SCREENS = new Set<Screen>(['atmosphere', 'camera', 'graphics', 'map', 'procobj']);
+
+const ALL_MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
   { label: 'Time', screen: 'time' },
@@ -201,6 +204,10 @@ const MENU: { label: string; screen: Screen }[] = [
   { label: 'Position', screen: 'position' },
   { label: 'Map', screen: 'map' },
 ];
+
+const MENU: { label: string; screen: Screen }[] = ALL_MENU.filter(
+  (item) => !__DEBUGGER_HIDE__ || !DEV_ONLY_SCREENS.has(item.screen),
+);
 
 /** ProcObj screen rows — display order for the clutter categories (plan 042). */
 const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [

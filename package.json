@@ -1,20 +1,43 @@
 {
-  "name": "prod-forge-todolist-frontend",
-  "version": "1.2.2",
-  "description": "An experiment in creating a project from scratch using Claude Code",
-  "homepage": "https://github.com/AlexSergey/todolist-ai#readme",
+  "name": "opensa",
+  "version": "0.1.0",
+  "description": "OpenSA — a TypeScript + three.js renderer for GTA San Andreas assets (RenderWare DFF/TXD, COL collision, IMG archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles.",
+  "keywords": [
+    "opensa",
+    "gta",
+    "gta-san-andreas",
+    "san-andreas",
+    "renderware",
+    "dff",
+    "txd",
+    "col",
+    "img-archive",
+    "ipl",
+    "ide",
+    "three.js",
+    "webgl",
+    "typescript",
+    "rapier",
+    "game-engine",
+    "browser"
+  ],
+  "homepage": "https://opensa.cc",
   "bugs": {
-    "url": "https://github.com/AlexSergey/todolist-ai/issues"
+    "url": "https://github.com/AlexSergey/opensa/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AlexSergey/todolist-ai.git"
+    "url": "git+https://github.com/AlexSergey/opensa.git"
   },
-  "license": "MIT",
+  "license": "CC-BY-NC-4.0",
   "author": "Aleksandrov Sergey <gooddev.sergey@gmail.com>",
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:prod": "tsc -b && OPENSA_NO_VIEWERS=true OPENSA_DEBUGGER_HIDE=true vite build",
     "dev": "vite",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:update": "playwright test --update-snapshots",
     "format": "npm run format:prettier && npm run format:code",
     "format:code": "eslint . --fix",
     "format:prettier": "prettier --write \"src/**/*.{ts,json}\"",
@@ -26,9 +49,6 @@
     "lint:ts": "tsc --noEmit",
     "pack:anim": "node scripts/pack-anim-img.mjs",
     "pack:img": "node scripts/pack-img.mjs",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "e2e:update": "playwright test --update-snapshots",
     "preview": "vite preview",
     "serve:static": "serve static -l 3001 --cors",
     "test": "vitest run",

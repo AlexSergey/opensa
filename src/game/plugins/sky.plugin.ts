@@ -24,6 +24,8 @@ import {
 import type { MoonConfig, NightConfig } from '../interfaces/config.interface';
 import type { Plugin, PluginContext } from './plugin';
 
+import { sunElevationAt } from './sun-position';
+
 /** The timecyc values the sky/sun need (RGB 0–255 + sun floats). Grows as graphics expand. */
 export interface SkySample {
   amb: Rgb;
@@ -73,10 +75,10 @@ const shadowRight = new Vector3();
 const shadowUp = new Vector3();
 const shadowFocus = new Vector3();
 
-/** Day window (hours): the sun is above the horizon between these, peaking at midday. */
-const SUNRISE = 6;
-const SUNSET = 20;
-const MAX_ELEVATION = MathUtils.degToRad(80); // sun height at midday
+// The sun's day window (rise → set) is NOT hardcoded — it tracks the `litFade` dawn/dusk window
+// (config.graphics.night.litFade), so it stays in sync with the world darkening and custom timecyc setups:
+// rise begins at `dawnStart`, fully below the horizon by `duskEnd`. The arc math lives in `sunElevationAt`
+// (pure, unit-tested in sun-position.test.ts).
 
 /** Light tuning (timecyc dir/dirMult are ~constant for EXTRASUNNY, so day/night rides the sun height). */
 const SUN_INTENSITY = 2.2; // directional at peak
@@ -372,7 +374,9 @@ export class SkyPlugin implements Plugin {
     this.material.uniforms.uCloudDark.value = sky.cloudDark;
     this.cloudCover = sky.cloudCover;
 
-    const elevation = this.sunElevation(this.getHour()); // radians; ≤0 → below horizon
+    // Sun rises at the litFade dawnStart and is fully below the horizon by duskEnd — same window the
+    // world darkening uses, so the sun and the night stay in sync (and track a custom timecyc).
+    const elevation = this.sunElevation(this.getHour(), nightCfg.litFade.dawnStart, nightCfg.litFade.duskEnd);
     const above = elevation > 0;
     const height = Math.max(0, Math.sin(elevation));
     // Night factor (0 day → 1 deep night), ramping as the sun nears/passes the horizon — drives the star
@@ -443,19 +447,11 @@ export class SkyPlugin implements Plugin {
     }
   }
 
-  /** Sun elevation (radians) for the hour: 0 at sunrise/sunset, peak at midday, negative at night.
-   *  Sets {@link sunDir} (three world space: +X east → +Z south → −X west, +Y up). */
-  private sunElevation(hour: number): number {
-    if (hour <= SUNRISE || hour >= SUNSET) {
-      this.sunDir.set(0, -1, 0); // below horizon (sprite hidden, light off)
-
-      return -1;
-    }
-    const t = (hour - SUNRISE) / (SUNSET - SUNRISE); // 0..1 across the day
-    const elevation = Math.sin(t * Math.PI) * MAX_ELEVATION;
-    const azimuth = t * Math.PI; // east → west, arcing over the south
-    const cosE = Math.cos(elevation);
-    this.sunDir.set(Math.cos(azimuth) * cosE, Math.sin(elevation), Math.sin(azimuth) * cosE);
+  /** Sun elevation (radians) for the hour over [`sunrise`, `sunset`] (= litFade dawnStart/duskEnd);
+   *  copies the computed direction into the reused {@link sunDir}. Math in {@link sunElevationAt}. */
+  private sunElevation(hour: number, sunrise: number, sunset: number): number {
+    const { dir, elevation } = sunElevationAt(hour, sunrise, sunset);
+    this.sunDir.set(dir[0], dir[1], dir[2]);
 
     return elevation;
   }
