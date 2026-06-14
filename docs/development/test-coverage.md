@@ -1,8 +1,19 @@
 # Test coverage
 
 Run: `npm run test:coverage` (Vitest + v8). Scope (from `vitest.config.ts`): `src/**/*.ts` logic; **excluded**
-`*.test.ts`, `index.ts`, `*.interface.ts`, `test-utils.ts`, `src/standalone/**`, and all `.tsx` UI (R3F/DOM
-glue — verified in-browser / e2e, not here). See plan 046 for the coverage-hardening roadmap.
+`*.test.ts`, `index.ts`, `*.interface.ts`, `test-utils.ts`, `src/standalone/**`, all `.tsx` UI, and the
+**GL / DOM / app-loop glue** (`game.ts`, `core/renderer`, `core/camera-controller`, `input/keyboard`, the
+sky/water/postfx/ambient/directional/vehicle-reflection GL plugins, `vehicle-headlight.system`,
+`setup-character`, `src/ui/**`) — WebGL/browser code verified on the Playwright e2e lane (`e2e.md`), not by
+headless node units (same rationale as the `.tsx` exclusion). See plan 046 for the roadmap.
+
+## Current (2026-06-13, after It.1–7 + coverage hardening)
+
+**Statements 88.9% · Branches 78.64% · Functions 87.21% · Lines 88.81%** over the headless scope above
+(108 test files, 651 passing, 0 skipped). Enforced floors in `vitest.config.ts`
+(`coverage.thresholds`): statements/lines/functions **85**, branches **77** — a small buffer below the
+achieved numbers so an unrelated change can't silently erode coverage (`npm run test:coverage` fails below).
+Branches sit lower by nature (error/edge + fetch paths in `resolve-map`/`img-archive`/`build-region`).
 
 ## Baseline (2026-06-13, Iteration 0)
 

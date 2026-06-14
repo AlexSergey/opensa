@@ -65,6 +65,14 @@ describe('parseIde', () => {
   it('returns an empty list when there are no object definitions', () => {
     expect(parseIde('objs\nend\npath\nend')).toEqual([]);
   });
+
+  it('skips objs rows with too few columns', () => {
+    expect(parseIde(['objs', '5000, gplane, basicmain', 'end'].join('\n'))).toEqual([]);
+  });
+
+  it('skips objs rows whose id is not a number', () => {
+    expect(parseIde(['objs', 'NaNid, gplane, basicmain, 300, 0', 'end'].join('\n'))).toEqual([]);
+  });
 });
 
 describe('parseTimedObjects', () => {
@@ -82,6 +90,10 @@ describe('parseTimedObjects', () => {
 
   it('ignores objs / anim sections', () => {
     expect(parseTimedObjects(['objs', '5000, gplane, basicmain, 300, 0', 'end'].join('\n'))).toEqual([]);
+  });
+
+  it('skips a malformed tobj row (too few columns to parse)', () => {
+    expect(parseTimedObjects(['tobj', 'broken, row', 'end'].join('\n'))).toEqual([]);
   });
 });
 

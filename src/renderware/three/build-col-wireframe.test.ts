@@ -74,6 +74,23 @@ describe('buildCollisionWireframe', () => {
       expect(positionsOf([{ col, name: 'col', transforms: [new Matrix4()] }])).toHaveLength(72);
     });
 
+    it('draws three great-circle rings for a sphere, all on its surface', () => {
+      const col = colModel({
+        spheres: [{ center: [1, 2, 3], radius: 5, surface: { brightness: 0, flag: 0, light: 0, material: 0 } }],
+      });
+
+      const positions = positionsOf([{ col, name: 'col', transforms: [new Matrix4()] }]);
+      // 3 axes * 12 segments * 2 endpoints * 3 components
+      expect(positions).toHaveLength(3 * 12 * 2 * 3);
+      // Every ring point sits on the sphere surface (one coordinate is the centre's, the plane radius = 5).
+      for (let i = 0; i < positions.length; i += 3) {
+        const dx = positions[i] - 1;
+        const dy = positions[i + 1] - 2;
+        const dz = positions[i + 2] - 3;
+        expect(Math.hypot(dx, dy, dz)).toBeCloseTo(5, 5);
+      }
+    });
+
     it('repeats a model once per placement transform', () => {
       const col = colModel({
         faces: [{ a: 0, b: 1, c: 2, light: 0, material: 0 }],
