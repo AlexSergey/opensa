@@ -11,7 +11,6 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [gen-ipl-manifest.mjs](#gen-ipl-manifestmjs)
   - [gen-wind-list.ts](#gen-wind-listts)
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
-  - [stretch-night.mjs](#stretch-nightmjs)
 - [Debugging / auditing](#debugging--auditing)
   - [audit-rw-coverage.ts](#audit-rw-coveragets)
   - [inspect-area.ts](#inspect-areats)
@@ -88,14 +87,14 @@ archive. Re-run after adding models to the viewer list.
 npx tsx scripts/extract-viewer-collision.ts
 ```
 
-### stretch-night.mjs
+### timecyc-builder (`npm run timecyc`)
 
-One-off timecyc tool: remaps hour rows of the "gtadrive Atmosphere Simulation" 24h timecyc
-(stretching the night) while keeping comments/labels byte-identical. Kept for reproducibility of
-the shipped `timecyc_24h` variant.
+Build a custom `timecyc_24h.dat` by selectively merging donor timecyc files onto a base (by weather/zone,
+hour, and property). Inputs may be vanilla or 24h (auto-converted). Config in `timecyc-builder/index.ts`;
+output to `timecyc-builder/merged/`. **Full guide: [timecyc-builder.md](./timecyc-builder.md).**
 
 ```sh
-node scripts/stretch-night.mjs
+npm run timecyc
 ```
 
 ---

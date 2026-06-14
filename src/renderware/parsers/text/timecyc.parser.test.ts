@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { convertTo24h, FIELDS, HOURS, parseTimecyc, TIME_WEATHERS } from './timecyc.parser';
+import {
+  convertTo24h,
+  ensure24h,
+  FIELD_LABELS,
+  FIELDS,
+  HOURS,
+  parseTimecyc,
+  stringifyTimecyc,
+  TIME_WEATHERS,
+  WEATHER_NAMES,
+} from './timecyc.parser';
 
 const ROW_SIZE = FIELDS.reduce((n, f) => n + (f.kind === 'rgb' ? 3 : f.kind === 'rgba' ? 4 : 1), 0);
 const base = readFileSync('tests/data/timecyc.dat', 'utf8');
@@ -82,6 +92,50 @@ describe('convertTo24h', () => {
       const a = k[0][3]; // skyTop.r at midnight
       const b = k[1][3]; // skyTop.r at 5am
       expect(h[1][3]).toBe(Math.trunc((4 / 5) * a + (1 / 5) * b));
+    });
+  });
+});
+
+describe('ensure24h', () => {
+  describe('negative cases', () => {
+    it('throws on a row count that is neither 24h nor vanilla', () => {
+      expect(() => ensure24h([[1], [2], [3]])).toThrow();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('passes an already-24h table through unchanged', () => {
+      const rows = parseTimecyc(day24); // 23 × 24
+      expect(ensure24h(rows)).toBe(rows);
+    });
+
+    it('expands a vanilla 8-keyframe table to 24h (= convertTo24h)', () => {
+      const vanilla = parseTimecyc(base); // 23 × 8
+      expect(vanilla).toHaveLength(WEATHER_NAMES.length * 8);
+      const converted = ensure24h(vanilla);
+      expect(converted).toHaveLength(TIME_WEATHERS * HOURS); // 504
+      expect(converted).toEqual(convertTo24h(vanilla));
+    });
+  });
+});
+
+describe('stringifyTimecyc', () => {
+  describe('positive cases', () => {
+    it('exposes a display label per field (aligned 1:1 with FIELDS)', () => {
+      expect(FIELD_LABELS).toHaveLength(FIELDS.length);
+      expect(FIELD_LABELS.slice(3, 5)).toEqual(['Sky top', 'Sky bot']);
+    });
+
+    it('round-trips with parseTimecyc on the real 24h table (parse∘stringify identity)', () => {
+      const rows = parseTimecyc(day24);
+      expect(parseTimecyc(stringifyTimecyc(rows))).toEqual(rows);
+    });
+
+    it('writes the FIELD_LABELS header and only `//` comment lines as non-data', () => {
+      const text = stringifyTimecyc(parseTimecyc(day24));
+      expect(text).toContain(`// ${FIELD_LABELS.join(' ')}`);
+      const nonData = text.split('\n').filter((line) => line.trim() !== '' && !line.startsWith('//'));
+      expect(nonData.every((line) => line.split(/\s+/).filter(Boolean).length === ROW_SIZE)).toBe(true);
     });
   });
 });

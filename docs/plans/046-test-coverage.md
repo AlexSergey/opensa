@@ -1,8 +1,9 @@
 # 046 — Test coverage hardening (pre open-source)
 
 Bring the project to thorough, trustworthy test coverage before the techno-demo open-source release. This plan
-is the audit + the iteration roadmap. **Status: planned** (no code yet — agreed to plan first, then execute
-iteration by iteration).
+is the audit + the iteration roadmap. **Status: ✅ DONE (2026-06-13)** — Iterations 0–7 complete (543→647
+passing, 0 skipped; `test:coverage` gated at 85/77), Iteration 8 (e2e) scaffolded; per-iteration details and the
+final summary are below.
 
 ## Goals
 

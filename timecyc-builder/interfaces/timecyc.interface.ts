@@ -1,12 +1,10 @@
-import type { TimecycParser } from '../parsers/timecyc';
-
+/** A merge source file + its selective filters. Any omitted dimension means "all" on that axis. */
 export interface TimecycItem {
   path: string;
-  props?: string[];
-  skipProps?: boolean;
-  timecyc?: TimecycParser;
-  times?: string[];
-  zones?: string[];
+  /** Property labels to overlay (e.g. `'Sky top'`); omitted ⇒ all properties. */
+  props?: readonly string[];
+  /** Hours to overlay (`'0h'..'23h'`); omitted ⇒ all hours. */
+  times?: readonly string[];
+  /** Weather names to overlay (e.g. `'CLOUDY_VEGAS'`); omitted ⇒ all weathers. */
+  zones?: readonly string[];
 }
-
-export type TimecycParsed = Record<string, Record<string, Record<string, string[]>>>;

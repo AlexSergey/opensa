@@ -37,6 +37,38 @@ export const FIELDS: readonly Field[] = [
   { kind: 'float', name: 'dirMult' },
 ];
 
+/** SA timecyc header display labels, aligned 1:1 with {@link FIELDS} (the names in the `.dat` header line).
+ *  Used to write the header in {@link stringifyTimecyc} and to resolve user-facing prop selections. */
+export const FIELD_LABELS: readonly string[] = [
+  'Amb',
+  'Amb_Obj',
+  'Dir',
+  'Sky top',
+  'Sky bot',
+  'SunCore',
+  'SunCorona',
+  'SunSz',
+  'SprSz',
+  'SprBght',
+  'Shdw',
+  'LightShd',
+  'PoleShd',
+  'FarClp',
+  'FogSt',
+  'LightOnGround',
+  'LowCloudsRGB',
+  'BottomCloudRGB',
+  'WaterRGBA',
+  'Alpha1',
+  'RGB1',
+  'Alpha2',
+  'RGB2',
+  'CloudAlpha',
+  'IntensityLimit',
+  'WaterFogAlpha',
+  'DirMult',
+];
+
 /** The 23 weather names, in table order. The first 21 are time-of-day weathers (24h). */
 export const WEATHER_NAMES: readonly string[] = [
   'EXTRASUNNY_LA',
@@ -90,6 +122,26 @@ export function convertTo24h(base: number[][]): number[][] {
 }
 
 /**
+ * Normalise parsed rows to 24h. Already-24h rows (24 per weather — the 21 time weathers, optionally plus the
+ * 2 static extracolours) pass through unchanged; vanilla 8-keyframe rows (23 × 8) are expanded via
+ * {@link convertTo24h}. Anything else throws. Lets callers accept either a vanilla `timecyc.dat` or an
+ * already-converted `timecyc_24h.dat`.
+ */
+export function ensure24h(rows: number[][]): number[][] {
+  if (rows.length === TIME_WEATHERS * HOURS || rows.length === WEATHER_NAMES.length * HOURS) {
+    return rows;
+  }
+  if (rows.length === WEATHER_NAMES.length * KEYFRAMES) {
+    return convertTo24h(rows);
+  }
+
+  throw new Error(
+    `timecyc: ${rows.length} rows — expected 24h (${TIME_WEATHERS * HOURS} or ${WEATHER_NAMES.length * HOURS}) ` +
+      `or vanilla 8-keyframe (${WEATHER_NAMES.length * KEYFRAMES})`,
+  );
+}
+
+/**
  * Parse a timecyc `.dat` (vanilla 8-keyframe or already-24h) into flat numeric
  * rows — one per non-comment line, each {@link FIELDS}-ordered (RGB expanded to
  * its 3 numbers, etc.). Every row is the full field width; missing/unparseable
@@ -114,6 +166,30 @@ export function parseTimecyc(text: string): number[][] {
   }
 
   return rows;
+}
+
+/**
+ * Serialise flat {@link FIELDS}-ordered rows back to SA timecyc `.dat` text: per-weather/per-hour `//`
+ * comment markers + the {@link FIELD_LABELS} header + one space-joined data line per row. The pair to
+ * {@link parseTimecyc} — `parseTimecyc(stringifyTimecyc(rows))` round-trips (parse already rounds floats to
+ * 2dp / truncates ints, so re-parsing parsed rows is stable). Weather count is derived from the row count;
+ * names beyond `weatherNames` fall back to `WEATHER_<i>` (comment only — `parseTimecyc` ignores comments).
+ */
+export function stringifyTimecyc(rows: readonly number[][], weatherNames: readonly string[] = WEATHER_NAMES): string {
+  const header = `// ${FIELD_LABELS.join(' ')}`;
+  const weatherCount = Math.ceil(rows.length / HOURS);
+  const lines: string[] = [];
+  for (let w = 0; w < weatherCount; w += 1) {
+    lines.push('//', `// ${weatherNames[w] ?? `WEATHER_${w}`}`, '//', header);
+    for (let h = 0; h < HOURS; h += 1) {
+      const row = rows[w * HOURS + h];
+      if (row) {
+        lines.push(`// ${h}h`, row.map(String).join(' '));
+      }
+    }
+  }
+
+  return `${lines.join('\n')}\n`;
 }
 
 /** Per-field interpolation: floats round to 2dp, everything else truncates (GTA convention). */

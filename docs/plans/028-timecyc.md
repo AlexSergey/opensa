@@ -102,12 +102,3 @@ Sky dome + gradient (skyTop/skyBottom), sun/moon position + corona/sprite, ambie
 from timecyc (driving `AmbientLightPlugin`/`DirectionalLightPlugin`), fog colour/`FarClp`/`FogSt` from
 timecyc (feeding plan 024 fog), water colour, weather selection/transitions, and the EXTRACOLOURS
 palettes. This plan only prepares + samples the data.
-
-## Asset tooling — night-stretched timecyc
-
-`scripts/stretch-night.mjs` is a one-off generator that **stretches the night** of a 24h timecyc by remapping
-each hour's data values while keeping every comment / hour label / column byte-identical (it only rewrites the
-numbers on data lines). It produced `static/data/timecycs/24h TimeCycle gtadrive's Atmosphere Simulation++.dat`
-from the `…Atmosphere Simulation.dat` mod: hours 0–3 = held dark, 4 ← original 1:00 (later dawn), 20 ← original
-23:00 (earlier twilight), 21–23 = a smooth 23→0 fade, day/5:00 unchanged. Edit the `mapHour` table + paths and
-re-run (`node scripts/stretch-night.mjs`) to retarget or remap.
