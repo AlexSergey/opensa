@@ -45,3 +45,6 @@ database-manager/migrations
 grafana/**
 ecs/**
 **/.last-run.json
+./game-src
+./static
+./static2

@@ -126,5 +126,12 @@ describe('GtaSaWorldAdapter integration', () => {
       expect(character.bonesByName.has('Root')).toBe(true);
       expect(character.object).toBeDefined();
     });
+
+    it('loads animations directly from an .ifp file (no packed archive)', async () => {
+      stubFetch((url) => (url.endsWith('.ifp') ? buffer('tests/dff/anim-clump/counxref.ifp') : null));
+      const clips = await new GtaSaWorldAdapter(cfg()).loadAnimations('anim/ped.ifp');
+      expect(clips.size).toBe(4); // counxref.ifp's four animations
+      expect(clips.has('derrick01')).toBe(true);
+    });
   });
 });

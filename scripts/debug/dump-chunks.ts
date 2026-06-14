@@ -1,10 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+
+import { gameArg, openGameArchive, positionalArgs } from '../lib/game';
 
 /**
  * Print a RenderWare file's chunk tree (type, offset, size) — diagnoses WHERE a plugin chunk
  * lives (e.g. a 2d Effect attached to the clump extension instead of a geometry extension).
- * Run: `npx tsx scripts/dump-chunks.ts static/img/gta3/se_bit_17.dff [filterHex]`.
+ * The target is an archive entry (e.g. `se_bit_17.dff`) or a filesystem path.
+ * Run: `npx tsx scripts/debug/dump-chunks.ts se_bit_17.dff [filterHex] [--game original]`.
  */
 const NAMES: Record<number, string> = {
   0x01: 'Struct',
@@ -24,12 +26,17 @@ const NAMES: Record<number, string> = {
   0x0253f2fe: 'NodeName',
 };
 
-const [path, filter] = process.argv.slice(2);
-if (!path) {
-  console.error('usage: npx tsx scripts/dump-chunks.ts <file> [filterHex]');
+const [target, filter] = positionalArgs();
+if (!target) {
+  console.error('usage: npx tsx scripts/debug/dump-chunks.ts <entry-or-file> [filterHex] [--game original]');
   process.exit(1);
 }
-const buffer = readFileSync(join(import.meta.dirname, '..', path));
+const fromArchive = openGameArchive(gameArg()).get(target);
+if (!fromArchive && !existsSync(target)) {
+  console.error(`not found in archive or filesystem: ${target}`);
+  process.exit(1);
+}
+const buffer = fromArchive ? Buffer.from(fromArchive) : readFileSync(target);
 const filterType = filter ? Number.parseInt(filter, 16) : null;
 
 walk(0, buffer.length, 0);

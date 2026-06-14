@@ -6,9 +6,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 ## Contents
 
 - [Build / asset pipeline](#build--asset-pipeline)
-  - [pack-img.mjs](#pack-imgmjs)
-  - [pack-anim-img.mjs](#pack-anim-imgmjs)
-  - [gen-ipl-manifest.mjs](#gen-ipl-manifestmjs)
+  - [build-game.ts](#build-gamets)
   - [gen-wind-list.ts](#gen-wind-listts)
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
 - [Debugging / auditing](#debugging--auditing)
@@ -31,46 +29,20 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 
 ## Build / asset pipeline
 
-### pack-img.mjs
+### build-game.ts
 
-Packs the extracted model folders into one stock **GTA VER2 IMG** archive (the same format the
-game and mods use). Streams data, so the ~600 MB output never sits in memory. Later source
-folders override earlier ones by lowercased name. Keeps `.dff/.txd/.col/.ifp`; stream IPLs are
-NOT packed — they are served from `static/ipl_binary/` instead.
+Packs a variant (`game-src/<game>/`) into three fflate zips under `static/<version>/` (priority +
+models + textures). See plan 048 for the full breakdown.
 
 ```sh
-node scripts/pack-img.mjs            # default: static/img/gta3,gta3additional,gta3anim → gta3-pf.img
-node scripts/pack-img.mjs --all      # every file, not just the model extensions
-IMG_SRC=dirA,dirB IMG_OUT=/out.img node scripts/pack-img.mjs
-```
-
-Real use: repacked after adding `static/img/gta3anim` (zone IFPs for animated map objects) so
-`counxref.ifp` reached the runtime archive.
-
-### pack-anim-img.mjs
-
-Packs every `*.ifp` from the extracted `static/anim/anim.img/` folder plus the loose `ped.ifp`
-into `static/anim/animations.img` — the single archive `loadAnimations` reads at runtime.
-
-```sh
-node scripts/pack-anim-img.mjs
-ANIM_SRC=dir ANIM_PED=ped.ifp ANIM_OUT=out.img node scripts/pack-anim-img.mjs
-```
-
-### gen-ipl-manifest.mjs
-
-Regenerates `static/ipl_binary/manifest.json` — `{ basename: streamCount }` — so `resolveMap`
-fetches exactly the binary stream IPLs that exist instead of probing by 404. Re-run after adding
-or removing `*_streamN.ipl` files.
-
-```sh
-node scripts/gen-ipl-manifest.mjs
+npm run build:game:original          # npm run timecyc && tsx scripts/build-game.ts --game original
+tsx scripts/build-game.ts --game <name>   # any other variant
 ```
 
 ### gen-wind-list.ts
 
 Regenerates the `WIND_MODELS` constant in `src/game/mods/wind-mode.ts` from the ground-truth
-folder `static/wind/` (the set of models that must sway). Re-run after adding wind-adapted
+folder `game-src/wind/` (the set of models that must sway). Re-run after adding wind-adapted
 models.
 
 ```sh
@@ -79,12 +51,12 @@ npx tsx scripts/gen-wind-list.ts
 
 ### extract-viewer-collision.ts
 
-One-time pre-bake: extracts the COL of the object-viewer's model list out of the IMG into small
-`static/viewer/<model>.col.json` files so `/object-viewer.html` doesn't download the full
-archive. Re-run after adding models to the viewer list.
+One-time pre-bake: extracts the COL of the object-viewer's model list out of the variant's
+`game-src/<game>/models/gta3.img` into small `static/viewer/<model>.col.json` files so
+`/object-viewer.html` doesn't download the full archive. Re-run after adding models to the viewer list.
 
 ```sh
-npx tsx scripts/extract-viewer-collision.ts
+npm run viewer:collision:original   # tsx scripts/extract-viewer-collision.ts --game original
 ```
 
 ### timecyc-builder (`npm run timecyc`)
@@ -101,18 +73,20 @@ npm run timecyc
 
 ## Debugging / auditing
 
-All of these mirror `resolveMap` offline (fs instead of fetch) over `static/`, so they see
-exactly what the game would.
+These live under `scripts/debug/` and mirror `resolveMap` offline (fs instead of fetch) over a
+variant's real assets in `game-src/<game>/` — models read straight from the stock `gta3.img` /
+`gta_int.img` archives, data from `game-src/<game>/data/`. They share `scripts/lib/game.ts`
+(`--game <name>`, default `original`) and must be run from the repo root (paths are cwd-relative).
 
 ### audit-rw-coverage.ts
 
-Full RenderWare coverage audit: walks every DFF/TXD in the extracted model folders and reports
+Full RenderWare coverage audit: walks every DFF/TXD in the variant's archive and reports
 what the data ACTUALLY contains vs what the parsers handle — DFF chunk-type histogram, the
 complete 2dfx entry census, multi-UV-layer model count, parse failures; TXD format histogram and
 how many textures the classifier drops. The ground truth behind plan 043.
 
 ```sh
-npx tsx scripts/audit-rw-coverage.ts
+npx tsx scripts/debug/audit-rw-coverage.ts [--game original]
 ```
 
 Real use: established 13126/0-failure DFF coverage, the 36 dropped 16-bit textures, and the
@@ -125,8 +99,8 @@ radius of a point with WHY it would (not) render — def present, LOD class, int
 archive, parse result, TXD presence.
 
 ```sh
-npx tsx scripts/inspect-area.ts <x> <y> [radius=120]
-npx tsx scripts/inspect-area.ts 2908 -1058 60     # the pier-hole case
+npx tsx scripts/debug/inspect-area.ts <x> <y> [radius=120] [--game original]
+npx tsx scripts/debug/inspect-area.ts 2908 -1058 60     # the pier-hole case
 ```
 
 Real use: the `ce_grndpalcst05` pier hole — showed the placement existed and pointed onward to
@@ -134,13 +108,13 @@ the bbox check.
 
 ### find-instances.ts
 
-Finds every placement of a model (or id) across ALL map IPLs — text, binary streams AND the
-standalone script-gated groups — with the source file of each. Companion to `inspect-area.ts`
+Finds every placement of a model (or id) across ALL map IPLs — the text IPLs plus the binary
+streams inside `gta3.img` — with the source of each. Companion to `inspect-area.ts`
 for "ghost text placement vs real streamed placement" cases.
 
 ```sh
-npx tsx scripts/find-instances.ts <modelNameOrId> [...more]
-npx tsx scripts/find-instances.ts se_bit_17 vegasnroad19
+npx tsx scripts/debug/find-instances.ts <modelNameOrId> [...more] [--game original]
+npx tsx scripts/debug/find-instances.ts se_bit_17 vegasnroad19
 ```
 
 Real use: located the road-sign host instances and their interior=1024 area codes; resolved the
@@ -154,8 +128,8 @@ transform/culling; if raw-geometry==COL but a frame is non-identity, a junk fram
 being applied where SA would ignore it.
 
 ```sh
-npx tsx scripts/model-bbox.ts <model> [...more]
-npx tsx scripts/model-bbox.ts ce_grndpalcst05
+npx tsx scripts/debug/model-bbox.ts <model> [...more] [--game original]
+npx tsx scripts/debug/model-bbox.ts ce_grndpalcst05
 ```
 
 Real use: proved the pier-hole model shipped a stray (12.85, 317.05, −28.52) frame translation.
@@ -163,12 +137,12 @@ Real use: proved the pier-hole model shipped a stray (12.85, 317.05, −28.52) f
 ### check-cell-signs.ts
 
 Reproduces the cell build's road-sign path offline: for a world position, lists the HD cell's
-model groups, parses each clump from the PLAYED archive, and reports which carry 2dfx roadsign
+model groups, parses each clump from the variant's archive, and reports which carry 2dfx roadsign
 entries — pinpoints where a missing sign drops out (def → grid → archive → parse).
 
 ```sh
-npx tsx scripts/check-cell-signs.ts <x> <y> [imgPath=static/models/gta3-pf.img]
-npx tsx scripts/check-cell-signs.ts 420 640 static/models/gta3-original.img
+npx tsx scripts/debug/check-cell-signs.ts <x> <y> [--game original]
+npx tsx scripts/debug/check-cell-signs.ts 1300 -1700
 ```
 
 Real use: proved the desert signs' data pipeline was clean, isolating the bug to rendering (the
@@ -178,12 +152,12 @@ glyph quad buried inside the board).
 
 Scans DFFs for 2d Effect entries: histograms entry types across the map and decodes every
 ROADSIGN (type 7) — model, flags, plate size, rotation, position, text lines. Byte-stepped (a
-4-byte stride misses unaligned chunks). `--img` scans inside an archive instead of the extracted
-dirs — diffing the two exposes re-export damage.
+4-byte stride misses unaligned chunks). Scans the variant's archive by default; `--img <path>`
+scans a specific archive instead — diffing the two exposes re-export damage.
 
 ```sh
-npx tsx scripts/find-2dfx.ts | tail -50
-npx tsx scripts/find-2dfx.ts --img static/models/gta3-original.img > 2dfx-original.txt
+npx tsx scripts/debug/find-2dfx.ts | tail -50
+npx tsx scripts/debug/find-2dfx.ts --img game-src/custom/models/gta3.img > 2dfx-custom.txt
 ```
 
 Real use: the road-sign survey (112 entries / 43+ models), pinning the 88-byte entry layout
@@ -193,32 +167,34 @@ empirically, and PF-vs-original data comparison.
 
 Prints a RenderWare file's chunk tree (type, offset, size) — diagnoses WHERE a plugin chunk
 lives (e.g. whether a 2d Effect is attached to a geometry extension or somewhere the runtime
-parser doesn't look).
+parser doesn't look). The target is an archive entry (e.g. `se_bit_17.dff`) or a filesystem path.
 
 ```sh
-npx tsx scripts/dump-chunks.ts static/img/gta3/se_bit_17.dff
-npx tsx scripts/dump-chunks.ts <file> 253f2f8     # filter by chunk type
+npx tsx scripts/debug/dump-chunks.ts se_bit_17.dff
+npx tsx scripts/debug/dump-chunks.ts se_bit_17.dff 253f2f8     # filter by chunk type
 ```
 
 ### dump-texture.ts
 
-Dumps one texture from a TXD to PNG (no deps — software DXT1/3/5 decode + zlib IDAT). The
-`alpha` mode bakes the alpha channel to opaque grayscale and reflows/zooms tall glyph strips —
-that is how the `roadsignfont` atlas layout was read by eye.
+Dumps one texture from a TXD to PNG (no deps — software DXT1/3/5 decode + zlib IDAT). The TXD is
+an archive entry (e.g. `particle.txd`) or a filesystem path. The `alpha` mode bakes the alpha
+channel to opaque grayscale and reflows/zooms tall glyph strips — that is how the `roadsignfont`
+atlas layout was read by eye.
 
 ```sh
-npx tsx scripts/dump-texture.ts static/models/particle.txd roadsignfont out.png alpha
+npx tsx scripts/debug/dump-texture.ts particle.txd roadsignfont out.png alpha
 ```
 
 ### dump-fx-system.ts
 
 Dumps one `effects.fxp` system: emitter prims with textures/blend ids and every keyframed
 track. This is how the fire system's COLOURBRIGHT tracks (vs the usual COLOUR) and its
-0→peak→0 alpha envelope were discovered (plan 044).
+0→peak→0 alpha envelope were discovered (plan 044). Defaults to
+`game-src/<game>/models/effects.fxp`; pass a path to override.
 
 ```sh
-npx tsx scripts/dump-fx-system.ts fire
-npx tsx scripts/dump-fx-system.ts water_fountain static/models/effects.fxp
+npx tsx scripts/debug/dump-fx-system.ts fire
+npx tsx scripts/debug/dump-fx-system.ts water_fountain tests/data/effects.fxp
 ```
 
 ### solve-roadsign.ts
@@ -230,17 +206,18 @@ N=−Z) after hand calibration proved unreliable (90°-multiple rotations satisf
 conventions).
 
 ```sh
-npx tsx scripts/solve-roadsign.ts
+npx tsx scripts/debug/solve-roadsign.ts
 ```
 
 ### procobj-stats.ts
 
 procobj scatter sanity counts for one cell: per model / per category, vanilla density
 (lottery < 1) vs full 3× capacity, plus an area-weighted surface histogram (COL material id →
-surfinfo name, m², rule matches, top contributing model).
+surfinfo name, m², rule matches, top contributing model). Needs `data/procobj.dat` and
+`data/surfinfo.dat` in `game-src/<game>/`.
 
 ```sh
-npx tsx scripts/procobj-stats.ts -450 1500    # desert cell
+npx tsx scripts/debug/procobj-stats.ts -450 1500    # desert cell
 ```
 
 Real use: confirmed the desert cell scatters cacti/bushes on the right surfaces and sized the
@@ -248,12 +225,12 @@ Real use: confirmed the desert cell scatters cacti/bushes on the right surfaces 
 
 ### wind-coverage.ts
 
-Wind audit: compares the ground-truth `static/wind/` set against the runtime `WIND_MODELS`
+Wind audit: compares the ground-truth `game-src/wind/` set against the runtime `WIND_MODELS`
 constant, IDE vegetation flags and prelit-alpha weights — reports unweighted models, missing
 list entries and alpha-rule false positives.
 
 ```sh
-npx tsx scripts/wind-coverage.ts
+npx tsx scripts/debug/wind-coverage.ts [--game original]
 ```
 
 Real use: exposed the 128 false positives of the alpha-as-trigger design (roads, LTS overlays,
@@ -261,11 +238,11 @@ piers), which led to the list-as-trigger redesign.
 
 ### ide-flag-histogram.ts
 
-Histogram of IDE object-flag bits across every shipped `.ide`, with example models per bit — to
-see which SA engine flags the renderer still ignores.
+Histogram of IDE object-flag bits across every `.ide` under the variant's `data/maps`, with
+example models per bit — to see which SA engine flags the renderer still ignores.
 
 ```sh
-npx tsx scripts/ide-flag-histogram.ts
+npx tsx scripts/debug/ide-flag-histogram.ts [--game original]
 ```
 
 Real use: scoped plan 039 (which render-relevant flags to implement: DRAW_LAST, ADDITIVE,

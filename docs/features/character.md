@@ -9,8 +9,9 @@
   (skin bone i ↔ frame i+1, frame 0 = dummy root); bind pose = raw mesh regardless of mapping;
   named-bone map for animation retargeting. Current model: Tommy (custom).
 - **Animation** (plan 012): ANP3 IFP parsing (quaternions i16/4096, times i16, root translation
-  i16/1024), `buildAnimationClip` (quaternion tracks by bone name; translation opt-in),
-  `animations.img` archive of every IFP + ped.ifp; `CharacterAnimationSystem` (idle/walk/run
+  i16/1024), `buildAnimationClip` (quaternion tracks by bone name; translation opt-in);
+  `ped.ifp` is loaded **directly** (`loadAnimations(ifpUrl)` → `anim/ped.ifp`, no packed archive);
+  `CharacterAnimationSystem` (idle/walk/run
   states, speed-matched locomotion — root motion stripped, physics owns position).
 - **Physics** (plans 008/013): bitECS entity + Rapier capsule/box controller, gravity, map
   collision, jump, slope handling; spawn at Ganton; respawn/teleport debug actions.

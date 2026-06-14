@@ -39,6 +39,6 @@ export default defineConfig({
     },
     environment: 'node',
     globals: false,
-    include: ['src/**/*.test.ts', 'timecyc-builder/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'timecyc-builder/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
 });

@@ -1,12 +1,14 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { gameArg, gameDir } from '../lib/game';
+
 /**
  * One-off audit (plan 004 follow-up): histogram of IDE object-flag bits across every `.ide` that
- * ships under `static/data/maps`, with example models per bit — to see which SA engine flags our
- * renderer still ignores. Run: `npx tsx scripts/ide-flag-histogram.ts`.
+ * ships under the variant's `data/maps`, with example models per bit — to see which SA engine flags
+ * our renderer still ignores. Run: `npx tsx scripts/debug/ide-flag-histogram.ts [--game original]`.
  */
-const root = join(import.meta.dirname, '..', 'static', 'data', 'maps');
+const root = gameDir(gameArg(), 'data', 'maps');
 const bits = new Map<number, number>();
 const examples = new Map<number, string[]>();
 let rows = 0;

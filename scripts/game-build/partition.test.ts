@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest';
+
+import type { ModelRef } from './partition';
+
+import { partitionEntries, placedModels, resolveSource } from './partition';
+
+const ide = new Map<number, ModelRef>([
+  [1, { model: 'house', txd: 'htex' }],
+  [2, { model: 'shed', txd: 'htex' }], // shares htex with house
+  [3, { model: 'tree', txd: 'ttex' }], // dff + txd only in gta_int
+  [4, { model: 'ghost', txd: 'gtex' }], // referenced but in neither img
+]);
+
+const gta3 = new Set(['house.dff', 'htex.txd', 'la.ipl', 'nodes.dat', 'ped.ifp', 'roads.col', 'shed.dff']);
+const gtaInt = new Set(['tree.dff', 'ttex.txd']);
+
+const names = (entries: { name: string }[]): string[] => entries.map((e) => e.name).sort();
+
+describe('resolveSource', () => {
+  describe('negative cases', () => {
+    it('returns null for a name in neither img', () => {
+      expect(resolveSource('ghost.dff', gta3, gtaInt)).toBeNull();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('prefers gta3, falls back to gta_int (override)', () => {
+      expect(resolveSource('house.dff', gta3, gtaInt)).toBe('gta3');
+      expect(resolveSource('tree.dff', gta3, gtaInt)).toBe('gta_int');
+    });
+  });
+});
+
+describe('placedModels', () => {
+  describe('positive cases', () => {
+    it('collects the unique referenced model + txd base names', () => {
+      const refs = placedModels([1, 2, 3, 1, 1], ide); // id 1 thrice → one
+      expect(refs.models.sort()).toEqual(['house', 'shed', 'tree']);
+      expect(refs.txds.sort()).toEqual(['htex', 'ttex']); // htex shared, deduped
+    });
+
+    it('skips ids without an IDE definition', () => {
+      expect(placedModels([999], ide)).toEqual({ models: [], txds: [] });
+    });
+  });
+});
+
+describe('partitionEntries', () => {
+  const { models, priority, textures } = partitionEntries(placedModels([1, 2, 3, 4], ide), gta3, gtaInt);
+
+  describe('negative cases', () => {
+    it('drops dff/txd present in neither img', () => {
+      expect(names(models)).not.toContain('ghost.dff');
+      expect(names(textures)).not.toContain('gtex.txd');
+    });
+
+    it('keeps the three buckets disjoint by extension', () => {
+      expect(models.every((e) => e.name.endsWith('.dff'))).toBe(true);
+      expect(textures.every((e) => e.name.endsWith('.txd'))).toBe(true);
+      expect(priority.every((e) => /\.(?:col|ipl|ifp|dat)$/.test(e.name))).toBe(true);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('puts only world files (col/ipl/ifp/dat) in priority — no dff/txd', () => {
+      expect(names(priority)).toEqual(['la.ipl', 'nodes.dat', 'ped.ifp', 'roads.col']);
+    });
+
+    it('puts every referenced dff in models, resolved across both imgs', () => {
+      expect(names(models)).toEqual(['house.dff', 'shed.dff', 'tree.dff']);
+      expect(models.find((e) => e.name === 'tree.dff')?.source).toBe('gta_int'); // override
+      expect(models.find((e) => e.name === 'house.dff')?.source).toBe('gta3');
+    });
+
+    it('puts every referenced txd in textures (deduped), resolved across both imgs', () => {
+      expect(names(textures)).toEqual(['htex.txd', 'ttex.txd']);
+      expect(textures.find((e) => e.name === 'ttex.txd')?.source).toBe('gta_int');
+    });
+  });
+});

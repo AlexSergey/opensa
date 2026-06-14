@@ -11,6 +11,9 @@ npm run dev           # Vite dev server (the game at /)
 npm run serve:static  # serve the static/ asset tree (required by dev)
 ```
 
+First time? You need to supply game assets and build them — see
+[docs/development/getting-started.md](./docs/development/getting-started.md).
+
 ## In-game debugger
 
 Press **F2** in the game for the debug menu. Opening it alone changes nothing in the world — it's a

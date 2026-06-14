@@ -1,25 +1,34 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-import type { RWTexture } from '../src/renderware/parsers/binary/types';
+import type { RWTexture } from '../../src/renderware/parsers/binary/types';
 
-import { parseTxd } from '../src/renderware/parsers/binary/txd';
+import { parseTxd } from '../../src/renderware/parsers/binary/txd';
+import { gameArg, openGameArchive, positionalArgs } from '../lib/game';
 
 /**
  * Dump one texture from a TXD to a PNG (no deps — zlib IDAT). Used to inspect glyph atlases
- * like `roadsignfont` (plan 042 item 5b). Run:
- * `npx tsx scripts/dump-texture.ts static/models/particle.txd roadsignfont out.png`
+ * like `roadsignfont` (plan 042 item 5b). The TXD is an archive entry (e.g. `particle.txd`) or a
+ * filesystem path. Run:
+ * `npx tsx scripts/debug/dump-texture.ts particle.txd roadsignfont out.png [alpha] [--game original]`
  */
-const [txdPath, textureName, outPath, mode] = process.argv.slice(2);
-if (!txdPath || !textureName) {
-  console.error('usage: npx tsx scripts/dump-texture.ts <txd> <textureName> [out.png] [alpha]');
+const [txdTarget, textureName, outPath, mode] = positionalArgs();
+if (!txdTarget || !textureName) {
+  console.error('usage: npx tsx scripts/debug/dump-texture.ts <txd> <textureName> [out.png] [alpha] [--game original]');
   process.exit(1);
 }
 
-const ROOT = join(import.meta.dirname, '..');
-const buffer = readFileSync(join(ROOT, txdPath));
-const txd = parseTxd(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+const fromArchive = openGameArchive(gameArg()).get(txdTarget);
+if (!fromArchive && !existsSync(txdTarget)) {
+  console.error(`not found in archive or filesystem: ${txdTarget}`);
+  process.exit(1);
+}
+let bytes = fromArchive;
+if (!bytes) {
+  const file = readFileSync(txdTarget);
+  bytes = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+}
+const txd = parseTxd(bytes);
 const texture = txd.textures.find((t) => t.name.toLowerCase() === textureName.toLowerCase());
 if (!texture) {
   console.error(`texture "${textureName}" not found; available: ${txd.textures.map((t) => t.name).join(', ')}`);
@@ -66,7 +75,7 @@ if (mode === 'alpha') {
   outHeight *= zoom;
 }
 console.log(`${texture.name}: ${texture.width}x${texture.height} ${texture.format} alpha=${texture.hasAlpha}`);
-writeFileSync(join(ROOT, outPath ?? `${textureName}.png`), encodePng(outWidth, outHeight, rgba));
+writeFileSync(outPath ?? `${textureName}.png`, encodePng(outWidth, outHeight, rgba));
 console.log(`written ${outPath ?? `${textureName}.png`} (${outWidth}x${outHeight})`);
 
 function alphaOf(

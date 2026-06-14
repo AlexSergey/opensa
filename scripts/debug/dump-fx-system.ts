@@ -1,14 +1,15 @@
 /**
  * Dump one effects.fxp system: emitters, blend modes, textures and every keyframed track.
- * Usage: npx tsx scripts/dump-fx-system.ts <system-name> [fxp-path]
+ * Usage: npx tsx scripts/debug/dump-fx-system.ts <system-name> [fxp-path] [--game original]
  */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-import { parseFxp } from '../src/renderware/parsers/text/fxp.parser';
+import { parseFxp } from '../../src/renderware/parsers/text/fxp.parser';
+import { gameArg, gameDir, positionalArgs } from '../lib/game';
 
-const name = (process.argv[2] ?? 'fire').toLowerCase();
-const path = process.argv[3] ?? join(process.cwd(), 'static', 'models', 'effects.fxp');
+const [nameArg, pathArg] = positionalArgs();
+const name = (nameArg ?? 'fire').toLowerCase();
+const path = pathArg ?? gameDir(gameArg(), 'models', 'effects.fxp');
 
 const systems = parseFxp(readFileSync(path, 'utf8'));
 const system = systems.get(name);

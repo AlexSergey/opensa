@@ -3,9 +3,11 @@ import { join, resolve } from 'node:path';
 
 import { TimecycManager } from './core/timecyc-manager';
 
+const gameDataFolder = join(__dirname, '..', 'game-src', 'original', 'data');
+
 const init = async (): Promise<void> => {
   const manager = new TimecycManager();
-  await manager.setBase(resolve(__dirname, './base/timecyc.dat')); // original timecyc (not 24h)
+  await manager.setBase(join(gameDataFolder, 'timecyc.dat')); // original timecyc (not 24h)
   await manager.setTimecycToMerge([
     {
       path: resolve(__dirname, './merge/RealVision_Enhanced.dat'), // not 24h
@@ -17,7 +19,7 @@ const init = async (): Promise<void> => {
       zones: ['CLOUDY_LA'],
     },
   ]);
-  await writeFile(join(__dirname, 'merged', 'timecyc_24h.dat'), manager.merge(), 'utf8');
+  await writeFile(join(gameDataFolder, 'timecyc_24h.dat'), manager.merge(), 'utf8');
 };
 
 void init();

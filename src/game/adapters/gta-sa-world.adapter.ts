@@ -207,19 +207,12 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   /**
-   * Load one IFP (e.g. `ped.ifp`) from a packed WIMG animation archive into
-   * `THREE.AnimationClip`s keyed by lowercased animation name. The archive
-   * (built by `scripts/pack-anim-img.mjs`) bundles every IFP; it is cached, so
-   * loading other IFPs from it later is free.
+   * Load an IFP file (e.g. `anim/ped.ifp`) **directly** — like the original game, no packed archive —
+   * into `THREE.AnimationClip`s keyed by lowercased animation name.
    */
-  async loadAnimations(archiveUrl: string, ifpName: string): Promise<Map<string, AnimationClip>> {
-    const archive = await loadArchive(archiveUrl);
-    const buffer = archive.get(ifpName);
-    if (!buffer) {
-      throw new Error(`Animation '${ifpName}' not found in ${archiveUrl}`);
-    }
+  async loadAnimations(ifpUrl: string): Promise<Map<string, AnimationClip>> {
     const clips = new Map<string, AnimationClip>();
-    for (const anim of parseIfp(buffer)) {
+    for (const anim of parseIfp(await fetchBuffer(ifpUrl))) {
       clips.set(anim.name.toLowerCase(), buildAnimationClip(anim));
     }
 

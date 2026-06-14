@@ -1,83 +1,42 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
-import type { IdeObjectDef, IplInstance, MapDefinitions } from '../src/renderware/parsers/text/types';
+import type { MapDefinitions } from '../../src/renderware/parsers/text/types';
 
-import { openArchive } from '../src/renderware/archive/img-archive';
-import { datChildUrl, iplBasename, streamIplUrl } from '../src/renderware/archive/resolve-paths';
-import { buildCellColliders } from '../src/renderware/collision/build-cell-colliders';
-import { buildCollisionIndex } from '../src/renderware/collision/collision-index';
-import { groupRulesBySurface, PROC_OBJ_MAX_DENSITY, scatterProcObjects } from '../src/renderware/map/procobj-scatter';
-import { buildWorldGrid } from '../src/renderware/map/world-grid';
-import { parseGtaDat } from '../src/renderware/parsers/text/gta-dat.parser';
-import { parseIde, parseTimedObjects } from '../src/renderware/parsers/text/ide.parser';
-import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
-import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
-import { parseProcObj } from '../src/renderware/parsers/text/procobj.parser';
-import { parseSurfaceNames } from '../src/renderware/parsers/text/surfinfo.parser';
+import { buildCellColliders } from '../../src/renderware/collision/build-cell-colliders';
+import { buildCollisionIndex } from '../../src/renderware/collision/collision-index';
+import {
+  groupRulesBySurface,
+  PROC_OBJ_MAX_DENSITY,
+  scatterProcObjects,
+} from '../../src/renderware/map/procobj-scatter';
+import { buildWorldGrid } from '../../src/renderware/map/world-grid';
+import { parseProcObj } from '../../src/renderware/parsers/text/procobj.parser';
+import { parseSurfaceNames } from '../../src/renderware/parsers/text/surfinfo.parser';
+import { gameArg, gameDir, loadMapDefs, openGameArchive, positionalArgs } from '../lib/game';
 
 /**
  * procobj scatter sanity counts for one cell (plan 042, iteration 3c): how many clutter
  * instances would the scatter generate at a world position — per model, per category, and at
- * vanilla density vs the full headroom. Mirrors `resolveMap` offline (fs instead of fetch).
- * Run: `npx tsx scripts/procobj-stats.ts <x> <y>` (e.g. desert: `-450 1500`; sea floor: `-900 -1900`).
+ * vanilla density vs the full headroom. Mirrors `resolveMap` offline (fs + the real archive).
+ * Run: `npx tsx scripts/debug/procobj-stats.ts <x> <y> [--game original]` (desert `-450 1500`; sea `-900 -1900`).
  */
-const ROOT = join(import.meta.dirname, '..');
-const BASE = join(ROOT, 'static');
 const CELL_SIZE = 250; // keep in sync with canvas-host's CELL_SIZE
-const [xArg, yArg] = process.argv.slice(2);
+const game = gameArg();
+const [xArg, yArg] = positionalArgs();
 const targetX = Number(xArg);
 const targetY = Number(yArg);
 if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
-  console.error('usage: npx tsx scripts/procobj-stats.ts <x> <y>');
+  console.error('usage: npx tsx scripts/debug/procobj-stats.ts <x> <y> [--game original]');
   process.exit(1);
 }
 
-const dat = parseGtaDat(readFileSync(join(BASE, 'data', 'gta.dat'), 'utf8'));
-
-const catalog = new Map<number, IdeObjectDef>();
-const timedCatalog = new Map<number, IdeObjectDef>();
-for (const idePath of dat.ide) {
-  const file = datChildUrl(BASE, idePath);
-  if (!existsSync(file)) {
-    continue;
-  }
-  const text = readFileSync(file, 'utf8');
-  for (const def of parseIde(text)) {
-    catalog.set(def.id, def);
-  }
-  for (const def of parseTimedObjects(text)) {
-    timedCatalog.set(def.id, def);
-  }
-}
-
-const manifest = JSON.parse(readFileSync(join(BASE, 'ipl_binary', 'manifest.json'), 'utf8')) as Record<string, number>;
-const instances: IplInstance[] = [];
-for (const iplPath of dat.ipl) {
-  if (iplPath.toLowerCase().endsWith('.zon')) {
-    continue;
-  }
-  const file = datChildUrl(BASE, iplPath);
-  if (existsSync(file)) {
-    instances.push(...parseIpl(readFileSync(file, 'utf8')));
-  }
-  const basename = iplBasename(iplPath);
-  for (let index = 0; index < (manifest[basename] ?? 0); index += 1) {
-    const stream = streamIplUrl(BASE, basename, index);
-    if (!existsSync(stream)) {
-      continue;
-    }
-    const buffer = readFileSync(stream);
-    instances.push(...parseBinaryIpl(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)));
-  }
-}
-
-const defs: MapDefinitions = { catalog, imgDirs: [], instances, timedCatalog };
+const archive = openGameArchive(game);
+const { catalog, instances } = loadMapDefs(game, archive);
+const defs: MapDefinitions = { catalog, imgDirs: [], instances, timedCatalog: new Map() };
 const grid = buildWorldGrid(defs, CELL_SIZE);
-const archive = openArchive(new Uint8Array(readFileSync(join(BASE, 'models', 'gta3-pf.img'))));
 
-const rules = groupRulesBySurface(parseProcObj(readFileSync(join(BASE, 'data', 'procobj.dat'), 'utf8')));
-const surfaceNames = parseSurfaceNames(readFileSync(join(BASE, 'data', 'surfinfo.dat'), 'utf8'));
+const rules = groupRulesBySurface(parseProcObj(readFileSync(gameDir(game, 'data', 'procobj.dat'), 'utf8')));
+const surfaceNames = parseSurfaceNames(readFileSync(gameDir(game, 'data', 'surfinfo.dat'), 'utf8'));
 
 const cx = Math.floor(targetX / CELL_SIZE);
 const cy = Math.floor(targetY / CELL_SIZE);

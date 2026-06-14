@@ -1,22 +1,18 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { openArchive } from '../src/renderware/archive/img-archive';
-import { buildCollisionIndex, getCollision } from '../src/renderware/collision/collision-index';
-import { parseDff } from '../src/renderware/parsers/binary/dff';
+import { buildCollisionIndex, getCollision } from '../../src/renderware/collision/collision-index';
+import { parseDff } from '../../src/renderware/parsers/binary/dff';
+import { gameArg, openGameArchive, positionalArgs } from '../lib/game';
 
 /**
  * Compare a model's RENDER extents (DFF positions, per atomic with its frame transform's
  * translation applied) against its COLLISION extents (COL bounds + mesh) — both in model space.
  * If the COL covers an area the DFF doesn't, the render mesh is partial/mis-parsed; if both match,
  * a missing-but-collidable model points at a transform/culling bug instead.
- * Run: `npx tsx scripts/model-bbox.ts <modelName> [...more]`.
+ * Run: `npx tsx scripts/debug/model-bbox.ts <modelName> [...more] [--game original]`.
  */
-const ROOT = join(import.meta.dirname, '..');
-const archive = openArchive(new Uint8Array(readFileSync(join(ROOT, 'static', 'models', 'gta3-pf.img'))));
+const archive = openGameArchive(gameArg());
 const colIndex = buildCollisionIndex(archive);
 
-for (const model of process.argv.slice(2)) {
+for (const model of positionalArgs()) {
   const name = model.toLowerCase();
   console.log(`\n=== ${name}`);
   const dff = archive.get(`${name}.dff`);

@@ -3,6 +3,18 @@ import type { Vec3 } from '../interfaces/world-adapter.interface';
 /** A grid cell coordinate `[cx, cy]` (X/Y plane; Z is ignored). */
 export type CellCoord = [number, number];
 
+/** Squared distance from `position` to the nearest point of cell `(cx,cy)`'s square (Z ignored). */
+export function cellDistanceSq(position: Vec3, cx: number, cy: number, cellSize: number): number {
+  const minX = cx * cellSize;
+  const minY = cy * cellSize;
+  const nx = clamp(position[0], minX, minX + cellSize);
+  const ny = clamp(position[1], minY, minY + cellSize);
+  const dx = position[0] - nx;
+  const dy = position[1] - ny;
+
+  return dx * dx + dy * dy;
+}
+
 /** Stable string key for a cell coordinate (matches the renderware grid's format). */
 export function cellKey(cx: number, cy: number): string {
   return `${cx},${cy}`;
@@ -36,18 +48,6 @@ export function cellsWithin(position: Vec3, radius: number, cellSize: number): C
   }
 
   return cells;
-}
-
-/** Squared distance from `position` to the nearest point of cell `(cx,cy)`'s square (Z ignored). */
-export function cellDistanceSq(position: Vec3, cx: number, cy: number, cellSize: number): number {
-  const minX = cx * cellSize;
-  const minY = cy * cellSize;
-  const nx = clamp(position[0], minX, minX + cellSize);
-  const ny = clamp(position[1], minY, minY + cellSize);
-  const dx = position[0] - nx;
-  const dy = position[1] - ny;
-
-  return dx * dx + dy * dy;
 }
 
 function clamp(value: number, min: number, max: number): number {

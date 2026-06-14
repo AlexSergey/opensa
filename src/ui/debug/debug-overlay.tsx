@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useState } from 'react';
+import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
 import type {
   BloomConfig,
@@ -306,6 +306,17 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
   const [sunSize, setSunSize] = useState(() => actions.sunSize());
   const [weather, setWeather] = useState(() => actions.weather());
 
+  const resetTo = useCallback(
+    (next: Screen): void => {
+      setScreen(next);
+      setShowCoords(false);
+      setMapActive(false);
+      setNormals(false);
+      actions.setShowNormals(false); // leaving the screen / closing always drops the debug normals view
+    },
+    [actions],
+  );
+
   // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -320,7 +331,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
     window.addEventListener('keydown', handleKeyDown);
 
     return (): void => window.removeEventListener('keydown', handleKeyDown);
-  }, [visible]);
+  }, [visible, resetTo]);
 
   // Keep the shown coords live while the Position screen displays them.
   useEffect(() => {
@@ -354,14 +365,6 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
     return (): void => clearInterval(id);
   }, [actions, visible, screen]);
-
-  function resetTo(next: Screen): void {
-    setScreen(next);
-    setShowCoords(false);
-    setMapActive(false);
-    setNormals(false);
-    actions.setShowNormals(false); // leaving the screen / closing always drops the debug normals view
-  }
 
   if (!visible) {
     return null;

@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { AdditiveBlending, Group, type ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 
@@ -19,8 +18,10 @@ import {
 import { buildTextureMap } from './build-texture';
 import { GLOW_LAYER } from './corona';
 
-const FXP_PATH = join(process.cwd(), 'static', 'models', 'effects.fxp');
-const TXD_PATH = join(process.cwd(), 'static', 'models', 'effectsPC.txd');
+// Committed fixtures (mirror of static/): a 16-system effects.fxp slice (includes the skull-pillar `fire`
+// system) + the real particle TXD + the skull-pillar model.
+const FXP_PATH = 'tests/data/effects.fxp';
+const TXD_PATH = 'tests/txd/effectsPC.txd';
 const SKULL_DFF = 'tests/dff/particle/skullpillar01_lvs.dff';
 const libraryExists = existsSync(FXP_PATH) && existsSync(TXD_PATH) && existsSync(SKULL_DFF);
 

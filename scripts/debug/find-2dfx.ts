@@ -1,18 +1,14 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { openArchive } from '../src/renderware/archive/img-archive';
+import { openArchive } from '../../src/renderware/archive/img-archive';
+import { gameArg, openGameArchive, readBytes } from '../lib/game';
 
 /**
  * Scan DFFs for 2d Effect (0x0253F2F8) entries: histogram the entry types across the map and
  * decode every ROADSIGN (type 7) entry — model, raw flags, text lines. Groundwork for plan 042
  * item 5 (street-name plates rendered from the `roadsignfont` glyph atlas).
- * Run: `npx tsx scripts/find-2dfx.ts` (extracted dirs — the PF sources) or
- * `npx tsx scripts/find-2dfx.ts --img static/models/gta3-original.img` (inside an archive) —
- * diffing the two exposes PF re-export damage to the entries.
+ * Run: `npx tsx scripts/debug/find-2dfx.ts [--game original]` (the variant's archive) or
+ * `npx tsx scripts/debug/find-2dfx.ts --img <path-to.img>` (a specific archive) —
+ * diffing the two exposes re-export damage to the entries.
  */
-const ROOT = join(import.meta.dirname, '..');
-const DIRS = ['static/img/gta3', 'static/img/gta3additional'];
 const TWO_D_EFFECT = 0x0253f2f8;
 const PARTICLE = 1;
 const ROADSIGN = 7;
@@ -23,27 +19,17 @@ const particleNames = new Map<string, number>();
 let roadsignModels = 0;
 
 const imgFlag = process.argv.indexOf('--img');
-if (imgFlag >= 0 && process.argv[imgFlag + 1]) {
-  const archive = openArchive(new Uint8Array(readFileSync(join(ROOT, process.argv[imgFlag + 1]))));
-  for (const name of archive.names) {
-    if (!name.toLowerCase().endsWith('.dff')) {
-      continue;
-    }
-    const buffer = archive.get(name);
-    if (buffer) {
-      scan(Buffer.from(buffer), name.replace(/\.dff$/i, ''));
-    }
+const archive =
+  imgFlag >= 0 && process.argv[imgFlag + 1]
+    ? openArchive(readBytes(process.argv[imgFlag + 1]))
+    : openGameArchive(gameArg());
+for (const name of archive.names) {
+  if (!name.toLowerCase().endsWith('.dff')) {
+    continue;
   }
-} else {
-  for (const dir of DIRS) {
-    const base = join(ROOT, dir);
-    for (const file of readdirSync(base)) {
-      if (!file.toLowerCase().endsWith('.dff')) {
-        continue;
-      }
-      const buffer = readFileSync(join(base, file));
-      scan(buffer, file.replace(/\.dff$/i, ''));
-    }
+  const buffer = archive.get(name);
+  if (buffer) {
+    scan(Buffer.from(buffer), name.replace(/\.dff$/i, ''));
   }
 }
 

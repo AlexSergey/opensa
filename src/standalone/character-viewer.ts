@@ -29,7 +29,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { AnimationController } from '../game/character/animation-controller';
 import { orientCharacter } from '../game/character/orient-character';
-import { loadArchive } from '../renderware/archive/img-archive';
 import { parseDff } from '../renderware/parsers/binary/dff';
 import { parseIfp } from '../renderware/parsers/binary/ifp';
 import { parseTxd } from '../renderware/parsers/binary/txd';
@@ -37,11 +36,10 @@ import { buildAnimationClip } from '../renderware/three/build-anim-clip';
 import { buildSkinnedClump } from '../renderware/three/build-skinned-clump';
 import { buildTextureMap } from '../renderware/three/build-texture';
 
-/** Tommy ped (the player model) + the packed animation archive. */
+/** Tommy ped (the player model) + the locomotion IFP (loaded directly, like the original). */
 const DFF = 'player/tommy.dff';
 const TXD = 'player/tommy.txd';
-const ANIM_IMG = 'anim/animations.img';
-const IFP = 'ped.ifp';
+const IFP = 'anim/ped.ifp';
 const DEFAULT_CLIP = 'idle_stance';
 /** Stand the SA bind pose up (matches canvas-host's TOMMY_PLACEMENT). */
 const PLACEMENT = {
@@ -153,13 +151,8 @@ function frameObject(object: Object3D): void {
 }
 
 async function loadAnimations(): Promise<Map<string, AnimationClip>> {
-  const archive = await loadArchive(`${BASE}/${ANIM_IMG}`);
-  const buffer = archive.get(IFP);
-  if (!buffer) {
-    throw new Error(`Animation '${IFP}' not found in ${ANIM_IMG}`);
-  }
   const clips = new Map<string, AnimationClip>();
-  for (const anim of parseIfp(buffer)) {
+  for (const anim of parseIfp(await fetchBuffer(IFP))) {
     clips.set(anim.name.toLowerCase(), buildAnimationClip(anim));
   }
 

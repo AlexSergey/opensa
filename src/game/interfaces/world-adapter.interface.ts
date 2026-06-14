@@ -91,8 +91,8 @@ export interface WorldAdapter {
   describe(object: Object3D, instanceId?: number): null | WorldObjectInfo;
   /** Every grid cell that holds content (for the debug section inspector). */
   listCells(): CellCoord[];
-  /** Load one IFP from a packed WIMG animation archive into clips keyed by lowercased name. */
-  loadAnimations(archiveUrl: string, ifpName: string): Promise<Map<string, AnimationClip>>;
+  /** Load an IFP file directly (e.g. `anim/ped.ifp`) into clips keyed by lowercased name. */
+  loadAnimations(ifpUrl: string): Promise<Map<string, AnimationClip>>;
   /** Build one grid cell's meshes (native Z-up; the streaming root applies the −90°X). */
   loadCell(request: CellRequest): Promise<Object3D[]>;
   /** Build one grid cell's collision (its HD instances), for streaming the physics colliders. */

@@ -1,19 +1,16 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { parseDff } from '../src/renderware/parsers/binary/dff';
-import { parseTxd } from '../src/renderware/parsers/binary/txd';
+import { parseDff } from '../../src/renderware/parsers/binary/dff';
+import { parseTxd } from '../../src/renderware/parsers/binary/txd';
+import { gameArg, openGameArchive } from '../lib/game';
 
 /**
- * RenderWare coverage audit (plan 043): walk every DFF/TXD in the extracted model folders and
+ * RenderWare coverage audit (plan 043): walk every DFF/TXD in the variant's real archive and
  * report what the data ACTUALLY contains vs what our parsers handle —
  * - DFF: chunk-type histogram (proper tree walk), multi-UV-layer geometries, 2dfx entry types,
  *   parse failures;
  * - TXD: d3dFormat/depth histogram and how many textures the classifier DROPS.
- * Run: `npx tsx scripts/audit-rw-coverage.ts`.
+ * Run: `npx tsx scripts/debug/audit-rw-coverage.ts [--game original]`.
  */
-const ROOT = join(import.meta.dirname, '..');
-const DIRS = ['static/img/gta3', 'static/img/gta3additional'];
+const archive = openGameArchive(gameArg());
 
 /** Containers whose data is a sequence of child chunks. */
 const CONTAINERS = new Set([0x03, 0x06, 0x07, 0x08, 0x0e, 0x0f, 0x10, 0x14, 0x1a, 0x1b, 0x1f, 0x2b]);
@@ -99,37 +96,36 @@ const txdFormats = new Map<string, number>();
 let txdDropped = 0;
 let txdTotal = 0;
 
-for (const dir of DIRS) {
-  const base = join(ROOT, dir);
-  for (const file of readdirSync(base)) {
-    const lower = file.toLowerCase();
-    const path = join(base, file);
-    if (lower.endsWith('.dff')) {
-      dffTotal += 1;
-      const buffer = readFileSync(path);
-      walkChunks(buffer, 0, buffer.length, 0);
-      try {
-        const clump = parseDff(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
-        if (clump.geometries.some((geometry) => geometry.numUVLayers > 1)) {
-          multiUv += 1;
-        }
-      } catch {
-        dffFailures += 1;
+for (const name of archive.names) {
+  const lower = name.toLowerCase();
+  const bytes = lower.endsWith('.dff') || lower.endsWith('.txd') ? archive.get(name) : null;
+  if (!bytes) {
+    continue;
+  }
+  const buffer = Buffer.from(bytes);
+  if (lower.endsWith('.dff')) {
+    dffTotal += 1;
+    walkChunks(buffer, 0, buffer.length, 0);
+    try {
+      const clump = parseDff(bytes);
+      if (clump.geometries.some((geometry) => geometry.numUVLayers > 1)) {
+        multiUv += 1;
       }
-    } else if (lower.endsWith('.txd')) {
-      const buffer = readFileSync(path);
-      try {
-        const dict = parseTxd(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
-        txdTotal += dict.textures.length;
-        for (const texture of dict.textures) {
-          txdFormats.set(texture.format, (txdFormats.get(texture.format) ?? 0) + 1);
-        }
-        // Dropped textures don't appear in the dict — count raw TextureNative chunks to compare.
-        const natives = countNatives(buffer);
-        txdDropped += Math.max(0, natives - dict.textures.length);
-      } catch {
-        txdDropped += 1;
+    } catch {
+      dffFailures += 1;
+    }
+  } else {
+    try {
+      const dict = parseTxd(bytes);
+      txdTotal += dict.textures.length;
+      for (const texture of dict.textures) {
+        txdFormats.set(texture.format, (txdFormats.get(texture.format) ?? 0) + 1);
       }
+      // Dropped textures don't appear in the dict — count raw TextureNative chunks to compare.
+      const natives = countNatives(buffer);
+      txdDropped += Math.max(0, natives - dict.textures.length);
+    } catch {
+      txdDropped += 1;
     }
   }
 }

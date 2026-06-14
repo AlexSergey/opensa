@@ -497,8 +497,8 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     });
     game.frameEntity(player, 12);
 
-    // Animations (ped.ifp from the packed WIMG archive) driven by the movement state machine.
-    const clips = await adapter.loadAnimations(`${BASE}/anim/animations.img`, 'ped.ifp');
+    // Animations: ped.ifp loaded directly (like the original), driven by the movement state machine.
+    const clips = await adapter.loadAnimations(`${BASE}/anim/ped.ifp`);
     const animation = new AnimationController(player, clips, character.bonesByName);
     animation.play('idle_stance', 0);
     const animationSystem = new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig());
