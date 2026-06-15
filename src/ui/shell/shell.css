@@ -123,12 +123,30 @@
   text-transform: uppercase;
 }
 
+/* Open-source tagline under the logo (the logo's own subtitle already says "in your browser"). */
+.sa-tagline {
+  max-width: 360px;
+  margin-top: -8px;
+  color: var(--sa-muted);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 /* --- Menu --- */
 .sa-menu {
   display: flex;
   flex-direction: column;
   gap: 14px;
   align-items: center;
+}
+
+.sa-menu__divider {
+  width: 56px;
+  height: 0;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid rgb(255 255 255 / 18%);
 }
 
 .sa-menu__item {

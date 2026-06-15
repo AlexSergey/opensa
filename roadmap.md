@@ -126,8 +126,8 @@
 - [✅] Rename project
 - [ ] Routine deals
   - [ ] Readme
-  - [ ] Dev Docs
-  - [ ] Create site
+  - [✅] Dev Docs
+  - [✅] Create site
   - [ ] Articles
   - [ ] Screenshots
   - [ ] Video
@@ -136,6 +136,7 @@
 - [ ] Release v 0.1.0
 
 Known issues:
+
 - [✅] Country - Truth's Farm Problems with rendering
 - [✅] Vehicle's windscreen alpha channel bug [SilentPatch fix or SkyGFX]
 - [ ] If the camera directly above on the scene, then Tommy only moves forward
@@ -147,6 +148,7 @@ Known issues:
 - [✅] Streaming is blinking
 
 Next iterations:
+
 - [ ] Effects Enhancements
 - [ ] Particles Enhancements
   - [ ] Smoke from wheels
@@ -174,7 +176,7 @@ Next iterations:
   - [ ] Jumping out of the car while it's moving
     - [ ] Jumping and rolling animations
   - [ ] If the driver's door is blocked by a wall or another car, get in from the passenger side. If both are blocked, don't
-    get in.
+        get in.
   - [ ] Entry animation interrupted.
 - [ ] Interiors
 - [ ] Health for User

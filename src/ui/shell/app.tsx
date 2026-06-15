@@ -69,6 +69,7 @@ export function App(): ReactElement {
       {phase === 'menu' ? (
         <div className="sa-stage sa-stage--col">
           <Logo className={SUBTITLED} />
+          <p className="sa-tagline">Free and open source — a from-scratch re-creation of the RenderWare engine.</p>
           <Menu
             note={boot.state.degraded ? DEGRADED_NOTE : undefined}
             onPlay={boot.play}

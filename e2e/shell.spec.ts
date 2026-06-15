@@ -18,7 +18,7 @@ test.describe('ui shell', () => {
     // priority + models loaded → menu
     const play = page.getByRole('button', { name: 'Play Game' });
     await expect(play).toBeVisible({ timeout: 90_000 });
-    await expect(page.getByRole('link', { name: 'Code' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'GitHub' })).toBeVisible();
     await play.click();
 
     // first-time disclaimer

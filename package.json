@@ -1,7 +1,7 @@
 {
   "name": "opensa",
   "version": "0.1.0",
-  "description": "OpenSA — a TypeScript + three.js renderer for GTA San Andreas assets (RenderWare DFF/TXD, COL collision, IMG archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles.",
+  "description": "GTA San Andreas in your browser — an open-source RenderWare engine re-creation (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics.",
   "keywords": [
     "opensa",
     "gta",
@@ -47,7 +47,10 @@
     "lint:code": "eslint .",
     "lint:commit": "commitlint --config .commitlintrc.cjs --edit",
     "lint:ts": "tsc --noEmit",
+    "pre-commit": "lint-staged --config .lintstagedrc.cjs",
+    "prepare": "husky",
     "preview": "vite preview",
+    "release": "release-it",
     "serve:static": "serve static -l 3001 --cors",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

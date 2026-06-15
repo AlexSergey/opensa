@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react';
 
-/** External menu links (placeholder URLs — wire to the real Code/Blog/Videos destinations). */
+/** External menu links. (Videos is a placeholder until the YouTube channel exists.) */
 const LINKS: readonly { href: string; label: string }[] = [
-  { href: 'https://github.com/AlexSergey/opensa', label: 'Code' },
-  { href: 'https://opensa.cc/blog', label: 'Blog' },
+  { href: 'https://github.com/AlexSergey/opensa', label: 'GitHub' },
+  { href: 'https://github.com/AlexSergey/opensa/tree/main/blog', label: 'Blog' },
   { href: 'https://opensa.cc/videos', label: 'Videos' },
 ];
 
@@ -23,6 +23,7 @@ export function Menu({ note, onPlay, playDisabled = false, playLabel = 'Play Gam
       <button className="sa-menu__item" disabled={playDisabled} onClick={onPlay} type="button">
         {playLabel}
       </button>
+      <hr className="sa-menu__divider" />
       {LINKS.map((link) => (
         <a className="sa-menu__item" href={link.href} key={link.label} rel="noopener noreferrer" target="_blank">
           {link.label}
