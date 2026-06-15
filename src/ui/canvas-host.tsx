@@ -21,6 +21,7 @@ import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
+import { Velocity } from '../game/ecs/components';
 import { createWindMod } from '../game/mods/wind.mod';
 import { cloudProfile } from '../game/plugins/cloud-profile';
 import { FogPlugin } from '../game/plugins/fog.plugin';
@@ -84,6 +85,7 @@ import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
 const BASE = import.meta.env.VITE_STATIC_URL;
 
 const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
+const WORLD_READY_TIMEOUT_MS = 12000; // reveal the game even if grounding is delayed
 
 // Player collision box (half-extents) — a human, decoupled from the T-pose mesh bbox.
 const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
@@ -93,7 +95,7 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 
 // Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
 // omitted 3rd/4th default to palette 0, like SA).
-const CAR_COLORS: Record<string, string> = { admiral: '37,37', camper: '0,6,3,0' };
+const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3' };
 
 // Default timecyc weather on load (index into WEATHER_NAMES).
 const DEFAULT_WEATHER = WEATHER_NAMES.indexOf('EXTRASUNNY_SMOG_LA');
@@ -106,11 +108,11 @@ const WEATHERS: readonly { index: number; label: string }[] = WEATHER_NAMES.map(
 })).filter(({ label }) => !/RAINY|SANDSTORM|UNDERWATER|EXTRACOLOUR/.test(label));
 
 // Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
-// admiral = 2-colour paint, camper = 4-colour. Positions/z/heading tuned in-browser.
+// admiral = 2-colour paint, comet = 2-colour. Positions/z/heading tuned in-browser.
 const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
   { colour: CAR_COLORS.admiral, heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
-  // Camper next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
-  { colour: CAR_COLORS.camper, heading: 0, model: 'camper', position: [2496, -1678, 13.4] },
+  // Comet next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
+  { colour: CAR_COLORS.comet, heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
 ];
 
 interface Bootstrap {
@@ -162,7 +164,15 @@ let bootstrapped: null | Promise<Bootstrap> = null;
  * the DOM debug overlay. React never touches the scene graph — it just wires the
  * canvas, forwards resize/pointer events, and shows load state.
  */
-export function CanvasHost({ fs }: { fs: AssetFileSystem }): ReactElement {
+interface CanvasHostProps {
+  fs: AssetFileSystem;
+  /** Called once the world has settled (player grounded) — the shell reveals the game on this. */
+  onWorldReady?: () => void;
+  /** Freeze the game (physics + control + clock) while the pause menu is up. */
+  paused?: boolean;
+}
+
+export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [actions, setActions] = useState<DebugActions | null>(null);
@@ -177,7 +187,7 @@ export function CanvasHost({ fs }: { fs: AssetFileSystem }): ReactElement {
     }
     let disposed = false;
 
-    bootstrap(canvas, fs)
+    bootstrap(canvas, fs, onWorldReady)
       .then((ready) => {
         if (!disposed) {
           setGame(ready.game);
@@ -195,7 +205,12 @@ export function CanvasHost({ fs }: { fs: AssetFileSystem }): ReactElement {
     return (): void => {
       disposed = true;
     };
-  }, [fs]);
+  }, [fs, onWorldReady]);
+
+  // Pause/resume the game (frozen physics + control + clock) when the shell shows the pause menu.
+  useEffect(() => {
+    game?.setGameState(paused ? 'pause' : 'play');
+  }, [game, paused]);
 
   // Keep the renderer/camera in sync with the canvas size, and only raycast on
   // click while the debug overlay is open (a full-map pick is not free).
@@ -309,7 +324,7 @@ export function LoadOverlay({ text }: { text: string }): ReactElement {
   );
 }
 
-function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem): Promise<Bootstrap> {
+function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?: () => void): Promise<Bootstrap> {
   bootstrapped ??= (async (): Promise<Bootstrap> => {
     const game = Game.getInstance(canvas, {
       camera: {
@@ -505,6 +520,27 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem): Promise<Boot
       skeleton: model.skeleton,
     });
     game.frameEntity(player, 12);
+
+    // World-ready: signal once the player has landed (collision cell loaded → grounded), so the shell
+    // reveals the game only after the world has settled (a fallback timer guards a delayed grounding).
+    if (onWorldReady) {
+      let fired = false;
+      const fire = (): void => {
+        if (!fired) {
+          fired = true;
+          onWorldReady();
+        }
+      };
+      game.addSystem({
+        name: 'world-ready',
+        update: (): void => {
+          if (Velocity.grounded[character.playerEid] === 1) {
+            fire();
+          }
+        },
+      });
+      setTimeout(fire, WORLD_READY_TIMEOUT_MS);
+    }
 
     // Animations: ped.ifp loaded directly (like the original), driven by the movement state machine.
     const clips = await adapter.loadAnimations('anim/ped.ifp');

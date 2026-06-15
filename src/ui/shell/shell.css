@@ -1,0 +1,320 @@
+/* UI shell theme + animations (plan 051). Black bg, white text, orange-gradient accent (from logo.svg). */
+:root {
+  --sa-bg: #000;
+  --sa-fg: #fff;
+  --sa-muted: #989998;
+  --sa-orange-1: #fd8709;
+  --sa-orange-2: #f55c07;
+  --sa-gradient: linear-gradient(180deg, var(--sa-orange-1), var(--sa-orange-2));
+  --sa-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sa-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--sa-bg);
+  color: var(--sa-fg);
+  font-family: var(--sa-font);
+}
+
+/* --- Logo + intro animation --- */
+.sa-stage {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.sa-stage--col {
+  flex-direction: column;
+  gap: 32px;
+}
+
+.sa-logo {
+  width: min(600px, 86vw);
+  transition:
+    width 1.2s ease,
+    transform 1.2s ease;
+}
+
+.sa-logo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sa-logo--pulse {
+  animation: sa-pulse 4s ease-in-out infinite;
+}
+
+/* Shrunk + nudged up once priority is in. */
+.sa-logo--small {
+  width: 400px;
+  transform: translateY(-12vh);
+}
+
+/* Subtitle paths are hidden until revealed (staggered). */
+.sa-logo .logo-opensa-title,
+.sa-logo .logo-opensa-description {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+/* Reveal staggered after the 1.2s move-up: title, then description. */
+.sa-logo--titled .logo-opensa-title {
+  opacity: 1;
+  transition-delay: 1.2s;
+}
+
+.sa-logo--described .logo-opensa-description {
+  opacity: 1;
+  transition-delay: 1.9s;
+}
+
+@keyframes sa-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* --- Preloader (bottom) --- */
+.sa-preloader {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding: 28px 16px;
+}
+
+.sa-progress {
+  overflow: hidden;
+  width: min(360px, 70vw);
+  height: 3px;
+  background: rgb(255 255 255 / 15%);
+  border-radius: 2px;
+}
+
+.sa-progress__bar {
+  width: 0;
+  height: 100%;
+  background: var(--sa-gradient);
+  transition: width 0.3s ease;
+}
+
+.sa-status {
+  color: var(--sa-muted);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* --- Menu --- */
+.sa-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.sa-menu__item {
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  color: var(--sa-fg);
+  font: inherit;
+  font-size: 22px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.sa-menu__item:hover:not(:disabled) {
+  background: var(--sa-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sa-menu__item:disabled {
+  color: rgb(255 255 255 / 30%);
+  cursor: not-allowed;
+}
+
+.sa-menu__note {
+  margin-top: 8px;
+  max-width: 320px;
+  color: var(--sa-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* --- Overlay panels (disclaimer / error / pause) --- */
+.sa-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 78%);
+}
+
+.sa-panel {
+  max-width: 460px;
+  margin: 16px;
+  padding: 28px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: #0a0a0a;
+}
+
+.sa-panel__title {
+  margin: 0 0 14px;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sa-panel__body {
+  color: var(--sa-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sa-panel__body strong {
+  color: var(--sa-fg);
+}
+
+.sa-panel__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.sa-button {
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--sa-gradient);
+  color: #000;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sa-button--ghost {
+  background: none;
+  color: var(--sa-fg);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 25%);
+}
+
+/* The game surface fills the viewport; hidden while the world warms up, faded in once ready. */
+.sa-game {
+  position: fixed;
+  inset: 0;
+}
+
+.sa-hidden {
+  visibility: hidden;
+}
+
+/* The game canvas fades in once the world has warmed up. */
+.sa-fade-in {
+  animation: sa-fade 0.8s ease forwards;
+}
+
+/* --- In-game notification (top-left info toast) --- */
+.sa-notif {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-left: 3px solid var(--sa-orange-1);
+  border-radius: 6px;
+  background: rgb(10 10 10 / 92%);
+  color: var(--sa-fg);
+  font-family: var(--sa-font);
+  animation: sa-notif-life 9s ease forwards;
+}
+
+.sa-notif__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sa-gradient);
+  color: #000;
+  font-weight: 700;
+}
+
+.sa-notif__title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sa-orange-1);
+}
+
+.sa-notif__msg {
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes sa-notif-life {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  6% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sa-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

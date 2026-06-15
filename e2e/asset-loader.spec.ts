@@ -54,7 +54,7 @@ function run(page: Page): Promise<RunResult> {
         AssetLoader: new (config: {
           cacheName?: string;
           manifestUrl: string;
-          sink?: { addChunk(group: string, bytes: Uint8Array): void };
+          sink?: { addChunk(group: string, file: string, bytes: Uint8Array): void };
         }) => {
           events: { on(event: string, handler: (payload: unknown) => void): void };
           init(): Promise<unknown>;
@@ -69,7 +69,7 @@ function run(page: Page): Promise<RunResult> {
         cacheName,
         manifestUrl,
         sink: {
-          addChunk: (group, bytes): void => {
+          addChunk: (group, _file, bytes): void => {
             delivered.push([group, bytes.length]);
           },
         },

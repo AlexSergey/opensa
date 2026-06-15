@@ -104,23 +104,22 @@
 - [✅] Fog enhanced
 - [✅] Fix car headlight
 - [✅] Increase test coverage
-- [ ] Optimizing game archives
-  - [ ] Drop unuzed files
-  - [ ] Add build scripts
-  - [ ] Gzip
-  - [ ] Client Caching
-  - [ ] Scripts for creating different archive types
-  - [ ] Load at startup
-    - [ ] Procobj
-    - [ ] LODs
-    - [ ] Auto
-    - [ ] Characters
-    - [ ] Weapons
-  - [ ] Load in background
-    - [ ] Map parts
+- [✅] Optimizing game archives
+  - [✅] Drop unuzed files
+  - [✅] Add build scripts
+  - [✅] Gzip
+  - [✅] Client Caching
+  - [✅] Scripts for creating different archive types
+  - [✅] Load at startup
+    - [✅] Procobj
+    - [✅] LODs
+    - [✅] Vehicles
+    - [✅] Characters
+  - [✅] Load in background
+    - [✅] Map parts
 - [ ] Google Analytics
-- [ ] Version in cache file names (reset user caches when update)
-- [ ] Browser caching
+- [✅] Version in cache file names (reset user caches when update)
+- [✅] Browser caching
 - [ ] Testing
   - [ ] Map
   - [ ] Mods

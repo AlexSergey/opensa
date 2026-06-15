@@ -19,11 +19,6 @@ vi.mock('../../renderware', async (importActual) => {
   };
 });
 
-/** Empty asset file system — the map comes from the mocked resolveMap; optional data files are absent. */
-function fakeFs(): Renderware.AssetFileSystem {
-  return { get: () => null, getText: () => null, has: () => false, names: [] };
-}
-
 function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
   return { cellSize: 250, fs: fakeFs() };
 }
@@ -40,6 +35,11 @@ function colModel(partial: Partial<Renderware.ColModel>): Renderware.ColModel {
     vertices: new Float32Array(),
     ...partial,
   };
+}
+
+/** Empty asset file system — the map comes from the mocked resolveMap; optional data files are absent. */
+function fakeFs(): Renderware.AssetFileSystem {
+  return { get: () => null, getText: () => null, has: () => false, names: [] };
 }
 
 const SURFACE = { brightness: 0, flag: 0, light: 0, material: 0 };

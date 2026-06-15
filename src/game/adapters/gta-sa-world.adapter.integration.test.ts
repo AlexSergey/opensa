@@ -28,6 +28,10 @@ vi.mock('../../renderware', async (importActual) => {
   };
 });
 
+function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
+  return { cellSize: 250, fs: fakeFs() };
+}
+
 /** Fixture file system: bare model/txd names + loose data paths, as the build packs them. */
 function fakeFs(): Renderware.AssetFileSystem {
   const files = new Map<string, ArrayBuffer | string>([
@@ -56,10 +60,6 @@ function fakeFs(): Renderware.AssetFileSystem {
     has: (name: string): boolean => files.has(name.toLowerCase()),
     names: [...files.keys()],
   };
-}
-
-function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
-  return { cellSize: 250, fs: fakeFs() };
 }
 
 /** Find every InstancedMesh in a built cell. */

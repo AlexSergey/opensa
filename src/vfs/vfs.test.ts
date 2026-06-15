@@ -30,7 +30,7 @@ describe('Vfs', () => {
         version: 'test-1',
       };
       const vfs = new Vfs();
-      vfs.addChunk('priority', chunk({ 'data/gta.dat': text('IPL') }));
+      vfs.addChunk('priority', 'priority-p.zip', chunk({ 'data/gta.dat': text('IPL') }));
       expect(vfs.verify(manifest)).toEqual(['expected 2 chunks, got 1', 'expected 2 entries, got 1']);
     });
   });
@@ -38,7 +38,7 @@ describe('Vfs', () => {
   describe('positive cases', () => {
     it('unzips a chunk and serves entries by name (bare + loose path)', () => {
       const vfs = new Vfs();
-      vfs.addChunk('priority', chunk({ 'cj.dff': text('DFF'), 'data/gta.dat': text('IPL la.ipl') }));
+      vfs.addChunk('priority', 'priority-a.zip', chunk({ 'cj.dff': text('DFF'), 'data/gta.dat': text('IPL la.ipl') }));
 
       expect(vfs.has('cj.dff')).toBe(true);
       expect(new Uint8Array(vfs.get('cj.dff')!)).toEqual(text('DFF'));
@@ -57,12 +57,29 @@ describe('Vfs', () => {
         version: 'test-1',
       };
       const vfs = new Vfs();
-      vfs.addChunk('priority', chunk({ 'data/gta.dat': text('dat') }));
-      vfs.addChunk('models', chunk({ 'cj.dff': text('dff') }));
-      vfs.addChunk('textures', chunk({ 'cj.txd': text('txd') }));
+      vfs.addChunk('priority', 'p.zip', chunk({ 'data/gta.dat': text('dat') }));
+      vfs.addChunk('models', 'm.zip', chunk({ 'cj.dff': text('dff') }));
+      vfs.addChunk('textures', 't.zip', chunk({ 'cj.txd': text('txd') }));
 
       expect(vfs.names).toHaveLength(3);
       expect(vfs.verify(manifest)).toEqual([]);
+    });
+
+    it('ignores a re-delivered chunk (idempotent — retry/StrictMode safe)', () => {
+      const manifest: Manifest = {
+        chunks: {
+          models: [],
+          priority: [{ bytes: 1, entries: 1, file: 'p.zip', hash: 'p' }],
+          textures: [],
+        },
+        game: 'test',
+        version: 'test-1',
+      };
+      const vfs = new Vfs();
+      const bytes = chunk({ 'data/gta.dat': text('dat') });
+      vfs.addChunk('priority', 'p.zip', bytes);
+      vfs.addChunk('priority', 'p.zip', bytes); // same chunk again → ignored
+      expect(vfs.verify(manifest)).toEqual([]); // still 1 chunk / 1 entry
     });
   });
 });

@@ -11,5 +11,11 @@ interface ImportMeta {
 }
 
 interface ImportMetaEnv {
+  /** Google Analytics measurement ID (e.g. `G-XXXXXXX`). Unset in dev → analytics is skipped. */
+  readonly VITE_GA_ID?: string;
   readonly VITE_STATIC_URL: string;
+}
+
+interface Window {
+  dataLayer?: unknown[];
 }

@@ -21,9 +21,12 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 ## Assets
 
 `static/` is gitignored (like the rest of the game data) — the e2e lane needs it present, the same way the app
-and `npm run dev` do. The current spec targets **`object-viewer.html`**, whose models live in the small,
-self-contained `static/viewer/` (no 700 MB WIMG archive). The main app and the character/vehicle viewers need
-the full archives, so they are out of scope for the asset-light CI lane for now.
+and `npm run dev` do. `e2e/object-viewer.spec.ts` targets **`object-viewer.html`**, whose models live in the
+small, self-contained `static/viewer/` (no 700 MB WIMG archive; `npm run e2e` runs `viewer:assets:original`
+first to populate it). `e2e/asset-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
+`e2e/shell.spec.ts` exercises the UI shell boot flow and needs the built **`original-<version>` chunk
+archives** served (priority + models for the menu); it stops before the full texture download + WebGL boot to
+stay fast.
 
 ## What is covered (`e2e/object-viewer.spec.ts`)
 

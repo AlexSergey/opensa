@@ -15,13 +15,19 @@ export class Vfs implements AssetFileSystem, AssetSink {
   get names(): string[] {
     return [...this.files.keys()];
   }
+  private readonly addedChunks = new Set<string>();
   private chunkCount = 0;
   private entryCount = 0;
 
   private readonly files = new Map<string, Uint8Array>();
 
-  /** Unzip a delivered chunk and index its entries (loader hands these in via the sink). */
-  addChunk(_group: GroupName, zipBytes: Uint8Array): void {
+  /** Unzip a delivered chunk and index its entries. Idempotent — a re-delivered chunk (retry/StrictMode)
+   *  is ignored, so the verify counts stay correct. */
+  addChunk(_group: GroupName, file: string, zipBytes: Uint8Array): void {
+    if (this.addedChunks.has(file)) {
+      return;
+    }
+    this.addedChunks.add(file);
     const entries = unzipSync(zipBytes);
     for (const name of Object.keys(entries)) {
       this.files.set(name, entries[name]);

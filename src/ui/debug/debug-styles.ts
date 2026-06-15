@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react';
 
-/** Neon theme shared by the F2 debugger and its map inspector. */
-export const NEON = '#00ffcc';
-const NEON_DIM = '#00ffcc33';
-const BG = 'rgba(0, 8, 20, 0.92)';
-const BORDER = '#00ffcc55';
+/** Debugger theme — shared with the UI shell: black panel, white text, orange accent (from logo.svg). */
+const ACCENT = '#fd8709';
+const FG = '#fff';
+const MUTED = '#989998';
+const BG = 'rgba(8, 8, 8, 0.94)';
+const BORDER = 'rgba(255, 255, 255, 0.16)';
 
 /** Pixel size of one section checkbox in the map inspector grid. */
 export const CELL_PX = 11;
@@ -14,7 +15,7 @@ export const styles: Record<string, CSSProperties> = {
     background: 'transparent',
     border: `1px solid ${BORDER}`,
     borderRadius: 3,
-    color: NEON,
+    color: FG,
     cursor: 'pointer',
     fontFamily: '"Courier New", monospace',
     fontSize: 12,
@@ -26,7 +27,7 @@ export const styles: Record<string, CSSProperties> = {
     alignSelf: 'flex-start',
     background: 'transparent',
     border: 'none',
-    color: NEON,
+    color: ACCENT,
     cursor: 'pointer',
     fontFamily: '"Courier New", monospace',
     fontSize: 12,
@@ -35,14 +36,14 @@ export const styles: Record<string, CSSProperties> = {
     padding: 0,
   },
   cell: {
-    accentColor: NEON,
+    accentColor: ACCENT,
     cursor: 'pointer',
     height: CELL_PX,
     margin: 0,
     width: CELL_PX,
   },
   cellCenter: {
-    outline: `1px solid ${NEON}`,
+    outline: `1px solid ${ACCENT}`,
     outlineOffset: 1,
   },
   cellEmpty: {
@@ -52,14 +53,13 @@ export const styles: Record<string, CSSProperties> = {
   close: {
     background: 'transparent',
     border: 'none',
-    color: NEON,
+    color: FG,
     cursor: 'pointer',
     fontSize: 16,
     lineHeight: 1,
     padding: 0,
     position: 'absolute',
     right: 8,
-    textShadow: `0 0 8px ${NEON}`,
     top: 6,
   },
   divider: {
@@ -77,18 +77,18 @@ export const styles: Record<string, CSSProperties> = {
     gap: 6,
   },
   groupLabel: {
-    color: NEON,
+    color: MUTED,
     fontSize: 9,
     letterSpacing: 3,
     marginBottom: 2,
-    opacity: 0.6,
+    opacity: 0.8,
   },
   hint: {
-    color: '#667',
+    color: MUTED,
     fontSize: 11,
   },
   info: {
-    color: NEON,
+    color: FG,
     fontSize: 11,
     wordBreak: 'break-all',
   },
@@ -105,7 +105,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   legendItem: {
     alignItems: 'center',
-    color: '#aaa',
+    color: MUTED,
     display: 'flex',
     fontSize: 10,
     gap: 3,
@@ -114,7 +114,7 @@ export const styles: Record<string, CSSProperties> = {
     background: 'transparent',
     border: `1px solid ${BORDER}`,
     borderRadius: 3,
-    color: NEON,
+    color: FG,
     cursor: 'pointer',
     display: 'flex',
     fontFamily: '"Courier New", monospace',
@@ -124,21 +124,20 @@ export const styles: Record<string, CSSProperties> = {
     padding: '9px 11px',
   },
   option: {
-    color: '#aaa',
+    color: MUTED,
     fontSize: 12,
     letterSpacing: 1,
   },
   optionActive: {
-    color: NEON,
+    color: ACCENT,
     fontSize: 12,
     letterSpacing: 1,
-    textShadow: `0 0 8px ${NEON}`,
   },
   panel: {
     backgroundColor: BG,
-    border: `1px solid ${NEON}`,
+    border: `1px solid ${BORDER}`,
     borderRadius: 4,
-    boxShadow: `0 0 16px ${NEON_DIM}, inset 0 0 12px rgba(0,255,204,0.04)`,
+    boxShadow: '0 8px 28px rgba(0, 0, 0, 0.6)',
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
@@ -160,7 +159,7 @@ export const styles: Record<string, CSSProperties> = {
     gap: 4,
   },
   radio: {
-    accentColor: NEON,
+    accentColor: ACCENT,
     cursor: 'pointer',
     margin: 0,
   },
@@ -177,12 +176,11 @@ export const styles: Record<string, CSSProperties> = {
     width: 9,
   },
   title: {
-    borderBottom: `1px solid ${NEON}`,
-    color: NEON,
+    borderBottom: `1px solid ${BORDER}`,
+    color: ACCENT,
     fontSize: 10,
     letterSpacing: 4,
     paddingBottom: 6,
     textAlign: 'center',
-    textShadow: `0 0 10px ${NEON}`,
   },
 };

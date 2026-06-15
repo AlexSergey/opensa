@@ -38,7 +38,7 @@ import { buildTextureMap } from '../renderware/three/build-texture';
 import { buildVehicle } from '../renderware/three/build-vehicle';
 
 /** Cars extracted into static/vehicles/ (model name → `<name>.dff` + `<name>.txd`). */
-const VEHICLES: readonly string[] = ['admiral', 'admiral2', 'camper'];
+const VEHICLES: readonly string[] = ['admiral', 'comet'];
 /** Debug paint (the carcol markers become these) + a neutral wheel scale. */
 const PRIMARY: [number, number, number] = [200, 40, 40];
 const SECONDARY: [number, number, number] = [40, 50, 70];

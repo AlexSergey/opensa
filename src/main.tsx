@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { GameBootstrap } from './ui/game-bootstrap';
+import { App } from './ui/shell/app';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GameBootstrap />
+    <App />
   </StrictMode>,
 );

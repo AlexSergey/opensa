@@ -16,7 +16,8 @@ export interface AssetLoaderEvents {
  * (next plan): the VFS unzips + indexes the chunk — the loader never unzips.
  */
 export interface AssetSink {
-  addChunk(group: GroupName, zipBytes: Uint8Array): Promise<void> | void;
+  /** `file` is the chunk's content-hashed name — lets the sink ignore a re-delivered chunk (retry/StrictMode). */
+  addChunk(group: GroupName, file: string, zipBytes: Uint8Array): Promise<void> | void;
 }
 
 /** One chunk as recorded in `manifest.json` (mirrors the build's `ChunkInfo`). */

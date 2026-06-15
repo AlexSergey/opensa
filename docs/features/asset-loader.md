@@ -39,8 +39,8 @@ the VFS):
   (`fs.get`/`getText` for models/txd/data; binary IPL streams enumerated from `fs.names`), and
   `canvas-host` (zones/gxt/particle/effects/water/player/anim). `asset-cache` is unchanged — `AssetFileSystem`
   is a superset of the `ImgArchive` it already consumed.
-- **Boot wiring:** `src/ui/game-bootstrap.tsx` (temporary) runs loader → `Vfs` → `verify` → mounts
-  `<CanvasHost fs={vfs} />`.
+- **Boot wiring:** the UI shell (`src/ui/shell/`, plan 051) — `use-asset-boot.ts` runs loader → `Vfs` →
+  `verify` by phase (priority+models, then textures), and lazy-mounts `<CanvasHost fs={vfs} />`.
 
 Test anchors: `src/vfs/verify.test.ts`, `src/vfs/vfs.test.ts`; full-boot smoke validated against the real
 build output (loader → VFS → `resolveMap`).

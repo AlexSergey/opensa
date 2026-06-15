@@ -24,3 +24,4 @@ implemented ones, and assembling the release changelog.
 | Breakable objects | [breakable-objects.md](breakable-objects.md) |
 | Game mods (WorldMod) + wind | [mods.md](mods.md) |
 | Zones, HUD, debug tooling | [zones-hud-debug.md](zones-hud-debug.md) |
+| UI shell (boot/menu/loading/pause) | [ui-shell.md](ui-shell.md) |

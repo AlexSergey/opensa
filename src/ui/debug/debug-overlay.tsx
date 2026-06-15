@@ -135,7 +135,7 @@ export interface DebugActions {
   /** Current god-rays shader tuning. */
   sky(): SkyConfig;
   /** Spawn a car just in front of the player. */
-  spawnVehicle(model: 'admiral' | 'camper'): Promise<void>;
+  spawnVehicle(model: 'admiral' | 'comet'): Promise<void>;
   /** Current SSAO tuning. */
   ssao(): SsaoConfig;
   /** Whether night stars are on. */
@@ -417,8 +417,8 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
               <button onClick={() => void actions.spawnVehicle('admiral')} style={styles.actionButton} type="button">
                 Admiral Spawn
               </button>
-              <button onClick={() => void actions.spawnVehicle('camper')} style={styles.actionButton} type="button">
-                Camper Spawn
+              <button onClick={() => void actions.spawnVehicle('comet')} style={styles.actionButton} type="button">
+                Comet Spawn
               </button>
               <button onClick={() => actions.flipVehicle()} style={styles.actionButton} type="button">
                 Flip vehicle

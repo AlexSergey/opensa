@@ -70,14 +70,14 @@ npm run serve:static            # serves ./static at http://localhost:3001 (VITE
 npm run dev                     # Vite dev server for the app
 ```
 
-The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). On boot the **asset
-loader** (plan 049) downloads the chunks from `static/<game>-<version>/` (caching each in Cache Storage),
-the **VFS** (plan 050) unzips them and verifies against the manifest, then the game runs entirely from
-the VFS. A network blip re-fetches only the dropped chunk; a return visit downloads nothing.
+The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). The UI shell (plan 051,
+`src/ui/shell/`) boots instantly, then the **asset loader** (plan 049) downloads the chunks from
+`static/<game>-<version>/` (caching each in Cache Storage), the **VFS** (plan 050) unzips them and
+verifies against the manifest, and the lazily-loaded game runs entirely from the VFS. A network blip
+re-fetches only the dropped chunk; a return visit downloads nothing.
 
-> **Note:** the version directory the boot fetches is currently hard-coded (`original-0.1.0`) in
-> `src/ui/game-bootstrap.tsx`; a proper boot/version UI (splash + progress bar bound to the loader's
-> events) is a later plan.
+> **Note:** the boot fetches `static/original-${__APP_VERSION__}/manifest.json` (version from
+> `package.json`, wired in `src/ui/shell/use-asset-boot.ts`) — currently the `original` variant only.
 
 ## Where to go next
 

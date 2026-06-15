@@ -68,7 +68,7 @@ export class AssetLoader {
 
   private async deliver(chunk: GroupChunk, bytes: Uint8Array): Promise<void> {
     this.events.emit('chunkReady', { bytes, file: chunk.file, group: chunk.group });
-    await this.config.sink?.addChunk(chunk.group, bytes);
+    await this.config.sink?.addChunk(chunk.group, chunk.file, bytes);
   }
 
   private async download(url: string, chunk: GroupChunk, tracker: ProgressTracker): Promise<Uint8Array<ArrayBuffer>> {
