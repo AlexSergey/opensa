@@ -31,8 +31,9 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 
 ### build-game.ts
 
-Packs a variant (`game-src/<game>/`) into three fflate zips under `static/<version>/` (priority +
-models + textures). See plan 048 for the full breakdown.
+Packs a variant (`game-src/<game>/`) into `static/<version>/`: priority + models + textures, each
+split into ~50MB content-hashed chunks (`game-build/chunk.ts`) listed in `manifest.json`. See plan 048
+for the full breakdown.
 
 ```sh
 npm run build:game:original          # npm run timecyc && tsx scripts/build-game.ts --game original

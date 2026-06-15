@@ -51,14 +51,17 @@ tsx scripts/build-game.ts --game <name>
 ```
 
 `build:game:original` first regenerates `timecyc_24h.dat` (`npm run timecyc`), then packs
-`game-src/original/` into `static/original-<version>/` (version comes from `package.json`):
+`game-src/original/` into `static/original-<version>/` (version comes from `package.json`). Each group
+is split into **~50MB content-hashed chunks** (`<group>-<hash>.zip`) so a dropped download re-fetches
+one chunk, not the whole group; `manifest.json` lists them:
 
-- `priority.zip` — loose data/player/vehicles/anim + world files (col/ipl/ifp/dat); no dff/txd.
-- `models.zip` — the `.dff` geometry the exterior map references (interiors excluded).
-- `textures.zip` — the `.txd` textures the exterior map references.
-- `manifest.json` — sizes/entry counts per archive.
+- `priority` — loose data/player/vehicles/anim + world files (col/ipl/ifp/dat); no dff/txd.
+- `models` — the `.dff` geometry the exterior map references (interiors excluded).
+- `textures` — the `.txd` textures the exterior map references (the bulk → ~10 chunks).
 
-See [build-flags.md](./build-flags.md) and plan 048 for the full breakdown.
+Chunk assignment is a stable hash bucket, so changing one file leaves the other chunks byte-identical
+(same hash/filename → the browser cache survives a version bump). See [build-flags.md](./build-flags.md)
+and plan 048 for the full breakdown.
 
 ## 4. Run
 

@@ -1,13 +1,16 @@
 /**
- * Game build (plan 048). Packs `game-src/<game>/` into three fflate zips under `static/<version>/`:
- *  - priority.zip — loose data/player/vehicles/anim/etc. + world files (col/ipl/ifp/dat); NO dff/txd.
- *  - models.zip   — the `.dff` geometry the EXTERIOR map references (interiors excluded).
- *  - textures.zip — the `.txd` textures the EXTERIOR map references.
- * Model bytes come from gta3.img, falling back to gta_int.img for the few props it lacks (override pattern).
- * Usage: `tsx scripts/build-game.ts --game original`.
+ * Game build (plan 048). Packs `game-src/<game>/` into content-hashed fflate chunks under
+ * `static/<version>/` (one `manifest.json` lists them):
+ *  - priority — loose data/player/vehicles/anim/etc. + world files (col/ipl/ifp/dat); NO dff/txd.
+ *  - models   — the `.dff` geometry the EXTERIOR map references (interiors excluded).
+ *  - textures — the `.txd` textures the EXTERIOR map references.
+ * Each group is split into ~50MB chunks (see `game-build/chunk.ts`) so a dropped download re-fetches
+ * one chunk, not the whole group. Model bytes come from gta3.img, falling back to gta_int.img for the
+ * few props it lacks (override pattern). Usage: `tsx scripts/build-game.ts --game original`.
  */
 import { type Zippable, zipSync } from 'fflate';
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 import type { ImgArchive } from '../src/renderware/archive/img-archive';
@@ -16,20 +19,44 @@ import { openArchive } from '../src/renderware/archive/img-archive';
 import { parseIde } from '../src/renderware/parsers/text/ide.parser';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
+import { chunkByHash } from './game-build/chunk';
 import { type Entry, type ModelRef, partitionEntries, placedModels } from './game-build/partition';
 
 const ROOT = process.cwd();
 
-/** One file to write into a zip: its key + a lazy byte reader (so we never hold all files in memory at once). */
-interface ZipEntry {
+/** Fixed zip timestamp (must be in the DOS 1980-2099 range) — keeps chunk bytes, hence the content
+ *  hash / filename, stable across builds so the browser cache survives a version bump. */
+const ZIP_MTIME = new Date('1985-01-01T00:00:00Z');
+
+/** One written chunk, recorded in the manifest. */
+interface ChunkInfo {
+  bytes: number;
+  entries: number;
+  file: string;
+  hash: string;
+}
+
+/** A file's bytes loaded for packing: its zip key + payload + size (for chunking). */
+interface LoadedEntry {
+  bytes: Uint8Array;
   name: string;
-  read: () => Uint8Array;
+  size: number;
 }
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
 
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+/** Build a zip's bytes — `.txd` stored (DXT is already compressed), everything else deflated. */
+function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
+  const data: Zippable = {};
+  for (const entry of entries) {
+    data[entry.name] = [entry.bytes, { level: entry.name.endsWith('.txd') ? 0 : 6, mtime: ZIP_MTIME }];
+  }
+
+  return zipSync(data);
 }
 
 /** id → {model, txd} (lowercased) from every IDE under the variant's data folder. */
@@ -58,6 +85,12 @@ function main(): void {
   const version = `${game}-${pkg.version}`;
   const outDir = join(ROOT, 'static', version);
   mkdirSync(outDir, { recursive: true });
+  // Drop prior chunks/manifest — content-hashed names mean stale chunks would otherwise pile up.
+  for (const file of readdirSync(outDir)) {
+    if (file.endsWith('.zip') || file === 'manifest.json') {
+      rmSync(join(outDir, file));
+    }
+  }
 
   // Open both model archives (gta3.img primary, gta_int.img override). names are already lowercased.
   const gta3 = openArchive(readFileSync(join(src, 'models', 'gta3.img')));
@@ -72,52 +105,62 @@ function main(): void {
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
   const { models, priority, textures } = partitionEntries(placed, gta3Names, gtaIntNames);
 
-  // Map a partition entry to its lazy byte reader from the right archive.
-  const imgEntry = (entry: Entry): ZipEntry => {
-    const archive = entry.source === 'gta3' ? gta3 : gtaInt;
+  // Load a partition entry's bytes from the right archive.
+  const loadImg = (entry: Entry): LoadedEntry => {
+    const bytes = new Uint8Array((entry.source === 'gta3' ? gta3 : gtaInt).get(entry.name)!);
 
-    return { name: entry.name, read: () => new Uint8Array(archive.get(entry.name)!) };
+    return { bytes, name: entry.name, size: bytes.length };
   };
 
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
   // keyed by their lowercased relative path.
   const excluded = new Set([join('anim', 'anim.img'), join('models', 'gta3.img'), join('models', 'gta_int.img')]);
-  const loose: ZipEntry[] = [];
+  const loose: LoadedEntry[] = [];
   for (const path of walk(src)) {
     const rel = relative(src, path);
     if (excluded.has(rel) || path.endsWith('.DS_Store')) {
       continue;
     }
-    loose.push({ name: rel.split(sep).join('/').toLowerCase(), read: () => new Uint8Array(readFileSync(path)) });
+    const bytes = new Uint8Array(readFileSync(path));
+    loose.push({ bytes, name: rel.split(sep).join('/').toLowerCase(), size: bytes.length });
   }
 
-  const priorityPath = join(outDir, 'priority.zip');
-  const modelsPath = join(outDir, 'models.zip');
-  const texturesPath = join(outDir, 'textures.zip');
-  writeZip(priorityPath, [...loose, ...priority.map(imgEntry)]);
-  writeZip(modelsPath, models.map(imgEntry));
-  writeZip(texturesPath, textures.map(imgEntry));
+  // Pack each group into ~50MB content-hashed chunks (sequential so peak memory ≈ the largest group).
+  const priorityChunks = packChunks('priority', [...loose, ...priority.map(loadImg)], outDir);
+  const modelChunks = packChunks('models', models.map(loadImg), outDir);
+  const textureChunks = packChunks('textures', textures.map(loadImg), outDir);
 
-  const priorityBytes = statSync(priorityPath).size;
-  const modelsBytes = statSync(modelsPath).size;
-  const texturesBytes = statSync(texturesPath).size;
   const manifest = {
+    chunks: { models: modelChunks, priority: priorityChunks, textures: textureChunks },
     game,
-    models: { bytes: modelsBytes, entries: models.length, file: 'models.zip' },
-    priority: { bytes: priorityBytes, entries: loose.length + priority.length, file: 'priority.zip' },
-    textures: { bytes: texturesBytes, entries: textures.length, file: 'textures.zip' },
     version,
   };
   writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
   const fromInt = [...priority, ...models, ...textures].filter((e) => e.source === 'gta_int').length;
-  const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(1)} MB`;
+  const mb = (chunks: ChunkInfo[]): string =>
+    `${(chunks.reduce((sum, c) => sum + c.bytes, 0) / 1024 / 1024).toFixed(1)} MB`;
   console.log(`build ${version}:`);
-  console.log(`  priority.zip — ${loose.length} loose + ${priority.length} world files, ${mb(priorityBytes)}`);
-  console.log(`  models.zip   — ${models.length} dff, ${mb(modelsBytes)}`);
-  console.log(`  textures.zip — ${textures.length} txd, ${mb(texturesBytes)}`);
+  console.log(
+    `  priority — ${priorityChunks.length} chunk(s), ${loose.length + priority.length} files, ${mb(priorityChunks)}`,
+  );
+  console.log(`  models   — ${modelChunks.length} chunk(s), ${models.length} dff, ${mb(modelChunks)}`);
+  console.log(`  textures — ${textureChunks.length} chunk(s), ${textures.length} txd, ${mb(textureChunks)}`);
   console.log(`  from gta_int.img (override): ${fromInt} files`);
   console.log(`  → static/${version}/`);
+}
+
+/** Split a group into ~50MB content-hashed zips, write them, and return one {@link ChunkInfo} per chunk. */
+function packChunks(prefix: string, entries: readonly LoadedEntry[], outDir: string): ChunkInfo[] {
+  return chunkByHash(entries).map((bucket) => {
+    const sorted = [...bucket].sort((a, b) => a.name.localeCompare(b.name)); // stable order → stable bytes
+    const zip = buildZip(sorted);
+    const hash = createHash('sha1').update(zip).digest('hex').slice(0, 12);
+    const file = `${prefix}-${hash}.zip`;
+    writeFileSync(join(outDir, file), zip);
+
+    return { bytes: zip.length, entries: bucket.length, file, hash };
+  });
 }
 
 /** Instance ids placed in the EXTERIOR map: text IPLs (excluding interior/) + the binary IPL streams. */
@@ -157,15 +200,6 @@ function walk(dir: string, out: string[] = []): string[] {
   }
 
   return out;
-}
-
-/** Build a zip and write it — `.txd` stored (DXT is already compressed), everything else deflated. */
-function writeZip(outPath: string, entries: ZipEntry[]): void {
-  const data: Zippable = {};
-  for (const entry of entries) {
-    data[entry.name] = [entry.read(), { level: entry.name.endsWith('.txd') ? 0 : 6 }];
-  }
-  writeFileSync(outPath, zipSync(data));
 }
 
 try {
