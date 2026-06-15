@@ -243,6 +243,53 @@
   animation: sa-fade 0.8s ease forwards;
 }
 
+/* --- Mouse-capture prompt (centered) + fullscreen button (bottom-right) --- */
+.sa-capture {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 15;
+  padding: 12px 26px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 6px;
+  background: rgb(10 10 10 / 82%);
+  color: var(--sa-fg);
+  font: inherit;
+  font-family: var(--sa-font);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.sa-capture:hover {
+  background: var(--sa-gradient);
+  color: #000;
+}
+
+.sa-fullscreen-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 25;
+  padding: 8px 14px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 4px;
+  background: rgb(10 10 10 / 70%);
+  color: var(--sa-fg);
+  font: inherit;
+  font-family: var(--sa-font);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.sa-fullscreen-btn:hover {
+  background: var(--sa-gradient);
+  color: #000;
+}
+
 /* --- In-game notification (top-left info toast) --- */
 .sa-notif {
   position: fixed;

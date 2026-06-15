@@ -134,6 +134,20 @@ Shown on first Play (persist `opensa.disclaimer.v1` once OK'd). Content (concise
 ## Open placeholders (need values, non-blocking)
 - Code/Blog/Videos URLs; GA measurement ID (`VITE_GA_ID`); final disclaimer wording; exact thanks list.
 
+## Follow-up: fullscreen + mouse capture (DONE 2026-06-15)
+- **Pointer lock** (`canvas-host.tsx`): centered **"Click to play"** prompt while `playing && !locked`;
+  click → `canvas.requestPointerLock()`. Look already uses `movementX/Y`, so lock just makes it continuous
+  + cursor-hidden. `locked` tracked via `pointerlockchange`. Esc (browser unlock) + the shell Esc handler →
+  pause menu; Continue → prompt again → re-lock. **F2** calls `exitPointerLock()` so the debug panel is
+  usable; pause also releases the cursor. `requestPointerLock()`'s promise is `Promise.resolve(...).catch()`
+  -wrapped (swallow denied/unsupported — headless Chromium refuses it with `WrongDocumentError`; real desktop
+  works). Mouse sensitivity is hard-coded for now.
+- **Fullscreen** (`use-fullscreen.ts` + `app.tsx`): persistent **⛶ Fullscreen** button (bottom-right) shown
+  while `!isFullscreen`; targets `document.documentElement` (keeps HUD/menu overlays); `fullscreenchange` is
+  the source of truth; existing `ResizeObserver` handles the resize. Esc exits fullscreen (browser) — expected.
+
 ## Out of scope / future
 - Settings screen, key rebinding UI, save slots, localization — later.
 - Per-zone lazy texture streaming (chunking phase 2) — the textures phase stays "load all" for now.
+- **Mouse-capture polish (backlog):** sensitivity slider (currently hard-coded); ignore the first jumpy
+  `movementX/Y` delta after acquiring lock; optional auto re-lock when the F2 debugger closes.

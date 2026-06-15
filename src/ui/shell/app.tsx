@@ -10,6 +10,7 @@ import { Logo } from './logo';
 import { Menu } from './menu';
 import { Preloader } from './preloader';
 import { useAssetBoot } from './use-asset-boot';
+import { useFullscreen } from './use-fullscreen';
 import './shell.css';
 
 // The heavy game surface (three.js/Rapier) is code-split — fetched only past the menu.
@@ -20,6 +21,7 @@ const SUBTITLED = 'sa-logo--small sa-logo--titled sa-logo--described';
 
 export function App(): ReactElement {
   const boot = useAssetBoot();
+  const fullscreen = useFullscreen();
   const { phase } = boot.state;
   const { pause, resume } = boot;
 
@@ -85,6 +87,12 @@ export function App(): ReactElement {
       ) : null}
 
       {phase === 'playing' || phase === 'paused' ? <GameHint /> : null}
+
+      {fullscreen.isFullscreen ? null : (
+        <button className="sa-fullscreen-btn" onClick={fullscreen.toggle} type="button">
+          ⛶ Fullscreen
+        </button>
+      )}
     </div>
   );
 }

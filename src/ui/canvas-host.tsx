@@ -178,6 +178,7 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
   const [actions, setActions] = useState<DebugActions | null>(null);
   const [phase, setPhase] = useState<'error' | 'loading' | 'ready'>('loading');
   const [errorText, setErrorText] = useState('');
+  const [locked, setLocked] = useState(false);
   const debugEnabledRef = useRef(false);
 
   useEffect(() => {
@@ -210,7 +211,18 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
   // Pause/resume the game (frozen physics + control + clock) when the shell shows the pause menu.
   useEffect(() => {
     game?.setGameState(paused ? 'pause' : 'play');
+    if (paused && document.pointerLockElement) {
+      document.exitPointerLock(); // free the cursor for the pause menu
+    }
   }, [game, paused]);
+
+  // Track mouse capture (pointer lock) — the look uses movementX/Y, continuous + cursor-hidden while locked.
+  useEffect(() => {
+    const onChange = (): void => setLocked(document.pointerLockElement === canvasRef.current);
+    document.addEventListener('pointerlockchange', onChange);
+
+    return (): void => document.removeEventListener('pointerlockchange', onChange);
+  }, []);
 
   // Keep the renderer/camera in sync with the canvas size, and only raycast on
   // click while the debug overlay is open (a full-map pick is not free).
@@ -258,8 +270,13 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
         chordFired = true;
         setFly(!fly);
       }
-      if (e.key === 'F2' && fly) {
-        setFly(false); // entering the debugger leaves fly mode
+      if (e.key === 'F2') {
+        if (fly) {
+          setFly(false); // entering the debugger leaves fly mode
+        }
+        if (document.pointerLockElement) {
+          document.exitPointerLock(); // free the cursor for the debug panel
+        }
       }
     }
     function onKeyUp(e: KeyboardEvent): void {
@@ -288,9 +305,19 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
     game.pick(ndcX, ndcY);
   }
 
+  function capture(): void {
+    // Newer browsers return a Promise that can reject (denied / unsupported); swallow it either way.
+    void Promise.resolve(canvasRef.current?.requestPointerLock()).catch(() => undefined);
+  }
+
   return (
     <>
       <canvas onClick={handleClick} ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
+      {game && !locked && !paused ? (
+        <button className="sa-capture" onClick={capture} type="button">
+          Click to play
+        </button>
+      ) : null}
       {phase === 'loading' && <LoadOverlay text="Loading map…" />}
       {phase === 'error' && <LoadOverlay text={`Failed to load map: ${errorText}`} />}
       {game && (
