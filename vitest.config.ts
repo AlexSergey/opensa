@@ -29,6 +29,8 @@ export default defineConfig({
         'src/game/vehicle/vehicle-headlight.system.ts', // canvas-texture lamps (logic unit-tested in build-vehicle)
         'src/game/character/setup-character.ts', // async model load + scene wiring
         'src/ui/**', // DOM/style helpers (locations, debug-styles, hud font loading)
+        'src/asset-loader/asset-loader.ts', // fetch streaming + Cache Storage orchestration (e2e: asset-loader.spec.ts)
+        'src/asset-loader/cache-store.ts', // Cache Storage API wrapper (e2e: asset-loader.spec.ts)
       ],
       include: ['src/**/*.ts'],
       provider: 'v8',

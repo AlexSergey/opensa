@@ -15,6 +15,7 @@ import type { CellCoord } from '../streaming/grid';
 
 // game/adapters/** (and game/mods/**) are the only places allowed to import renderware.
 import {
+  type AssetFileSystem,
   breakableInstanceKey,
   buildAnimationClip,
   buildCell,
@@ -36,8 +37,6 @@ import {
   groupRulesBySurface,
   type HandlingEntry,
   type IdeObjectDef,
-  type ImgArchive,
-  loadArchive,
   type MapDefinitions,
   type ObjectDatEntry,
   oceanFrame,
@@ -86,13 +85,12 @@ const BREAKABLE_EFFECTS = new Set<number>([
 ]);
 
 export interface GtaSaWorldConfig {
-  archiveUrl: string;
-  base: string;
   cellSize: number;
-  datUrl: string;
   /** Standalone script-gated binary IPL groups to load (plan 042) — the world-state choice
    *  vanilla makes via mission-script LOAD_IPL/REMOVE_IPL (e.g. `truthsfarm`, `barriers1`). */
   extraIpl?: readonly string[];
+  /** The asset source (plan 050) — all models/textures/data are read from here, not fetched. */
+  fs: AssetFileSystem;
   /** Installed game mods (plan 039) — their `decoratePart` hooks run during cell builds. */
   mods?: readonly WorldMod[];
   /** Effective clutter density per category (0 when disabled) — keeps clutter COLLISION in sync
@@ -122,7 +120,6 @@ interface VehiclePaint {
 export class GtaSaWorldAdapter implements WorldAdapter {
   readonly cellSize: number;
 
-  private archive: ImgArchive | null = null;
   /** Lowercased model names that "smash" per object.dat but carry no RW Breakable atomic (plan 045) —
    *  their shatter mesh is synthesized from the render geometry. Built in {@link prepare}. */
   private readonly breakableModels = new Set<string>();
@@ -134,6 +131,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   /** Catalog defs by lowercased model name — resolves procobj clutter models to their TXDs. */
   private defByName: Map<string, IdeObjectDef> | null = null;
   private defs: MapDefinitions | null = null;
+  private readonly fs: AssetFileSystem;
   private genericVehicleTextures: Map<string, Texture> | null = null;
   private grid: null | WorldGrid = null;
   /** Parsed `handling.cfg`, kept for the later vehicle-physics phase. */
@@ -149,6 +147,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
 
   constructor(config: GtaSaWorldConfig) {
     this.config = config;
+    this.fs = config.fs;
     this.cellSize = config.cellSize;
     const mods = config.mods ?? [];
     this.decoratePart =
@@ -210,9 +209,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    * Load an IFP file (e.g. `anim/ped.ifp`) **directly** — like the original game, no packed archive —
    * into `THREE.AnimationClip`s keyed by lowercased animation name.
    */
-  async loadAnimations(ifpUrl: string): Promise<Map<string, AnimationClip>> {
+  async loadAnimations(ifpName: string): Promise<Map<string, AnimationClip>> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     const clips = new Map<string, AnimationClip>();
-    for (const anim of parseIfp(await fetchBuffer(ifpUrl))) {
+    for (const anim of parseIfp(requireBuffer(this.fs, ifpName))) {
       clips.set(anim.name.toLowerCase(), buildAnimationClip(anim));
     }
 
@@ -226,9 +226,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    * model space (no Z-up→Y-up conversion) — the caller stands it up under the
    * engine's `entityRoot`.
    */
-  async loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel> {
-    const [dffBuffer, txdBuffer] = await Promise.all([fetchBuffer(dffUrl), fetchBuffer(txdUrl)]);
-    const textures = buildTextureMap(parseTxd(txdBuffer));
+  async loadCharacter(dffName: string, txdName: string): Promise<CharacterModel> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
+    const dffBuffer = requireBuffer(this.fs, dffName);
+    const textures = buildTextureMap(parseTxd(requireBuffer(this.fs, txdName)));
     const clump = parseDff(dffBuffer);
 
     const skinned = buildSkinnedClump(clump, textures);
@@ -241,14 +242,14 @@ export class GtaSaWorldAdapter implements WorldAdapter {
 
   // eslint-disable-next-line
   async loadCell(request: CellRequest): Promise<Object3D[]> {
-    if (!this.archive || !this.defs || !this.grid) {
+    if (!this.defs || !this.grid) {
       throw new Error('GtaSaWorldAdapter.loadCell called before prepare()');
     }
     const key = `${request.cx},${request.cy},${request.lod ? 'lod' : 'hd'}`;
     let meshes = this.cellCache.get(key);
     if (!meshes) {
       // Native Z-up; the streaming root applies the −90°X (so no per-cell group).
-      meshes = buildCell(this.archive, this.defs, this.grid, request.cx, request.cy, request.lod, {
+      meshes = buildCell(this.fs, this.defs, this.grid, request.cx, request.cy, request.lod, {
         breakableModels: this.breakableModels,
         decoratePart: this.decoratePart,
       });
@@ -258,7 +259,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       if (batches && this.defByName) {
         const defByName = this.defByName;
         meshes.push(
-          ...buildProcObjMeshes(this.archive, batches, (model) => defByName.get(model), {
+          ...buildProcObjMeshes(this.fs, batches, (model) => defByName.get(model), {
             decoratePart: this.decoratePart,
             lotteryCap: procObjLotteryCap(batches, this.config.procObjLimit),
           }),
@@ -272,14 +273,14 @@ export class GtaSaWorldAdapter implements WorldAdapter {
 
   // eslint-disable-next-line
   async loadCellColliders(cx: number, cy: number): Promise<ModelColliders[]> {
-    if (!this.archive || !this.defs || !this.grid) {
+    if (!this.defs || !this.grid) {
       throw new Error('GtaSaWorldAdapter.loadCellColliders called before prepare()');
     }
     const key = `${cx},${cy}`;
     let colliders = this.colliderCache.get(key);
     if (!colliders) {
-      const index = buildCollisionIndex(this.archive);
-      const archive = this.archive;
+      const index = buildCollisionIndex(this.fs);
+      const archive = this.fs;
       const breakableModels = this.breakableModels;
       colliders = buildCellColliders(index, this.defs, this.grid, cx, cy).map((region) =>
         // Tag breakable-prop placements with their instance keys (plan 045) so a smashed prop's one
@@ -309,10 +310,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
 
   // eslint-disable-next-line
   async loadCollisionDebug(request: RegionRequest): Promise<Object3D[]> {
-    if (!this.archive || !this.defs) {
+    if (!this.defs) {
       throw new Error('GtaSaWorldAdapter.loadCollisionDebug called before prepare()');
     }
-    const index = buildCollisionIndex(this.archive);
+    const index = buildCollisionIndex(this.fs);
     const colliders = buildColliders(index, this.defs, { center: request.center, radius: request.radius });
     const root = new Group();
     root.rotation.x = -Math.PI / 2; // GTA Z-up → three.js Y-up (matches the streaming root)
@@ -327,14 +328,13 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    * mandatory vanilla `timecyc.dat` (8 keyframes/weather) to 24h.
    */
   async loadTimecyc(): Promise<Timecyc> {
-    const base = this.config.base;
-    const text24 = await tryFetchText(`${base}/data/timecyc_24h.dat`);
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
+    const text24 = this.fs.getText('data/timecyc_24h.dat');
     if (text24 !== null) {
       return buildTimecyc(parseTimecyc(text24));
     }
-    const baseText = await fetchText(`${base}/data/timecyc.dat`);
 
-    return buildTimecyc(convertTo24h(parseTimecyc(baseText)));
+    return buildTimecyc(convertTo24h(parseTimecyc(requireText(this.fs, 'data/timecyc.dat'))));
   }
 
   /**
@@ -352,12 +352,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
       throw new Error(`No vehicle definition for '${modelName}' in vehicles.ide`);
     }
 
-    const base = this.config.base;
-    const [dffBuffer, carTxdBuffer, genericTextures] = await Promise.all([
-      fetchBuffer(`${base}/vehicles/${def.model}.dff`),
-      fetchBuffer(`${base}/vehicles/${def.txd}.txd`),
-      this.loadGenericVehicleTextures(),
-    ]);
+    const genericTextures = await this.loadGenericVehicleTextures();
+    const dffBuffer = requireBuffer(this.fs, `vehicles/${def.model}.dff`);
+    const carTxdBuffer = requireBuffer(this.fs, `vehicles/${def.txd}.txd`);
     const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
     const indices = colour
       ? colour
@@ -405,11 +402,12 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    * (reaching the horizon); the file's non-sea-level polygons (lakes) are kept on
    * top. (Sea-level file polygons are dropped — the big plane covers them.)
    */
-  async loadWater(waterUrl: string, txdUrl: string): Promise<Object3D> {
-    const [waterText, txdBuffer] = await Promise.all([fetchText(waterUrl), fetchBuffer(txdUrl)]);
-    const texture = buildTextureMap(parseTxd(txdBuffer)).get('waterclear256');
+  async loadWater(waterName: string, txdName: string): Promise<Object3D> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
+    const waterText = requireText(this.fs, waterName);
+    const texture = buildTextureMap(parseTxd(requireBuffer(this.fs, txdName))).get('waterclear256');
     if (!texture) {
-      throw new Error(`Water texture 'waterclear256' not found in ${txdUrl}`);
+      throw new Error(`Water texture 'waterclear256' not found in ${txdName}`);
     }
 
     // Real water.dat polygons (correct coverage — tunnels under land stay dry), plus an open-ocean
@@ -420,28 +418,26 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   async prepare(onProgress?: (fraction: number) => void): Promise<void> {
-    if (this.archive && this.defs) {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
+    if (this.defs) {
       onProgress?.(1); // already prepared (e.g. a debug reload) — skip the heavy work
 
       return;
     }
-    this.archive = await loadArchive(this.config.archiveUrl);
-    this.defs = await resolveMap(this.config.datUrl, this.config.base, { extraIpl: this.config.extraIpl });
+    this.defs = resolveMap(this.fs, { extraIpl: this.config.extraIpl });
     setTxdParents(this.defs.txdParents ?? new Map<string, string>()); // wire txdp: area TXDs inherit *_gene parents
     this.grid = buildWorldGrid(this.defs, this.cellSize);
     this.defByName = new Map([...this.defs.catalog.values()].map((def) => [def.modelName.toLowerCase(), def]));
     // Procedural ground clutter (plan 042): both data files present → cells scatter; else skipped.
-    const [procObjText, surfInfoText] = await Promise.all([
-      tryFetchText(`${this.config.base}/data/procobj.dat`),
-      tryFetchText(`${this.config.base}/data/surfinfo.dat`),
-    ]);
+    const procObjText = this.fs.getText('data/procobj.dat');
+    const surfInfoText = this.fs.getText('data/surfinfo.dat');
     if (procObjText !== null && surfInfoText !== null) {
       this.procObjRules = groupRulesBySurface(parseProcObj(procObjText));
       this.surfaceNames = parseSurfaceNames(surfInfoText);
     }
     // Breakable-prop tuning (plan 045) — absent-tolerant: no file, props still break at the default
     // threshold (the break gate is the RW Breakable mesh, not this table).
-    const objectDatText = await tryFetchText(`${this.config.base}/data/object.dat`);
+    const objectDatText = this.fs.getText('data/object.dat');
     if (objectDatText !== null) {
       this.objectDat = parseObjectDat(objectDatText);
       for (const [name, entry] of this.objectDat) {
@@ -457,25 +453,23 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    *  were absent. Shared by the render path (loadCell) and the collider path (loadCellColliders) —
    *  same inputs give byte-identical batches, so visuals and collision always agree. */
   private cellProcObjBatches(cx: number, cy: number): null | readonly ProcObjBatch[] {
-    if (!this.archive || !this.defs || !this.grid || !this.procObjRules || !this.surfaceNames) {
+    if (!this.defs || !this.grid || !this.procObjRules || !this.surfaceNames) {
       return null;
     }
-    const colliders = buildCellColliders(buildCollisionIndex(this.archive), this.defs, this.grid, cx, cy);
+    const colliders = buildCellColliders(buildCollisionIndex(this.fs), this.defs, this.grid, cx, cy);
 
     return scatterProcObjects(colliders, this.procObjRules, this.surfaceNames, cx, cy);
   }
 
   /** Lazily fetch + parse vehicles.ide, carcols.dat and handling.cfg (cached). */
   private async ensureVehicleData(): Promise<void> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     if (this.vehicleDefs && this.vehicleColours && this.handling) {
       return;
     }
-    const base = this.config.base;
-    const [ide, carcols, handling] = await Promise.all([
-      fetchText(`${base}/data/vehicles.ide`),
-      fetchText(`${base}/data/carcols.dat`),
-      fetchText(`${base}/data/handling.cfg`),
-    ]);
+    const ide = requireText(this.fs, 'data/vehicles.ide');
+    const carcols = requireText(this.fs, 'data/carcols.dat');
+    const handling = requireText(this.fs, 'data/handling.cfg');
     this.vehicleDefs = parseVehicleDefs(ide);
     this.vehicleColours = parseCarcols(carcols);
     this.handling = parseHandling(handling); // stored for the later vehicle-physics phase
@@ -483,9 +477,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
 
   /** The shared generic `vehicle.txd` texture map, parsed once. */
   private async loadGenericVehicleTextures(): Promise<Map<string, Texture>> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     if (!this.genericVehicleTextures) {
-      const buffer = await fetchBuffer(`${this.config.base}/models/generic/vehicle.txd`);
-      this.genericVehicleTextures = buildTextureMap(parseTxd(buffer));
+      this.genericVehicleTextures = buildTextureMap(parseTxd(requireBuffer(this.fs, 'models/generic/vehicle.txd')));
     }
 
     return this.genericVehicleTextures;
@@ -560,22 +554,24 @@ export function toModelColliders({ col, name, transforms }: RegionColliders): Mo
   };
 }
 
-async function fetchBuffer(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+/** Read a required binary asset from the file system (throws if absent). */
+function requireBuffer(fs: AssetFileSystem, name: string): ArrayBuffer {
+  const buffer = fs.get(name);
+  if (!buffer) {
+    throw new Error(`asset not found: ${name}`);
   }
 
-  return response.arrayBuffer();
+  return buffer;
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+/** Read a required text asset from the file system (throws if absent). */
+function requireText(fs: AssetFileSystem, name: string): string {
+  const text = fs.getText(name);
+  if (text === null) {
+    throw new Error(`asset not found: ${name}`);
   }
 
-  return response.text();
+  return text;
 }
 
 /** Tag a model's collider placements with breakable instance keys (plan 045); a pass-through for
@@ -589,16 +585,4 @@ function tagBreakable(model: ModelColliders, isBreakable: boolean): ModelCollide
   );
 
   return { ...model, instanceKeys };
-}
-
-/** Fetch text, or null when the file is absent or unreachable (optional assets like
- *  `timecyc_24h.dat` / `procobj.dat` — a fetch failure means "feature off", never a crash). */
-async function tryFetchText(url: string): Promise<null | string> {
-  try {
-    const response = await fetch(url);
-
-    return response.ok ? response.text() : null;
-  } catch {
-    return null;
-  }
 }

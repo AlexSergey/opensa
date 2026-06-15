@@ -1,10 +1,11 @@
 /**
- * One-time dev script: extract the COL (collision) for the object-viewer's models
- * out of a variant's `game-src/<game>/models/gta3.img` into small `static/viewer/<model>.col.json` files,
- * so `/object-viewer.html` can show collision without downloading the full archive.
+ * Maintenance dev script: extract the COL (collision) for the object-viewer's models
+ * out of a variant's `game-src/<game>/models/gta3.img` into small `game-src/viewer/<model>.col.json`
+ * files (the viewer-fixture source `copy-viewer.ts` syncs into `static/viewer/`).
  *
  * Map objects keep their COL in the IMG (not embedded in the DFF), so this pre-bakes
- * just the few models the viewer lists. Re-run after adding models to that list.
+ * just the few models the viewer lists. Re-run after adding models to that list or when the COL
+ * parser changes.
  *
  *   tsx scripts/extract-viewer-collision.ts --game original
  */
@@ -16,7 +17,7 @@ import { buildCollisionIndex, getCollision } from '../src/renderware/collision/c
 
 /** Keep in sync with the object-viewer's MODELS (model = dff basename, lowercased). */
 const MODELS = ['lae2_ground08', 'wattspark1_lae2'];
-const OUT_DIR = 'static/viewer';
+const OUT_DIR = join('game-src', 'viewer');
 
 const gameIndex = process.argv.indexOf('--game');
 const game = gameIndex >= 0 ? process.argv[gameIndex + 1] : undefined;

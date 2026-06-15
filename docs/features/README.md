@@ -9,6 +9,7 @@ implemented ones, and assembling the release changelog.
 | DFF parser (models) | [dff-parser.md](dff-parser.md) |
 | TXD parser + textures | [txd-textures.md](txd-textures.md) |
 | IMG archive + asset cache | [img-archive.md](img-archive.md) |
+| Asset loader (chunk download/cache) | [asset-loader.md](asset-loader.md) |
 | Map pipeline (DAT/IDE/IPL → streaming) | [map-pipeline.md](map-pipeline.md) |
 | Collision + physics | [collision-physics.md](collision-physics.md) |
 | World lighting (SA prelit) | [world-lighting.md](world-lighting.md) |

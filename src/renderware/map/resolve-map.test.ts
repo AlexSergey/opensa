@@ -1,21 +1,21 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import type { AssetFileSystem } from '../archive';
 
 import { resolveMap } from './resolve-map';
 
-const BASE = 'http://test';
-const DAT_URL = `${BASE}/data/gta.dat`;
-
-/** Minimal map: one IDE (ids 100 + 3261) and one text IPL placing id 100. */
+/** Minimal map: one IDE (ids 100 + 3261) and one text IPL placing id 100, plus a standalone group. */
 const FILES: Record<string, ArrayBuffer | string> = {
-  [`${BASE}/data/gta.dat`]: 'IDE DATA\\MAPS\\test\\test.ide\nIPL DATA\\MAPS\\test\\test.ipl',
-  [`${BASE}/data/maps/test/test.ide`]: [
+  'data/gta.dat': 'IDE DATA\\MAPS\\test\\test.ide\nIPL DATA\\MAPS\\test\\test.ipl',
+  'data/maps/test/test.ide': [
     'objs',
     '100, house, housetxd, 100, 0',
     '3261, grasshouse, grasshouse, 299, 4',
     'end',
   ].join('\n'),
-  [`${BASE}/data/maps/test/test.ipl`]: ['inst', '100, house, 0, 10, 20, 5, 0, 0, 0, 1, -1', 'end'].join('\n'),
-  [`${BASE}/ipl_binary/truthsfarm.ipl`]: binaryIpl([{ id: 3261, position: [-1023.1, -1632.5, 75.5] }]),
+  'data/maps/test/test.ipl': ['inst', '100, house, 0, 10, 20, 5, 0, 0, 0, 1, -1', 'end'].join('\n'),
+  // Standalone binary group, packed bare (from gta3.img) — keyed by name without a path.
+  'truthsfarm.ipl': binaryIpl([{ id: 3261, position: [-1023.1, -1632.5, 75.5] }]),
 };
 
 /** Build a synthetic "bnry" IPL (the real header/record layout, see ipl-binary.parser). */
@@ -40,41 +40,44 @@ function binaryIpl(instances: { id: number; position: [number, number, number] }
   return buffer;
 }
 
-function stubFetch(): void {
-  vi.stubGlobal('fetch', (url: string) => {
-    const file = FILES[url];
-    if (file === undefined) {
-      return Promise.resolve(new Response(null, { status: 404 }));
-    }
+/** A fake AssetFileSystem backed by an in-memory file map (string files → text, ArrayBuffer → binary). */
+function fakeFs(files: Record<string, ArrayBuffer | string>): AssetFileSystem {
+  return {
+    get(name: string): ArrayBuffer | null {
+      const file = files[name];
+      if (file === undefined) {
+        return null;
+      }
 
-    return Promise.resolve(new Response(file));
-  });
+      return typeof file === 'string' ? new TextEncoder().encode(file).buffer : file;
+    },
+    getText(name: string): null | string {
+      const file = files[name];
+
+      return typeof file === 'string' ? file : null;
+    },
+    has: (name: string): boolean => name in files,
+    names: Object.keys(files),
+  };
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 describe('resolveMap extraIpl (standalone binary IPL groups, plan 042)', () => {
   describe('negative cases', () => {
-    it('loads no standalone groups when the option is absent', async () => {
-      stubFetch();
-      const defs = await resolveMap(DAT_URL, BASE);
+    it('loads no standalone groups when the option is absent', () => {
+      const defs = resolveMap(fakeFs(FILES));
       expect(defs.instances).toHaveLength(1); // only the text IPL placement
       expect(defs.instances[0].id).toBe(100);
     });
 
-    it('skips missing standalone files without failing the map', async () => {
-      stubFetch();
-      const defs = await resolveMap(DAT_URL, BASE, { extraIpl: ['truthsfarm', 'nosuchgroup'] });
+    it('skips missing standalone files without failing the map', () => {
+      const defs = resolveMap(fakeFs(FILES), { extraIpl: ['truthsfarm', 'nosuchgroup'] });
       expect(defs.instances.map((instance) => instance.id).sort((a, b) => a - b)).toEqual([100, 3261]);
     });
   });
 
   describe('positive cases', () => {
-    it('merges configured standalone group instances into the map', async () => {
-      stubFetch();
-      const defs = await resolveMap(DAT_URL, BASE, { extraIpl: ['truthsfarm'] });
+    it('merges configured standalone group instances into the map', () => {
+      const defs = resolveMap(fakeFs(FILES), { extraIpl: ['truthsfarm'] });
       expect(defs.instances).toHaveLength(2);
       const farm = defs.instances.find((instance) => instance.id === 3261);
       expect(farm).toBeDefined();

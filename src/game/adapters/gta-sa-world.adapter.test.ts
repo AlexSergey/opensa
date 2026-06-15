@@ -5,24 +5,27 @@ import type * as Renderware from '../../renderware';
 
 import { GtaSaWorldAdapter, toModelColliders } from './gta-sa-world.adapter';
 
-// Stub the network parts of the renderware barrel; keep grid/cell builders real.
+// Stub the map resolution; keep grid/cell builders real. The adapter reads everything from the VFS now.
 vi.mock('../../renderware', async (importActual) => {
   const actual = await importActual<typeof Renderware>();
 
   return {
     ...actual,
-    loadArchive: (): Promise<Renderware.ImgArchive> => Promise.resolve({ get: () => null, names: [] }),
-    resolveMap: (): Promise<Renderware.MapDefinitions> =>
-      Promise.resolve({
-        catalog: new Map([[1, { drawDistance: 300, flags: 0, id: 1, modelName: 'house', txdName: 'txd' }]]),
-        imgDirs: [],
-        instances: [{ id: 1, interior: 0, lod: -1, modelName: '', position: [10, 10, 0], rotation: [0, 0, 0, 1] }],
-      }),
+    resolveMap: (): Renderware.MapDefinitions => ({
+      catalog: new Map([[1, { drawDistance: 300, flags: 0, id: 1, modelName: 'house', txdName: 'txd' }]]),
+      imgDirs: [],
+      instances: [{ id: 1, interior: 0, lod: -1, modelName: '', position: [10, 10, 0], rotation: [0, 0, 0, 1] }],
+    }),
   };
 });
 
+/** Empty asset file system — the map comes from the mocked resolveMap; optional data files are absent. */
+function fakeFs(): Renderware.AssetFileSystem {
+  return { get: () => null, getText: () => null, has: () => false, names: [] };
+}
+
 function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
-  return { archiveUrl: 'a', base: 'b', cellSize: 250, datUrl: 'd' };
+  return { cellSize: 250, fs: fakeFs() };
 }
 
 function colModel(partial: Partial<Renderware.ColModel>): Renderware.ColModel {

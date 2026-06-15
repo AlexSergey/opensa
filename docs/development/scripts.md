@@ -8,6 +8,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 - [Build / asset pipeline](#build--asset-pipeline)
   - [build-game.ts](#build-gamets)
   - [gen-wind-list.ts](#gen-wind-listts)
+  - [copy-viewer.ts](#copy-viewerts)
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
 - [Debugging / auditing](#debugging--auditing)
   - [audit-rw-coverage.ts](#audit-rw-coveragets)
@@ -50,15 +51,23 @@ models.
 npx tsx scripts/gen-wind-list.ts
 ```
 
-### extract-viewer-collision.ts
+### copy-viewer.ts
 
-One-time pre-bake: extracts the COL of the object-viewer's model list out of the variant's
-`game-src/<game>/models/gta3.img` into small `static/viewer/<model>.col.json` files so
-`/object-viewer.html` doesn't download the full archive. Re-run after adding models to the viewer list.
+Copies the object-viewer fixtures (dff/txd + pre-baked col.json) from `game-src/viewer/` (the
+gitignored, local source of truth) into `static/viewer/`, so `/object-viewer.html` and the e2e lane
+have their models without the full archive. Run together with `extract-viewer-collision.ts` via the
+combined `viewer:assets:original` script (the `e2e*` scripts run it first).
 
 ```sh
-npm run viewer:collision:original   # tsx scripts/extract-viewer-collision.ts --game original
+npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original
 ```
+
+### extract-viewer-collision.ts
+
+Maintenance tool: re-bakes the COL of the object-viewer's model list out of the variant's
+`game-src/<game>/models/gta3.img` into `<model>.col.json` (written into `game-src/viewer/`, which
+`copy-viewer` syncs to static). Use when the collision parser changes. Bundled into
+`viewer:assets:original` (above), so the regenerated col ships with the next copy.
 
 ### timecyc-builder (`npm run timecyc`)
 

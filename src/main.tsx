@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { CanvasHost } from './ui/canvas-host';
+import { GameBootstrap } from './ui/game-bootstrap';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <CanvasHost />
+    <GameBootstrap />
   </StrictMode>,
 );

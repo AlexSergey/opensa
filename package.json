@@ -36,9 +36,9 @@
     "build:game:original": "npm run timecyc && tsx scripts/build-game.ts --game original",
     "build:prod": "tsc -b && OPENSA_NO_VIEWERS=true OPENSA_DEBUGGER_HIDE=true vite build",
     "dev": "vite",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "e2e:update": "playwright test --update-snapshots",
+    "e2e": "npm run viewer:assets:original && playwright test",
+    "e2e:ui": "npm run viewer:assets:original && playwright test --ui",
+    "e2e:update": "npm run viewer:assets:original && playwright test --update-snapshots",
     "format": "npm run format:prettier && npm run format:code",
     "format:code": "eslint . --fix",
     "format:prettier": "prettier --write \"src/**/*.{ts,json}\"",
@@ -53,8 +53,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "timecyc": "tsx ./timecyc-builder/index.ts",
-    "viewer:collision": "tsx scripts/extract-viewer-collision.ts",
-    "viewer:collision:original": "tsx scripts/extract-viewer-collision.ts --game original"
+    "viewer:assets:original": "tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.3",

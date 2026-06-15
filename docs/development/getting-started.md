@@ -70,12 +70,14 @@ npm run serve:static            # serves ./static at http://localhost:3001 (VITE
 npm run dev                     # Vite dev server for the app
 ```
 
-The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`) and loads the game from
-the archives produced in step 3.
+The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). On boot the **asset
+loader** (plan 049) downloads the chunks from `static/<game>-<version>/` (caching each in Cache Storage),
+the **VFS** (plan 050) unzips them and verifies against the manifest, then the game runs entirely from
+the VFS. A network blip re-fetches only the dropped chunk; a return visit downloads nothing.
 
-> **Note:** the runtime archive loader (consuming `static/<game>-<version>/*.zip`) is the final piece
-> of plan 048 and is still being wired up; until it lands the app reads the build output directly. The
-> build pipeline above (steps 2–3) is complete and stable.
+> **Note:** the version directory the boot fetches is currently hard-coded (`original-0.1.0`) in
+> `src/ui/game-bootstrap.tsx`; a proper boot/version UI (splash + progress bar bound to the loader's
+> events) is a later plan.
 
 ## Where to go next
 

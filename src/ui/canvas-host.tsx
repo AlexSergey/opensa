@@ -42,6 +42,7 @@ import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
 import { CityZoneSystem } from '../game/zones/city-zone.system';
 import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
 import {
+  type AssetFileSystem,
   breakBreakable,
   buildTextureMap,
   coronaMaterial,
@@ -117,46 +118,39 @@ interface Bootstrap {
   game: Game;
 }
 
-/** Fetch map.zon and map its boxes to city AABBs ([] on any failure → everything classifies as Countryside). */
-async function loadCityBoxes(url: string): Promise<CityBox[]> {
-  try {
-    const zones = parseZones(await fetch(url).then((response) => response.text()));
-
-    return zones.flatMap((zone) => {
-      const city = cityFromLevel(zone.level);
-
-      return city ? [{ city, max: zone.max, min: zone.min }] : [];
-    });
-  } catch {
+/** Read map.zon and map its boxes to city AABBs ([] when absent → everything classifies as Countryside). */
+function loadCityBoxes(fs: AssetFileSystem, name: string): CityBox[] {
+  const text = fs.getText(name);
+  if (text === null) {
     return [];
   }
+
+  return parseZones(text).flatMap((zone) => {
+    const city = cityFromLevel(zone.level);
+
+    return city ? [{ city, max: zone.max, min: zone.min }] : [];
+  });
 }
 
-/** Fetch + parse a `.gxt` text archive into a `hash → text` map (null on any failure). */
-async function loadGxt(url: string): Promise<Map<number, string> | null> {
-  try {
-    return parseGxt(await fetch(url).then((response) => response.arrayBuffer()));
-  } catch {
-    return null;
-  }
+/** Parse a `.gxt` text archive into a `hash → text` map (null when absent). */
+function loadGxt(fs: AssetFileSystem, name: string): Map<number, string> | null {
+  const buffer = fs.get(name);
+
+  return buffer ? parseGxt(buffer) : null;
 }
 
-/** Fetch info.zon's zones ([] on any failure). Drives both the desert boxes (by name) and the zone-name HUD. */
-async function loadInfoZones(url: string): Promise<MapZone[]> {
-  try {
-    return parseZones(await fetch(url).then((response) => response.text()));
-  } catch {
-    return [];
-  }
+/** Read info.zon's zones ([] when absent). Drives both the desert boxes (by name) and the zone-name HUD. */
+function loadInfoZones(fs: AssetFileSystem, name: string): MapZone[] {
+  const text = fs.getText(name);
+
+  return text === null ? [] : parseZones(text);
 }
 
-/** Fetch + parse a standalone .txd into a name→Texture map (null on any failure). */
-async function loadTxd(url: string): Promise<Map<string, Texture> | null> {
-  try {
-    return buildTextureMap(parseTxd(await fetch(url).then((response) => response.arrayBuffer())));
-  } catch {
-    return null;
-  }
+/** Parse a standalone .txd into a name→Texture map (null when absent). */
+function loadTxd(fs: AssetFileSystem, name: string): Map<string, Texture> | null {
+  const buffer = fs.get(name);
+
+  return buffer ? buildTextureMap(parseTxd(buffer)) : null;
 }
 
 // One bootstrap per page load, kept at module scope so React StrictMode's
@@ -168,7 +162,7 @@ let bootstrapped: null | Promise<Bootstrap> = null;
  * the DOM debug overlay. React never touches the scene graph — it just wires the
  * canvas, forwards resize/pointer events, and shows load state.
  */
-export function CanvasHost(): ReactElement {
+export function CanvasHost({ fs }: { fs: AssetFileSystem }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [actions, setActions] = useState<DebugActions | null>(null);
@@ -183,7 +177,7 @@ export function CanvasHost(): ReactElement {
     }
     let disposed = false;
 
-    bootstrap(canvas)
+    bootstrap(canvas, fs)
       .then((ready) => {
         if (!disposed) {
           setGame(ready.game);
@@ -201,7 +195,7 @@ export function CanvasHost(): ReactElement {
     return (): void => {
       disposed = true;
     };
-  }, []);
+  }, [fs]);
 
   // Keep the renderer/camera in sync with the canvas size, and only raycast on
   // click while the debug overlay is open (a full-map pick is not free).
@@ -294,7 +288,28 @@ export function CanvasHost(): ReactElement {
   );
 }
 
-function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
+export function LoadOverlay({ text }: { text: string }): ReactElement {
+  return (
+    <div
+      style={{
+        alignItems: 'center',
+        color: '#fff',
+        display: 'flex',
+        fontFamily: 'sans-serif',
+        height: '100%',
+        justifyContent: 'center',
+        left: 0,
+        position: 'fixed',
+        top: 0,
+        width: '100%',
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem): Promise<Bootstrap> {
   bootstrapped ??= (async (): Promise<Bootstrap> => {
     const game = Game.getInstance(canvas, {
       camera: {
@@ -378,14 +393,12 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     const windMod = createWindMod();
     game.installMod(windMod);
     const adapter = new GtaSaWorldAdapter({
-      archiveUrl: `${BASE}/models/gta3-original.img`,
-      base: BASE,
       cellSize: CELL_SIZE,
-      datUrl: `${BASE}/data/gta.dat`,
       // Script-gated placement groups (plan 042) — our permanent "world state". Available:
       // truthsfarm (Truth's weed farm), barriers1/2 (SF+LV unlock roadblocks — left off: the map
       // is fully open here), carter/crack (mission-state crack-palace pieces — left off).
       extraIpl: ['truthsfarm'],
+      fs,
       mods: [windMod],
       // Clutter collision follows the live per-category knobs (0 when disabled) — see setProcObj.
       procObjDensityOf: (category): number => {
@@ -438,19 +451,15 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
       };
     };
     // The moon uses the SA `coronamoon` texture from particle.txd (alpha-shaped); null if it can't be loaded.
-    const particleTextures = await loadTxd(`${BASE}/models/particle.txd`);
+    const particleTextures = loadTxd(fs, 'models/particle.txd');
     const moonTexture = particleTextures?.get('coronamoon') ?? null;
     // Road-sign text (plan 042 item 5): the glyph atlas the sign quads UV into. Installed before
     // any cell builds, so every streamed sign model gets its text parts.
     setRoadsignFont(particleTextures?.get('roadsignfont') ?? null);
     // 2dfx particle effects (plan 044): the FX library — systems from effects.fxp + sprites from
     // effectsPC.txd. Both absent-tolerant: no files, no particles.
-    const [fxpText, fxSprites] = await Promise.all([
-      fetch(`${BASE}/models/effects.fxp`)
-        .then((response) => (response.ok ? response.text() : null))
-        .catch(() => null),
-      loadTxd(`${BASE}/models/effectsPC.txd`),
-    ]);
+    const fxpText = fs.getText('models/effects.fxp');
+    const fxSprites = loadTxd(fs, 'models/effectsPC.txd');
     if (fxpText && fxSprites) {
       setFxLibrary(parseFxp(fxpText), fxSprites);
     }
@@ -459,7 +468,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
 
     // Water mesh (geometry from the adapter) loaded up front so the WaterPlugin can own its material;
     // parented under the −90°X streaming root (which `game.init` adds to the scene).
-    const water = await adapter.loadWater(`${BASE}/data/water.dat`, `${BASE}/models/particle.txd`);
+    const water = await adapter.loadWater('data/water.dat', 'models/particle.txd');
     game.getStreamingRoot().add(water);
 
     game
@@ -488,7 +497,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
-    const model = await adapter.loadCharacter(`${BASE}/player/tommy.dff`, `${BASE}/player/tommy.txd`);
+    const model = await adapter.loadCharacter('player/tommy.dff', 'player/tommy.txd');
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN, {
       bonesByName: model.bonesByName,
@@ -498,7 +507,7 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     game.frameEntity(player, 12);
 
     // Animations: ped.ifp loaded directly (like the original), driven by the movement state machine.
-    const clips = await adapter.loadAnimations(`${BASE}/anim/ped.ifp`);
+    const clips = await adapter.loadAnimations('anim/ped.ifp');
     const animation = new AnimationController(player, clips, character.bonesByName);
     animation.play('idle_stance', 0);
     const animationSystem = new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig());
@@ -513,11 +522,9 @@ function bootstrap(canvas: HTMLCanvasElement): Promise<Bootstrap> {
     // later: cross-fade the weather for that city). Plan 035.
     // Zones: city/desert (weather) from map.zon + info.zon counties; district name (HUD) from all info.zon zones
     // resolved through the GXT. info.zon + the GXT are fetched once and shared.
-    const [cityBoxes, infoZones, gxt] = await Promise.all([
-      loadCityBoxes(`${BASE}/data/map.zon`),
-      loadInfoZones(`${BASE}/data/info.zon`),
-      loadGxt(`${BASE}/text/american.gxt`),
-    ]);
+    const cityBoxes = loadCityBoxes(fs, 'data/map.zon');
+    const infoZones = loadInfoZones(fs, 'data/info.zon');
+    const gxt = loadGxt(fs, 'text/american.gxt');
 
     // On a region crossing: update the city state, and follow the weather for that region while KEEPING the
     // current type (cross-fades over weatherTransitionSeconds). Desert boxes go FIRST so they win over the
@@ -958,25 +965,4 @@ function disposeVehicle(object: Object3D): void {
       material?.dispose();
     }
   });
-}
-
-function LoadOverlay({ text }: { text: string }): ReactElement {
-  return (
-    <div
-      style={{
-        alignItems: 'center',
-        color: '#fff',
-        display: 'flex',
-        fontFamily: 'sans-serif',
-        height: '100%',
-        justifyContent: 'center',
-        left: 0,
-        position: 'fixed',
-        top: 0,
-        width: '100%',
-      }}
-    >
-      {text}
-    </div>
-  );
 }

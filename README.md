@@ -46,11 +46,12 @@ build path, so what you see is what the game produces. Each is its own Vite HTML
 - **`/character-viewer.html`** — a skinned ped. Play any `ped.ifp` animation (looped), and toggle
   the skeleton and the collision capsule.
 
-Map objects keep their collision in `gta3.img` (not in the DFF), so the object viewer reads
-pre-baked COL from `static/viewer/<model>.col.json`. Regenerate after editing its model list:
+Map objects keep their collision in `gta3.img` (not in the DFF), so the object viewer reads its
+fixtures (dff/txd + pre-baked COL) from `static/viewer/`. Sync them from `game-src/viewer/` (and
+re-bake the COL) with:
 
 ```bash
-npm run viewer:collision
+npm run viewer:assets:original
 ```
 
 See `.claude/plans/022-debug-viewers.md` for details.
