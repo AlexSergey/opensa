@@ -56,7 +56,7 @@ interface ViewOptions {
   prelit: boolean;
 }
 
-/** Models extracted from gta3.img into static/viewer/ for this tool. */
+/** Models extracted from gta3.img into static/viewer/objects/ for this tool. */
 const MODELS: readonly ModelEntry[] = [
   { dff: 'wattspark1_lae2.dff', name: 'wattspark1_LAe2 (txd lae2tempshit)', txd: 'lae2tempshit.txd' },
   { dff: 'lae2_ground08.dff', name: 'lae2_ground08 (txd burnsground)', txd: 'burnsground.txd' },
@@ -192,7 +192,7 @@ async function loadCollision(model: ModelEntry): Promise<void> {
     collision = null;
   }
   const base = model.dff.replace(/\.dff$/, '');
-  const response = await fetch(`${BASE}/viewer/${base}.col.json`);
+  const response = await fetch(`${BASE}/viewer/objects/${base}.col.json`);
   if (!response.ok) {
     return; // no extracted COL for this model — re-run scripts/extract-viewer-collision.ts
   }
@@ -208,7 +208,7 @@ async function loadCollision(model: ModelEntry): Promise<void> {
 
 async function loadModel(model: ModelEntry): Promise<void> {
   const textures = await loadTextures(model.txd);
-  const buffer = await fetch(`${BASE}/viewer/${model.dff}`).then((response) => response.arrayBuffer());
+  const buffer = await fetch(`${BASE}/viewer/objects/${model.dff}`).then((response) => response.arrayBuffer());
   const group = buildClump(parseDff(buffer), textures);
 
   if (current) {
@@ -230,7 +230,7 @@ async function loadModel(model: ModelEntry): Promise<void> {
 function loadTextures(txd: string): Promise<TextureDictionary> {
   let promise = txdCache.get(txd);
   if (!promise) {
-    promise = fetch(`${BASE}/viewer/${txd}`)
+    promise = fetch(`${BASE}/viewer/objects/${txd}`)
       .then((response) => response.arrayBuffer())
       .then((buffer) => buildTextureMap(parseTxd(buffer)));
     txdCache.set(txd, promise);

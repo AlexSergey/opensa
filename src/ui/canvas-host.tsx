@@ -16,6 +16,7 @@ import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-l
 import type { DebugActions } from './debug/debug-overlay';
 
 import { Game } from '../game';
+import { GAME_TYPE } from '../game-config';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
 import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
@@ -534,14 +535,14 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     // Corona Points live on GLOW_LAYER (excluded from the SSAO normal prepass) — the camera must see it.
     game.getCamera().layers.enable(GLOW_LAYER);
     // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
-    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 0, weather: DEFAULT_WEATHER });
+    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
 
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
     const model = await adapter.loadCharacter('player/tommy.dff', 'player/tommy.txd');
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
-    const character = await setupCharacter(game, player, PLAYER_SPAWN, {
+    const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,
       skeleton: model.skeleton,
@@ -1000,7 +1001,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       streaming: () => game.getConfig().streaming,
       sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleport: (coords) => character.placePlayer(coords, true),
-      teleportToGanton: () => character.placePlayer(PLAYER_SPAWN, true),
+      teleportToGanton: () => character.placePlayer(PLAYER_SPAWN[GAME_TYPE], true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
       topDownView: () => game.topDownView(),
       vehicleReflection: () => game.getConfig().graphics.vehicleReflection,

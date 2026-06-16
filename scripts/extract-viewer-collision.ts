@@ -17,7 +17,7 @@ import { buildCollisionIndex, getCollision } from '../src/renderware/collision/c
 
 /** Keep in sync with the object-viewer's MODELS (model = dff basename, lowercased). */
 const MODELS = ['lae2_ground08', 'wattspark1_lae2'];
-const OUT_DIR = join('game-src', 'viewer');
+const OUT_DIR = join('game-src', 'viewer', 'objects');
 
 const gameIndex = process.argv.indexOf('--game');
 const game = gameIndex >= 0 ? process.argv[gameIndex + 1] : undefined;

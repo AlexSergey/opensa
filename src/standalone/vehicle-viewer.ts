@@ -37,7 +37,7 @@ import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe
 import { buildTextureMap } from '../renderware/three/build-texture';
 import { buildVehicle } from '../renderware/three/build-vehicle';
 
-/** Cars extracted into static/vehicles/ (model name → `<name>.dff` + `<name>.txd`). */
+/** Cars extracted into static/viewer/vehicles/ (model name → `<name>.dff` + `<name>.txd`). */
 const VEHICLES: readonly string[] = ['admiral', 'comet'];
 /** Debug paint (the carcol markers become these) + a neutral wheel scale. */
 const PRIMARY: [number, number, number] = [200, 40, 40];
@@ -178,7 +178,7 @@ function disposeTree(object: Object3D): void {
 }
 
 async function fetchBuffer(file: string): Promise<ArrayBuffer> {
-  const response = await fetch(`${BASE}/vehicles/${file}`);
+  const response = await fetch(`${BASE}/viewer/vehicles/${file}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${file}: ${response.status}`);
   }

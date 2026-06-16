@@ -13,6 +13,8 @@ interface ImportMeta {
 interface ImportMetaEnv {
   /** Google Analytics measurement ID (e.g. `G-XXXXXXX`). Unset in dev → analytics is skipped. */
   readonly VITE_GA_ID?: string;
+  /** Game variant to boot (`original` | `carcer`). Default `original`. */
+  readonly VITE_GAME_TYPE?: string;
   readonly VITE_STATIC_URL: string;
 }
 

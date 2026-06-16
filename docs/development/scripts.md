@@ -53,10 +53,10 @@ npx tsx scripts/gen-wind-list.ts
 
 ### copy-viewer.ts
 
-Copies the object-viewer fixtures (dff/txd + pre-baked col.json) from `game-src/viewer/` (the
-gitignored, local source of truth) into `static/viewer/`, so `/object-viewer.html` and the e2e lane
-have their models without the full archive. Run together with `extract-viewer-collision.ts` via the
-combined `viewer:assets:original` script (the `e2e*` scripts run it first).
+Copies the viewer fixtures from `game-src/viewer/` (the gitignored, local source of truth) into
+`static/viewer/`, preserving the per-viewer subfolders (`objects/`, `vehicles/`, `character/`), so the
+standalone viewers and the e2e lane have their models without the full archive. Run together with
+`extract-viewer-collision.ts` via the combined `viewer:assets:original` script (the `e2e*` scripts run it first).
 
 ```sh
 npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original
@@ -65,8 +65,8 @@ npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/
 ### extract-viewer-collision.ts
 
 Maintenance tool: re-bakes the COL of the object-viewer's model list out of the variant's
-`game-src/<game>/models/gta3.img` into `<model>.col.json` (written into `game-src/viewer/`, which
-`copy-viewer` syncs to static). Use when the collision parser changes. Bundled into
+`game-src/<game>/models/gta3.img` into `<model>.col.json` (written into `game-src/viewer/objects/`, which
+`copy-viewer` syncs to `static/viewer/objects/`). Use when the collision parser changes. Bundled into
 `viewer:assets:original` (above), so the regenerated col ships with the next copy.
 
 ### timecyc-builder (`npm run timecyc`)

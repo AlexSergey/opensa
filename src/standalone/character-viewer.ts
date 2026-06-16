@@ -37,9 +37,9 @@ import { buildSkinnedClump } from '../renderware/three/build-skinned-clump';
 import { buildTextureMap } from '../renderware/three/build-texture';
 
 /** Tommy ped (the player model) + the locomotion IFP (loaded directly, like the original). */
-const DFF = 'player/tommy.dff';
-const TXD = 'player/tommy.txd';
-const IFP = 'anim/ped.ifp';
+const DFF = 'tommy.dff';
+const TXD = 'tommy.txd';
+const IFP = 'ped.ifp';
 const DEFAULT_CLIP = 'idle_stance';
 /** Stand the SA bind pose up (matches canvas-host's TOMMY_PLACEMENT). */
 const PLACEMENT = {
@@ -132,7 +132,7 @@ function buildControls(): void {
 }
 
 async function fetchBuffer(path: string): Promise<ArrayBuffer> {
-  const response = await fetch(`${BASE}/${path}`);
+  const response = await fetch(`${BASE}/viewer/character/${path}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${path}: ${response.status}`);
   }

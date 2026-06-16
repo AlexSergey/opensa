@@ -25,6 +25,7 @@ import type {
   WorldLightConfig,
 } from '../../game';
 
+import { GAME_TYPE, type GameType } from '../../game-config';
 import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
 import { GameClock } from '../../game/time/game-clock';
 import { PLAYER_SPAWN } from '../locations';
@@ -192,6 +193,29 @@ type Screen =
 /** Authoring / live-tuning screens hidden only in the deploy build (`build:prod` sets `__DEBUGGER_HIDE__`). */
 const DEV_ONLY_SCREENS = new Set<Screen>(['atmosphere', 'camera', 'graphics', 'map', 'procobj']);
 
+/** Quick teleport destinations per game variant (native GTA Z-up world coords). Empty → no Position tab. */
+const TELEPORTS: Record<GameType, { coords: Vec3; label: string }[]> = {
+  carcer: [],
+  original: [
+    { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
+    { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
+    { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
+    { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
+    { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
+    { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
+    { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
+    { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
+    { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
+    { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
+    { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
+    { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
+    { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
+  ],
+};
+
+/** Teleports for the active variant; when empty, the Position tab is hidden. */
+const TELEPORTS_FOR_GAME = TELEPORTS[GAME_TYPE];
+
 const ALL_MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
@@ -206,7 +230,10 @@ const ALL_MENU: { label: string; screen: Screen }[] = [
 ];
 
 const MENU: { label: string; screen: Screen }[] = ALL_MENU.filter(
-  (item) => !__DEBUGGER_HIDE__ || !DEV_ONLY_SCREENS.has(item.screen),
+  (item) =>
+    (!__DEBUGGER_HIDE__ || !DEV_ONLY_SCREENS.has(item.screen)) &&
+    // No teleports for this variant → hide the Position tab entirely.
+    (item.screen !== 'position' || TELEPORTS_FOR_GAME.length > 0),
 );
 
 /** ProcObj screen rows — display order for the clutter categories (plan 042). */
@@ -218,55 +245,6 @@ const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [
   'trees',
   'rocks',
   'underwater',
-];
-
-/** Graphics-screen block for the world 2dfx particle effects (plan 044): master toggle + the
- *  draw distance that replaces the systems' authored CULLDIST. */
-function WorldEffectsControls(props: {
-  effects: EffectsConfig;
-  onPatch: (patch: Partial<EffectsConfig>) => void;
-}): ReactElement {
-  const { effects, onPatch } = props;
-
-  return (
-    <>
-      <label style={styles.label}>
-        <input
-          checked={effects.enabled}
-          onChange={() => onPatch({ enabled: !effects.enabled })}
-          style={styles.radio}
-          type="checkbox"
-        />
-        <span style={effects.enabled ? styles.optionActive : styles.option}>World effects</span>
-      </label>
-      <div style={styles.groupLabel}>EFFECTS DISTANCE: {effects.drawDistance.toFixed(0)}</div>
-      <input
-        max={300}
-        min={10}
-        onChange={(e) => onPatch({ drawDistance: Number(e.target.value) })}
-        step={10}
-        type="range"
-        value={effects.drawDistance}
-      />
-    </>
-  );
-}
-
-/** Quick teleport destinations (native GTA Z-up world coords). */
-const TELEPORTS: { coords: Vec3; label: string }[] = [
-  { coords: PLAYER_SPAWN, label: 'LS - Ganton' },
-  { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
-  { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
-  { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
-  { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
-  { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
-  { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
-  { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
-  { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
-  { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
-  { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
-  { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
-  { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
 ];
 
 /**
@@ -453,7 +431,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
               )}
 
               <div style={styles.groupLabel}>TELEPORT</div>
-              {TELEPORTS.map((t) => (
+              {TELEPORTS_FOR_GAME.map((t) => (
                 <button
                   key={t.label}
                   onClick={() => actions.teleport(t.coords)}
@@ -1176,6 +1154,38 @@ function MapScreen({
       )}
       {mapActive && <MapInspector game={game} />}
     </div>
+  );
+}
+
+/** Graphics-screen block for the world 2dfx particle effects (plan 044): master toggle + the
+ *  draw distance that replaces the systems' authored CULLDIST. */
+function WorldEffectsControls(props: {
+  effects: EffectsConfig;
+  onPatch: (patch: Partial<EffectsConfig>) => void;
+}): ReactElement {
+  const { effects, onPatch } = props;
+
+  return (
+    <>
+      <label style={styles.label}>
+        <input
+          checked={effects.enabled}
+          onChange={() => onPatch({ enabled: !effects.enabled })}
+          style={styles.radio}
+          type="checkbox"
+        />
+        <span style={effects.enabled ? styles.optionActive : styles.option}>World effects</span>
+      </label>
+      <div style={styles.groupLabel}>EFFECTS DISTANCE: {effects.drawDistance.toFixed(0)}</div>
+      <input
+        max={300}
+        min={10}
+        onChange={(e) => onPatch({ drawDistance: Number(e.target.value) })}
+        step={10}
+        type="range"
+        value={effects.drawDistance}
+      />
+    </>
   );
 }
 

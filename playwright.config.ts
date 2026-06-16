@@ -27,7 +27,7 @@ export default defineConfig({
       command: 'npm run serve:static',
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
-      url: `http://localhost:${STATIC_PORT}/viewer/wattspark1_lae2.dff`,
+      url: `http://localhost:${STATIC_PORT}/viewer/objects/wattspark1_lae2.dff`,
     },
     {
       command: `npm run dev -- --port ${APP_PORT} --strictPort`,

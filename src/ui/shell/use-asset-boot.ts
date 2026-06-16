@@ -5,13 +5,14 @@ import type { AssetFileSystem } from '../../renderware';
 import type { BootState } from './boot-machine';
 
 import { AssetLoader } from '../../asset-loader';
+import { GAME_TYPE } from '../../game-config';
 import { Vfs } from '../../vfs';
 import { bootReducer, initialBootState } from './boot-machine';
 import { CORE_STATUS, rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-status';
 import { readBootFlags, rememberDisclaimerAccepted, rememberIntroSeen } from './boot-storage';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
-const MANIFEST_URL = `${BASE}/original-${__APP_VERSION__}/manifest.json`;
+const MANIFEST_URL = `${BASE}/${GAME_TYPE}-${__APP_VERSION__}/manifest.json`;
 const NO_PROGRESS: ProgressSnapshot = { loadedBytes: 0, loadedChunks: 0, totalBytes: 0, totalChunks: 0 };
 const STATUS_INTERVAL_MS = 3600;
 // First-visit intro: kick the logo animation at the progress midpoint; hold the menu until it finishes.
