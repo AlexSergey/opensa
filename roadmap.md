@@ -122,15 +122,15 @@
 - [✅] Browser caching
 - [ ] Testing
   - [ ] Map
-  - [ ] Mods
+  - [✅] Mods
 - [✅] Rename project
 - [ ] Routine deals
-  - [ ] Readme
+  - [✅] Readme
   - [✅] Dev Docs
   - [✅] Create site
   - [ ] Articles
-  - [ ] Screenshots
-  - [ ] Video
+  - [✅] Screenshots
+  - [✅] Video
 - [✅] Buy domain name
 - [ ] CI/CD
 - [ ] Release v 0.1.0

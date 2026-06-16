@@ -7,6 +7,7 @@ export const GANTON_CJ_HOME: Vec3 = [2495, -1687, 13];
 // Player spawn per game variant (GTA SA world coords, Z-up) — raised so the player drops onto the
 // surface once physics is on. Tune against the real ground / lot centre.
 export const PLAYER_SPAWN: Record<GameType, Vec3> = {
+  anderius: [-904.7, 1430.1, 136.5],
   carcer: [401.9, 795.4, 20.5],
   original: [2495, 795.4, 20.5],
 };

@@ -25,8 +25,8 @@ Dev notes and progress — in [`/blog`](./blog).
 ## What's inside
 
 A TypeScript / three.js renderer for GTA San Andreas assets (RenderWare DFF/TXD, COL collision, IMG
-archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles. Full per-feature reference:
-[docs/features/](./docs/features/).
+archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles. See the
+[architecture overview](./docs/architecture.md) and the per-feature reference in [docs/features/](./docs/features/).
 
 ## Contributing
 

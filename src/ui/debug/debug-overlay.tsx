@@ -195,6 +195,7 @@ const DEV_ONLY_SCREENS = new Set<Screen>(['atmosphere', 'camera', 'graphics', 'm
 
 /** Quick teleport destinations per game variant (native GTA Z-up world coords). Empty → no Position tab. */
 const TELEPORTS: Record<GameType, { coords: Vec3; label: string }[]> = {
+  anderius: [],
   carcer: [],
   original: [
     { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
