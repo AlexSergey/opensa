@@ -9,6 +9,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [build-game.ts](#build-gamets)
   - [gen-wind-list.ts](#gen-wind-listts)
   - [copy-viewer.ts](#copy-viewerts)
+  - [serve-static.ts](#serve-staticts)
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
 - [Debugging / auditing](#debugging--auditing)
   - [audit-rw-coverage.ts](#audit-rw-coveragets)
@@ -53,13 +54,25 @@ npx tsx scripts/gen-wind-list.ts
 
 ### copy-viewer.ts
 
-Copies the viewer fixtures from `game-src/viewer/` (the gitignored, local source of truth) into
-`static/viewer/`, preserving the per-viewer subfolders (`objects/`, `vehicles/`, `character/`), so the
-standalone viewers and the e2e lane have their models without the full archive. Run together with
-`extract-viewer-collision.ts` via the combined `viewer:assets:original` script (the `e2e*` scripts run it first).
+Regenerates the viewer fixtures from `game-src/viewer/` (the gitignored, local source of truth) into
+**`static-viewer/viewer/`** (committed), preserving the per-viewer subfolders (`objects/`, `vehicles/`,
+`character/`), so the standalone viewers and the e2e lane have their models without the full archive (and run
+in CI). Local/dev only (needs game-src). Run together with `extract-viewer-collision.ts` via the combined
+`viewer:assets:original` script, then **commit the trimmed `static-viewer/`**.
 
 ```sh
 npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original
+```
+
+### serve-static.ts
+
+The local + e2e static origin (`npm run serve:static`, port 3001 = `VITE_STATIC_URL`). Serves **two roots at
+one origin** with fallthrough: `static-viewer/` (committed viewer fixtures) then `static/` (built game
+archives, gitignored). Their URL prefixes are disjoint (`/viewer/*` vs `/<game>-<version>/*`), CORS is on, and
+a missing `static/` (e.g. CI) just 404s the game archives while the viewers still work.
+
+```sh
+npm run serve:static                # tsx scripts/serve-static.ts
 ```
 
 ### extract-viewer-collision.ts

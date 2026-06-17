@@ -5,6 +5,21 @@ import { defineConfig, type Plugin } from 'vite';
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version: string };
 
+/** Copy `deploy/.htaccess` into the build output so the Apache config (HTTPS/SPA/caching/MIME) ships with
+ *  `dist/` — upload the whole folder to the web root. See `deploy/README.md`. */
+function emitHtaccess(): Plugin {
+  return {
+    generateBundle(): void {
+      this.emitFile({
+        fileName: '.htaccess',
+        source: readFileSync(resolve(__dirname, 'deploy/.htaccess')),
+        type: 'asset',
+      });
+    },
+    name: 'emit-htaccess',
+  };
+}
+
 /**
  * Emit the social-share preview to `dist/assets/og.png` with a STABLE name (no content hash), so the
  * `og:image` / `twitter:image` meta can point at a fixed URL (https://opensa.cc/assets/og.png).
@@ -46,6 +61,9 @@ const excludeViewers = process.env.OPENSA_NO_VIEWERS === 'true';
 // Hide the authoring/tuning debugger sections — only in the deploy build (OPENSA_DEBUGGER_HIDE=true via `build:prod`).
 const hideDebugger = process.env.OPENSA_DEBUGGER_HIDE === 'true';
 
+// The prod deploy build (`npm run build:prod` sets both flags) — gates deploy-only output like `.htaccess`.
+const isProdDeploy = excludeViewers && hideDebugger;
+
 const viewerInputs = {
   characterViewer: resolve(__dirname, 'character-viewer.html'),
   objectViewer: resolve(__dirname, 'object-viewer.html'),
@@ -68,5 +86,10 @@ export default defineConfig(({ command }) => ({
     // Guarantee `process.env.NODE_ENV === 'production'` resolves statically (build → production, serve → development).
     'process.env.NODE_ENV': JSON.stringify(command === 'build' ? 'production' : 'development'),
   },
-  plugins: [react(), emitOgImage(), injectVersionComment(pkg.version)],
+  plugins: [
+    react(),
+    emitOgImage(),
+    injectVersionComment(pkg.version),
+    ...(isProdDeploy ? [emitHtaccess()] : []), // ship deploy/.htaccess in dist only for build:prod
+  ],
 }));

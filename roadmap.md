@@ -117,7 +117,7 @@
     - [✅] Characters
   - [✅] Load in background
     - [✅] Map parts
-- [ ] Google Analytics
+- [✅] Google Analytics
 - [✅] Version in cache file names (reset user caches when update)
 - [✅] Browser caching
 - [ ] Testing
@@ -132,7 +132,7 @@
   - [✅] Screenshots
   - [✅] Video
 - [✅] Buy domain name
-- [ ] CI/CD
+- [✅] CI/CD
 - [ ] Release v 0.1.0
 
 Known issues:
