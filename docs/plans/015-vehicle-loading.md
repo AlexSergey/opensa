@@ -147,3 +147,16 @@ the front axle steers). A missing/empty wheel rig left the car sunk (no suspensi
 force applied at the wheels). Real fixtures: `tests/dff/vehicle/petro-4wheels.dff` (per-corner) +
 `petro-6wheels.dff` (3-axle + stray `wheel`). A "locked"/protected mod DFF (`yosemite`) that builds no
 wheels is a separate, shelved issue — see [open-issues/locked-dff.md](../open-issues/locked-dff.md).
+
+---
+
+**Correction (2026-06-19): 3rd/4th paint markers are cyan/yellow, NOT (255,175,0)/(255,60,0).** The
+2026-06-10 note above recorded the 3rd/4th markers as **(255,175,0)/(255,60,0)** and dismissed cyan/yellow
+as "no real DFF uses" — that was **wrong**. Found via `original-extend` **bobcat** (4-colour): its interior
+(`salon2`/`velur`/`apache_sits`) + body 3rd-colour regions use SA cyan **(0,255,255)**, so the interior
+rendered an unrepainted light green/cyan. Verified across **admiral, bobcat AND camper**: all three have
+their real 3rd-colour paint in **cyan**, while **(255,175,0)/(255,60,0) appear only on the `vehiclelights`
+atlas** (per-lamp ids, handled by the `isLight` branch) — they were misread as paint. So `build-vehicle.ts`
+uses **green/magenta/cyan/yellow** (`TERTIARY_MARKER` = cyan, `QUATERNARY_MARKER` = yellow); the lamp colours
+are NOT paint markers (re-adding them would hijack a legit orange/red body material). Tests in
+`build-vehicle.test.ts`; memory `vehicle-paint-markers` updated.

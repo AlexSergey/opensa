@@ -73,11 +73,14 @@ export interface VehicleOptions {
   wheelScale: [number, number];
 }
 
-/** Material marker colours that the carcol paint replaces (SA's editable material colours 1-4). */
+/** Material marker colours the carcol paint replaces — SA's editable material colours 1-4 (the standard
+ *  Kam's/ZModeler magic colours): 1 green, 2 magenta, 3 cyan, 4 yellow. NOTE: (255,175,0)/(255,60,0) are
+ *  NOT paint markers — they are per-lamp ids on the `vehiclelights` atlas; verified across admiral, bobcat
+ *  and camper, all of whose real 3rd-colour paint is cyan (those two colours appear only on lamps). */
 const PRIMARY_MARKER: [number, number, number] = [60, 255, 0];
 const SECONDARY_MARKER: [number, number, number] = [255, 0, 175];
-const TERTIARY_MARKER: [number, number, number] = [255, 175, 0];
-const QUATERNARY_MARKER: [number, number, number] = [255, 60, 0];
+const TERTIARY_MARKER: [number, number, number] = [0, 255, 255];
+const QUATERNARY_MARKER: [number, number, number] = [255, 255, 0];
 
 /** The single wheel atomic, instanced at each `wheel_*_dummy`. */
 const WHEEL_FRAME = 'wheel';

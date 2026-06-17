@@ -44,6 +44,53 @@ function fakeFs(): Renderware.AssetFileSystem {
 
 const SURFACE = { brightness: 0, flag: 0, light: 0, material: 0 };
 
+/** A file system serving the three vehicle-data files `ensureVehicleData` requires. */
+function vehicleFs(carcols: string): Renderware.AssetFileSystem {
+  const files: Record<string, string> = {
+    'data/carcols.dat': carcols,
+    'data/handling.cfg': '',
+    'data/vehicles.ide': '',
+  };
+
+  return { get: () => null, getText: (name) => files[name] ?? null, has: (name) => name in files, names: [] };
+}
+
+describe('GtaSaWorldAdapter.vehicleColourCombos', () => {
+  const CARCOLS = [
+    'col',
+    '0,0,0',
+    '10,20,30',
+    '40,50,60',
+    'end',
+    'car',
+    'testcar, 1,2, 2,1',
+    'end',
+    'car4',
+    'quadcar, 0,1,2,1',
+    'end',
+  ].join('\n');
+  const adapter = (): GtaSaWorldAdapter => new GtaSaWorldAdapter({ cellSize: 250, fs: vehicleFs(CARCOLS) });
+
+  describe('negative cases', () => {
+    it('returns empty for a car with no carcols entry', async () => {
+      expect(await adapter().vehicleColourCombos('nope')).toEqual([]);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('returns the car own 2-colour combos in order (case-insensitive)', async () => {
+      expect(await adapter().vehicleColourCombos('TestCar')).toEqual([
+        [1, 2],
+        [2, 1],
+      ]);
+    });
+
+    it('includes 4-colour combos', async () => {
+      expect(await adapter().vehicleColourCombos('quadcar')).toEqual([[0, 1, 2, 1]]);
+    });
+  });
+});
+
 describe('toModelColliders', () => {
   describe('negative cases', () => {
     it('produces empty shape arrays for a model with no geometry', () => {

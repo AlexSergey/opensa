@@ -9,7 +9,7 @@ import type { RWClump, RWGeometry, RWMaterial } from '../parsers/binary/types';
 import { GeometryFlag } from '../parsers/binary/constants';
 import { parseDff } from '../parsers/binary/dff';
 import { toArrayBuffer } from '../test-utils';
-import { buildClump, buildClumpParts } from './build-clump';
+import { buildClump, buildClumpParts, buildMaterial } from './build-clump';
 
 function alphaTextureMap(): Map<string, Texture> {
   const tex = new Texture();
@@ -25,6 +25,18 @@ function clumpWith(geo: RWGeometry): RWClump {
     frames: [{ name: 'Mesh', parentIndex: -1, position: [1, 2, 3], rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] }],
     geometries: [geo],
   };
+}
+
+/** Recursively: does any value in `obj` hold a live three Texture? (userData must stay JSON-serializable.) */
+function containsTexture(value: unknown): boolean {
+  if (value instanceof Texture) {
+    return true;
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(containsTexture);
+  }
+
+  return false;
 }
 
 function geometry(partial: Partial<RWGeometry> = {}): RWGeometry {
@@ -197,6 +209,66 @@ describe.skipIf(!existsSync(WASHER_DFF))('day/night vertex colours (real washer.
         expect(value).toBeGreaterThanOrEqual(0);
         expect(value).toBeLessThanOrEqual(1); // bytes normalised to 0..1
       }
+    });
+  });
+});
+
+/** Minimal stand-in for the parameters object three passes to `onBeforeCompile`. */
+interface ShaderStub {
+  fragmentShader: string;
+  uniforms: Record<string, { value: unknown }>;
+  vertexShader: string;
+}
+
+describe('buildMaterial — SA env-map reflection (userData stays serializable)', () => {
+  const ENV = 'generic_envmap9';
+  // Translucent → also a glass material, so the vehicle glass-pass clones it (where the bug surfaced).
+  const reflectiveMat = (): RWMaterial =>
+    material({
+      color: [255, 255, 255, 128],
+      effects: { envMap: { coefficient: 0.5, texture: ENV, useFrameBufferAlpha: false } },
+    });
+  const envTextures = (): Map<string, Texture> => {
+    const env = new Texture();
+    env.name = ENV;
+
+    return new Map([[ENV, env]]);
+  };
+  const runOnBeforeCompile = (mat: MeshStandardMaterial): ShaderStub => {
+    const shader: ShaderStub = { fragmentShader: '#include <emissivemap_fragment>', uniforms: {}, vertexShader: '' };
+    (mat.onBeforeCompile as unknown as (s: ShaderStub) => void)(shader);
+
+    return shader;
+  };
+
+  describe('negative cases', () => {
+    it('non-reflective materials get no SA-reflect holder and no texture in userData', () => {
+      const mat = buildMaterial(material(), geometry(), new Map());
+      expect(mat.userData.saReflect).toBeUndefined();
+      expect(containsTexture(mat.userData)).toBe(false);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('keeps the env Texture off userData (only the JSON-safe strength holder remains)', () => {
+      const mat = buildMaterial(reflectiveMat(), geometry(), envTextures());
+      const sa = mat.userData.saReflect as { saStrength: { value: number } };
+      expect(sa.saStrength).toEqual({ value: 0 }); // plugin-driven, serializable
+      expect(containsTexture(mat.userData)).toBe(false); // the Texture is NOT on userData (the bug)
+    });
+
+    it('still wires the env Texture into the shader uniform (reflection preserved)', () => {
+      const textures = envTextures();
+      const mat = buildMaterial(reflectiveMat(), geometry(), textures);
+      const shader = runOnBeforeCompile(mat);
+      const sa = mat.userData.saReflect as { saStrength: unknown };
+      expect(shader.uniforms.saEnvMap.value).toBe(textures.get(ENV)); // texture flows via the closure
+      expect(shader.uniforms.saStrength).toBe(sa.saStrength); // same holder the plugin drives
+    });
+
+    it('cloning a reflective material leaves no Texture in the clone userData (glass-pass safe)', () => {
+      const mat = buildMaterial(reflectiveMat(), geometry(), envTextures());
+      expect(containsTexture(mat.clone().userData)).toBe(false);
     });
   });
 });

@@ -45,14 +45,16 @@ const bodyGeometry: RWGeometry = {
     material({ color: [255, 0, 175, 255] }), // secondary marker
     material({ color: [10, 20, 30, 255] }), // plain
     material({ color: [255, 255, 255, 128], texture: { maskName: '', name: 'glass' } }), // translucent glass
-    material({ color: [255, 175, 0, 255] }), // tertiary (3rd-colour) marker
+    material({ color: [0, 255, 255, 255] }), // tertiary (3rd-colour) marker — SA cyan (e.g. bobcat interior)
     material({ color: [50, 50, 50, 255], texture: { maskName: '', name: 'interior' } }), // dark textured (interior)
+    material({ color: [255, 255, 0, 255] }), // quaternary (4th-colour) marker — SA yellow
   ]),
   triangles: [
     { a: 0, b: 1, c: 2, materialIndex: 0 }, // opaque
     { a: 0, b: 1, c: 2, materialIndex: 3 }, // glass
     { a: 0, b: 1, c: 2, materialIndex: 4 }, // tertiary
     { a: 0, b: 1, c: 2, materialIndex: 5 }, // interior
+    { a: 0, b: 1, c: 2, materialIndex: 6 }, // quaternary
   ],
 };
 const wheelGeometry = triangleGeometry([material({ color: [40, 40, 40, 255] })]);
@@ -306,9 +308,39 @@ describe('buildVehicle', () => {
       expect(materials[2].color.getHex()).toBe((10 << 16) | (20 << 8) | 30);
     });
 
-    it('replaces the 3rd-colour (255,175,0) marker with the tertiary paint', () => {
+    it('replaces the 3rd-colour cyan (0,255,255) marker with the tertiary paint', () => {
       const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
       expect(materials[4].color.getHex()).toBe((11 << 16) | (22 << 8) | 33);
+    });
+
+    it('replaces the 4th-colour yellow (255,255,0) marker with the quaternary paint', () => {
+      const materials = bodyMaterials(buildVehicle(vehicleClump(), new Map(), OPTIONS));
+      expect(materials[6].color.getHex()).toBe((44 << 16) | (55 << 8) | 66);
+    });
+
+    it('leaves the lamp-atlas colours (255,175,0)/(255,60,0) as lamps, never paint', () => {
+      const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      const geo: RWGeometry = {
+        ...triangleGeometry([
+          material({ color: [255, 175, 0, 255], texture: { maskName: '', name: 'vehiclelights128' } }),
+          material({ color: [255, 60, 0, 255], texture: { maskName: '', name: 'vehiclelights128' } }),
+        ]),
+        triangles: [
+          { a: 0, b: 1, c: 2, materialIndex: 0 },
+          { a: 0, b: 1, c: 2, materialIndex: 1 },
+        ],
+      };
+      const clump: RWClump = {
+        atomics: [{ frameIndex: 1, geometryIndex: 0 }],
+        frames: [
+          { name: 'root', parentIndex: -1, position: [0, 0, 0], rotation: id },
+          { name: 'body', parentIndex: 0, position: [0, 0, 0], rotation: id },
+        ],
+        geometries: [geo],
+      };
+      const mats = (buildVehicle(clump, new Map(), OPTIONS).root.children[0] as Mesh)
+        .material as MeshStandardMaterial[];
+      expect(mats.map((m) => m.color.getHex())).toEqual([0xffffff, 0xffffff]); // untinted lamps, not paint
     });
 
     it('modulates non-marker textured materials by their RW colour (dark interiors)', () => {
@@ -574,6 +606,40 @@ describe.skipIf(!existsSync(ADMIRAL))('buildVehicle (real admiral.dff)', () => {
         }
       });
       expect(bad).toBe(0);
+    });
+  });
+});
+
+// A stock SA 4-colour vehicle (squalo boat) — its real 3rd-colour paint is cyan (0,255,255) on the stock
+// vehiclegeneric/vehiclegrunge textures, proving cyan is the canonical SA 3rd marker (not a mod quirk).
+const SQUALO = 'tests/dff/vehicle/squalo.dff';
+
+describe.skipIf(!existsSync(SQUALO))('buildVehicle (real stock squalo.dff — cyan 3rd-colour paint)', () => {
+  const TERTIARY: [number, number, number] = [123, 45, 67];
+  const allColours = (): number[] => {
+    const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(SQUALO))), new Map(), {
+      ...OPTIONS,
+      tertiary: TERTIARY,
+    });
+    const out: number[] = [];
+    vehicle.root.traverse((child) => {
+      const mesh = child as Mesh;
+      if (!mesh.isMesh) {
+        return;
+      }
+      for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        out.push((m as MeshStandardMaterial).color.getHex());
+      }
+    });
+
+    return out;
+  };
+
+  describe('positive cases', () => {
+    it('repaints the cyan 3rd-colour marker (none left as cyan, the tertiary paint appears)', () => {
+      const colours = allColours();
+      expect(colours).not.toContain(0x00ffff); // cyan marker must be replaced by paint
+      expect(colours).toContain((TERTIARY[0] << 16) | (TERTIARY[1] << 8) | TERTIARY[2]);
     });
   });
 });

@@ -401,14 +401,18 @@ function faceNormal(p: Float32Array, a: number, b: number, c: number): [number, 
  * Wire the GTA-SA env-map reflection (PC/PS2) into a reflective material via `onBeforeCompile`: an additive
  * **sphere/matcap** reflection of `saEnvMap`, sampled by the **camera-space normal** (so it's screen-locked
  * like the original `CCustomCarEnvMapPipeline`). Gated by a `saStrength` uniform the vehicle-reflection plugin
- * drives per preset (0 for non-SA presets). The uniform holders live in `userData.saReflect`.
+ * drives per preset (0 for non-SA presets). Only the JSON-safe `saStrength` holder lives on `userData` (so the
+ * plugin can reach it); the env **Texture** uniform stays in this closure and is NEVER put on `userData` —
+ * `Material.copy()` (used by `clone()`, e.g. the vehicle glass-pass) JSON-clones userData and can't serialize a
+ * Texture ("THREE.Texture: Unable to serialize Texture").
  */
 function installSaReflection(material: MeshPhysicalMaterial, saEnvMap: Texture): void {
-  const saReflect = { saEnvMap: { value: saEnvMap }, saStrength: { value: 0 } };
-  material.userData.saReflect = saReflect;
+  const envMap = { value: saEnvMap }; // closure-only uniform — keep the Texture off userData (not serializable)
+  const saStrength = { value: 0 };
+  material.userData.saReflect = { saStrength };
   material.onBeforeCompile = (shader): void => {
-    shader.uniforms.saEnvMap = saReflect.saEnvMap;
-    shader.uniforms.saStrength = saReflect.saStrength;
+    shader.uniforms.saEnvMap = envMap;
+    shader.uniforms.saStrength = saStrength;
     shader.fragmentShader = `uniform sampler2D saEnvMap;\nuniform float saStrength;\n${shader.fragmentShader}`.replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>

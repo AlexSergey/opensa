@@ -939,6 +939,20 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     // debug spawn list, so adding a vehicle needs no per-car code.
     const vehicleModels = vehicleModelsFromNames(fs.names);
 
+    // Cycle each car's OWN carcols combos on repeated debug spawns (so re-spawning gives a different
+    // colour); undefined when the car has no carcols entry → loadVehicle picks its default.
+    const colourCycle = new Map<string, number>();
+    const nextVehicleColour = async (model: string): Promise<string | undefined> => {
+      const combos = await adapter.vehicleColourCombos(model);
+      if (combos.length === 0) {
+        return undefined;
+      }
+      const index = colourCycle.get(model) ?? 0;
+      colourCycle.set(model, index + 1);
+
+      return combos[index % combos.length].join(',');
+    };
+
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
       breakNearest: () => breakProp(nearestBreakable(character.viewOf(), 8)),
@@ -997,7 +1011,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       spawnVehicle: async (model) => {
         const facing = animationSystem.getFacing();
         const from = character.viewOf();
-        const colour = CAR_COLORS[model];
+        const colour = await nextVehicleColour(model);
         const spawned = await spawnVehicle({ colour, heading: facing, model, position: from }, { facing, from });
         const at: Vec3 = [spawned.position[0], spawned.position[1], spawned.position[2]];
         vehicleLod.add({ colour, heading: facing, model, position: at }, spawned);

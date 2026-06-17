@@ -449,6 +449,16 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     onProgress?.(1);
   }
 
+  /** Every carcol paint combo for a model (palette-index tuples) — 2-colour entries then 4-colour;
+   *  empty if the car has none. Lets callers cycle paint on repeated spawns (each combo is its OWN car's). */
+  async vehicleColourCombos(modelName: string): Promise<number[][]> {
+    await this.ensureVehicleData();
+    const name = modelName.toLowerCase();
+    const colours = this.vehicleColours;
+
+    return [...(colours?.cars.get(name) ?? []), ...(colours?.cars4.get(name) ?? [])].map((combo) => [...combo]);
+  }
+
   /** Deterministic clutter batches for one cell (plan 042), or null when the procobj data files
    *  were absent. Shared by the render path (loadCell) and the collider path (loadCellColliders) —
    *  same inputs give byte-identical batches, so visuals and collision always agree. */
