@@ -1,3 +1,5 @@
+import { parseIde, parseTimedObjects } from '../../src/renderware/parsers/text/ide.parser';
+
 /** One file to pack: its bare lowercased name (`cj.dff`) + which img to read it from. */
 export interface Entry {
   name: string;
@@ -31,6 +33,21 @@ export type Source = 'gta3' | 'gta_int';
 
 /** World-layout files taken wholesale from gta3.img into the priority bucket (collision/placement/anim/data). */
 const WORLD_EXTENSIONS = ['.col', '.ipl', '.ifp', '.dat'] as const;
+
+/**
+ * id → model/txd refs from one IDE's drawable, **placed** sections: `objs`/anim (`parseIde`) AND `tobj`
+ * (`parseTimedObjects`). tobj (time-of-day) models — lit-window / neon night overlays — are placed like any
+ * other but parsed separately, so the build must include them too; omitting them drops every tobj model from
+ * the archive (they vanish in-game).
+ */
+export function ideRefs(ideText: string): Map<number, ModelRef> {
+  const refs = new Map<number, ModelRef>();
+  for (const def of [...parseIde(ideText), ...parseTimedObjects(ideText)]) {
+    refs.set(def.id, { model: def.modelName.toLowerCase(), txd: def.txdName.toLowerCase() });
+  }
+
+  return refs;
+}
 
 /**
  * Split build entries into three buckets:

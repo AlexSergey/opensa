@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ModelRef } from './partition';
 
-import { partitionEntries, placedModels, resolveSource } from './partition';
+import { ideRefs, partitionEntries, placedModels, resolveSource } from './partition';
 
 const ide = new Map<number, ModelRef>([
   [1, { model: 'house', txd: 'htex' }],
@@ -75,6 +75,27 @@ describe('partitionEntries', () => {
     it('puts every referenced txd in textures (deduped), resolved across both imgs', () => {
       expect(names(textures)).toEqual(['htex.txd', 'ttex.txd']);
       expect(textures.find((e) => e.name === 'ttex.txd')?.source).toBe('gta_int');
+    });
+  });
+});
+
+describe('ideRefs', () => {
+  // objs (5 cols) + a tobj (objs cols + timeOn,timeOff). tobj models must be packed too, or every
+  // time-of-day overlay (lit windows / neon) is dropped from the build and vanishes in-game.
+  const IDE = [
+    'objs',
+    '100, house, htex, 299, 0',
+    'end',
+    'tobj',
+    '200, lampwin_nt, lamptex, 299, 0, 20, 6',
+    'end',
+  ].join('\n');
+
+  describe('positive cases', () => {
+    it('includes both objs and tobj models (lowercased) keyed by id', () => {
+      const refs = ideRefs(IDE);
+      expect(refs.get(100)).toEqual({ model: 'house', txd: 'htex' });
+      expect(refs.get(200)).toEqual({ model: 'lampwin_nt', txd: 'lamptex' }); // the tobj model — previously dropped
     });
   });
 });

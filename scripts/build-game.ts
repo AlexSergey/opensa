@@ -16,11 +16,10 @@ import { join, relative, sep } from 'node:path';
 import type { ImgArchive } from '../src/renderware/archive/img-archive';
 
 import { openArchive } from '../src/renderware/archive/img-archive';
-import { parseIde } from '../src/renderware/parsers/text/ide.parser';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
 import { chunkByHash } from './game-build/chunk';
-import { type Entry, type ModelRef, partitionEntries, placedModels } from './game-build/partition';
+import { type Entry, ideRefs, type ModelRef, partitionEntries, placedModels } from './game-build/partition';
 
 const ROOT = process.cwd();
 
@@ -63,8 +62,8 @@ function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
 function ideIdMap(dataDir: string): Map<number, ModelRef> {
   const map = new Map<number, ModelRef>();
   for (const file of walk(dataDir).filter((p) => p.toLowerCase().endsWith('.ide'))) {
-    for (const def of parseIde(readFileSync(file, 'utf8'))) {
-      map.set(def.id, { model: def.modelName.toLowerCase(), txd: def.txdName.toLowerCase() });
+    for (const [id, ref] of ideRefs(readFileSync(file, 'utf8'))) {
+      map.set(id, ref);
     }
   }
 
