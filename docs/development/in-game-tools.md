@@ -35,10 +35,10 @@ what you see is what the game produces. Each is its own Vite HTML entry; run `np
 - **`/character-viewer.html`** — a skinned ped. Play any `ped.ifp` animation (looped), and toggle the
   skeleton and the collision capsule.
 
-Each viewer reads its fixtures from a subfolder of `static-viewer/viewer/` (committed; served alongside
-`static/` by `serve:static`): `objects/` (dff/txd + pre-baked COL — map objects keep their collision in
-`gta3.img`, not the DFF), `vehicles/`, and `character/`. Regenerate from `game-src/viewer/` (and re-bake the
-object COL), then commit the trimmed `static-viewer/`, with:
+Each viewer reads its fixtures from a subfolder of `static/viewer/` (the only committed path under `static/`;
+the rest — `static/games/`, artifacts — is gitignored): `objects/` (dff/txd + pre-baked COL — map objects
+keep their collision in `gta3.img`, not the DFF), `vehicles/`, and `character/`. Regenerate from
+`game-src/viewer/` (and re-bake the object COL), then commit the trimmed `static/viewer/`, with:
 
 ```bash
 npm run viewer:assets:original

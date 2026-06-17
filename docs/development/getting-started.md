@@ -66,7 +66,7 @@ and plan 048 for the full breakdown.
 ## 4. Run
 
 ```sh
-npm run serve:static            # serves ./static-viewer + ./static at http://localhost:3001 (VITE_STATIC_URL)
+npm run serve:static            # serves ./static (viewer fixtures + built game archives) at :3001 (VITE_STATIC_URL)
 npm run dev                     # Vite dev server for the app
 ```
 

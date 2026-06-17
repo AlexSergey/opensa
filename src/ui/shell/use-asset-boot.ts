@@ -12,7 +12,8 @@ import { CORE_STATUS, rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-s
 import { readBootFlags, rememberDisclaimerAccepted, rememberIntroSeen } from './boot-storage';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
-const MANIFEST_URL = `${BASE}/${GAME_TYPE}-${__APP_VERSION__}/manifest.json`;
+// Game archives live under static/games/<game>-<version>/ (gitignored); static/viewer/ is committed.
+const MANIFEST_URL = `${BASE}/games/${GAME_TYPE}-${__APP_VERSION__}/manifest.json`;
 const NO_PROGRESS: ProgressSnapshot = { loadedBytes: 0, loadedChunks: 0, totalBytes: 0, totalChunks: 0 };
 const STATUS_INTERVAL_MS = 3600;
 // First-visit intro: kick the logo animation at the progress midpoint; hold the menu until it finishes.

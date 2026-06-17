@@ -39,8 +39,8 @@ jobs:
       - run: echo "VITE_STATIC_URL=http://localhost:3001" > .env
       # Only the specs that don't need the gitignored game archives:
       #  - asset-loader: mocks all network (page.route).
-      #  - object-viewer: loads from the committed static-viewer/ (served by serve:static).
-      # shell.spec's happy path needs static/<game>-<version>/ → not run here.
+      #  - object-viewer: loads from the committed static/viewer/ (served by serve:static).
+      # shell.spec's happy path needs static/games/<game>-<version>/ → not run here.
       # --ignore-snapshots: the visual baseline is platform-bound (…-darwin.png); the functional
       # checks (render smoke, model switch) still run. Pixel comparison stays a local concern.
       - run: npx playwright test asset-loader object-viewer --ignore-snapshots

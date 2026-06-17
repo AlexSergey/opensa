@@ -43,7 +43,7 @@ export interface GroupChunk extends ChunkInfo {
 /** A build group — the three partition buckets the build emits (see scripts/build-game.ts). */
 export type GroupName = 'models' | 'priority' | 'textures';
 
-/** The build manifest at `static/<game>-<version>/manifest.json`. */
+/** The build manifest at `static/games/<game>-<version>/manifest.json`. */
 export interface Manifest {
   chunks: Record<GroupName, ChunkInfo[]>;
   game: string;

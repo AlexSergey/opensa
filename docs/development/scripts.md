@@ -55,10 +55,11 @@ npx tsx scripts/gen-wind-list.ts
 ### copy-viewer.ts
 
 Regenerates the viewer fixtures from `game-src/viewer/` (the gitignored, local source of truth) into
-**`static-viewer/viewer/`** (committed), preserving the per-viewer subfolders (`objects/`, `vehicles/`,
-`character/`), so the standalone viewers and the e2e lane have their models without the full archive (and run
-in CI). Local/dev only (needs game-src). Run together with `extract-viewer-collision.ts` via the combined
-`viewer:assets:original` script, then **commit the trimmed `static-viewer/`**.
+**`static/viewer/`** (the only committed path under `static/`), preserving the per-viewer subfolders
+(`objects/`, `vehicles/`, `character/`), so the standalone viewers and the e2e lane have their models without
+the full archive (and run in CI). Local/dev only (needs game-src). Run together with
+`extract-viewer-collision.ts` via the combined `viewer:assets:original` script, then **commit the trimmed
+`static/viewer/`**.
 
 ```sh
 npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original
@@ -66,10 +67,9 @@ npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/
 
 ### serve-static.ts
 
-The local + e2e static origin (`npm run serve:static`, port 3001 = `VITE_STATIC_URL`). Serves **two roots at
-one origin** with fallthrough: `static-viewer/` (committed viewer fixtures) then `static/` (built game
-archives, gitignored). Their URL prefixes are disjoint (`/viewer/*` vs `/<game>-<version>/*`), CORS is on, and
-a missing `static/` (e.g. CI) just 404s the game archives while the viewers still work.
+The local + e2e static origin (`npm run serve:static`, port 3001 = `VITE_STATIC_URL`). Serves `static/`,
+which holds both the committed `static/viewer/` fixtures (`/viewer/*`) and the built
+`static/games/<game>-<version>/` archives (gitignored). CORS is on; dev mode reads files fresh.
 
 ```sh
 npm run serve:static                # tsx scripts/serve-static.ts

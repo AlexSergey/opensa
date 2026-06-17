@@ -14,8 +14,8 @@ npm run e2e:update     # regenerate screenshot baselines
 
 `playwright.config.ts` starts two `webServer`s for you (reused if already running locally):
 
-- `npm run serve:static` — serves `static-viewer/` (committed viewer fixtures) + `static/` (built game
-  archives, gitignored) on :3001 (`VITE_STATIC_URL`), one origin, fallthrough.
+- `npm run serve:static` — serves `static/` on :3001 (`VITE_STATIC_URL`): the committed `static/viewer/`
+  fixtures **and** the built `static/games/<game>-<version>/` archives (gitignored).
 - `npm run dev -- --port 5173 --strictPort` — the Vite app on :5173 (`baseURL`).
 
 Chromium is already installed under the repo's Playwright cache. If missing: `npx playwright install chromium`.
@@ -23,13 +23,13 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 ## Assets
 
 `e2e/object-viewer.spec.ts` targets **`object-viewer.html`**, whose models live in the small,
-**committed** `static-viewer/viewer/` — so it runs **anywhere, including CI**, with no game-src and no full
-archive (`npm run e2e` no longer pre-populates anything; regenerate the fixtures locally with
-`npm run viewer:assets:original`, which writes `static-viewer/`, and commit the trimmed result).
+**committed** `static/viewer/` — so it runs **anywhere, including CI**, with no game-src and no full archive
+(`npm run e2e` no longer pre-populates anything; regenerate the fixtures locally with
+`npm run viewer:assets:original`, which writes `static/viewer/`, and commit the trimmed result).
 `e2e/asset-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
-`e2e/shell.spec.ts` exercises the UI shell boot flow; its happy path needs the built **`original-<version>`
-chunk archives** served from `static/` (gitignored), so that spec only runs where those are present (not on
-GitHub-hosted CI). It stops before the full texture download + WebGL boot to stay fast.
+`e2e/shell.spec.ts` exercises the UI shell boot flow; its happy path needs the built
+**`static/games/original-<version>/`** chunk archives (gitignored), so that spec only runs where those are
+present (not on GitHub-hosted CI). It stops before the full texture download + WebGL boot to stay fast.
 
 ## What is covered (`e2e/object-viewer.spec.ts`)
 

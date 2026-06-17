@@ -1,6 +1,7 @@
 /**
  * Game build (plan 048). Packs `game-src/<game>/` into content-hashed fflate chunks under
- * `static/<version>/` (one `manifest.json` lists them):
+ * `static/games/<version>/` (one `manifest.json` lists them; `static/games` is gitignored, `static/viewer`
+ * is committed):
  *  - priority — loose data/player/vehicles/anim/etc. + world files (col/ipl/ifp/dat); NO dff/txd.
  *  - models   — the `.dff` geometry the EXTERIOR map references (interiors excluded).
  *  - textures — the `.txd` textures the EXTERIOR map references.
@@ -82,7 +83,7 @@ function main(): void {
 
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { version: string };
   const version = `${game}-${pkg.version}`;
-  const outDir = join(ROOT, 'static', version);
+  const outDir = join(ROOT, 'static', 'games', version);
   mkdirSync(outDir, { recursive: true });
   // Drop prior chunks/manifest — content-hashed names mean stale chunks would otherwise pile up.
   for (const file of readdirSync(outDir)) {
@@ -146,7 +147,7 @@ function main(): void {
   console.log(`  models   — ${modelChunks.length} chunk(s), ${models.length} dff, ${mb(modelChunks)}`);
   console.log(`  textures — ${textureChunks.length} chunk(s), ${textures.length} txd, ${mb(textureChunks)}`);
   console.log(`  from gta_int.img (override): ${fromInt} files`);
-  console.log(`  → static/${version}/`);
+  console.log(`  → static/games/${version}/`);
 }
 
 /** Split a group into ~50MB content-hashed zips, write them, and return one {@link ChunkInfo} per chunk. */

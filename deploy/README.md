@@ -1,7 +1,7 @@
 # Deploy (shared hosting + Apache)
 
 How to put OpenSA online on a shared host with Apache and a bound domain. Two parts ship: the **app**
-(`dist/`, a static SPA) and the **game asset archives** (`static/<game>-<version>/`, large binary chunks).
+(`dist/`, a static SPA) and the **game asset archives** (`static/games/<game>-<version>/`, large binary chunks).
 
 > **HTTPS is required.** The asset loader uses the Cache Storage API, which only works in a secure context.
 > Enable TLS (most hosts offer free Let's Encrypt). The bundled `.htaccess` also forces `http → https`.
@@ -40,13 +40,13 @@ These are **not** in git and are large (textures alone is hundreds of MB). Build
 `VITE_GAME_TYPE`:
 
 ```bash
-npm run build:game:original          # → static/original-<version>/  (manifest.json + chunk zips)
+npm run build:game:original          # → static/games/original-<version>/  (manifest.json + chunk zips)
 # or: npm run build:game:original-extend, etc.
 ```
 
 > The folder name is `<GAME_TYPE>-<version>` where `<version>` is `package.json`'s version. The runtime
-> fetches `${VITE_STATIC_URL}/<GAME_TYPE>-<version>/manifest.json`, so **the names must line up**. If you
-> bump the version, rebuild the archives and re-upload the new folder (a stale/missing manifest → 404).
+> fetches `${VITE_STATIC_URL}/games/<GAME_TYPE>-<version>/manifest.json`, so **the names must line up**. If
+> you bump the version, rebuild the archives and re-upload the new folder (a stale/missing manifest → 404).
 
 ## 4. Upload to the web root
 
@@ -58,15 +58,16 @@ Upload (FTP/SFTP/SSH) so the served layout is:
   .htaccess              # from dist/ (already configured: HTTPS, SPA fallback, caching, MIME)
   assets/                # hashed js/css/fonts/og.png
   static/
-    original-<version>/
-      manifest.json
-      priority-<hash>.zip
-      models-<hash>.zip
-      textures-<hash>.zip
+    games/
+      original-<version>/
+        manifest.json
+        priority-<hash>.zip
+        models-<hash>.zip
+        textures-<hash>.zip
 ```
 
 - Everything inside `dist/` → the web root.
-- The `static/<game>-<version>/` folder → under the web root (or wherever `VITE_STATIC_URL` points).
+- The `static/games/<game>-<version>/` folder → under the web root (or wherever `VITE_STATIC_URL` points).
 - Make sure `.htaccess` made it (dotfiles are hidden in some FTP clients — enable "show hidden files").
 
 ## 5. (Optional) Offload the heavy assets
@@ -79,8 +80,8 @@ serve `static/` from a CDN / object storage (Cloudflare R2, Backblaze B2, etc.) 
 
 - [ ] HTTPS on, `http → https` redirect working.
 - [ ] `.htaccess` present in the web root (SPA fallback returns `index.html` for unknown paths).
-- [ ] `VITE_STATIC_URL` + `VITE_GAME_TYPE` matched the build, and the `static/<game>-<version>/` folder name
-      matches `package.json`'s version.
+- [ ] `VITE_STATIC_URL` + `VITE_GAME_TYPE` matched the build, and the `static/games/<game>-<version>/` folder
+      name matches `package.json`'s version.
 - [ ] `manifest.json` and `index.html` are served `no-cache`; hashed assets/chunks are cached immutable
       (the bundled `.htaccess` does this).
 - [ ] Open the site → menu loads → Play streams the world. Check the Network tab: the chunk zips download
