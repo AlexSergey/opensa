@@ -34,6 +34,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # .env is gitignored, so CI has no VITE_STATIC_URL — the dev server would bake it as undefined and the
+      # viewers would fetch the SPA index.html instead of their dff/txd. Point it at the local static origin.
+      - run: echo "VITE_STATIC_URL=http://localhost:3001" > .env
       # Only the specs that don't need the gitignored game archives:
       #  - asset-loader: mocks all network (page.route).
       #  - object-viewer: loads from the committed static-viewer/ (served by serve:static).
