@@ -22,7 +22,8 @@ plans 015–021/025/030/033.
   sorted).
 - **Physics** (plans 017/018): Rapier dynamic chassis from the COL convex hull, raycast wheels
   (suspension), handling.cfg parsed (kept for tuning), enter/exit flow with seat alignment
-  (plan 016), damage system (plan 019) using the full COL.
+  (plan 016) — the run-to-door is interruptible (movement input or a blocked path hands control back,
+  GTA-style), damage system (plan 019) using the full COL.
 - **LOD/streaming** (plan 021): HD/LOD/unload distances per vehicle, placements respawn.
 - **Headlights** (plan 033, ⚠️ MVP — redo later): glowing lamp glass + coronas at the lamp dummies; lamps
   found by position near the `headlights`/`taillights` dummies; no road beam yet. See night-and-time.md.

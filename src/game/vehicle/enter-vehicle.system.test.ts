@@ -175,6 +175,24 @@ describe('EnterVehicleSystem', () => {
       expect(doorAngle(car)).toBeCloseTo(0);
     });
 
+    it('does not cancel once climbing in (movement input ignored mid-getin)', () => {
+      const h = setup();
+      const car = vehicleAt([2, 0, 0]);
+      h.system.add(car);
+      h.press(true);
+      h.system.update(0.016); // approaching
+      h.ctrl.arrived = true;
+      h.system.update(1); // arrived → open → step into the doorway
+      h.system.update(0.016); // doorway → climb in (phase 'getin', scripted)
+      expect(h.ctrl.enabled).toBe(false);
+
+      h.press(false);
+      h.hold('KeyW', true); // try to bail out mid-getin
+      h.system.update(0.5);
+      h.system.fixedUpdate(2); // getin completes regardless of input
+      expect(h.anim.clip).toBe('car_sit'); // committed to seating, not cancelled
+    });
+
     it('does not drive while not seated', () => {
       const h = setup();
       h.system.add(vehicleAt([2, 0, 0]));
@@ -217,6 +235,35 @@ describe('EnterVehicleSystem', () => {
       h.press(true);
       h.system.update(1);
       expect(h.ctrl.path).toHaveLength(3);
+    });
+
+    it('hands control back when the player feeds movement during the run-up (after a short hold)', () => {
+      const h = setup();
+      h.system.add(vehicleAt([2, 0, 0]));
+      h.press(true);
+      h.system.update(0.016); // begin approach
+      expect(h.ctrl.path).toHaveLength(1); // running to the door
+      h.press(false); // release Enter
+      h.hold('KeyW', true); // player takes over
+
+      h.system.update(0.1); // held 0.1 s < threshold → still auto-running
+      expect(h.ctrl.path).toHaveLength(1);
+      h.system.update(0.1); // held 0.2 s ≥ threshold → control returns
+      expect(h.ctrl.path).toEqual([]); // empty path = manual control restored
+    });
+
+    it('auto-cancels the run-up when the path is blocked (no progress), so Tommy stops running in place', () => {
+      const h = setup(); // player position is fixed → never progresses toward the door
+      h.system.add(vehicleAt([2, 0, 0]));
+      h.press(true);
+      h.system.update(0.016); // approaching
+      h.press(false);
+      expect(h.ctrl.path).toHaveLength(1);
+
+      h.system.update(1); // ~1 s stalled, under the timeout → still running
+      expect(h.ctrl.path).toHaveLength(1);
+      h.system.update(1); // ~2 s stalled, over the timeout → cancelled
+      expect(h.ctrl.path).toEqual([]);
     });
 
     it('opens the driver door once the player arrives', () => {

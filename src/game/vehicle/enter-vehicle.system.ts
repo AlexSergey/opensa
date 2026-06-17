@@ -85,6 +85,9 @@ const STEER_LOCK_SCALE = 0.6; // use only this fraction of the handling lock (ge
 const UPRIGHT_MIN = 0.6; // car-up·world-up above this = upright enough for the normal door entry
 const STOP_THRESHOLD = 0.8; // forward speed (m/s) below which the car counts as stopped (for exit)
 const VEHICLE_CLEARANCE = 0.6; // how far outside the car footprint the player must be to re-collide
+const APPROACH_CANCEL_HOLD = 0.18; // s of movement input during the run-to-door before control returns (GTA-like lag)
+const APPROACH_STALL_TIMEOUT = 1.5; // s of no progress toward the door (blocked path) before auto-cancelling
+const APPROACH_STALL_EPSILON = 0.02; // planar distance (m) under which the player counts as not progressing per frame
 
 type Phase = 'approaching' | 'exiting' | 'exitopen' | 'getin' | 'idle' | 'opening' | 'seated' | 'stepin' | 'stopping';
 
@@ -101,6 +104,9 @@ export class EnterVehicleSystem implements System {
   private active: EnterableVehicle | null = null;
   private readonly aimCamera: (azimuth: number) => void;
   private readonly animation: CharacterAnimationSystem;
+  private approachHeld = 0; // s of movement input held during 'approaching' → hand control back (GTA-like lag)
+  private approachLast: Vec3 = [0, 0, 0]; // player position last 'approaching' frame (stall detection)
+  private approachStalled = 0; // s without progress toward the door → auto-cancel a blocked approach
   /** Whether the driver is actively braking (handbrake or braking forward motion) — for the brake lights. */
   private braking = false;
   private readonly config: Readonly<Config>;
@@ -218,6 +224,9 @@ export class EnterVehicleSystem implements System {
       this.phase = 'stopping'; // brake to a halt first, then climb out (no exiting a moving car)
     }
 
+    if (this.phase === 'approaching') {
+      this.updateApproachCancel(delta); // movement input / a blocked path hands control back
+    }
     if (this.phase === 'approaching' && this.controller.arrived) {
       this.phase = 'opening';
       this.doorTarget = DOOR_OPEN_ANGLE;
@@ -322,11 +331,25 @@ export class EnterVehicleSystem implements System {
 
     this.active = nearest;
     this.phase = 'approaching';
+    this.approachHeld = 0;
+    this.approachStalled = 0;
+    this.approachLast = this.playerPosition();
     // Stop the player shoving the dynamic car while walking to the door / climbing in.
     this.physics.ignoreVehicles(this.playerCollider, true);
     this.restoreWhenClear = false; // entering again — keep ignoring cars
     this.controller.runPath(this.driverDoorPath(nearest));
     this.logger.debug('enter-vehicle', 'approach', { distance: Math.sqrt(nearestDistance) });
+  }
+
+  /** Abort an in-progress run-to-door: restore manual control and go idle. The player keeps ignoring the
+   *  car until he steps clear (reuses the post-exit cleanup), so he doesn't shove it while standing next to it. */
+  private cancelApproach(): void {
+    this.controller.runPath([]); // empty path → manual control resumes next step
+    this.phase = 'idle';
+    this.restoreWhenClear = true; // re-collide with the car once the player walks clear (see update)
+    this.approachHeld = 0;
+    this.approachStalled = 0;
+    this.logger.debug('enter-vehicle', 'approach cancelled');
   }
 
   private doorAngleOf(vehicle: EnterableVehicle | null): number {
@@ -583,6 +606,26 @@ export class EnterVehicleSystem implements System {
       vehicle.position[1] + local[0] * sin + local[1] * cos,
       vehicle.position[2],
     ];
+  }
+
+  /**
+   * GTA-style interrupt of the run-to-door (only while 'approaching'): movement input hands control back
+   * after a short hold (a slight lag, not an instant cancel on a stray tap); and a blocked path — no planar
+   * progress for {@link APPROACH_STALL_TIMEOUT} — auto-cancels so Tommy doesn't run in place forever.
+   */
+  private updateApproachCancel(delta: number): void {
+    const { controls } = this.config;
+    const moving = this.axis(controls.forward, controls.back) !== 0 || this.axis(controls.right, controls.left) !== 0;
+    this.approachHeld = moving ? this.approachHeld + delta : 0;
+
+    const [px, py] = this.playerPosition();
+    const progressed = Math.hypot(px - this.approachLast[0], py - this.approachLast[1]) > APPROACH_STALL_EPSILON;
+    this.approachLast = [px, py, 0];
+    this.approachStalled = progressed ? 0 : this.approachStalled + delta;
+
+    if (this.approachHeld >= APPROACH_CANCEL_HOLD || this.approachStalled >= APPROACH_STALL_TIMEOUT) {
+      this.cancelApproach();
+    }
   }
 }
 

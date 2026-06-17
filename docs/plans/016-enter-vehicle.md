@@ -21,6 +21,7 @@ pose. Driver side only (left front / LHS) for now; exit deferred.
 ## Design
 
 ### Component framework (extend `buildVehicle`)
+
 - Wrap each `door_*_ok` atomic (frame parent is a `door_*_dummy`) in a **pivot at the hinge** so it can
   swing; skip `*_dam`. Expose on `BuiltVehicle`:
   - `doors: { side: 'lf'|'rf'|'lr'|'rr'; pivot: Group; closed: Quaternion }[]`
@@ -29,14 +30,17 @@ pose. Driver side only (left front / LHS) for now; exit deferred.
 - (Wheels already exposed; this generalises the rig to doors.)
 
 ### Vehicle registry (enterable vehicles)
+
 - A small registry (held by the enter system) of placed vehicles: `{ root, rig, doors, seatLocal,
-  doorEntryLocal }`. `findEnterable(playerPos, range)` → nearest car whose driver-door entry point is within
+doorEntryLocal }`. `findEnterable(playerPos, range)` → nearest car whose driver-door entry point is within
   range (a few metres). World transforms via `root.matrixWorld` (but vehicles live under the −90°X streaming
   root; the **physics/world** positions are native Z-up — compute entry/seat world points in native Z-up
   from the car's known placement, not the display matrix).
 
 ### Enter state machine (`EnterVehicleSystem`, game/vehicle)
+
 Reads the Enter key (KeyboardInput). States:
+
 1. `NONE` → on Enter, `findEnterable`; if found, lock onto it, **gate** the normal character controller +
    character-animation systems (CJ is now scripted).
 2. `ALIGN` → drive CJ (reuse Velocity/locomotion or a simple move) to the door entry point, facing the car;
@@ -92,3 +96,14 @@ src/ui/canvas-host.tsx                      # register vehicles with the enter s
 
 Exit/get-out, passenger seats, RHS, driving (steering/throttle from handling), traffic/AI, car-jacking,
 camera rework, closing-door-from-outside.
+
+---
+
+**Since-added (2026-06-19): interruptible run-to-door (GTA-style).** The `'approaching'` phase had no exit,
+so if something blocked Tommy's path he ran in place forever. `EnterVehicleSystem.update` now cancels the
+approach (only while `'approaching'`; the get-in animation still commits) on either trigger:
+(1) **movement input** held past `APPROACH_CANCEL_HOLD` (0.18 s — the slight lag, and ignores a stray tap),
+or (2) **no planar progress** for `APPROACH_STALL_TIMEOUT` (1.5 s — a blocked path). `cancelApproach`
+reuses the existing teardown: `controller.runPath([])` (manual control back), `phase = 'idle'`,
+`restoreWhenClear = true` (re-collide with the car once the player steps clear). Tests in
+`enter-vehicle.system.test.ts`.
