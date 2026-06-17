@@ -82,6 +82,11 @@ const QUATERNARY_MARKER: [number, number, number] = [255, 60, 0];
 /** The single wheel atomic, instanced at each `wheel_*_dummy`. */
 const WHEEL_FRAME = 'wheel';
 
+/** Per-corner wheel atomics — `wheel_{l|r}{f|m|b}` — each its own mesh, SA's "different front/rear wheels"
+ *  convention (as opposed to the single shared {@link WHEEL_FRAME} atomic instanced at the dummies). The
+ *  middle axle (`m`) is for 3-axle trucks (e.g. petro). */
+const WHEEL_CORNER_RE = /^wheel_(lf|rf|lm|rm|lb|rb)$/;
+
 /** Door body atomics — `door_{lf|rf|lr|rr}_ok` — wrapped in a hinge pivot so they swing. */
 const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
 
@@ -108,12 +113,23 @@ interface BodyBuild {
   worldCache: Map<number, Matrix4>;
 }
 
+/** A per-corner wheel atomic and its axle/side flags (the {@link WHEEL_CORNER_RE} convention). */
+interface CornerWheel {
+  atomic: RWClump['atomics'][number];
+  /** Middle + back axles (everything but the front) — they don't steer. */
+  rear: boolean;
+  /** Right side (`r*`) — left copies are mirrored so they face outward. */
+  right: boolean;
+}
+
 /**
  * Build a renderable vehicle from its DFF clump. Renders the body (chassis +
  * each `*_ok` component atomic, placed by its frame's **world** transform),
- * skipping `*_dam` (damaged) and `*_vlo` (LOD) parts and the bare `wheel`
- * atomic. The wheel is instanced at the four `wheel_*_dummy` frames, scaled per
- * front/rear and mirrored on the right side. Paint markers in material colours
+ * skipping `*_dam` (damaged) and `*_vlo` (LOD) parts and the wheel atomics.
+ * Wheels follow one of SA's two conventions: a single shared `wheel` atomic
+ * instanced at the four `wheel_*_dummy` frames (scaled per front/rear, mirrored
+ * on the right), or per-corner `wheel_{lf|rf|lb|rb}` atomics placed at their own
+ * frames (different front/rear wheels). Paint markers in material colours
  * are replaced by the carcol primary/secondary. Result stays in native Z-up
  * (the caller's streaming root applies the Z-up→Y-up rotation). Wheels are
  * wrapped in pivot/spinner groups so a {@link BuiltWheel} rig can spin and steer
@@ -137,6 +153,7 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
   lod.visible = false; // shown only at distance by the LOD system
 
   let wheelGeometryIndex: null | number = null;
+  const cornerWheels: CornerWheel[] = [];
 
   for (const atomic of clump.atomics) {
     const frame = clump.frames[atomic.frameIndex];
@@ -147,6 +164,12 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     }
     if (name === WHEEL_FRAME) {
       wheelGeometryIndex = atomic.geometryIndex; // placed separately at the dummies
+      continue;
+    }
+    const corner = WHEEL_CORNER_RE.exec(name)?.[1];
+    if (corner) {
+      // per-corner wheel — placed by the rig, not the body. Middle (`m`) + back (`b`) axles don't steer.
+      cornerWheels.push({ atomic, rear: corner[1] !== 'f', right: corner[0] === 'r' });
       continue;
     }
     if (name.endsWith('_vlo')) {
@@ -169,8 +192,7 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
   }
 
   const { worldCache } = build;
-  const wheels =
-    wheelGeometryIndex === null ? [] : addWheels(root, clump, wheelGeometryIndex, textures, options, worldCache);
+  const wheels = buildWheels(root, clump, { cornerWheels, wheelGeometryIndex }, textures, options, worldCache);
   const seats = {
     backseat: seatMatrix(clump, 'ped_backseat', worldCache),
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
@@ -256,6 +278,62 @@ function addBodyAtomic(
   root.add(mesh);
 
   return {};
+}
+
+/**
+ * Place each per-corner wheel atomic (`wheel_{lf|rf|lb|rb}`) on its own frame — SA's "different
+ * front/rear wheels" convention, where the wheels are modelled in place rather than instancing a
+ * single shared {@link WHEEL_FRAME} atomic at the dummies. Each keeps the same pivot → spinner →
+ * mesh rig as {@link addWheels} so it spins (about the axle) and steers (front, about up). The
+ * geometry is reused +X-facing across corners (side comes from the frame translation), so the left
+ * copies are mirrored exactly like the shared wheel; no wheel-scale (authored at size). Returns the
+ * rig handles (empty when the clump has no per-corner wheels).
+ */
+function addCornerWheels(
+  root: Group,
+  clump: RWClump,
+  corners: readonly CornerWheel[],
+  textures: Map<string, Texture>,
+  options: VehicleOptions,
+  worldCache: Map<number, Matrix4>,
+): BuiltWheel[] {
+  const wheels: BuiltWheel[] = [];
+
+  for (const { atomic, rear, right } of corners) {
+    const rwGeometry = clump.geometries[atomic.geometryIndex];
+    const geometry = buildGeometry(rwGeometry);
+    const materials = rwGeometry.materials.map((m, i) => buildVehicleMaterial(m, rwGeometry, textures, options, i));
+    const name = clump.frames[atomic.frameIndex]?.name ?? `wheel_${rear ? 'b' : 'f'}`;
+
+    const world = worldMatrix(clump, atomic.frameIndex, worldCache);
+    const pivot = new Group();
+    pivot.name = name;
+    pivot.applyMatrix4(world); // the wheel's own frame is the hub (geometry centred on it)
+
+    const spinner = new Group();
+    spinner.name = `${name}_spin`;
+    pivot.add(spinner);
+
+    // The wheel is modelled facing out on the right (+X); mirror the left copies so they don't face
+    // inward. Mesh centred on the pivot so spin/steer rotate about the axle, not an offset.
+    const mesh = new Mesh(geometry, materials);
+    mesh.name = `${name}_mesh`;
+    if (!right) {
+      mesh.applyMatrix4(new Matrix4().makeRotationZ(Math.PI));
+    }
+    spinner.add(mesh);
+    root.add(pivot);
+
+    const hub = new Vector3().setFromMatrixPosition(world);
+    wheels.push({
+      connection: [hub.x, hub.y, hub.z],
+      front: !rear,
+      radius: geometry.boundingSphere?.radius ?? 0.5,
+      spinner,
+    });
+  }
+
+  return wheels;
 }
 
 /**
@@ -450,6 +528,29 @@ function buildVehicleMaterial(
   }
 
   return material;
+}
+
+/**
+ * Pick the wheel rig: per-corner atomics win when present (distinct per-position meshes, any axle
+ * count — some models also keep a stray shared `wheel` atomic for compatibility, which we then
+ * ignore); otherwise instance the single shared `wheel` atomic at the dummies. [] when neither.
+ */
+function buildWheels(
+  root: Group,
+  clump: RWClump,
+  source: { cornerWheels: readonly CornerWheel[]; wheelGeometryIndex: null | number },
+  textures: Map<string, Texture>,
+  options: VehicleOptions,
+  worldCache: Map<number, Matrix4>,
+): BuiltWheel[] {
+  if (source.cornerWheels.length > 0) {
+    return addCornerWheels(root, clump, source.cornerWheels, textures, options, worldCache);
+  }
+  if (source.wheelGeometryIndex !== null) {
+    return addWheels(root, clump, source.wheelGeometryIndex, textures, options, worldCache);
+  }
+
+  return [];
 }
 
 /** Index every `_dam` atomic's geometry by its part name (the prefix before `_dam`). */
@@ -664,15 +765,16 @@ function vehicleMesh(geometry: RWGeometry, textures: Map<string, Texture>, optio
   return group;
 }
 
-/** Match `wheel_{lf|rf|lb|rb}_dummy` → side flags, or null if not a wheel dummy. */
+/** Match `wheel_{l|r}{f|m|b}_dummy` → side flags, or null if not a wheel dummy. The middle axle (`m`) is
+ *  for 3-axle trucks; only the front axle steers, so middle + back both count as rear. */
 function wheelPlacement(frameName: string): null | { rear: boolean; right: boolean } {
-  const match = /^wheel_(lf|rf|lb|rb)_dummy$/.exec(frameName);
+  const match = /^wheel_(lf|rf|lm|rm|lb|rb)_dummy$/.exec(frameName);
   if (!match) {
     return null;
   }
   const [side, axle] = match[1];
 
-  return { rear: axle === 'b', right: side === 'r' };
+  return { rear: axle !== 'f', right: side === 'r' };
 }
 
 /** A copy of `rw` keeping only triangles whose material index passes `keep` (other arrays shared). */

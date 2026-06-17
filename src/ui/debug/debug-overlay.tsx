@@ -135,8 +135,8 @@ export interface DebugActions {
   shadows(): ShadowsConfig;
   /** Current god-rays shader tuning. */
   sky(): SkyConfig;
-  /** Spawn a car just in front of the player. */
-  spawnVehicle(model: 'admiral' | 'comet'): Promise<void>;
+  /** Spawn a car (by model name) just in front of the player. */
+  spawnVehicle(model: string): Promise<void>;
   /** Current SSAO tuning. */
   ssao(): SsaoConfig;
   /** Whether night stars are on. */
@@ -153,6 +153,8 @@ export interface DebugActions {
   toneMapping(): boolean;
   /** Snap the map-inspector camera back to top-down (undo a right-drag orbit). */
   topDownView(): void;
+  /** Spawnable car model names of the loaded game (from its `vehicles/` folder) — for the spawn list. */
+  vehicleModels(): readonly string[];
   /** Current vehicle-reflection tuning (preset + intensity). */
   vehicleReflection(): VehicleReflectionConfig;
   /** Current water shader tuning. */
@@ -198,6 +200,21 @@ const TELEPORTS: Record<GameType, { coords: Vec3; label: string }[]> = {
   anderius: [],
   carcer: [],
   original: [
+    { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
+    { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
+    { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
+    { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
+    { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
+    { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
+    { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
+    { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
+    { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
+    { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
+    { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
+    { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
+    { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
+  ],
+  'original-extend': [
     { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
     { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
     { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
@@ -393,12 +410,16 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
           {screen === 'vehicles' && (
             <div style={styles.group}>
-              <button onClick={() => void actions.spawnVehicle('admiral')} style={styles.actionButton} type="button">
-                Admiral Spawn
-              </button>
-              <button onClick={() => void actions.spawnVehicle('comet')} style={styles.actionButton} type="button">
-                Comet Spawn
-              </button>
+              {actions.vehicleModels().map((model) => (
+                <button
+                  key={model}
+                  onClick={() => void actions.spawnVehicle(model)}
+                  style={styles.actionButton}
+                  type="button"
+                >
+                  {model.charAt(0).toUpperCase() + model.slice(1)} Spawn
+                </button>
+              ))}
               <button onClick={() => actions.flipVehicle()} style={styles.actionButton} type="button">
                 Flip vehicle
               </button>

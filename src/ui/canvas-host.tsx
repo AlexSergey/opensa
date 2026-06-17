@@ -38,6 +38,7 @@ import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
 import { VehicleHeadlightSystem } from '../game/vehicle/vehicle-headlight.system';
 import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
+import { vehicleModelsFromNames } from '../game/vehicle/vehicle-models';
 import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
 import { weatherForCity } from '../game/weather/weather-zones';
 import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
@@ -96,7 +97,7 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 
 // Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
 // omitted 3rd/4th default to palette 0, like SA).
-const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3' };
+const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3', petro: '10,1' };
 
 // Default timecyc weather on load (index into WEATHER_NAMES).
 const DEFAULT_WEATHER = WEATHER_NAMES.indexOf('EXTRASUNNY_SMOG_LA');
@@ -872,6 +873,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
         colliders?.shape ?? null,
         handling.mass,
         wheels,
+        halfExtents,
       );
       // The physics system keeps these live from the body; seed with the placement.
       const live: [number, number, number] = [position[0], position[1], position[2]];
@@ -932,6 +934,10 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
         [flipped.x, flipped.y, flipped.z, flipped.w],
       );
     };
+
+    // Cars this game ships (its `vehicles/` folder, packed into the loaded archive) — drives the
+    // debug spawn list, so adding a vehicle needs no per-car code.
+    const vehicleModels = vehicleModelsFromNames(fs.names);
 
     const debugActions: DebugActions = {
       bloom: () => game.getConfig().graphics.bloom,
@@ -1004,6 +1010,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       teleportToGanton: () => character.placePlayer(PLAYER_SPAWN[GAME_TYPE], true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
       topDownView: () => game.topDownView(),
+      vehicleModels: () => vehicleModels,
       vehicleReflection: () => game.getConfig().graphics.vehicleReflection,
       water: () => game.getConfig().graphics.water,
       weather: () => game.getWeather(),

@@ -343,6 +343,173 @@ describe('buildVehicle', () => {
   });
 });
 
+/** SA's second wheel convention: per-corner `wheel_{lf|rf|lb|rb}` atomics (different front/rear wheels),
+ *  with no shared `wheel` atomic. Each wheel is modelled in place on its own frame. */
+function cornerWheelClump(): RWClump {
+  const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  return {
+    atomics: [
+      { frameIndex: 1, geometryIndex: 0 }, // chassis_ok
+      { frameIndex: 2, geometryIndex: 1 }, // wheel_lf (front-left)
+      { frameIndex: 3, geometryIndex: 1 }, // wheel_rf (front-right)
+      { frameIndex: 4, geometryIndex: 1 }, // wheel_lb (rear-left)
+      { frameIndex: 5, geometryIndex: 1 }, // wheel_rb (rear-right)
+    ],
+    frames: [
+      { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
+      { name: 'chassis_ok', parentIndex: 0, position: [0, 0, 1], rotation: id },
+      { name: 'wheel_lf', parentIndex: 0, position: [1, 2, 0], rotation: id },
+      { name: 'wheel_rf', parentIndex: 0, position: [-1, 2, 0], rotation: id },
+      { name: 'wheel_lb', parentIndex: 0, position: [1, -2, 0], rotation: id },
+      { name: 'wheel_rb', parentIndex: 0, position: [-1, -2, 0], rotation: id },
+    ],
+    geometries: [bodyGeometry, wheelGeometry],
+  };
+}
+
+/** A clump with neither a shared `wheel` atomic nor per-corner wheels (only the chassis body). */
+function wheellessClump(): RWClump {
+  const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  return {
+    atomics: [{ frameIndex: 1, geometryIndex: 0 }],
+    frames: [
+      { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
+      { name: 'chassis_ok', parentIndex: 0, position: [0, 0, 1], rotation: id },
+    ],
+    geometries: [bodyGeometry],
+  };
+}
+
+describe('buildVehicle (per-corner wheels)', () => {
+  describe('negative cases', () => {
+    it('builds no wheels when the clump has neither a shared nor per-corner wheel', () => {
+      expect(buildVehicle(wheellessClump(), new Map(), OPTIONS).wheels).toHaveLength(0);
+    });
+
+    it('does not expose the per-corner wheel atomics as damageable parts', () => {
+      const { parts } = buildVehicle(cornerWheelClump(), new Map(), OPTIONS);
+      expect(parts.some((p) => p.name.startsWith('wheel_'))).toBe(false);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('builds the four per-corner wheels as rig handles (front pair flagged)', () => {
+      const { wheels } = buildVehicle(cornerWheelClump(), new Map(), OPTIONS);
+      expect(wheels).toHaveLength(4);
+      expect(wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+
+    it('places each wheel hub at its own frame world transform', () => {
+      const { wheels } = buildVehicle(cornerWheelClump(), new Map(), OPTIONS);
+      expect(wheels.map((w) => w.connection).sort()).toEqual(
+        [
+          [-1, -2, 0],
+          [-1, 2, 0],
+          [1, -2, 0],
+          [1, 2, 0],
+        ].sort(),
+      );
+    });
+
+    it('wraps each wheel in a pivot → spinner → mesh rig (not wheel-scaled)', () => {
+      const group = buildVehicle(cornerWheelClump(), new Map(), OPTIONS);
+      const mesh = wheelMesh(group, 'wheel_lf'); // pivot.children[0].children[0]
+      expect(mesh.name).toBe('wheel_lf_mesh');
+      expect(mesh.scale.x).toBeCloseTo(1); // authored at size — not scaled by OPTIONS.wheelScale
+    });
+
+    it('mirrors the left (driver-side) wheels so they face outward, not inward', () => {
+      const group = buildVehicle(cornerWheelClump(), new Map(), OPTIONS);
+      expect(Math.abs(wheelMesh(group, 'wheel_lf').rotation.z)).toBeCloseTo(Math.PI); // left flipped 180°
+      expect(Math.abs(wheelMesh(group, 'wheel_lb').rotation.z)).toBeCloseTo(Math.PI);
+      expect(wheelMesh(group, 'wheel_rf').rotation.z).toBeCloseTo(0); // right authored facing out
+      expect(wheelMesh(group, 'wheel_rb').rotation.z).toBeCloseTo(0);
+    });
+  });
+});
+
+/** A 3-axle (6-wheel) truck with per-corner wheels (front/middle/back × left/right) AND a stray bare
+ *  `wheel` atomic some exporters leave in for compatibility. The per-corner wheels must win. */
+function sixWheelCornerClump(): RWClump {
+  const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  return {
+    atomics: [
+      { frameIndex: 1, geometryIndex: 0 }, // chassis_ok
+      { frameIndex: 2, geometryIndex: 1 }, // wheel_lf
+      { frameIndex: 3, geometryIndex: 1 }, // wheel_rf
+      { frameIndex: 4, geometryIndex: 1 }, // wheel_lm (middle)
+      { frameIndex: 5, geometryIndex: 1 }, // wheel_rm (middle)
+      { frameIndex: 6, geometryIndex: 1 }, // wheel_lb
+      { frameIndex: 7, geometryIndex: 1 }, // wheel_rb
+      { frameIndex: 8, geometryIndex: 1 }, // bare wheel (stray — ignored)
+    ],
+    frames: [
+      { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
+      { name: 'chassis_ok', parentIndex: 0, position: [0, 0, 1], rotation: id },
+      { name: 'wheel_lf', parentIndex: 0, position: [1, 3, 0], rotation: id },
+      { name: 'wheel_rf', parentIndex: 0, position: [-1, 3, 0], rotation: id },
+      { name: 'wheel_lm', parentIndex: 0, position: [1, -1, 0], rotation: id },
+      { name: 'wheel_rm', parentIndex: 0, position: [-1, -1, 0], rotation: id },
+      { name: 'wheel_lb', parentIndex: 0, position: [1, -3, 0], rotation: id },
+      { name: 'wheel_rb', parentIndex: 0, position: [-1, -3, 0], rotation: id },
+      { name: 'wheel', parentIndex: 0, position: [-1, 3, 0], rotation: id },
+    ],
+    geometries: [bodyGeometry, wheelGeometry],
+  };
+}
+
+/** A 3-axle truck using the shared `wheel` atomic instanced at six `wheel_*_dummy` frames. */
+function sixWheelSharedClump(): RWClump {
+  const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  return {
+    atomics: [
+      { frameIndex: 1, geometryIndex: 0 }, // chassis_ok
+      { frameIndex: 2, geometryIndex: 1 }, // wheel (shared, instanced)
+    ],
+    frames: [
+      { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
+      { name: 'chassis_ok', parentIndex: 0, position: [0, 0, 1], rotation: id },
+      { name: 'wheel', parentIndex: 0, position: [0, 0, 0], rotation: id },
+      { name: 'wheel_lf_dummy', parentIndex: 0, position: [1, 3, 0], rotation: id },
+      { name: 'wheel_rf_dummy', parentIndex: 0, position: [-1, 3, 0], rotation: id },
+      { name: 'wheel_lm_dummy', parentIndex: 0, position: [1, -1, 0], rotation: id },
+      { name: 'wheel_rm_dummy', parentIndex: 0, position: [-1, -1, 0], rotation: id },
+      { name: 'wheel_lb_dummy', parentIndex: 0, position: [1, -3, 0], rotation: id },
+      { name: 'wheel_rb_dummy', parentIndex: 0, position: [-1, -3, 0], rotation: id },
+    ],
+    geometries: [bodyGeometry, wheelGeometry],
+  };
+}
+
+describe('buildVehicle (3-axle trucks)', () => {
+  describe('negative cases', () => {
+    it('ignores the stray bare wheel atomic when per-corner wheels exist (no 7th / overlapping wheel)', () => {
+      const group = buildVehicle(sixWheelCornerClump(), new Map(), OPTIONS);
+      expect(group.wheels).toHaveLength(6);
+      expect(group.root.children.map((c) => c.name)).not.toContain('wheel'); // stray neither rendered nor instanced
+    });
+  });
+
+  describe('positive cases', () => {
+    it('builds all six per-corner wheels (only the front axle steers)', () => {
+      const { wheels } = buildVehicle(sixWheelCornerClump(), new Map(), OPTIONS);
+      expect(wheels).toHaveLength(6);
+      expect(wheels.filter((w) => w.front)).toHaveLength(2); // front axle only
+    });
+
+    it('instances the shared wheel at all six dummies, including the middle axle', () => {
+      const { wheels } = buildVehicle(sixWheelSharedClump(), new Map(), OPTIONS);
+      expect(wheels).toHaveLength(6);
+      expect(wheels.filter((w) => w.front)).toHaveLength(2); // lf + rf
+    });
+  });
+});
+
 // A real SA vehicle (admiral.dff): full dummy rig, vehiclelights, prelit-free dynamic model.
 const ADMIRAL = 'tests/dff/vehicle/admiral.dff';
 
@@ -407,6 +574,45 @@ describe.skipIf(!existsSync(ADMIRAL))('buildVehicle (real admiral.dff)', () => {
         }
       });
       expect(bad).toBe(0);
+    });
+  });
+});
+
+// Real per-corner vehicles (mod re-exports): each wheel is its own atomic, not a shared instanced wheel.
+const PETRO_4 = 'tests/dff/vehicle/petro-4wheels.dff';
+const PETRO_6 = 'tests/dff/vehicle/petro-6wheels.dff';
+
+describe.skipIf(!existsSync(PETRO_4))('buildVehicle (real per-corner petro-4wheels.dff)', () => {
+  const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(PETRO_4))), new Map(), OPTIONS);
+
+  describe('positive cases', () => {
+    it('builds the four per-corner wheels (front pair steers)', () => {
+      expect(vehicle.wheels).toHaveLength(4);
+      expect(vehicle.wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(vehicle.wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+
+    it('mirrors the left (driver-side) wheels so they face outward', () => {
+      expect(Math.abs(wheelMesh(vehicle, 'wheel_lf').rotation.z)).toBeCloseTo(Math.PI);
+      expect(wheelMesh(vehicle, 'wheel_rf').rotation.z).toBeCloseTo(0);
+    });
+  });
+});
+
+describe.skipIf(!existsSync(PETRO_6))('buildVehicle (real 3-axle petro-6wheels.dff)', () => {
+  const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(PETRO_6))), new Map(), OPTIONS);
+
+  describe('negative cases', () => {
+    it('ignores the stray bare wheel atomic (exactly six wheels, none rendered as a body mesh)', () => {
+      expect(vehicle.wheels).toHaveLength(6);
+      expect(vehicle.root.children.map((c) => c.name)).not.toContain('wheel');
+    });
+  });
+
+  describe('positive cases', () => {
+    it('builds all six per-corner wheels (only the front axle steers)', () => {
+      expect(vehicle.wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(vehicle.wheels.every((w) => w.radius > 0)).toBe(true);
     });
   });
 });

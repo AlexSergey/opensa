@@ -9,18 +9,18 @@ histogram + full 2dfx census) rather than by spec completeness for its own sake.
 
 Audit highlights:
 
-| Chunk | Count | Status |
-| --- | --- | --- |
-| ExtraVertColour (night prelit) | 11978 | parsed |
-| HAnimPLG | 10948 | NOT parsed (we bind bones by frame name) |
-| MaterialEffects / SpecularMat / ReflectionMat | 10873 / 8100 / 16459 | parsed (env path) |
-| Breakable `0x253F2FD` (gtamods-confirmed) | 1724 | NOT parsed |
-| 2dEffect | 1670 chunks | types 0+7 parsed, see census |
-| SkinPLG / CollisionModel | 342 / 214 | parsed |
-| UVAnimDict/PLG | 20 / 32 | parsed |
-| PipelineSet | 27 | NOT parsed (we derive materials ourselves) |
-| MorphPLG | 0 | N/A — absent from data |
-| Multi-UV-layer models | 316 | 2nd layer parsed but unused by the renderer |
+| Chunk                                         | Count                | Status                                      |
+| --------------------------------------------- | -------------------- | ------------------------------------------- |
+| ExtraVertColour (night prelit)                | 11978                | parsed                                      |
+| HAnimPLG                                      | 10948                | NOT parsed (we bind bones by frame name)    |
+| MaterialEffects / SpecularMat / ReflectionMat | 10873 / 8100 / 16459 | parsed (env path)                           |
+| Breakable `0x253F2FD` (gtamods-confirmed)     | 1724                 | NOT parsed                                  |
+| 2dEffect                                      | 1670 chunks          | types 0+7 parsed, see census                |
+| SkinPLG / CollisionModel                      | 342 / 214            | parsed                                      |
+| UVAnimDict/PLG                                | 20 / 32              | parsed                                      |
+| PipelineSet                                   | 27                   | NOT parsed (we derive materials ourselves)  |
+| MorphPLG                                      | 0                    | N/A — absent from data                      |
+| Multi-UV-layer models                         | 316                  | 2nd layer parsed but unused by the renderer |
 
 2dfx census (all entries, byte-accurate): type 0 lights **1664** (done), 1 particles **113**,
 3 ped attractors **820**, 4 sun glare **2**, 6 enex **75**, 7 roadsigns **516** (done),
@@ -48,13 +48,13 @@ Audit highlights:
    need an emitter/animation system behind the parsing, so they live in their own plan with the
    full effect-name survey (113 particle entries across 13 distinct effects, 6 escalators).
 
-5. **Multi-UV layer usage (316 models).** Investigate what the 2nd UV set drives in SA (dual-pass
+4. **Multi-UV layer usage (316 models).** Investigate what the 2nd UV set drives in SA (dual-pass
    MatFX dirt/detail overlays on roads is the prime suspect — pairs with the MaterialEffects
    dual-texture subtype we currently skip). If confirmed visual: plumb `uvLayers[1]` through
    `buildClumpParts` + a `|dualPass` material variant. Audit first with a small script listing
    which models/textures use it.
 
-6. **HAnim PLG (10948 chunks).** Parse bone ids/hierarchy; switch IFP→skeleton binding to bone
+5. **HAnim PLG (10948 chunks).** Parse bone ids/hierarchy; switch IFP→skeleton binding to bone
    IDs when present (frame-name binding stays the fallback). Low visual impact (names work for
    shipped data) but removes a whole class of modded-ped fragility.
 
@@ -75,3 +75,15 @@ Audit highlights:
 Re-run `scripts/audit-rw-coverage.ts` after each iteration: dropped-texture count → 0 (iter 1),
 unknown-chunk list shrinks (iter 2); in-browser checks per feature (fountain at the Strip,
 escalator in SF); `npm test` with new fixtures per parser addition.
+
+---
+
+**Since-fixed (2026-06-17): TXD leading-chunk tolerance.** Found via a mod vehicle TXD
+(`yosemite.txd`) that **prepends an empty type-0 chunk** before the `TexDictionary` (0x16), so the
+dictionary isn't the very first chunk — `parseTxd` threw _"Not a TXD: expected TexDictionary (0x16),
+got 0x0"_ on spawn. `readDictHeader` now **scans the top-level chunks for the dictionary** (skipping
+leading non-matching chunks), mirroring RW's `RwStreamFindChunk`; still throws if no `0x16` is found
+anywhere. Regression tests in `txd.test.ts` (synthetic leading-chunk case + real asset
+`tests/txd/yosemite.txd`). Note: the matching `yosemite.dff` is a separate, shelved problem — a
+"locked"/protected container whose declared chunk counts exceed its contents, which no faithful RW
+reader recovers — see [open-issues/locked-dff.md](../open-issues/locked-dff.md).

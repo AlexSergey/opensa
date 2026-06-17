@@ -11,6 +11,7 @@ suspension rays + engine/brake/steer.
 ## Approach (Rapier `DynamicRayCastVehicleController`)
 
 GTA SA's model maps directly onto Rapier's raycast vehicle:
+
 - **Chassis** = a **dynamic rigid body** (mass from handling.cfg). Gravity is automatic → the car falls
   and rests on its wheels; no hover, no settle, no snag.
 - **Chassis collider = the car's COL.** Dynamic bodies need a convex shape to collide with the static
@@ -62,3 +63,16 @@ frame; keep the player collider disabled while seated).
 
 Damage model itself (panel deformation), traffic/AI, passengers, advanced tyre friction model, flips/roll
 recovery.
+
+---
+
+**Since-fixed (2026-06-17): chassis fallback no longer crashes on a no-COL vehicle.** Found via a modded
+`cheetah.dff` with no usable embedded collision. `createDynamicVehicle`/`addVehicleHull` built the chassis
+hull with `ColliderDesc.convexHull(vertices) ?? boxHull(vertices)`, assuming `convexHull` returns `null`
+on failure — but for empty/degenerate input it returns a **non-null but invalid** desc, so the `??` guard
+never fired and `createCollider` threw _"expected instance of OA"_ (Rapier rejects the bad desc). Now
+`addConvexChassis` only attempts the hull with ≥4 points, wraps it in try/catch, and box-falls-back to the
+car's `halfExtents` (threaded through `createDynamicVehicle`; default `[1.2, 2.5, 0.7]`). General
+robustness for any vehicle missing a COL. Tests in `physics-world.test.ts`. The locked DFFs that trigger
+this (cheetah/yosemite) are otherwise shelved — see
+[open-issues/locked-dff.md](../open-issues/locked-dff.md).

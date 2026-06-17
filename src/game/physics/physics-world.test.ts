@@ -50,6 +50,44 @@ describe('PhysicsWorld', () => {
   });
 });
 
+describe('PhysicsWorld.createDynamicVehicle', () => {
+  const HALF: [number, number, number] = [1.2, 2.5, 0.7];
+
+  describe('negative cases', () => {
+    it('does not crash when the model has no COL (null shape) — falls back to the halfExtents box', async () => {
+      const physics = await makeWorld();
+      expect(() => physics.createDynamicVehicle([0, 0, 5], 0, null, 1500, [], HALF)).not.toThrow();
+      physics.dispose();
+    });
+
+    it('does not crash for a shape with no primitives and no vertices', async () => {
+      const physics = await makeWorld();
+      expect(() => physics.createDynamicVehicle([0, 0, 5], 0, shape(), 1500, [], HALF)).not.toThrow();
+      physics.dispose();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('builds a convex hull from a vertices-only shape and rests it on the ground', async () => {
+      const physics = await makeWorld();
+      physics.createStaticBox([0, 0, 0], [20, 20, 0.5]); // top surface at z = 0.5
+      // eight corners of a 1m cube → a valid convex hull (half-height 0.5)
+      const cube = new Float32Array([
+        -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5, 0.5,
+        0.5, 0.5, 0.5, 0.5,
+      ]);
+      const { body } = physics.createDynamicVehicle([0, 0, 5], 0, shape({ vertices: cube }), 1500, [], HALF);
+
+      for (let i = 0; i < 240; i += 1) {
+        physics.step(STEP);
+      }
+
+      expect(physics.readBody(body).position[2]).toBeCloseTo(1, 0); // ground-top 0.5 + half-height 0.5
+      physics.dispose();
+    });
+  });
+});
+
 describe('PhysicsWorld kinematic character controller', () => {
   describe('positive cases', () => {
     it('lands a kinematic capsule on a static ground and reports grounded', async () => {

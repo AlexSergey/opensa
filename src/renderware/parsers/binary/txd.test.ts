@@ -211,6 +211,16 @@ describe('parseTxd (synthetic)', () => {
     expect(Array.from(tex.mipmaps[0].data)).toEqual([3, 2, 1, 4]);
   });
 
+  it('skips a leading non-dictionary chunk before the TexDictionary (RwStreamFindChunk behaviour)', () => {
+    // Some mod/exporter TXDs prepend an empty type-0 chunk before the dictionary.
+    const dict = chunk(
+      RwSection.TEXTURE_DICTIONARY,
+      concat(chunk(RwSection.STRUCT, concat(u16(1), u16(0))), uncompressed),
+    );
+    const withPrefix = toArrayBuffer(concat(chunk(0, new Uint8Array(0)), dict));
+    expect(parseTxd(withPrefix).textures.map((t) => t.name)).toEqual(['raw32']);
+  });
+
   it('rejects non-txd input', () => {
     expect(() => parseTxd(toArrayBuffer(chunk(RwSection.CLUMP, u32(0))))).toThrow(/Not a TXD/);
   });
@@ -238,5 +248,18 @@ describe.skipIf(!txdExists)('parseTxd (real asset junk.txd)', () => {
     expect(tex.format).toBe('dxt1');
     expect(tex.hasAlpha).toBe(false);
     expect(tex.mipmaps.length).toBeGreaterThan(0);
+  });
+});
+
+// A real mod TXD (yosemite / Ford F350) that prepends an empty type-0 chunk before the dictionary —
+// the leading-chunk case that broke `readDictHeader` (RwStreamFindChunk scan).
+const yosemitePath = join(process.cwd(), 'tests', 'txd', 'yosemite.txd');
+const yosemiteExists = existsSync(yosemitePath);
+const yosemiteDict = yosemiteExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(yosemitePath)))) : null;
+
+describe.skipIf(!yosemiteExists)('parseTxd (real asset yosemite.txd with a leading chunk)', () => {
+  it('finds the dictionary past the leading empty chunk and parses all ten textures', () => {
+    expect(yosemiteDict!.textures.map((t) => t.name)).toContain('F350_interior');
+    expect(yosemiteDict!.textures).toHaveLength(10);
   });
 });

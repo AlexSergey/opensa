@@ -2,7 +2,7 @@ import type { ChunkHeader } from './chunks';
 import type { RWMipLevel, RWTexture, RWTextureDictionary, RWTextureFormat } from './types';
 
 import { BinaryStream } from './binary-stream';
-import { findChild, forEachChild } from './chunks';
+import { findChild, forEachChild, readChunkHeader } from './chunks';
 import { D3dCompression, RasterFormat, RwSection } from './constants';
 
 /**
@@ -154,14 +154,19 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | R
 }
 
 function readDictHeader(stream: BinaryStream): ChunkHeader {
-  const type = stream.u32();
-  const size = stream.u32();
-  const version = stream.u32();
-  if (type !== RwSection.TEXTURE_DICTIONARY) {
-    throw new Error(`Not a TXD: expected TexDictionary (0x16), got 0x${type.toString(16)}`);
+  // Scan top-level chunks for the TexDictionary, like RW's RwStreamFindChunk — some mod/exporter TXDs
+  // prepend an empty type-0 chunk before the dictionary, so it isn't always the very first chunk.
+  let first: null | number = null;
+  while (stream.position + 12 <= stream.length) {
+    const header = readChunkHeader(stream);
+    if (header.type === RwSection.TEXTURE_DICTIONARY) {
+      return header;
+    }
+    first ??= header.type;
+    stream.seek(header.end);
   }
 
-  return { dataStart: stream.position, end: stream.position + size, size, type, version };
+  throw new Error(`Not a TXD: no TexDictionary (0x16) chunk found (first chunk 0x${(first ?? 0).toString(16)})`);
 }
 
 function readMipmaps(

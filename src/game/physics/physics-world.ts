@@ -154,9 +154,10 @@ export class PhysicsWorld {
    * — low hood, high cabin — and collide with the static world trimesh, which a
    * concave trimesh can't). The COL trimesh is skipped here (trimesh-vs-trimesh
    * generates no contacts) but kept by the caller for damage; a convex hull of the
-   * vertices is the fallback when a COL has no primitives. Gravity + four
-   * suspension-raycast wheels rest it on its wheels and collide it with the world;
-   * the returned controller drives it (engine/brake/steer).
+   * vertices is the fallback when a COL has no primitives, then a `halfExtents`
+   * box when there's no usable hull either (e.g. a modded DFF with no embedded
+   * collision). Gravity + four suspension-raycast wheels rest it on its wheels and
+   * collide it with the world; the returned controller drives it (engine/brake/steer).
    */
   createDynamicVehicle(
     position: Vec3,
@@ -164,6 +165,7 @@ export class PhysicsWorld {
     shape: ModelColliders['shape'] | null,
     mass: number,
     wheels: readonly VehicleWheelSpec[],
+    halfExtents: [number, number, number],
   ): { body: number; controller: VehicleController } {
     const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), heading);
     // No CCD: on the detailed streamed world trimesh it sweeps the body's leading (front) edge
@@ -180,7 +182,7 @@ export class PhysicsWorld {
         // pop" only on the first drive after parking). Keeping it awake holds it on its wheels.
         .setCanSleep(false),
     );
-    this.addVehicleHull(body, shape, mass);
+    this.addVehicleHull(body, shape, mass, halfExtents);
 
     const controller = this.world.createVehicleController(body);
     controller.indexUpAxis = UP_AXIS;
@@ -502,6 +504,36 @@ export class PhysicsWorld {
     return 1;
   }
 
+  /**
+   * Chassis fallback when the COL has no convex primitives: a convex hull of the vertices, else a
+   * car-sized `halfExtents` box. Rapier's `convexHull` returns a NON-null but invalid desc for
+   * empty/degenerate input — `createCollider` then throws "expected instance of OA" — so we only
+   * attempt it with enough points and box-fall-back if it still rejects (a no-COL modded DFF, e.g.
+   * the cheetah/yosemite "locked" vehicles, otherwise crashes the spawn).
+   */
+  private addConvexChassis(
+    body: RapierBody,
+    vertices: Float32Array,
+    mass: number,
+    halfExtents: [number, number, number],
+  ): void {
+    const finish = (desc: ReturnType<Rapier['ColliderDesc']['cuboid']>): ReturnType<Rapier['ColliderDesc']['cuboid']> =>
+      desc.setMass(mass).setFriction(CHASSIS_FRICTION).setCollisionGroups(VEHICLE_GROUPS);
+
+    const hull = vertices.length >= 12 ? this.rapier.ColliderDesc.convexHull(vertices) : null;
+    if (hull) {
+      try {
+        this.world.createCollider(finish(hull), body);
+
+        return;
+      } catch {
+        // degenerate vertices: convexHull yielded an invalid desc — fall through to the box.
+      }
+    }
+    const [hx, hy, hz] = halfExtents;
+    this.world.createCollider(finish(this.rapier.ColliderDesc.cuboid(hx, hy, hz)), body);
+  }
+
   private addShapes(body: RapierBody, shape: ModelColliders['shape']): number {
     let count = this.addTrimesh(body, shape.vertices, shape.indices);
     for (const box of shape.boxes) {
@@ -543,21 +575,22 @@ export class PhysicsWorld {
    * single oversized COL sphere — e.g. the camper's big front sphere — can't drag the
    * centre of mass high/forward and make the car wobble. Each shape keeps its own
    * shape-based inertia (realistic, unlike a single box approximation). Falls back to a
-   * convex hull (then a box) of the vertices when a COL has no primitives. The COL
-   * trimesh is omitted (it can't collide with the static world trimesh).
+   * convex hull of the vertices when a COL has no primitives, then a `halfExtents` box
+   * when there's no usable hull either. The COL trimesh is omitted (it can't collide
+   * with the static world trimesh).
    */
-  private addVehicleHull(body: RapierBody, shape: ModelColliders['shape'] | null, mass: number): void {
+  private addVehicleHull(
+    body: RapierBody,
+    shape: ModelColliders['shape'] | null,
+    mass: number,
+    halfExtents: [number, number, number],
+  ): void {
     const spheres = (shape?.spheres ?? []).filter((sphere) => sphere.radius > 0);
     const boxes = (shape?.boxes ?? []).filter(
       (box) => box.max[0] > box.min[0] && box.max[1] > box.min[1] && box.max[2] > box.min[2],
     );
     if (spheres.length + boxes.length === 0) {
-      const vertices = shape?.vertices ?? new Float32Array();
-      const hull = this.rapier.ColliderDesc.convexHull(vertices) ?? this.boxHull(vertices);
-      this.world.createCollider(
-        hull.setMass(mass).setFriction(CHASSIS_FRICTION).setCollisionGroups(VEHICLE_GROUPS),
-        body,
-      );
+      this.addConvexChassis(body, shape?.vertices ?? new Float32Array(), mass, halfExtents);
 
       return;
     }
@@ -578,20 +611,6 @@ export class PhysicsWorld {
       const desc = this.rapier.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz);
       this.world.createCollider(this.vehicleCollider(desc, perShape), body);
     }
-  }
-
-  /** A cuboid hull (half-extents from the vertices' AABB) — fallback when convexHull fails. */
-  private boxHull(vertices: Float32Array): ReturnType<Rapier['ColliderDesc']['cuboid']> {
-    let hx = 0.5;
-    let hy = 0.5;
-    let hz = 0.5;
-    for (let i = 0; i + 2 < vertices.length; i += 3) {
-      hx = Math.max(hx, Math.abs(vertices[i]));
-      hy = Math.max(hy, Math.abs(vertices[i + 1]));
-      hz = Math.max(hz, Math.abs(vertices[i + 2]));
-    }
-
-    return this.rapier.ColliderDesc.cuboid(hx, hy, hz);
   }
 
   /**

@@ -15,7 +15,7 @@ system / wheel rotation / doors / lights / seats), **collision**, **physics** (d
   (DXT1) holds car-specific textures (`admiral92interior128`, `admiral92wheel64`). **Both TXDs must be merged**
   into one texture map (generic + car) — the car DFF references textures from both.
 - `static/data/vehicles.ide` `cars` section columns: `id, model, txd, type, handlingId, gameName, anims,
-  class, frq, flags, comprules, wheelModelId, wheelScaleFront, wheelScaleRear, upgradeClass`. **admiral
+class, frq, flags, comprules, wheelModelId, wheelScaleFront, wheelScaleRear, upgradeClass`. **admiral
   0.68/0.68, camper 0.66/0.66.**
 - `static/data/carcols.dat`: `col`…`end` = **palette** (one `R,G,B  # i name` per line, index = order);
   `car`…`end` = per-car **2-colour** combos (`name, p,s, p,s, …` palette-index pairs; game picks one);
@@ -37,15 +37,18 @@ system / wheel rotation / doors / lights / seats), **collision**, **physics** (d
 ## Design
 
 ### Parsers (`renderware/parsers/text` + a small vehicles module)
+
 - `parseHandling(text) → Map<handlingId, HandlingEntry>` — split each non-comment line; store fields (named
   where useful, else a `number[]`). Keyed by handlingId.
 - `parseVehicleDefs(text) → Map<id, VehicleDef>` from the `cars` section (reuse `sectionedParse`):
   `{ id, model, txd, type, handlingId, gameName, wheelScale: [front, rear], wheelModelId }`.
 - `parseCarcols(text) → { palette: [r,g,b][]; cars: Map<name, [number, number][]>; cars4: Map<name,
-  [number, number, number, number][]> }` (lowercased names; strip `#` comments).
+[number, number, number, number][]> }` (lowercased names; strip `#` comments).
 
 ### Vehicle mesh builder (`renderware/three/build-vehicle.ts`)
+
 `buildVehicle(clump, textures, { primary, secondary, wheelScale }) → THREE.Group`:
+
 - Render the **body**: chassis + each component atomic, but **skip `*_dam`** and **`chassis_vlo`** (and the
   bare `wheel` atomic — placed separately). Each atomic uses its frame's world transform (the `_ok` parts are
   positioned by their frames).
@@ -56,6 +59,7 @@ system / wheel rotation / doors / lights / seats), **collision**, **physics** (d
   materials as usual. (4-colour: primary+secondary now; 3rd/4th later.)
 
 ### Adapter + placement
+
 - `WorldAdapter.loadVehicle(modelName) → Object3D` (or a lower-level signature): resolve the def
   (`vehicles.ide` → txd + wheelScale), the colours (`carcols` palette + the car/car4 entry → primary/secondary
   RGB), load the car DFF + car TXD + generic `vehicle.txd` (merged texture map), `buildVehicle`. Cache the
@@ -127,3 +131,19 @@ only).
 (3) `resolveVehicleColours` defaults missing 3rd/4th combo colours to **palette[0] (black)**, like SA
 does
 for 2-colour `car`-section cars. See memory `vehicle-paint-markers`.
+
+---
+
+**Since-fixed (2026-06-17): both SA wheel conventions + 3-axle support.** Found via custom
+`original-extend` petro re-exports. `build-vehicle.ts` originally only built wheels from the single
+shared `wheel` atomic instanced at the `wheel_*_dummy` frames (scaled per front/rear, mirrored on the
+right). Mod re-exports also use SA's **per-corner** convention — distinct `wheel_{l|r}{f|m|b}` atomics
+placed at their own frames (different front/rear wheels). Now: (1) per-corner wheel atomics are detected
+(`WHEEL_CORNER_RE`) and built by `addCornerWheels`, mirroring the left copies exactly like the shared
+path (geometry is reused +X-facing across corners, so the left side faced inward without it), at
+authored size (no wheel-scale); (2) per-corner wheels **take precedence** over a stray shared `wheel`
+atomic some exporters leave in; (3) both paths handle the **middle axle** (`m`) of 3-axle trucks (only
+the front axle steers). A missing/empty wheel rig left the car sunk (no suspension) and undriveable (no
+force applied at the wheels). Real fixtures: `tests/dff/vehicle/petro-4wheels.dff` (per-corner) +
+`petro-6wheels.dff` (3-axle + stray `wheel`). A "locked"/protected mod DFF (`yosemite`) that builds no
+wheels is a separate, shelved issue — see [open-issues/locked-dff.md](../open-issues/locked-dff.md).

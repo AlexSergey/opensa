@@ -6,7 +6,11 @@ plans 015–021/025/030/033.
 ## Implemented
 
 - **Loading**: vehicles.ide defs, DFF with frame hierarchy KEPT (doors/wheels as named parts),
-  embedded COL, generic `vehicle.txd` merge, per-model TXD.
+  embedded COL, generic `vehicle.txd` merge, per-model TXD. Both SA wheel conventions are built:
+  a single shared `wheel` atomic instanced at the `wheel_*_dummy` frames (scaled per front/rear,
+  mirrored on the right), or per-corner `wheel_{l|r}{f|m|b}` atomics placed at their own frames
+  (different front/rear wheels). Both handle the middle axle (`m`) of 3-axle trucks, and per-corner
+  wheels take precedence over a stray shared `wheel` atomic some exporters leave in.
 - **Paint**: carcols.dat palettes; SA editable-material markers — primary (60,255,0), secondary
   (255,0,175), tertiary (255,175,0), quaternary (255,60,0); colour spec strings `"p,s[,t,q]"`
   with omitted 3rd/4th defaulting to palette 0 (SA behaviour); RW modulate (texture × material

@@ -354,6 +354,23 @@
   line-height: 1.5;
 }
 
+.sa-notif__close {
+  flex: none;
+  margin: -4px -4px 0 auto;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--sa-fg);
+  font-size: 18px;
+  line-height: 1.2;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.sa-notif__close:hover {
+  opacity: 1;
+}
+
 @keyframes sa-notif-life {
   0% {
     opacity: 0;
