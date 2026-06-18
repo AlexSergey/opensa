@@ -2,8 +2,6 @@
 
 Dev notes and progress on **OpenSA** — GTA San Andreas re-created in the browser. Newest first.
 
-> Hosted here in the repo for now; it may move to a proper site later.
-
 ## Posts
 
-- 2026-06-15 — [Hello, San Andreas](./2026-06-15-hello-san-andreas.md)
+- 2026-06-18 — [I built GTA San Andreas in the browser in three weeks — solo, with Claude Code](./2026-06-18-i-built-gta-san-andreas-in-the-browser-in-three-weeks-solo-with-claude-code.md)
