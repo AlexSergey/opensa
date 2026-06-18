@@ -18,7 +18,13 @@ export function initAnalytics(): void {
   script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
   document.head.append(script);
 
+  // gtag's command API needs the real `arguments` object pushed (Google's canonical snippet form) — a
+  // plain array isn't recognised as a command, so `config` never registers and no hits are sent.
   window.dataLayer ??= [];
-  window.dataLayer.push(['js', new Date()]);
-  window.dataLayer.push(['config', GA_ID]);
+  const gtag: (...args: unknown[]) => void = function () {
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer?.push(arguments);
+  };
+  gtag('js', new Date());
+  gtag('config', GA_ID);
 }
