@@ -1,6 +1,6 @@
 {
   "name": "opensa",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "GTA San Andreas in your browser — an open-source RenderWare engine re-creation (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics.",
   "keywords": [
     "opensa",
