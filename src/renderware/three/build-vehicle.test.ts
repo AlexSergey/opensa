@@ -682,3 +682,27 @@ describe.skipIf(!existsSync(PETRO_6))('buildVehicle (real 3-axle petro-6wheels.d
     });
   });
 });
+
+const COMET = 'tests/dff/vehicle/comet.dff';
+
+describe.skipIf(!existsSync(COMET))('buildVehicle (real comet.dff — lone wheel_rf atomic, no shared wheel)', () => {
+  const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(COMET))), new Map(), OPTIONS);
+
+  describe('negative cases', () => {
+    it('does not render only the single passenger-side corner (the regression)', () => {
+      expect(vehicle.wheels.length).toBeGreaterThan(1);
+    });
+
+    it('does not expose the wheel atomic as a damageable part', () => {
+      expect(vehicle.parts.some((p) => p.name.startsWith('wheel'))).toBe(false);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('instances the lone wheel at all four dummies (front pair steers)', () => {
+      expect(vehicle.wheels).toHaveLength(4);
+      expect(vehicle.wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(vehicle.wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+  });
+});

@@ -59,5 +59,5 @@ enforce most of it.
 
 ## License
 
-By contributing, you agree your contributions are licensed under the project's **CC BY-NC 4.0**
-(non-commercial) license. See [LICENSE](./LICENSE).
+By contributing, you agree your contributions are licensed under the project's **AGPL-3.0**
+license. See [LICENSE](./LICENSE).

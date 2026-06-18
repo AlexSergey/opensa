@@ -132,7 +132,9 @@ interface CornerWheel {
  * Wheels follow one of SA's two conventions: a single shared `wheel` atomic
  * instanced at the four `wheel_*_dummy` frames (scaled per front/rear, mirrored
  * on the right), or per-corner `wheel_{lf|rf|lb|rb}` atomics placed at their own
- * frames (different front/rear wheels). Paint markers in material colours
+ * frames (different front/rear wheels). A lone corner atomic with no shared
+ * `wheel` but real dummies is treated as a mis-named shared wheel (see
+ * {@link buildWheels}). Paint markers in material colours
  * are replaced by the carcol primary/secondary. Result stays in native Z-up
  * (the caller's streaming root applies the Z-up→Y-up rotation). Wheels are
  * wrapped in pivot/spinner groups so a {@link BuiltWheel} rig can spin and steer
@@ -533,11 +535,6 @@ function buildVehicleMaterial(
   return material;
 }
 
-/**
- * Pick the wheel rig: per-corner atomics win when present (distinct per-position meshes, any axle
- * count — some models also keep a stray shared `wheel` atomic for compatibility, which we then
- * ignore); otherwise instance the single shared `wheel` atomic at the dummies. [] when neither.
- */
 function buildWheels(
   root: Group,
   clump: RWClump,
@@ -546,6 +543,12 @@ function buildWheels(
   options: VehicleOptions,
   worldCache: Map<number, Matrix4>,
 ): BuiltWheel[] {
+  // A lone corner atomic with no shared `wheel`, alongside real `wheel_*_dummy` frames, is a mis-named
+  // shared wheel (some mods, e.g. comet, ship only `wheel_rf` expecting it instanced at all four dummies).
+  // Treat its geometry as the shared wheel. Genuine per-corner sets (≥2 corners) stay on addCornerWheels.
+  if (source.wheelGeometryIndex === null && source.cornerWheels.length === 1 && hasWheelDummies(clump)) {
+    return addWheels(root, clump, source.cornerWheels[0].atomic.geometryIndex, textures, options, worldCache);
+  }
   if (source.cornerWheels.length > 0) {
     return addCornerWheels(root, clump, source.cornerWheels, textures, options, worldCache);
   }
@@ -617,6 +620,16 @@ function glassPass(
   mesh.renderOrder = renderOrder;
 
   return mesh;
+}
+
+/**
+ * Pick the wheel rig: per-corner atomics win when present (distinct per-position meshes, any axle
+ * count — some models also keep a stray shared `wheel` atomic for compatibility, which we then
+ * ignore); otherwise instance the single shared `wheel` atomic at the dummies. [] when neither.
+ */
+/** True if the clump has any `wheel_*_dummy` frame (the shared-wheel instancing targets). */
+function hasWheelDummies(clump: RWClump): boolean {
+  return clump.frames.some((frame) => wheelPlacement(frame.name.toLowerCase()) !== null);
 }
 
 /** Which light a lamp centroid belongs to: the nearer of the head/tail dummy within {@link LAMP_DUMMY_RADIUS},

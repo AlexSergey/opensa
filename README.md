@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://opensa.cc"><img src="https://img.shields.io/badge/site-opensa.cc-2a7ae2" alt="Website" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey" alt="License: CC BY-NC 4.0" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-2a7ae2" alt="License: AGPL-3.0" /></a>
 </p>
 
 An open-source, from-scratch re-creation of the RenderWare engine — streaming the real San Andreas world, models and
@@ -14,6 +14,12 @@ physics, in the browser.
 
 <p align="center">
   <a href="https://opensa.cc"><img src="https://img.shields.io/badge/%E2%96%B6%20Play%20the%20Demo-opensa.cc-F55C07?style=for-the-badge" alt="Play the demo" /></a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=J2P4gQd9NQo" title="Watch the OpenSA launch trailer">
+    <img src="https://img.youtube.com/vi/J2P4gQd9NQo/hqdefault.jpg" alt="OpenSA — GTA San Andreas in your browser — launch trailer" width="640" />
+  </a>
 </p>
 
 ## Blog
@@ -35,22 +41,14 @@ conventions. First-time asset setup: [docs/development/getting-started.md](./doc
 
 # License
 
-**CC BY-NC 4.0**
+Copyright (c) 2026 Aleksandrov Sergey
 
-Commercial Use Restriction
+The OpenSA source code is licensed under the **GNU Affero General Public License v3.0**
+(AGPL-3.0). You may use, modify and redistribute it under the terms of that license; if
+you run a modified version as a network service, you must offer its source to users. See
+[LICENSE](./LICENSE) for the full text.
 
-This project is provided for personal, educational,
-research, and non-commercial use only.
-
-Commercial use, including but not limited to:
-
-- selling copies,
-- paid hosting,
-- SaaS offerings,
-- commercial redistribution,
-- bundling into commercial products,
-
-is prohibited without explicit written permission
-from the copyright holder.
-
-[LICENSE](./LICENSE)
+**This license covers only the original OpenSA code.** GTA San Andreas assets, models,
+maps, names and trademarks are the property of Rockstar Games / Take-Two Interactive and
+are **not** covered by it or distributed with this project. OpenSA is an unofficial,
+non-commercial fan project, not affiliated with Rockstar Games or Take-Two.

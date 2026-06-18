@@ -29,7 +29,7 @@
     "type": "git",
     "url": "git+https://github.com/AlexSergey/opensa.git"
   },
-  "license": "CC-BY-NC-4.0",
+  "license": "AGPL-3.0-only",
   "author": "Aleksandrov Sergey <gooddev.sergey@gmail.com>",
   "scripts": {
     "build": "tsc -b && vite build",
