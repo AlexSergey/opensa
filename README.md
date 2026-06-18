@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="./assets/logo-repo.png" alt="OpenSA — GTA San Andreas in your browser" width="420" />
+  <img src="./assets/logo-repo.png" alt="OpenSA - GTA San Andreas in your browser" width="420" />
 </p>
 
 <p align="center">
   <a href="https://opensa.cc"><img src="https://img.shields.io/badge/site-opensa.cc-2a7ae2" alt="Website" /></a>
-  <a href="./LICENSE.md"><img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey" alt="License: CC BY-NC 4.0" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey" alt="License: CC BY-NC 4.0" /></a>
 </p>
 
-An open-source, from-scratch re-creation of the RenderWare engine — streaming the real San Andreas world,
-models and physics, with no install.
+An open-source, from-scratch re-creation of the RenderWare engine — streaming the real San Andreas world, models and
+physics, in the browser.
 
 > Unofficial, non-commercial fan project. Not affiliated with Rockstar Games or Take-Two.
 
@@ -18,9 +18,9 @@ models and physics, with no install.
 
 ## Blog
 
-Dev notes and progress — in [`/blog`](./blog).
+Dev notes and progress - in [`/blog`](./blog).
 
-- 2026-06-15 — [Hello, San Andreas](./blog/2026-06-15-hello-san-andreas.md)
+- 2026-06-18 - [I built GTA San Andreas in the browser in three weeks - solo, with Claude Code](./2026-06-18-i-built-gta-san-andreas-in-the-browser-in-three-weeks-solo-with-claude-code.md)
 
 ## What's inside
 
@@ -30,7 +30,7 @@ archives, IPL/IDE world streaming) with a Rapier-physics player and vehicles. Se
 
 ## Contributing
 
-Contributions are welcome — see **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, the dev workflow, and
+Contributions are welcome - see **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, the dev workflow, and
 conventions. First-time asset setup: [docs/development/getting-started.md](./docs/development/getting-started.md).
 
 # License
@@ -53,4 +53,4 @@ Commercial use, including but not limited to:
 is prohibited without explicit written permission
 from the copyright holder.
 
-[LICENSE](./LICENSE.md)
+[LICENSE](./LICENSE)

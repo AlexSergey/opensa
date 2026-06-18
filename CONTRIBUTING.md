@@ -60,4 +60,4 @@ enforce most of it.
 ## License
 
 By contributing, you agree your contributions are licensed under the project's **CC BY-NC 4.0**
-(non-commercial) license. See [LICENSE.md](./LICENSE.md).
+(non-commercial) license. See [LICENSE](./LICENSE).
