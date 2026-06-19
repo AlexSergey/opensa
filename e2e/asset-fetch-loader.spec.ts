@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 /**
- * E2E for the asset loader's browser-IO shell (`src/asset-loader/asset-loader.ts` + `cache-store.ts`) —
+ * E2E for the asset loader's browser-IO shell (`src/loaders/asset-fetch-loader/asset-fetch-loader.ts` + `cache-store.ts`) —
  * real `fetch` streaming + Cache Storage, which node units can't exercise. Network is mocked with
  * `page.route` (no served fixtures needed); the loader doesn't parse the zip bytes, so fake chunk bodies
  * of the manifest-declared lengths are enough. Runs on the Vite origin so `import('/src/...')` resolves
@@ -11,7 +11,7 @@ const ORIGIN = 'http://localhost:3001';
 const DIR = `${ORIGIN}/loader-e2e`;
 const MANIFEST_URL = `${DIR}/manifest.json`;
 const CACHE_NAME = 'opensa-assets-e2e';
-const MODULE = '/src/asset-loader/index.ts';
+const MODULE = '/src/loaders/index.ts';
 
 const manifest = {
   chunks: {
@@ -46,12 +46,12 @@ async function mockNetwork(page: Page, fail404?: string): Promise<void> {
   });
 }
 
-/** Run a fresh AssetLoader (init + load all) in the page and report what happened. */
+/** Run a fresh AssetFetchLoader (init + load all) in the page and report what happened. */
 function run(page: Page): Promise<RunResult> {
   return page.evaluate(
     async ({ cacheName, manifestUrl, module }) => {
       interface LoaderModule {
-        AssetLoader: new (config: {
+        AssetFetchLoader: new (config: {
           cacheName?: string;
           manifestUrl: string;
           sink?: { addChunk(group: string, file: string, bytes: Uint8Array): void };
@@ -65,7 +65,7 @@ function run(page: Page): Promise<RunResult> {
       const statuses: string[] = [];
       const delivered: [string, number][] = [];
       let progress = { loadedBytes: 0, loadedChunks: 0, totalBytes: 0, totalChunks: 0 };
-      const loader = new mod.AssetLoader({
+      const loader = new mod.AssetFetchLoader({
         cacheName,
         manifestUrl,
         sink: {
@@ -122,12 +122,12 @@ test.describe('asset loader', () => {
     const remaining = await page.evaluate(
       async ({ cacheName, dir, manifestUrl, module }) => {
         interface LoaderModule {
-          AssetLoader: new (config: { cacheName?: string; manifestUrl: string }) => { init(): Promise<unknown> };
+          AssetFetchLoader: new (config: { cacheName?: string; manifestUrl: string }) => { init(): Promise<unknown> };
         }
         const cache = await caches.open(cacheName);
         await cache.put(`${dir}/stale-9999.zip`, new Response(new Uint8Array(2)));
         const mod = (await import(/* @vite-ignore */ module)) as LoaderModule;
-        await new mod.AssetLoader({ cacheName, manifestUrl }).init();
+        await new mod.AssetFetchLoader({ cacheName, manifestUrl }).init();
 
         return (await cache.keys()).map((request) => request.url);
       },
@@ -142,13 +142,13 @@ test.describe('asset loader', () => {
     const outcome = await page.evaluate(
       async ({ cacheName, manifestUrl, module }) => {
         interface LoaderModule {
-          AssetLoader: new (config: { cacheName?: string; manifestUrl: string }) => {
+          AssetFetchLoader: new (config: { cacheName?: string; manifestUrl: string }) => {
             events: { on(event: string, handler: (payload: unknown) => void): void };
             load(): Promise<void>;
           };
         }
         const mod = (await import(/* @vite-ignore */ module)) as LoaderModule;
-        const loader = new mod.AssetLoader({ cacheName, manifestUrl });
+        const loader = new mod.AssetFetchLoader({ cacheName, manifestUrl });
         let errorFile = '';
         loader.events.on('error', (event): void => {
           errorFile = (event as { file: string }).file;

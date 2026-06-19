@@ -120,6 +120,43 @@ export function openArchive(bytes: Uint8Array): ImgArchive {
   throw new Error('Not a WIMG or VER2 archive');
 }
 
+/**
+ * Parse a VER2 directory into `name (lowercased) -> [byteOffset, byteSize]`. `bytes` need only cover the
+ * directory (header + `count` × 32). Sizes are padded to whole sectors; our chunk parsers read by length and
+ * ignore the trailing padding, so the padded range is fine. Shared by {@link openVer2} and the lazy local-loader
+ * reader, which slices entries straight from disk without buffering the whole (~1 GB) archive.
+ */
+export function parseVer2Directory(bytes: Uint8Array): Map<string, [number, number]> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const count = view.getUint32(4, true);
+  const files = new Map<string, [number, number]>();
+  for (let i = 0; i < count; i += 1) {
+    const base = 8 + i * 32;
+    const offsetSectors = view.getUint32(base, true);
+    const streamingSize = view.getUint16(base + 4, true);
+    const sizeInArchive = view.getUint16(base + 6, true);
+    const sectors = streamingSize !== 0 ? streamingSize : sizeInArchive;
+    let end = base + 8;
+    while (end < base + 32 && bytes[end] !== 0) {
+      end += 1;
+    }
+    const name = decode(bytes, base + 8, end).toLowerCase();
+    files.set(name, [offsetSectors * SECTOR, sectors * SECTOR]);
+  }
+
+  return files;
+}
+
+/** Bytes needed to hold a VER2 directory of `count` entries (magic + count + 32 bytes each). */
+export function ver2DirectoryLength(count: number): number {
+  return 8 + count * 32;
+}
+
+/** Entry count from a VER2 header (first 8 bytes: `"VER2"` + u32 count). */
+export function ver2EntryCount(header: Uint8Array): number {
+  return new DataView(header.buffer, header.byteOffset, header.byteLength).getUint32(4, true);
+}
+
 function decode(bytes: Uint8Array, start: number, end: number): string {
   return new TextDecoder().decode(bytes.subarray(start, end));
 }
@@ -135,24 +172,7 @@ async function downloadArchive(url: string): Promise<ImgArchive> {
 
 /** Stock GTA San Andreas `.img` (VER2): inline 32-byte directory entries, offsets/sizes in 2048-byte sectors. */
 function openVer2(bytes: Uint8Array): ImgArchive {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const count = view.getUint32(4, true);
-  // name (lowercased) -> [byteOffset, byteSize]. Sizes are padded to whole sectors; our chunk parsers
-  // read by length and ignore the trailing padding, so handing back the padded slice is fine.
-  const files = new Map<string, [number, number]>();
-  for (let i = 0; i < count; i += 1) {
-    const base = 8 + i * 32;
-    const offsetSectors = view.getUint32(base, true);
-    const streamingSize = view.getUint16(base + 4, true);
-    const sizeInArchive = view.getUint16(base + 6, true);
-    const sectors = streamingSize !== 0 ? streamingSize : sizeInArchive;
-    let end = base + 8;
-    while (end < base + 32 && bytes[end] !== 0) {
-      end += 1;
-    }
-    const name = decode(bytes, base + 8, end).toLowerCase();
-    files.set(name, [offsetSectors * SECTOR, sectors * SECTOR]);
-  }
+  const files = parseVer2Directory(bytes);
 
   return {
     get(name: string): ArrayBuffer | null {

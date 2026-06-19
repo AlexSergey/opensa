@@ -45,6 +45,19 @@ describe('bootReducer', () => {
       expect(state.phase).toBe('textures');
     });
 
+    it('local loader (autoLoad off): boots to the menu, then Play → folder → textures', () => {
+      const start = initialBootState(true, false);
+      expect(start.phase).toBe('menu'); // nothing loads until the folder is picked
+
+      const state = run(start, [{ type: 'CHOOSE_FOLDER' }, { type: 'FOLDER_READY' }]);
+      expect(state.phase).toBe('textures');
+    });
+
+    it('local loader with a remembered folder goes menu → textures directly', () => {
+      const state = run(initialBootState(true, false), [{ type: 'FOLDER_READY' }]);
+      expect(state.phase).toBe('textures');
+    });
+
     it('pauses and resumes from playing', () => {
       let state = run(initialBootState(true), [
         { type: 'CORE_LOADED' },

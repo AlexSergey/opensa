@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Manifest } from '../asset-loader';
+import type { Manifest } from '../loaders';
 
 import { manifestTotals, verifyTotals } from './verify';
 

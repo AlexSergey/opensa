@@ -1,4 +1,4 @@
-import { parseIde, parseTimedObjects } from '../../src/renderware/parsers/text/ide.parser';
+import { parseIde, parseTimedObjects } from '../renderware/parsers/text/ide.parser';
 
 /** One file to pack: its bare lowercased name (`cj.dff`) + which img to read it from. */
 export interface Entry {

@@ -46,6 +46,7 @@ import {
   parseHandling,
   parseIfp,
   parseObjectDat,
+  parsePedDefs,
   parseProcObj,
   parseSurfaceNames,
   parseTimecyc,
@@ -138,6 +139,8 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private handling: Map<string, HandlingEntry> | null = null;
   /** Parsed `object.dat` collision-damage tuning by lowercased model (plan 045); null when absent. */
   private objectDat: Map<string, ObjectDatEntry> | null = null;
+  /** Parsed `peds.ide` defs by lowercased model name (TEMP: resolves the env-picked main character). */
+  private peds: null | ReturnType<typeof parsePedDefs> = null;
   /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
   private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Surface-name table from surfinfo.dat (index = COL material id); pairs with procObjRules. */
@@ -241,6 +244,20 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     return { bonesByName: new Map(), object: buildClump(clump, textures, { convertToYUp: false }), skeleton: null };
+  }
+
+  /**
+   * TEMP (bring-your-own-files): load a character by its `peds.ide` model name (e.g. `BMYPOL1`), resolving to
+   * the archive's bare `model.dff` / `txd.txd` — for raw installs that have no loose `player/*` files.
+   */
+  async loadCharacterByModel(modelName: string): Promise<CharacterModel> {
+    this.peds ??= parsePedDefs(requireText(this.fs, 'data/peds.ide'));
+    const def = this.peds.get(modelName.toLowerCase());
+    if (!def) {
+      throw new Error(`No ped definition for '${modelName}' in peds.ide`);
+    }
+
+    return this.loadCharacter(`${def.model}.dff`, `${def.txd}.txd`);
   }
 
   // eslint-disable-next-line
@@ -356,8 +373,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     const genericTextures = await this.loadGenericVehicleTextures();
-    const dffBuffer = requireBuffer(this.fs, `vehicles/${def.model}.dff`);
-    const carTxdBuffer = requireBuffer(this.fs, `vehicles/${def.txd}.txd`);
+    // Loose `vehicles/<name>` (fetch build) or the bare archive name (raw install, e.g. local loader).
+    const dffBuffer = requireFirstBuffer(this.fs, [`vehicles/${def.model}.dff`, `${def.model}.dff`]);
+    const carTxdBuffer = requireFirstBuffer(this.fs, [`vehicles/${def.txd}.txd`, `${def.txd}.txd`]);
     const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
     const indices = colour
       ? colour
@@ -575,6 +593,17 @@ function requireBuffer(fs: AssetFileSystem, name: string): ArrayBuffer {
   }
 
   return buffer;
+}
+
+/** First present buffer among `names` (case-insensitive keys), throwing if none exist. */
+function requireFirstBuffer(fs: AssetFileSystem, names: readonly string[]): ArrayBuffer {
+  for (const name of names) {
+    const buffer = fs.get(name.toLowerCase());
+    if (buffer) {
+      return buffer;
+    }
+  }
+  throw new Error(`asset not found: ${names.join(' | ')}`);
 }
 
 /** Read a required text asset from the file system (throws if absent). */

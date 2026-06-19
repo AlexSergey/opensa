@@ -16,7 +16,7 @@ import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-l
 import type { DebugActions } from './debug/debug-overlay';
 
 import { Game } from '../game';
-import { GAME_TYPE } from '../game-config';
+import { GAME_TYPE, MAIN_CHARACTER, VEHICLES } from '../game-config';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
 import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
@@ -538,10 +538,12 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
     await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
 
-    // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
-    // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
-    // stands it up in GTA Z-up under a wrapper the render-sync system positions.
-    const model = await adapter.loadCharacter('player/t800.dff', 'player/t800.txd');
+    // Spawn the player on CJ's parking lot. The model is native GTA model-space (up = +Y);
+    // `orientCharacter` stands it up in GTA Z-up under a wrapper the render-sync system positions.
+    // TEMP: `VITE_MAIN_CHARACTER` picks a ped model from peds.ide (bring-your-own-files); else the loose DFF.
+    const model = MAIN_CHARACTER
+      ? await adapter.loadCharacterByModel(MAIN_CHARACTER)
+      : await adapter.loadCharacter('player/t800.dff', 'player/t800.txd');
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
       bonesByName: model.bonesByName,
@@ -936,9 +938,9 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       );
     };
 
-    // Cars this game ships (its `vehicles/` folder, packed into the loaded archive) — drives the
-    // debug spawn list, so adding a vehicle needs no per-car code.
-    const vehicleModels = vehicleModelsFromNames(fs.names);
+    // Cars available in-game → drives the debug spawn list. TEMP: `VITE_VEHICLES` (resolved via vehicles.ide,
+    // for bring-your-own-files) takes precedence; otherwise the loose `vehicles/*.dff` packed in the archive.
+    const vehicleModels = VEHICLES.length > 0 ? VEHICLES : vehicleModelsFromNames(fs.names);
 
     // Cycle each car's OWN carcols combos on repeated debug spawns (so re-spawning gives a different
     // colour); undefined when the car has no carcols entry → loadVehicle picks its default.

@@ -99,6 +99,8 @@ export interface WorldAdapter {
   loadCellColliders(cx: number, cy: number): Promise<ModelColliders[]>;
   /** Load a character model (DFF + TXD) into a renderable object (native GTA Z-up). */
   loadCharacter(dffUrl: string, txdUrl: string): Promise<CharacterModel>;
+  /** TEMP: load a character by its `peds.ide` model name (e.g. `BMYPOL1`), resolving the archive DFF/TXD. */
+  loadCharacterByModel(modelName: string): Promise<CharacterModel>;
   /** Build a debug wireframe overlay of the region's collision (empty if unsupported). */
   loadCollisionDebug(request: RegionRequest): Promise<Object3D[]>;
   /**

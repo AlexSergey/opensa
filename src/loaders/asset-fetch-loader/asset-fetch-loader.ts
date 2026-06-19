@@ -1,18 +1,18 @@
 /**
- * The asset loader (plan 049): fetches the build manifest, downloads chunk zips on demand with a small
+ * The fetch asset loader (plan 049): fetches the build manifest, downloads chunk zips on demand with a small
  * concurrency limit, caches each in Cache Storage (skipping cached ones), invalidates stale chunks, and
  * pushes every ready chunk's RAW bytes to the sink (the VFS). Progress goes out on `events`. Browser-only
- * (fetch streaming + Cache Storage) — exercised on the Playwright e2e lane.
+ * (fetch streaming + Cache Storage) — exercised on the Playwright e2e lane. Implements {@link AssetLoader}.
  */
-import type { AssetLoaderEvents, AssetSink, GroupChunk, GroupName, Manifest } from './types';
+import type { AssetLoader, AssetLoaderEvents, AssetSink, GroupChunk, GroupName, Manifest } from '../types';
 
+import { Emitter } from '../emitter';
+import { allChunks, chunkUrl, chunkUrls, GROUP_NAMES, manifestDir, parseManifest } from '../manifest';
+import { ProgressTracker } from '../progress';
 import { CacheStore } from './cache-store';
-import { Emitter } from './emitter';
 import { staleKeys } from './invalidate';
-import { allChunks, chunkUrl, chunkUrls, GROUP_NAMES, manifestDir, parseManifest } from './manifest';
-import { ProgressTracker } from './progress';
 
-export interface AssetLoaderConfig {
+export interface AssetFetchLoaderConfig {
   /** Cache Storage bucket name (default `opensa-assets`). */
   cacheName?: string;
   /** Parallel chunk downloads (default 4). */
@@ -25,16 +25,16 @@ export interface AssetLoaderConfig {
   verifyHash?: boolean;
 }
 
-export class AssetLoader {
+export class AssetFetchLoader implements AssetLoader {
   readonly events = new Emitter<AssetLoaderEvents>();
 
   private readonly cache: CacheStore;
   private readonly concurrency: number;
-  private readonly config: AssetLoaderConfig;
+  private readonly config: AssetFetchLoaderConfig;
   private dir = '';
   private manifest: Manifest | null = null;
 
-  constructor(config: AssetLoaderConfig) {
+  constructor(config: AssetFetchLoaderConfig) {
     this.config = config;
     this.cache = new CacheStore(config.cacheName ?? 'opensa-assets');
     this.concurrency = config.concurrency ?? 4;

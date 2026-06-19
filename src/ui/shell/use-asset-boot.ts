@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import type { Manifest, ProgressSnapshot } from '../../asset-loader';
+import type { Manifest, ProgressSnapshot } from '../../loaders';
 import type { AssetFileSystem } from '../../renderware';
 import type { BootState } from './boot-machine';
 
-import { AssetLoader } from '../../asset-loader';
-import { GAME_TYPE } from '../../game-config';
+import { GAME_TYPE, MAIN_CHARACTER, VEHICLES } from '../../game-config';
+import { createAssetLoader, GROUP_NAMES } from '../../loaders';
 import { Vfs } from '../../vfs';
 import { bootReducer, initialBootState, PLAY_ENABLED } from './boot-machine';
 import { CORE_STATUS, rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-status';
@@ -23,6 +23,8 @@ const INTRO_DURATION_MS = 3400;
 /** The shell's boot controller: drives the loader/VFS by phase and exposes state + actions for the UI. */
 export interface AssetBoot {
   acceptDisclaimer: () => void;
+  /** Prompt for the install folder (local loader, user gesture) — unblocks loading. No-op for fetch. */
+  chooseFolder: () => void;
   /** Last error message (for the error panel). */
   detail: string;
   /** The asset file system the game reads from (filled as phases complete). */
@@ -43,10 +45,30 @@ export interface AssetBoot {
 
 export function useAssetBoot(): AssetBoot {
   const flags = useMemo(() => readBootFlags(), []);
+
+  const vfs = useMemo(() => new Vfs(), []);
+  const loader = useMemo(
+    () =>
+      createAssetLoader({
+        game: GAME_TYPE,
+        manifestUrl: MANIFEST_URL,
+        peds: MAIN_CHARACTER ? [MAIN_CHARACTER] : [],
+        sink: vfs,
+        vehicles: VEHICLES,
+        version: __APP_VERSION__,
+      }),
+    [vfs],
+  );
+  // The local loader (bring-your-own-files) can't read anything until the user picks the install folder (a
+  // gesture), so it boots to the menu and loads only after the folder prompt. The fetch loader has no
+  // `prepare`, so it's ready immediately and auto-loads `core` on mount.
+  const requiresGesture = typeof loader.prepare === 'function';
+  const [folderReady, setFolderReady] = useState(!requiresGesture);
+
   // While the playable demo is disabled, boot straight to a Play-disabled menu so nothing downloads.
   const [state, dispatch] = useReducer(bootReducer, flags.disclaimerAccepted, (accepted) =>
     PLAY_ENABLED
-      ? initialBootState(accepted)
+      ? initialBootState(accepted, !requiresGesture)
       : ({
           degraded: true,
           disclaimerAccepted: accepted,
@@ -64,8 +86,6 @@ export function useAssetBoot(): AssetBoot {
   const [introDone, setIntroDone] = useState(flags.introSeen);
   const percent = toPercent(snapshot);
 
-  const vfs = useMemo(() => new Vfs(), []);
-  const loader = useMemo(() => new AssetLoader({ manifestUrl: MANIFEST_URL, sink: vfs }), [vfs]);
   const manifestRef = useRef<Manifest | null>(null);
   const attemptRef = useRef(''); // `${phase}:${retries}` — runs each loading phase once per attempt
 
@@ -74,11 +94,35 @@ export function useAssetBoot(): AssetBoot {
     return loader.events.on('progress', setSnapshot);
   }, [loader]);
 
+  // Boot-time restore (no user gesture): if the remembered folder is still granted, mark ready so loading
+  // proceeds without prompting. No-op for the fetch loader. Best-effort — failures just leave it not-ready.
+  useEffect(() => {
+    if (!loader.restore) {
+      return;
+    }
+    let cancelled = false;
+    void loader
+      .restore()
+      .then(() => {
+        if (!cancelled && loader.ready?.()) {
+          setFolderReady(true);
+        }
+      })
+      .catch(() => undefined);
+
+    return (): void => {
+      cancelled = true;
+    };
+  }, [loader]);
+
   // Run the active loading phase (core = priority+models, textures), once per attempt (retry/StrictMode-safe).
   useEffect(() => {
     const { phase, retries } = state;
     if (phase !== 'core' && phase !== 'textures') {
       return;
+    }
+    if (!folderReady) {
+      return; // local loader: wait for the install-folder gesture before reading anything
     }
     const key = `${phase}:${retries}`;
     if (attemptRef.current === key) {
@@ -99,8 +143,10 @@ export function useAssetBoot(): AssetBoot {
       setCoreReady(true); // the menu waits for the intro animation too (see below)
     };
     const runTextures = async (): Promise<void> => {
-      await loader.load(['textures']);
-      const problems = vfs.verify(manifestRef.current ?? (await loader.init()));
+      // Fetch already loaded core (priority+models); local skipped it, so it loads everything here.
+      manifestRef.current ??= await loader.init();
+      await loader.load(requiresGesture ? GROUP_NAMES : ['textures']);
+      const problems = vfs.verify(manifestRef.current);
       if (problems.length > 0) {
         throw new Error(problems.join('; '));
       }
@@ -111,7 +157,7 @@ export function useAssetBoot(): AssetBoot {
       setDetail(String(error));
       dispatch({ phase, type: 'FAIL' });
     });
-  }, [loader, vfs, state]);
+  }, [loader, vfs, state, folderReady, requiresGesture]);
 
   // Start the intro animation at the progress midpoint (or once core is in, whichever comes first).
   useEffect(() => {
@@ -156,12 +202,35 @@ export function useAssetBoot(): AssetBoot {
       rememberDisclaimerAccepted();
       dispatch({ type: 'DISCLAIMER_OK' });
     }, []),
+    // Local loader, from the folder screen: prompt for the install folder (the picker must run in this
+    // click — its user gesture). On success loading begins; a cancelled/denied prompt surfaces in `detail`.
+    chooseFolder: useCallback((): void => {
+      void (async (): Promise<void> => {
+        try {
+          await loader.prepare?.();
+          setFolderReady(true);
+          dispatch({ type: 'FOLDER_READY' });
+        } catch (error) {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            setDetail(String(error));
+          }
+        }
+      })();
+    }, [loader]),
     detail,
     fs: vfs,
     introStarted,
     pause: useCallback((): void => dispatch({ type: 'PAUSE' }), []),
     percent,
-    play: useCallback((): void => dispatch({ type: 'PLAY' }), []),
+    // Fetch: straight into the loading/disclaimer flow. Local: go to the folder prompt, unless a remembered
+    // folder was already restored (then jump straight to loading).
+    play: useCallback((): void => {
+      if (requiresGesture) {
+        dispatch(folderReady ? { type: 'FOLDER_READY' } : { type: 'CHOOSE_FOLDER' });
+      } else {
+        dispatch({ type: 'PLAY' });
+      }
+    }, [requiresGesture, folderReady]),
     resume: useCallback((): void => dispatch({ type: 'RESUME' }), []),
     retry: useCallback((): void => {
       setDetail('');

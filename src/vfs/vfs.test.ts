@@ -1,7 +1,7 @@
 import { zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 
-import type { Manifest } from '../asset-loader';
+import type { Manifest } from '../loaders';
 
 import { Vfs } from './vfs';
 
@@ -80,6 +80,24 @@ describe('Vfs', () => {
       vfs.addChunk('priority', 'p.zip', bytes);
       vfs.addChunk('priority', 'p.zip', bytes); // same chunk again → ignored
       expect(vfs.verify(manifest)).toEqual([]); // still 1 chunk / 1 entry
+    });
+
+    it('addFiles raw-ingests pre-unzipped entries and accounts like addChunk (idempotent)', () => {
+      const manifest: Manifest = {
+        chunks: {
+          models: [{ bytes: 1, entries: 1, file: 'local-models', hash: '' }],
+          priority: [],
+          textures: [],
+        },
+        game: 'test',
+        version: 'test-1',
+      };
+      const vfs = new Vfs();
+      vfs.addFiles('local-models', [['cj.dff', text('DFF')]]);
+      vfs.addFiles('local-models', [['cj.dff', text('DFF')]]); // same chunk id again → ignored
+
+      expect(vfs.getText('cj.dff')).toBe('DFF');
+      expect(vfs.verify(manifest)).toEqual([]); // 1 chunk / 1 entry
     });
   });
 });

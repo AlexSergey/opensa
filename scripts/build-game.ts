@@ -13,14 +13,18 @@ import { type Zippable, zipSync } from 'fflate';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { loadEnv } from 'vite';
 
 import type { ImgArchive } from '../src/renderware/archive/img-archive';
 
+import { parseModelList } from '../src/game-build/env-list';
+import { type Entry, ideRefs, type ModelRef, partitionEntries, placedModels } from '../src/game-build/partition';
 import { openArchive } from '../src/renderware/archive/img-archive';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
+import { parsePedDefs } from '../src/renderware/parsers/text/ped-defs.parser';
+import { parseVehicleDefs } from '../src/renderware/parsers/text/vehicle-defs.parser';
 import { chunkByHash } from './game-build/chunk';
-import { type Entry, ideRefs, type ModelRef, partitionEntries, placedModels } from './game-build/partition';
 
 const ROOT = process.cwd();
 
@@ -57,6 +61,42 @@ function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
   }
 
   return zipSync(data);
+}
+
+/**
+ * TEMP: model + txd base names for the env-named main character (`peds.ide`) and vehicles (`vehicles.ide`).
+ * Those are spawned dynamically (not placed on the map), so the partition misses them — pack them explicitly.
+ */
+function dynamicRefs(
+  dataDir: string,
+  mainCharacter?: string,
+  vehiclesEnv?: string,
+): { models: string[]; txds: string[] } {
+  const models: string[] = [];
+  const txds: string[] = [];
+
+  const char = mainCharacter?.trim().toLowerCase();
+  if (char) {
+    const def = parsePedDefs(readIde(dataDir, 'peds.ide')).get(char);
+    if (def) {
+      models.push(def.model.toLowerCase());
+      txds.push(def.txd.toLowerCase());
+    }
+  }
+
+  const vehicles = parseModelList(vehiclesEnv);
+  if (vehicles.length > 0) {
+    const defs = parseVehicleDefs(readIde(dataDir, 'vehicles.ide'));
+    for (const name of vehicles) {
+      const def = defs.get(name);
+      if (def) {
+        models.push(def.model.toLowerCase());
+        txds.push(def.txd.toLowerCase());
+      }
+    }
+  }
+
+  return { models, txds };
 }
 
 /** id → {model, txd} (lowercased) from every IDE under the variant's data folder. */
@@ -103,7 +143,12 @@ function main(): void {
 
   const dataDir = join(src, 'data');
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
-  const { models, priority, textures } = partitionEntries(placed, gta3Names, gtaIntNames);
+  // TEMP (bring-your-own-files): also pack the env-named main character (peds.ide) + vehicles (vehicles.ide),
+  // since peds/cars are spawned dynamically, not placed on the map. Reads the local `.env` like the app does.
+  const env = loadEnv('production', ROOT, 'VITE_');
+  const dynamic = dynamicRefs(dataDir, env.VITE_MAIN_CHARACTER, env.VITE_VEHICLES);
+  const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
+  const { models, priority, textures } = partitionEntries(refs, gta3Names, gtaIntNames);
 
   // Load a partition entry's bytes from the right archive.
   const loadImg = (entry: Entry): LoadedEntry => {
@@ -186,6 +231,13 @@ function placedInstanceIds(dataDir: string, gta3: ImgArchive): number[] {
   }
 
   return ids;
+}
+
+/** Read an IDE file from the data folder, or '' when absent (so the parsers just yield nothing). */
+function readIde(dataDir: string, name: string): string {
+  const path = join(dataDir, name);
+
+  return statSync(path, { throwIfNoEntry: false }) ? readFileSync(path, 'utf8') : '';
 }
 
 /** Recursively list every file under `dir`. */

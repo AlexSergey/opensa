@@ -3,9 +3,9 @@
  * delivered chunk count + total entry count to the manifest's totals; returns a list of problems (empty =
  * complete).
  */
-import type { Manifest } from '../asset-loader';
+import type { Manifest } from '../loaders';
 
-import { allChunks } from '../asset-loader';
+import { allChunks } from '../loaders';
 
 export interface VfsTotals {
   chunks: number;

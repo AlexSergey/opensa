@@ -6,7 +6,7 @@
  */
 import { unzipSync } from 'fflate';
 
-import type { AssetSink, GroupName, Manifest } from '../asset-loader';
+import type { AssetSink, GroupName, Manifest } from '../loaders';
 import type { AssetFileSystem } from '../renderware/archive';
 
 import { manifestTotals, verifyTotals } from './verify';
@@ -31,6 +31,20 @@ export class Vfs implements AssetFileSystem, AssetSink {
     const entries = unzipSync(zipBytes);
     for (const name of Object.keys(entries)) {
       this.files.set(name, entries[name]);
+      this.entryCount += 1;
+    }
+    this.chunkCount += 1;
+  }
+
+  /** Raw ingest (local loader): index already-unzipped files under a synthetic chunk id. Idempotent on
+   *  `chunkId`, accounting like {@link addChunk} so `verify` works against a synthesised manifest. */
+  addFiles(chunkId: string, entries: Iterable<readonly [string, Uint8Array]>): void {
+    if (this.addedChunks.has(chunkId)) {
+      return;
+    }
+    this.addedChunks.add(chunkId);
+    for (const [name, bytes] of entries) {
+      this.files.set(name, bytes);
       this.entryCount += 1;
     }
     this.chunkCount += 1;

@@ -7,7 +7,10 @@ import { defineConfig, devices } from '@playwright/test';
  * WIMG archive needed). Headless Chromium renders WebGL via SwiftShader, so canvas screenshots are
  * deterministic across machines.
  */
-const APP_PORT = 5173;
+// Dedicated e2e port (not the usual 5173 dev port) so the lane never reuses a hand-started dev server that
+// might be in another mode (e.g. the `local` bring-your-own-files loader). The e2e server always boots with
+// `--mode e2e`, loading the committed `.env.e2e` (which forces the deterministic fetch loader).
+const APP_PORT = 5174;
 const STATIC_PORT = 3001;
 
 export default defineConfig({
@@ -30,7 +33,7 @@ export default defineConfig({
       url: `http://localhost:${STATIC_PORT}/viewer/objects/wattspark1_lae2.dff`,
     },
     {
-      command: `npm run dev -- --port ${APP_PORT} --strictPort`,
+      command: `npm run dev -- --mode e2e --port ${APP_PORT} --strictPort`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       url: `http://localhost:${APP_PORT}`,

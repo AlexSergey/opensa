@@ -6,6 +6,7 @@ import { initAnalytics } from './analytics';
 import { PLAY_ENABLED } from './boot-machine';
 import { Disclaimer } from './disclaimer';
 import { ErrorPanel } from './error-panel';
+import { FolderPrompt } from './folder-prompt';
 import { GameHint } from './game-hint';
 import { Logo } from './logo';
 import { Menu } from './menu';
@@ -78,6 +79,13 @@ export function App(): ReactElement {
             onPlay={boot.play}
             playDisabled={!PLAY_ENABLED || boot.state.degraded}
           />
+        </div>
+      ) : null}
+
+      {phase === 'folder' ? (
+        <div className="sa-stage sa-stage--col">
+          <Logo className={SUBTITLED} />
+          <FolderPrompt detail={boot.detail} onChoose={boot.chooseFolder} />
         </div>
       ) : null}
 
