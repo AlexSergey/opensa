@@ -30,3 +30,4 @@
 - [Timecyc](timecyc.md) — plan 028 (DONE); parse/convert(8→24h)/sample timecyc colour-lighting table (renderware/parsers/text); data layer for sky/sun/light
 - [Graphics](graphics.md) — plan 029; timecyc-driven sky/sun/fog (+godrays next); SkyPlugin gradient dome DONE (phase 1)
 - [Vehicle reflections plan](vehicle-reflections-plan.md) — plan 030 (researched, NOT built); SA env-map via DFF MatFX/reflection/specular plugins + vehicleenvmap128; sky-cube probe approach
+- [Locked DFF/TXD recovery](locked-dff-recovery.md) — anti-rip locks = inflated chunk SIZES (not absent data); count-based recovery (recoverLockedList/forEachClumpChild) for DFF atomics/geometries + TXD textures; cheetah+yosemite SOLVED

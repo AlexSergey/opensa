@@ -2,8 +2,11 @@ import type { ChunkHeader } from './chunks';
 import type { RWMipLevel, RWTexture, RWTextureDictionary, RWTextureFormat } from './types';
 
 import { BinaryStream } from './binary-stream';
-import { findChild, forEachChild, readChunkHeader } from './chunks';
+import { findChild, forEachChild, readChunkHeader, recoverLockedList } from './chunks';
 import { D3dCompression, RasterFormat, RwSection } from './constants';
+
+/** A TEXTURE_NATIVE is a Struct (raster) + Extension — used to find its real end past a bloated lock size. */
+const TEXTURE_CHILDREN: ReadonlySet<number> = new Set([RwSection.EXTENSION, RwSection.STRUCT]);
 
 /**
  * Parse a RenderWare Texture Dictionary (.txd) into RWTextureDictionary.
@@ -18,6 +21,7 @@ export function parseTxd(buffer: ArrayBuffer): RWTextureDictionary {
   const stream = new BinaryStream(buffer);
   const dictHeader = readDictHeader(stream);
 
+  const struct = findChild(stream, dictHeader.dataStart, dictHeader.end, RwSection.STRUCT);
   const textures: RWTexture[] = [];
   forEachChild(stream, dictHeader.dataStart, dictHeader.end, (child) => {
     if (child.type === RwSection.TEXTURE_NATIVE) {
@@ -27,6 +31,16 @@ export function parseTxd(buffer: ArrayBuffer): RWTextureDictionary {
       }
     }
   });
+
+  // Anti-rip "inflated size" recovery (e.g. yosemite.txd): the dictionary declares more textures than the
+  // boundary walk found because each TEXTURE_NATIVE's size is bloated to swallow the next. Re-read RW-style.
+  if (struct) {
+    stream.seek(struct.dataStart);
+    const declared = stream.u16(); // numTextures (deviceId follows)
+    if (textures.length < declared) {
+      return { textures: recoverTextures(stream, dictHeader, struct.end, declared) };
+    }
+  }
 
   return { textures };
 }
@@ -201,6 +215,32 @@ function readMipmaps(
   }
 
   return mipmaps;
+}
+
+/** Re-read a texture dictionary by its declared count, RW-style ({@link recoverLockedList}), past the
+ *  bloated TEXTURE_NATIVE sizes. Unparseable formats are skipped, as in the normal path. */
+function recoverTextures(
+  stream: BinaryStream,
+  dictHeader: ChunkHeader,
+  structEnd: number,
+  declared: number,
+): RWTexture[] {
+  const textures: RWTexture[] = [];
+  for (const header of recoverLockedList(
+    stream,
+    structEnd,
+    dictHeader.end,
+    declared,
+    RwSection.TEXTURE_NATIVE,
+    TEXTURE_CHILDREN,
+  )) {
+    const texture = parseTextureNative(stream, header);
+    if (texture) {
+      textures.push(texture);
+    }
+  }
+
+  return textures;
 }
 
 /** Convert in-place a BGRA byte buffer to RGBA (returns a new buffer). */

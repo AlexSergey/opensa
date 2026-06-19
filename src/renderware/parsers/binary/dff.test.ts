@@ -433,3 +433,24 @@ describe('parseDff (locked DFF — inflated clump-struct size)', () => {
     });
   });
 });
+
+// Anti-rip "inflated size" lock (see docs/open-issues/locked-dff.md): yosemite.dff declares 31 atomics /
+// 31 geometries but each item's size is bloated to swallow its siblings (+ 0x0 padding), so a boundary
+// walk finds only 8 / 16 and atomics index missing geometries. The count-based RW-style recovery restores
+// the full set. Committed custom fixture (a locked mod model). The game renders it whole (it reads by count).
+const INFLATED_DFF = 'tests/custom/locked-models/yosemite.dff';
+
+describe('parseDff (locked DFF — inflated atomic/geometry sizes)', () => {
+  const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(INFLATED_DFF))));
+
+  describe('positive cases', () => {
+    it('recovers every atomic and geometry the inflated sizes hid', () => {
+      expect(clump.atomics).toHaveLength(31);
+      expect(clump.geometries).toHaveLength(31);
+    });
+
+    it('leaves no atomic pointing past the geometry list (all indices resolve)', () => {
+      expect(clump.atomics.every((a) => a.geometryIndex < clump.geometries.length)).toBe(true);
+    });
+  });
+});

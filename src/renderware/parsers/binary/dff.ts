@@ -18,7 +18,14 @@ import type {
 } from './types';
 
 import { BinaryStream } from './binary-stream';
-import { findChild, forEachChild, forEachClumpChild, readChunkHeader, readStringChunk } from './chunks';
+import {
+  findChild,
+  forEachChild,
+  forEachClumpChild,
+  readChunkHeader,
+  readStringChunk,
+  recoverLockedList,
+} from './chunks';
 import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 
 /** RenderWare chunk header size (type + size + libraryVersion, 3 × u32). */
@@ -75,9 +82,19 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
         break;
     }
   });
+  recoverLockedAtomics(stream, clumpHeader, atomics);
 
   return { atomics, frames, geometries, ...(uvAnimations ? { uvAnimations } : {}) };
 }
+
+/** Direct children an Atomic / Geometry list-item is made of — used to find its real end past a bloated
+ *  declared size (anti-rip lock). Anything else (a `0x0` pad or the next item) marks the boundary. */
+const ATOMIC_CHILDREN: ReadonlySet<number> = new Set([RwSection.EXTENSION, RwSection.STRUCT]);
+const GEOMETRY_CHILDREN: ReadonlySet<number> = new Set([
+  RwSection.EXTENSION,
+  RwSection.MATERIAL_LIST,
+  RwSection.STRUCT,
+]);
 
 /**
  * Recover per-face material indices from the geometry's BinMeshPLG split when the
@@ -248,12 +265,23 @@ function parseGeometry(stream: BinaryStream, header: ChunkHeader): RWGeometry {
 }
 
 function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometry[] {
+  const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
   const geometries: RWGeometry[] = [];
   forEachChild(stream, header.dataStart, header.end, (child) => {
     if (child.type === RwSection.GEOMETRY) {
       geometries.push(parseGeometry(stream, child));
     }
   });
+
+  // Anti-rip "inflated size" recovery (e.g. yosemite): the list declares more geometries than the
+  // boundary walk found because each geometry's size is bloated to swallow siblings. Re-read RW-style.
+  if (struct) {
+    stream.seek(struct.dataStart);
+    const declared = stream.u32();
+    if (geometries.length < declared) {
+      return recoverGeometries(stream, header, struct.end, declared);
+    }
+  }
 
   return geometries;
 }
@@ -291,6 +319,48 @@ function parseUvAnimDict(stream: BinaryStream, header: ChunkHeader): RWUvAnimati
   });
 
   return animations;
+}
+
+/** Re-read a geometry list by its declared count, RW-style ({@link recoverLockedList}), past the bloated
+ *  item sizes (see {@link recoverLockedAtomics} for the atomic-list counterpart). */
+function recoverGeometries(
+  stream: BinaryStream,
+  listHeader: ChunkHeader,
+  structEnd: number,
+  declared: number,
+): RWGeometry[] {
+  return recoverLockedList(stream, structEnd, listHeader.end, declared, RwSection.GEOMETRY, GEOMETRY_CHILDREN).map(
+    (header) => parseGeometry(stream, header),
+  );
+}
+
+/**
+ * Anti-rip "inflated size" recovery (e.g. yosemite): the clump declares more atomics than a
+ * boundary-respecting walk finds because each atomic's size is bloated to swallow the following ones
+ * (plus `0x0` padding). Re-read all atomics RW-style by the declared count. No-op when the counts match.
+ */
+function recoverLockedAtomics(stream: BinaryStream, clumpHeader: ChunkHeader, atomics: RWAtomic[]): void {
+  const struct = findChild(stream, clumpHeader.dataStart, clumpHeader.end, RwSection.STRUCT);
+  if (!struct) {
+    return;
+  }
+  stream.seek(struct.dataStart);
+  const declared = stream.u32();
+  if (atomics.length >= declared) {
+    return;
+  }
+  const recovered = recoverLockedList(
+    stream,
+    clumpHeader.dataStart,
+    clumpHeader.end,
+    declared,
+    RwSection.ATOMIC,
+    ATOMIC_CHILDREN,
+  );
+  atomics.length = 0;
+  for (const header of recovered) {
+    atomics.push(parseAtomic(stream, header));
+  }
 }
 
 /** Decoded `flags` lookup tables (2 bits each): lines count and chars per line. */

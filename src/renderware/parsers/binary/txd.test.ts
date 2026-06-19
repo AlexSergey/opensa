@@ -251,15 +251,18 @@ describe.skipIf(!txdExists)('parseTxd (real asset junk.txd)', () => {
   });
 });
 
-// A real mod TXD (yosemite / Ford F350) that prepends an empty type-0 chunk before the dictionary —
-// the leading-chunk case that broke `readDictHeader` (RwStreamFindChunk scan).
+// A real mod TXD (yosemite / Ford F350) with two anti-rip quirks: a leading empty type-0 chunk before the
+// dictionary (broke `readDictHeader`), AND inflated TEXTURE_NATIVE sizes that swallow following textures
+// (declares 20, a boundary walk finds 10) — the count-based recovery restores all 20, incl. the F350_mix body.
 const yosemitePath = join(process.cwd(), 'tests', 'custom', 'txd', 'yosemite.txd');
 const yosemiteExists = existsSync(yosemitePath);
 const yosemiteDict = yosemiteExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(yosemitePath)))) : null;
 
-describe.skipIf(!yosemiteExists)('parseTxd (real asset yosemite.txd with a leading chunk)', () => {
-  it('finds the dictionary past the leading empty chunk and parses all ten textures', () => {
-    expect(yosemiteDict!.textures.map((t) => t.name)).toContain('F350_interior');
-    expect(yosemiteDict!.textures).toHaveLength(10);
+describe.skipIf(!yosemiteExists)('parseTxd (real asset yosemite.txd — leading chunk + inflated sizes)', () => {
+  it('recovers all 20 textures the inflated sizes hid (past the leading empty chunk)', () => {
+    expect(yosemiteDict!.textures).toHaveLength(20);
+    const names = yosemiteDict!.textures.map((t) => t.name);
+    expect(names).toContain('F350_interior');
+    expect(names).toContain('F350_mix'); // the body texture a boundary walk misses
   });
 });

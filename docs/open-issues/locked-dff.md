@@ -1,20 +1,31 @@
 # "Locked" (anti-rip protected) DFF models
 
-**Status: Variant B fixed; Variant A still open.** `cheetah.dff` (inflated struct size) now parses and
-renders fully — model **and** embedded COL — via `forEachClumpChild` (2026-06-19). `yosemite.dff`
-(inflated counts) remains unrecoverable: the data is genuinely absent. The spawn crash was already fixed
-(a no-COL / locked vehicle falls back to a box chassis instead of throwing).
+> **✅ SOLVED (2026-06-19).** Both lock variants are handled; `cheetah.dff` and `yosemite.dff` parse and
+> render fully — geometry, the embedded COL, **and** textures — verified in-game. Kept here (not deleted)
+> as a reference for the lock formats and the recovery, in case related regressions surface.
 
-Two distinct lock variants found so far — both falsify chunk-container metadata so a boundary-respecting
-parser (ours) chokes while RenderWare's count-based reader keeps going:
+Both locks bloat chunk **sizes** to swallow siblings; the data is all present (the game reads by count,
+ignoring sizes). Recovered the same way (see [Fix](#fix-2026-06-19) below). The spawn crash was already
+fixed separately (a no-COL / locked vehicle falls back to a box chassis instead of throwing).
 
-| Variant                  | Example                    | Tamper                                                                | Recoverable?                                            |
-| ------------------------ | -------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
-| A — inflated counts      | `yosemite.dff` (Ford F350) | clump/GeometryList struct **counts** declare more children than exist | **No** — data genuinely absent                          |
-| B — inflated struct size | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings    | **Yes** — data is present, hidden behind the bogus size |
+Two distinct lock variants — both falsify chunk metadata so a boundary-respecting parser (ours) chokes
+while RenderWare's count-based reader keeps going:
 
-Both live in `game-src/original-extend/vehicles/`. (The companion `yosemite.txd` had a separate,
-already-fixed issue — a leading empty chunk; see [plan 043](../plans/043-dff-txd-completeness.md).)
+| Variant                        | Example                    | Tamper                                                                                         | Fix                                            |
+| ------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| B — inflated clump-struct size | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings                             | `forEachClumpChild` (canonical 12-byte struct) |
+| A — inflated item sizes        | `yosemite.dff` (Ford F350) | every **atomic / geometry chunk size** is bloated (+ `0x0` padding) to swallow following items | count-based RW recovery (`findChunkFrom`)      |
+
+> **Correction:** Variant A was first (wrongly) read as "inflated counts → data absent". It is not —
+> the 31 atomics / 31 geometries are all present, each hidden behind the previous item's bloated size
+> plus `0x0` size-0 padding. A boundary walk finds only 8 / 16; RW (and now we) read by count.
+
+Both live in `game-src/original-extend/vehicles/`. The companion **`yosemite.txd` carries the same
+inflated-size lock**: it declares 20 textures but a boundary walk finds 10 (each TEXTURE_NATIVE's size
+swallows the next), so the body texture `F350_mix` was missing and the chassis rendered untextured.
+`parseTxd` now applies the same count-based recovery (`recoverLockedList`) → all 20 textures. (It also has
+the older leading-empty-chunk quirk, already handled by `readDictHeader`; see
+[plan 043](../plans/043-dff-txd-completeness.md).)
 
 ## How RenderWare reads DFFs (why the locks target our parser)
 
@@ -24,33 +35,31 @@ and it reads a struct's fixed fields (e.g. `numAtomics/numLights/numCameras`) **
 trusting the struct chunk's declared size to skip. Our parser instead walks children **strictly within**
 each parent's declared `[start, end)` (`forEachChild`) — which both locks exploit.
 
-## Variant A — inflated counts (`yosemite.dff`)
+## Variant A — inflated item sizes (`yosemite.dff`)
 
-The struct headers declare more children than the stream contains, and atomics index geometries that
-don't exist.
+The clump declares 31 atomics / 31 geometries, but **every atomic and geometry chunk's declared size is
+bloated** to swallow the items that follow (with `0x0` size-0 padding chunks interleaved). A
+boundary-respecting walk advances by each bloated size and so finds only **8 atomics / 16 geometries**;
+the 8 it sees index geometries `0, 2, 6, 10, 14, 19, 23, 27` (up to 27 — out of range for the 16 it
+walked). The other items are **all present**, nested inside the bloated ranges.
 
-|            | Declared in struct | Physically present                                            |
-| ---------- | ------------------ | ------------------------------------------------------------- |
-| Geometries | 31                 | 16 (each individually valid: geom#0 = 1790 tris / 1716 verts) |
-| Atomics    | 31                 | 8                                                             |
+RW reads each list by its **count** via `RwStreamFindChunk`, scanning forward (skipping the padding and
+ignoring the bloated sizes) and advancing past each item's _real_ content — so it finds all 31 atomics
+(indices `0…30`) and all 31 geometries (verts 1716, 1772, …, 2314; last ends exactly on the geomlist
+boundary). That is why the game renders the truck whole.
 
-- The 8 atomics reference geometry indices `0, 2, 6, 10, 14, 19, 23, 27` — up to **27, out of range**
-  for a 16-geometry list.
-- All chunk **sizes are self-consistent** (the GeometryList ends exactly where the atomics begin, the
-  clump ends exactly on its last extension) — not parser drift; the file declares more than it holds.
-- The missing 15 geometries (~100–450 KB each) are **not in the file** (the 2.8 KB tail after the clump
-  can't hold them).
+**Recovered the same way:** `parseDff` / `parseGeometryList` keep the fast boundary walk, but when the
+declared count exceeds what it found they re-read RW-style via `findChunkFrom` + `contentEnd` (struct +
+[matlist] + extension). Triggers only on the count mismatch → no change for well-formed files.
 
-Simulating RW's count-based reading:
+## Variant B — inflated clump-struct size (`cheetah.dff`)
 
-```
-declared geom 31 -> RW-style found 16 (then hit EOF)
-declared atomics 31 -> RW-style found 0   (the geometry scan already ran to EOF)
-```
-
-So **even a faithful RW reader fails here** — it finds 16 geometries, runs off the end hunting for the
-17th, never reaches the atomics. A vanilla SA + RW pipeline wouldn't load it either (it would need an
-unlocker ASI). We can't render geometries that aren't in the stream.
+Here the **clump's first child (the Struct, `0x01`) declares size `16777228` (`0x0100000C`)** instead of
+the real **`12` (`0x0C`)** — the high byte is tampered to `0x01`. A size-trusting walk seeks ~16 MB past
+the struct, sees **only the struct**, and misses the FrameList, GeometryList, all 57 atomics, and the
+Extension holding the `COL3` chunk. Fixed by `forEachClumpChild`: when the leading Struct overshoots the
+clump it uses the canonical 12-byte SA clump-struct payload and resumes sibling iteration after it.
+RenderWare survives the same way — it reads the struct's fixed fields directly and ignores the bogus size.
 
 ## Variant B — inflated struct size (`cheetah.dff`)
 
@@ -67,7 +76,7 @@ RenderWare survives because it reads the clump struct's fixed fields directly an
 size**, then finds each following chunk by scanning — so the game loads it. Unlike Variant A, the data
 is **recoverable** by an RW-faithful reader.
 
-## Fix — Variant B (`forEachClumpChild`, 2026-06-19)
+## Fix (2026-06-19)
 
 `parseDff` and `parseDffCollision` now iterate the clump via **`forEachClumpChild`** (in
 `parsers/binary/chunks.ts`) instead of the size-trusting `forEachChild`. When the leading Struct's
@@ -76,6 +85,14 @@ SA clump-struct payload and resumes sibling iteration right after it — recover
 GeometryList, all 57 atomics and the Extension (with COL3). Valid clumps are untouched (their Struct
 ends within the clump, so the recovery branch never fires) → near-zero regression surface. Covered by a
 committed custom fixture `tests/custom/locked-models/cheetah.dff` + tests in `dff.test.ts`.
+
+For **Variant A**, `parseGeometryList`, `parseDff` and `parseTxd` add a count-based recovery via the shared
+`recoverLockedList` (in `parsers/binary/chunks.ts`): after the normal boundary walk, if the declared
+geometry / atomic / texture count is higher, they re-read the list RW-style with `findChunkFrom` (scan for
+the next item past the bloated sizes + `0x0` padding) and `contentEnd` (advance by the item's real
+children: struct + [matlist] + extension). Only runs on the mismatch → well-formed files are unaffected.
+Covered by `tests/custom/locked-models/yosemite.dff` (31 atomics / 31 geometries) and the committed
+`tests/custom/txd/yosemite.txd` (20 textures incl. `F350_mix`).
 
 ## What is fixed vs. what remains
 
@@ -87,33 +104,17 @@ committed custom fixture `tests/custom/locked-models/cheetah.dff` + tests in `df
   win for **any** vehicle with no usable COL, not just locked ones. Tests in `physics-world.test.ts`.
 - **Fixed — Variant B renders (`forEachClumpChild`).** `cheetah.dff` now parses fully (83 frames / 57
   atomics / 57 geometries) with its embedded COL — see the fix section above.
-- **Still broken — Variant A (`yosemite.dff`).** Spawns a partial model: the 8 atomics that reference
-  present geometries render; those indexing the missing 15 are skipped (`build-vehicle` guards
-  `if (!geometry) continue`). The absent geometry can't be recovered from the stream. Open work: detect +
-  report the declared-vs-present mismatch (Option 3) and audit other consumers for out-of-range indices.
-
-## Options (when we return)
-
-1. **Treat it as an asset problem (recommended, both variants).** Un-lock / re-save the model in a clean
-   RW tool (a DFF unlocker, or open+resave via a sane exporter) so counts + layout become standard; then
-   our parser — and any RW reader — handle it.
-2. **RW-faithful parsing for Variant B (medium risk, recovers cheetah-type locks).** Read clump /
-   geometry-list Struct fixed fields and ignore the declared size (or clamp a child's `end` to the
-   parent's `end`, or walk by count like RW). Recovers files whose data is present but hidden behind a
-   bloated struct size. Touches the **core DFF read path every model uses** → real regression surface;
-   needs the count-based approach + careful fixtures. Does nothing for Variant A.
-3. **Detect + report locked DFFs (low risk, optional).** Flag a declared-vs-present mismatch and surface
-   a clear message (e.g. _"locked/corrupted DFF: declares 31 geometries, found 16"_) instead of a silent
-   empty/partial spawn. Doesn't make them work — fails legibly.
+- **Fixed — Variant A renders (count-based recovery).** `yosemite.dff` now recovers all 31 atomics / 31
+  geometries; `buildVehicle` produces the full truck (4 wheels, doors, panels).
 
 ## Reproduce
 
-- **Variant A** — `yosemite.dff`: walk the clump children and compare the clump / GeometryList struct
-  counts against the physically present `0x14` (atomic) / `0x0f` (geometry) chunks; or simulate
-  `RwStreamFindChunk` count-based reads and watch the geometry scan exhaust the file before the atomics.
+- **Variant A** — `yosemite.dff`: the clump declares 31 atomics / 31 geometries; a boundary walk finds
+  8 / 16 (atomics index up to 27), but reading each list by count with `RwStreamFindChunk`-style scanning
+  (skip `0x0` padding, advance by each item's real struct/matlist/extension) recovers all 31.
 - **Variant B** — `cheetah.dff`: read the clump's first child header — the Struct (`0x01`) declares size
-  `16777228` while its real payload is 12 bytes; `parseDff` then returns an empty model and
-  `parseDffCollision` returns `null` even though a `COL3` chunk is present near EOF.
+  `16777228` while its real payload is 12 bytes; without `forEachClumpChild` `parseDff` returns an empty
+  model and `parseDffCollision` returns `null` even though a `COL3` chunk is present near EOF.
 
 Related: [plan 015 — vehicle loading](../plans/015-vehicle-loading.md),
 [plan 043 — DFF/TXD completeness](../plans/043-dff-txd-completeness.md).

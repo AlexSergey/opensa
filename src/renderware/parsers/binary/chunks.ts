@@ -16,6 +16,32 @@ export interface ChunkHeader {
   version: number;
 }
 
+/**
+ * Real end of a list item whose declared chunk size may be inflated to swallow siblings (anti-rip lock):
+ * the end of its last consecutive child of an allowed type, walked from `dataStart`. The item's own
+ * children keep intact sizes — only the outer item size is tampered — so this lands on the real boundary.
+ */
+export function contentEnd(
+  stream: BinaryStream,
+  dataStart: number,
+  limit: number,
+  allowed: ReadonlySet<number>,
+): number {
+  let cursor = dataStart;
+  let end = dataStart;
+  while (cursor + 12 <= limit) {
+    stream.seek(cursor);
+    const header = readChunkHeader(stream);
+    if (!allowed.has(header.type)) {
+      break;
+    }
+    end = header.end;
+    cursor = header.end;
+  }
+
+  return end;
+}
+
 /** Find the first direct child chunk of the given type, or null. */
 export function findChild(stream: BinaryStream, start: number, end: number, type: number): ChunkHeader | null {
   let found: ChunkHeader | null = null;
@@ -26,6 +52,27 @@ export function findChild(stream: BinaryStream, start: number, end: number, type
   });
 
   return found;
+}
+
+/**
+ * RenderWare's `RwStreamFindChunk`: scan forward from `start` for the next chunk of `type`, **ignoring
+ * declared sizes as boundaries** — skip non-matching chunks (and `0x0` size-0 padding) until a match or
+ * `end`. Used to recover anti-rip "inflated size" locks (e.g. yosemite) whose chunk sizes swallow their
+ * siblings; a boundary-respecting walk ({@link forEachChild}) misses them, but RW reads lists by count
+ * and finds each item this way. Returns the header (cursor at its payload), or null.
+ */
+export function findChunkFrom(stream: BinaryStream, start: number, end: number, type: number): ChunkHeader | null {
+  let cursor = start;
+  while (cursor + 12 <= end) {
+    stream.seek(cursor);
+    const header = readChunkHeader(stream);
+    if (header.type === type) {
+      return header;
+    }
+    cursor = Math.max(header.end, header.dataStart); // advance ≥ 12 even for a size-0 chunk
+  }
+
+  return null;
 }
 
 /**
@@ -78,4 +125,34 @@ export function readStringChunk(stream: BinaryStream, header: ChunkHeader): stri
   stream.seek(header.dataStart);
 
   return stream.string(header.size);
+}
+
+/**
+ * Recover a count-based list defeated by the "inflated size" anti-rip lock (e.g. yosemite's atomics /
+ * geometries / textures): scan for `count` chunks of `type` from `start` via {@link findChunkFrom}
+ * (ignoring the bloated sizes + `0x0` padding), returning each header with its `end` corrected to its
+ * real content (the last consecutive child in `contentTypes`, via {@link contentEnd}). The caller parses
+ * each returned header. Only meaningful when a boundary walk under-counts; well-formed lists are fine.
+ */
+export function recoverLockedList(
+  stream: BinaryStream,
+  start: number,
+  end: number,
+  count: number,
+  type: number,
+  contentTypes: ReadonlySet<number>,
+): ChunkHeader[] {
+  const items: ChunkHeader[] = [];
+  let cursor = start;
+  for (let i = 0; i < count; i += 1) {
+    const item = findChunkFrom(stream, cursor, end, type);
+    if (!item) {
+      break;
+    }
+    const realEnd = contentEnd(stream, item.dataStart, end, contentTypes);
+    items.push({ ...item, end: realEnd });
+    cursor = realEnd;
+  }
+
+  return items;
 }
