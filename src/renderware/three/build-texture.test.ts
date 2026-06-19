@@ -87,7 +87,7 @@ describe('buildTextureMap', () => {
 });
 
 // Real TXD (junk.txd): two 64x64 DXT1 tyre textures, opaque.
-const JUNK_TXD = 'tests/txd/junk.txd';
+const JUNK_TXD = 'tests/original/txd/junk.txd';
 
 describe.skipIf(!existsSync(JUNK_TXD))('buildTextureMap (real junk.txd)', () => {
   const dict = parseTxd(toArrayBuffer(new Uint8Array(readFileSync(JUNK_TXD))));

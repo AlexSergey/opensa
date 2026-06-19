@@ -8,8 +8,8 @@ import { buildClumpEscalators, buildClumpParts } from './build-clump';
 import { buildEscalatorSteps, type EscalatorPathEntry, resetEscalators, updateEscalators } from './build-escalator';
 
 // Real assets: the LA mall escalator pair (path source) + the vanilla step model SA instances.
-const HOST_DFF = 'tests/dff/escalator/escl_la.dff';
-const STEP_DFF = 'tests/dff/escalator/esc_step.dff';
+const HOST_DFF = 'tests/original/dff/escalator/escl_la.dff';
+const STEP_DFF = 'tests/original/dff/escalator/esc_step.dff';
 const assetsExist = existsSync(HOST_DFF) && existsSync(STEP_DFF);
 
 /** The host model's two escalators as world entries (identity placement is fine for the rig math). */

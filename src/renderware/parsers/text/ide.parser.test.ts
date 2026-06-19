@@ -118,7 +118,7 @@ describe('parseTxdParents', () => {
   });
 });
 
-const idePath = join(process.cwd(), 'tests', 'data', 'barriers.ide');
+const idePath = join(process.cwd(), 'tests', 'original', 'data', 'barriers.ide');
 const ideExists = existsSync(idePath);
 
 describe.skipIf(!ideExists)('parseIde (real barriers.ide)', () => {

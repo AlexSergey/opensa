@@ -366,7 +366,7 @@ describe('parseDff 2d-effect lights', () => {
   });
 });
 
-const dffPath = join(process.cwd(), 'tests', 'dff', 'building', 'washer.dff');
+const dffPath = join(process.cwd(), 'tests', 'original', 'dff', 'building', 'washer.dff');
 const dffExists = existsSync(dffPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection,
 // so only touch the filesystem when the asset is actually present.
@@ -394,7 +394,7 @@ describe.skipIf(!dffExists)('parseDff (real map model washer.dff)', () => {
   });
 });
 
-const admiralPath = join(process.cwd(), 'tests', 'vehicles', 'admiral.dff');
+const admiralPath = join(process.cwd(), 'tests', 'original', 'vehicles', 'admiral.dff');
 const admiralExists = existsSync(admiralPath);
 const admiral = admiralExists ? parseDff(toArrayBuffer(new Uint8Array(readFileSync(admiralPath)))) : null;
 

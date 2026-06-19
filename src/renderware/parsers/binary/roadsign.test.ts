@@ -6,9 +6,9 @@ import { parseDff } from './dff';
 
 // Real 2dfx ROADSIGN case (plan 042 item 5): a Vegas junction road model carrying 4 sign plates
 // with baked text — survey values from scripts/find-2dfx.ts on this exact file.
-const SIGN_DFF = 'tests/dff/roadsign/vegasnroad19.dff';
+const SIGN_DFF = 'tests/custom/proper-fixes-models/vegasnroad19.dff';
 // Survey reference: flags 0x0002 → 2 lines × 16 chars, white; plate 5.6×2.7.
-const LIGHTS_ONLY_DFF = 'tests/dff/trafficlight-backface-culling/trafficlight1.dff';
+const LIGHTS_ONLY_DFF = 'tests/custom/proper-fixes-models/trafficlight1.dff';
 
 function load(path: string): ReturnType<typeof parseDff> {
   return parseDff(toArrayBuffer(new Uint8Array(readFileSync(path))));
@@ -46,7 +46,7 @@ describe('2dfx ROADSIGN parsing', () => {
     it('parses the desert freeway signs from se_bit_17 (regression: signs missing in-game)', () => {
       // 4 roadsign entries verified by the byte scan: Fort Carson, FREEWAY ENTRANCE,
       // LAS VENTURAS, WELCOME TO BONE COUNTY — at (390–427, 620–766).
-      const clump = load('tests/dff/roadsign/se_bit_17.dff');
+      const clump = load('tests/custom/proper-fixes-models/se_bit_17.dff');
       const roadsigns = clump.geometries.flatMap((geometry) => geometry.roadsigns ?? []);
       expect(roadsigns).toHaveLength(4);
       const bone = roadsigns.find((sign) => sign.lines[0].startsWith('WELCOME'));

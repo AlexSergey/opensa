@@ -34,7 +34,7 @@ describe('parseGtaDat', () => {
   });
 });
 
-const datPath = join(process.cwd(), 'tests', 'data', 'gta.dat');
+const datPath = join(process.cwd(), 'tests', 'original', 'data', 'gta.dat');
 
 // Map-agnostic: asserts structure for whatever gta.dat currently lives in tests/data.
 describe.skipIf(!existsSync(datPath))('parseGtaDat (real gta.dat)', () => {

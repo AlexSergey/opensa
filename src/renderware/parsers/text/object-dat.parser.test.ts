@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parseObjectDat } from './object-dat.parser';
 
 // Real object.dat copied into the committed tests/ tree (static/ is not committed).
-const REAL = 'tests/data/object.dat';
+const REAL = 'tests/original/data/object.dat';
 
 describe('parseObjectDat', () => {
   describe('negative cases', () => {

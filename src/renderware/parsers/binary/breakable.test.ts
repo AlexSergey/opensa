@@ -7,9 +7,9 @@ import { parseDff } from './dff';
 // Real Breakable cases (plan 045): the LA trash bin ships full shatter data (byte-verified
 // 252 verts / 154 tris / 7 materials); the roadsign ships only the 4-byte `magic = 0` marker;
 // the skull pillar has no Breakable chunk at all.
-const BIN_DFF = 'tests/dff/breakable/binnt08_la.dff';
-const MARKER_ONLY_DFF = 'tests/dff/roadsign/vegasnroad19.dff';
-const NO_CHUNK_DFF = 'tests/dff/particle/skullpillar01_lvs.dff';
+const BIN_DFF = 'tests/original/dff/breakable/binnt08_la.dff';
+const MARKER_ONLY_DFF = 'tests/custom/proper-fixes-models/vegasnroad19.dff';
+const NO_CHUNK_DFF = 'tests/original/dff/particle/skullpillar01_lvs.dff';
 
 function load(path: string): ReturnType<typeof parseDff> {
   return parseDff(toArrayBuffer(new Uint8Array(readFileSync(path))));
@@ -70,7 +70,7 @@ describe('Breakable plugin parsing', () => {
 
     it('parses real shatter data from a model whose magic is a raw runtime pointer', () => {
       // trafficlight1's exporter left a non-zero pointer in `magic` (not 1) — still real data.
-      const clump = load('tests/dff/trafficlight-backface-culling/trafficlight1.dff');
+      const clump = load('tests/custom/proper-fixes-models/trafficlight1.dff');
       const breakables = clump.geometries.flatMap((geometry) => geometry.breakable ?? []);
       expect(breakables).toHaveLength(1);
       expect(breakables[0].positions).toHaveLength(488 * 3);

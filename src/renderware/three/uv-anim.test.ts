@@ -15,7 +15,7 @@ import {
   updateUvAnimations,
 } from './uv-anim';
 
-const SIGN_DFF = 'tests/dff/uv-anim/visagesign04.dff';
+const SIGN_DFF = 'tests/custom/dff/uv-anim/visagesign04.dff';
 
 /** uv params order: (rotation, scaleX, scaleY, skew, translateX, translateY). */
 function scrollAnim(

@@ -35,12 +35,12 @@ function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
 /** Fixture file system: bare model/txd names + loose data paths, as the build packs them. */
 function fakeFs(): Renderware.AssetFileSystem {
   const files = new Map<string, ArrayBuffer | string>([
-    ['anim/ped.ifp', buffer('tests/dff/anim-clump/counxref.ifp')],
-    ['data/timecyc.dat', readFileSync('tests/data/timecyc.dat', 'utf8')],
-    ['junk.txd', buffer('tests/txd/junk.txd')],
-    ['tommy.dff', buffer('tests/dff/skinned/tommy.dff')],
-    ['tommy.txd', buffer('tests/txd/junk.txd')],
-    ['washer.dff', buffer('tests/dff/building/washer.dff')],
+    ['anim/ped.ifp', buffer('tests/original/dff/anim-clump/counxref.ifp')],
+    ['data/timecyc.dat', readFileSync('tests/original/data/timecyc.dat', 'utf8')],
+    ['junk.txd', buffer('tests/original/txd/junk.txd')],
+    ['tommy.dff', buffer('tests/original/dff/skinned/tommy.dff')],
+    ['tommy.txd', buffer('tests/original/txd/junk.txd')],
+    ['washer.dff', buffer('tests/original/dff/building/washer.dff')],
   ]);
 
   return {

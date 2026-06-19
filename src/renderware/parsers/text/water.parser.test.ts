@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { parseWater } from './water.parser';
 
 // A 20-quad slice of the real water.dat, committed to ./tests.
-const realPath = join(process.cwd(), 'tests', 'data', 'water.dat');
+const realPath = join(process.cwd(), 'tests', 'original', 'data', 'water.dat');
 const realExists = existsSync(realPath);
 
 /** A water.dat vertex: x y z + 4 normal/flow params. */

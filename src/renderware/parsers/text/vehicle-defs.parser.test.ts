@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseVehicleDefs } from './vehicle-defs.parser';
 
-const idePath = join(process.cwd(), 'tests', 'data', 'vehicles.ide');
+const idePath = join(process.cwd(), 'tests', 'original', 'data', 'vehicles.ide');
 
 const ADMIRAL = '445, admiral, admiral, car, ADMIRAL, ADMIRAL, null, richfamily, 10, 0, 0, -1, 0.68, 0.68, 0';
 

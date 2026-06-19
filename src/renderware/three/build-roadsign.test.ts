@@ -8,7 +8,7 @@ import { parseDff } from '../parsers/binary/dff';
 import { toArrayBuffer } from '../test-utils';
 import { buildRoadsignParts, roadsignGlyphIndex } from './build-roadsign';
 
-const SIGN_DFF = 'tests/dff/roadsign/vegasnroad19.dff';
+const SIGN_DFF = 'tests/custom/proper-fixes-models/vegasnroad19.dff';
 
 function sign(partial: Partial<RWRoadsign> = {}): RWRoadsign {
   return {

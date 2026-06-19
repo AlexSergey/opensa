@@ -13,7 +13,8 @@ import { resetProcObjMeshes, updateProcObjMeshes } from './procobj-runtime';
 
 // Stand-in clutter model: a real DFF+TXD fixture already in the repo (the archive path and
 // world-material build are identical for actual clutter like sand_combush02).
-const CASE_DIR = 'tests/dff/trafficlight-backface-culling';
+const CASE_DIR = 'tests/original/dff/trafficlight-backface-culling'; // dyntraffic.txd (stock, regenerated)
+const TRAFFICLIGHT_DFF = 'tests/custom/proper-fixes-models/trafficlight1.dff'; // proper-fixes re-export (committed)
 
 const def: IdeObjectDef = { drawDistance: 80, flags: 0, id: 1315, modelName: 'trafficlight1', txdName: 'dyntraffic' };
 
@@ -48,7 +49,7 @@ function batch(partial: Partial<ProcObjBatch> = {}): ProcObjBatch {
 function caseArchive(): ReturnType<typeof openArchive> {
   return openArchive(
     buildArchiveBuffer([
-      { data: readFileSync(`${CASE_DIR}/trafficlight1.dff`), name: 'trafficlight1.dff' },
+      { data: readFileSync(TRAFFICLIGHT_DFF), name: 'trafficlight1.dff' },
       { data: readFileSync(`${CASE_DIR}/dyntraffic.txd`), name: 'dyntraffic.txd' },
     ]),
   );

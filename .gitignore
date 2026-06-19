@@ -69,3 +69,8 @@ game-src
 issues
 map-optimizer
 blog-src
+
+# Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
+# copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /
+# version-pinned test models) live in tests/custom/, which stays tracked.
+/tests/original/

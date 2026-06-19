@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { parseZones } from '../text/zon.parser';
 import { gxtKeyHash, parseGxt } from './gxt';
 
-const GXT_PATH = join(process.cwd(), 'tests', 'text', 'american.gxt');
-const ZON_PATH = join(process.cwd(), 'tests', 'data', 'info.zon');
+const GXT_PATH = join(process.cwd(), 'tests', 'original', 'text', 'american.gxt');
+const ZON_PATH = join(process.cwd(), 'tests', 'original', 'data', 'info.zon');
 const haveFixtures = existsSync(GXT_PATH) && existsSync(ZON_PATH);
 
 function readGxt(): Map<number, string> {

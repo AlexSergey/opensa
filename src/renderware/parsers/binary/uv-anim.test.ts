@@ -8,9 +8,9 @@ import { parseIfp } from './ifp';
 // Real animated-map-object assets (plan 041): the Visage skull sign (UV-animated textures via a
 // leading UVAnimDict + per-material 0x135 plugin) and the oil-field nodding donkey (a multi-frame
 // clump whose looping clip lives in counxref.ifp, bound by DFF frame names).
-const SIGN_DFF = 'tests/dff/uv-anim/visagesign04.dff';
-const PUMP_DFF = 'tests/dff/anim-clump/nt_noddonkbase.dff';
-const PUMP_IFP = 'tests/dff/anim-clump/counxref.ifp';
+const SIGN_DFF = 'tests/custom/dff/uv-anim/visagesign04.dff';
+const PUMP_DFF = 'tests/original/dff/anim-clump/nt_noddonkbase.dff';
+const PUMP_IFP = 'tests/original/dff/anim-clump/counxref.ifp';
 
 function load(path: string): ArrayBuffer {
   return toArrayBuffer(new Uint8Array(readFileSync(path)));

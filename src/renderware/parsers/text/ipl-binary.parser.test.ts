@@ -52,7 +52,7 @@ describe('parseBinaryIpl', () => {
   });
 });
 
-const streamPath = join(process.cwd(), 'tests', 'ipl_binary', 'lae_stream0.ipl');
+const streamPath = join(process.cwd(), 'tests', 'original', 'ipl_binary', 'lae_stream0.ipl');
 
 describe.skipIf(!existsSync(streamPath))('parseBinaryIpl (real lae_stream0.ipl)', () => {
   it('decodes 319 instances with sane world positions', () => {

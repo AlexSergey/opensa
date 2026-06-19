@@ -543,7 +543,7 @@ describe('buildVehicle (3-axle trucks)', () => {
 });
 
 // A real SA vehicle (admiral.dff): full dummy rig, vehiclelights, prelit-free dynamic model.
-const ADMIRAL = 'tests/dff/vehicle/admiral.dff';
+const ADMIRAL = 'tests/original/dff/vehicle/admiral.dff';
 
 describe.skipIf(!existsSync(ADMIRAL))('buildVehicle (real admiral.dff)', () => {
   const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(ADMIRAL))), new Map(), OPTIONS);
@@ -612,7 +612,7 @@ describe.skipIf(!existsSync(ADMIRAL))('buildVehicle (real admiral.dff)', () => {
 
 // A stock SA 4-colour vehicle (squalo boat) — its real 3rd-colour paint is cyan (0,255,255) on the stock
 // vehiclegeneric/vehiclegrunge textures, proving cyan is the canonical SA 3rd marker (not a mod quirk).
-const SQUALO = 'tests/dff/vehicle/squalo.dff';
+const SQUALO = 'tests/original/dff/vehicle/squalo.dff';
 
 describe.skipIf(!existsSync(SQUALO))('buildVehicle (real stock squalo.dff — cyan 3rd-colour paint)', () => {
   const TERTIARY: [number, number, number] = [123, 45, 67];
@@ -645,8 +645,8 @@ describe.skipIf(!existsSync(SQUALO))('buildVehicle (real stock squalo.dff — cy
 });
 
 // Real per-corner vehicles (mod re-exports): each wheel is its own atomic, not a shared instanced wheel.
-const PETRO_4 = 'tests/dff/vehicle/petro-4wheels.dff';
-const PETRO_6 = 'tests/dff/vehicle/petro-6wheels.dff';
+const PETRO_4 = 'tests/custom/dff/vehicle/petro-4wheels.dff';
+const PETRO_6 = 'tests/custom/dff/vehicle/petro-6wheels.dff';
 
 describe.skipIf(!existsSync(PETRO_4))('buildVehicle (real per-corner petro-4wheels.dff)', () => {
   const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(PETRO_4))), new Map(), OPTIONS);
@@ -683,7 +683,7 @@ describe.skipIf(!existsSync(PETRO_6))('buildVehicle (real 3-axle petro-6wheels.d
   });
 });
 
-const COMET = 'tests/dff/vehicle/comet.dff';
+const COMET = 'tests/custom/dff/vehicle/comet.dff';
 
 describe.skipIf(!existsSync(COMET))('buildVehicle (real comet.dff — lone wheel_rf atomic, no shared wheel)', () => {
   const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(COMET))), new Map(), OPTIONS);

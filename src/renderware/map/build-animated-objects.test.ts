@@ -11,7 +11,7 @@ import { resetAnimatedObjects, updateAnimatedObjects } from '../three/animated-o
 import { buildAnimatedObjects, buildInstancedMeshes } from './build-region';
 
 // Real IDE `anim` row from counxref.ide: the oil-field nodding donkey at (628.1, 1354.4, 11.4).
-const CASE_DIR = 'tests/dff/anim-clump';
+const CASE_DIR = 'tests/original/dff/anim-clump';
 
 const pumpDef: IdeObjectDef = {
   anim: 'counxref',

@@ -11,6 +11,7 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [copy-viewer.ts](#copy-viewerts)
   - [serve-static.ts](#serve-staticts)
   - [extract-viewer-collision.ts](#extract-viewer-collisionts)
+  - [test-fixtures.ts](#test-fixturests)
 - [Debugging / auditing](#debugging--auditing)
   - [audit-rw-coverage.ts](#audit-rw-coveragets)
   - [inspect-area.ts](#inspect-areats)
@@ -91,6 +92,23 @@ output to `timecyc-builder/merged/`. **Full guide: [timecyc-builder.md](./timecy
 ```sh
 npm run timecyc
 ```
+
+### test-fixtures.ts
+
+Regenerates the real-asset test fixtures (`tests/original/`) — Rockstar assets, **gitignored, not
+redistributed**. Reads from a **clean, UNMODIFIED GTA San Andreas** copy at **`game-src/non-modified/`**:
+copies loose data/text files, extracts entries from `models/*.img`, builds `img/admiral.img`, and generates
+`models/effects` particle data + a stock `data/timecyc_24h.dat` (plain `convertTo24h`, no mod overlay).
+Committed fixtures (mods + curated/version-pinned test models) live in `tests/custom/` and are untouched.
+
+**Running the test suite requires this first** (CI has no game-src, so unit tests + e2e are disabled there):
+
+```sh
+npm run test:fixtures   # populate tests/original/ from game-src/non-modified
+npm test                # then run the unit tests
+```
+
+Extend the `MANIFEST` in `scripts/test-fixtures.ts` when a test needs a new real-asset fixture.
 
 ---
 

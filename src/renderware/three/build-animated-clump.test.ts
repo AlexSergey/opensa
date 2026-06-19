@@ -8,8 +8,8 @@ import { buildAnimatedClump } from './build-animated-clump';
 
 // Real IDE `anim` object (counxref.ide: `3426, nt_noddonkbase, des_xoilfield, counxref, 200, 0x200000`):
 // the oil-field nodding donkey — a 6-frame clump whose looping clip lives in counxref.ifp.
-const PUMP_DFF = 'tests/dff/anim-clump/nt_noddonkbase.dff';
-const PUMP_IFP = 'tests/dff/anim-clump/counxref.ifp';
+const PUMP_DFF = 'tests/original/dff/anim-clump/nt_noddonkbase.dff';
+const PUMP_IFP = 'tests/original/dff/anim-clump/counxref.ifp';
 
 function load(path: string): ArrayBuffer {
   return toArrayBuffer(new Uint8Array(readFileSync(path)));

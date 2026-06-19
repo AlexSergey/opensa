@@ -7,8 +7,8 @@ import { openArchive } from './img-archive';
 
 // A real stock-format (VER2) archive holding one vehicle, built from tests/vehicles/admiral.dff by
 // buildVer2Buffer (this module). Exercises the on-disk bytes end-to-end: open → find → parse.
-const fixturePath = join(process.cwd(), 'tests', 'img', 'admiral.img');
-const dffPath = join(process.cwd(), 'tests', 'vehicles', 'admiral.dff');
+const fixturePath = join(process.cwd(), 'tests', 'original', 'img', 'admiral.img');
+const dffPath = join(process.cwd(), 'tests', 'original', 'vehicles', 'admiral.dff');
 const fixtureExists = existsSync(fixturePath) && existsSync(dffPath);
 const archive = fixtureExists ? openArchive(new Uint8Array(readFileSync(fixturePath))) : null;
 

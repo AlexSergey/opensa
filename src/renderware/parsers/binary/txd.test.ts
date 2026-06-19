@@ -226,7 +226,7 @@ describe('parseTxd (synthetic)', () => {
   });
 });
 
-const txdPath = join(process.cwd(), 'tests', 'txd', 'junk.txd');
+const txdPath = join(process.cwd(), 'tests', 'original', 'txd', 'junk.txd');
 const txdExists = existsSync(txdPath);
 // Read lazily: describe.skipIf still evaluates the suite body during collection.
 const realDict = txdExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(txdPath)))) : null;
@@ -253,7 +253,7 @@ describe.skipIf(!txdExists)('parseTxd (real asset junk.txd)', () => {
 
 // A real mod TXD (yosemite / Ford F350) that prepends an empty type-0 chunk before the dictionary —
 // the leading-chunk case that broke `readDictHeader` (RwStreamFindChunk scan).
-const yosemitePath = join(process.cwd(), 'tests', 'txd', 'yosemite.txd');
+const yosemitePath = join(process.cwd(), 'tests', 'custom', 'txd', 'yosemite.txd');
 const yosemiteExists = existsSync(yosemitePath);
 const yosemiteDict = yosemiteExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(yosemitePath)))) : null;
 

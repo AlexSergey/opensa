@@ -72,7 +72,7 @@ describe('buildSkinnedClump', () => {
 });
 
 // A real skinned player model (tommy.dff): a full 32-bone skeleton.
-const TOMMY_DFF = 'tests/dff/skinned/tommy.dff';
+const TOMMY_DFF = 'tests/original/dff/skinned/tommy.dff';
 
 describe.skipIf(!existsSync(TOMMY_DFF))('buildSkinnedClump (real tommy.dff)', () => {
   const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(TOMMY_DFF))));

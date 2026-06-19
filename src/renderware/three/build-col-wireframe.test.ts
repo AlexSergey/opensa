@@ -104,8 +104,8 @@ describe('buildCollisionWireframe', () => {
 });
 
 // Real COL libraries: a 308-face trimesh (countn2_17) and a box-based model (barriers).
-const TRIMESH_COL = 'tests/col/countn2_17.col';
-const BOX_COL = 'tests/col/barriers.col';
+const TRIMESH_COL = 'tests/original/col/countn2_17.col';
+const BOX_COL = 'tests/original/col/barriers.col';
 
 describe.skipIf(!existsSync(TRIMESH_COL) || !existsSync(BOX_COL))('buildCollisionWireframe (real COL)', () => {
   function firstModel(path: string): ColModel {

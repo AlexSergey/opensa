@@ -85,7 +85,7 @@ describe('oceanFrame', () => {
 });
 
 // Real water.dat slice → builder: ties the parser's quads to a single merged mesh.
-const WATER_DAT = 'tests/data/water.dat';
+const WATER_DAT = 'tests/original/data/water.dat';
 
 describe.skipIf(!existsSync(WATER_DAT))('buildWater (real water.dat slice)', () => {
   describe('positive cases', () => {

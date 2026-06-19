@@ -17,7 +17,7 @@ import {
 import { GLOW_LAYER } from './corona';
 
 // The real LA trash bin shatter mesh (154 triangles, 7 identical-texture materials).
-const BIN_DFF = 'tests/dff/breakable/binnt08_la.dff';
+const BIN_DFF = 'tests/original/dff/breakable/binnt08_la.dff';
 
 function binBreakable(): RWBreakable {
   const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(BIN_DFF))));

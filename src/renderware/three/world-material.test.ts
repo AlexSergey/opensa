@@ -180,7 +180,9 @@ describe('buildWorldMaterial', () => {
     it('detects + alpha-blends the real SF stadium floodbeam DFF', () => {
       // Real model (SF stadium floodlights) — its lamp material uses the `white` placeholder texture with the
       // beam cone baked into the prelit vertex alpha. See tests/dff/floodbeams/ws_floodbeams.dff.
-      const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync('tests/dff/floodbeams/ws_floodbeams.dff'))));
+      const clump = parseDff(
+        toArrayBuffer(new Uint8Array(readFileSync('tests/original/dff/floodbeams/ws_floodbeams.dff'))),
+      );
       const geom = clump.geometries[0];
       const beamMaterial = geom.materials.find((m) => isVertexAlphaBeam(m, geom));
       if (!beamMaterial) {

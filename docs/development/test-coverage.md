@@ -1,5 +1,11 @@
 # Test coverage
 
+> **Before running any tests, run `npm run test:fixtures`** (mandatory). The real-asset fixtures under
+> `tests/original/` are Rockstar assets — gitignored and regenerated locally from a clean, **unmodified**
+> GTA San Andreas copy at **`game-src/non-modified/`**. Without this step, fixture-backed tests fail
+> (hard readers) or skip (guarded readers). CI runs no tests for this reason. See
+> [scripts.md → test-fixtures.ts](./scripts.md#test-fixturests).
+
 Run: `npm run test:coverage` (Vitest + v8). Scope (from `vitest.config.ts`): `src/**/*.ts` logic; **excluded**
 `*.test.ts`, `index.ts`, `*.interface.ts`, `test-utils.ts`, `src/standalone/**`, all `.tsx` UI, and the
 **GL / DOM / app-loop glue** (`game.ts`, `core/renderer`, `core/camera-controller`, `input/keyboard`, the
@@ -32,14 +38,15 @@ fixture-backed archive + real timecyc/character loads through stubbed fetch) →
 skipped**. Iteration 8 scaffolded the Playwright e2e lane (object-viewer smoke + visual baseline, 3 tests) —
 separate from `npm test`; see `e2e.md`.)
 
-| Metric | % | covered/total |
-|---|---|---|
-| Statements | 66.9 | 3782/5653 |
-| Branches | 62.17 | 1351/2173 |
-| Functions | 64.25 | 550/856 |
-| Lines | 66.42 | 3650/5495 |
+| Metric     | %     | covered/total |
+| ---------- | ----- | ------------- |
+| Statements | 66.9  | 3782/5653     |
+| Branches   | 62.17 | 1351/2173     |
+| Functions  | 64.25 | 550/856       |
+| Lines      | 66.42 | 3650/5495     |
 
 ### Per area (statements %)
+
 - **Strong (≥90):** `parsers/binary` 97, `parsers/text` 96, `three/` 91.5, `streaming/` 96, `collision/` 97,
   `events/` 100, `time/` 94.
 - **Partial:** `map/` 81, `archive/` 77, `vehicle/` 60 (enter/lod high; damage/headlight/physics 0),
@@ -51,6 +58,7 @@ separate from `npm test`; see `e2e.md`.)
 ## Untested-module triage (the 43 without a sibling test)
 
 ### Unit-testable now (pure / extractable logic) — target of Iterations 1–6
+
 - Parsers/util: `parsers/text/surfinfo.parser.ts`, `parsers/text/text-lines.ts`, `parsers/binary/col-types.ts`,
   `parsers/binary/constants.ts`, `map/procobj-categories.ts`.
 - three/: `three/corona.ts` (buildCoronaPoints), `three/night-fill.ts` (onBeforeCompile inject, like
@@ -64,6 +72,7 @@ separate from `npm test`; see `e2e.md`.)
   `mods/wind-mode.ts`, `ui/locations.ts`.
 
 ### Viewer / e2e only (canvas / GL / DOM / full loop) — Iteration 8
+
 - `game.ts` (whole loop), `core/camera-controller.ts`, `core/renderer.ts`, `input/keyboard.ts` (DOM — low value
   to mock), `plugins/{sky,water,postfx,ambient-light,directional-light}.plugin.ts`,
   `plugins/vehicle-reflection/vehicle-reflection.plugin.ts` (GL/shader output — extract pure bits in It.6,
@@ -73,6 +82,7 @@ separate from `npm test`; see `e2e.md`.)
   (these are the e2e harness, not units).
 
 ## Notes
+
 - v8 counts `.ts` files loaded during the run plus the `include` glob, so zero-coverage files still appear.
 - Coverage thresholds are intentionally NOT gated yet — measure first (this doc), set per-area floors in a
   later iteration (plan 046, It.7).

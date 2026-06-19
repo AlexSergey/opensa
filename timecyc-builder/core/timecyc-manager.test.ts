@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { HOURS, parseTimecyc, TIME_WEATHERS, WEATHER_NAMES } from '../../src/renderware/parsers/text/timecyc.parser';
+import { HOURS, parseTimecyc, TIME_WEATHERS } from '../../src/renderware/parsers/text/timecyc.parser';
 import { TimecycManager } from './timecyc-manager';
 
-const VANILLA = 'tests/data/timecyc.dat'; // 8-keyframe
-const DAY24 = 'tests/data/timecyc_24h.dat'; // already 24h
+const VANILLA = 'tests/original/data/timecyc.dat'; // 8-keyframe
+const DAY24 = 'tests/original/data/timecyc_24h.dat'; // already 24h
 
 describe('TimecycManager', () => {
   describe('negative cases', () => {
@@ -24,7 +24,7 @@ describe('TimecycManager', () => {
     it('keeps an already-24h base as 24h', async () => {
       const manager = new TimecycManager();
       await manager.setBase(DAY24);
-      expect(parseTimecyc(manager.merge())).toHaveLength(WEATHER_NAMES.length * HOURS); // 552
+      expect(parseTimecyc(manager.merge())).toHaveLength(TIME_WEATHERS * HOURS); // 504 = 21 weathers × 24
     });
 
     it('converts a vanilla merge source on input and overlays only the selected prop/hours', async () => {

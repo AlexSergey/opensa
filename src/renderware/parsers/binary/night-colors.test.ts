@@ -11,9 +11,9 @@ import { parseDff } from './dff';
 //   Lae2_roads03             — a road whose night colours bake the street-lamp pools: mostly dark, with a
 //                              few warm-moderate verts (the lit patches under lamps).
 const fixtures = {
-  dark: join(process.cwd(), 'tests', 'world', 'mcstraps_LAe2.dff'),
-  lit: join(process.cwd(), 'tests', 'world', 'compfukhouse3.dff'),
-  road: join(process.cwd(), 'tests', 'world', 'Lae2_roads03.dff'),
+  dark: join(process.cwd(), 'tests', 'original', 'world', 'mcstraps_LAe2.dff'),
+  lit: join(process.cwd(), 'tests', 'original', 'world', 'compfukhouse3.dff'),
+  road: join(process.cwd(), 'tests', 'custom', 'world', 'Lae2_roads03.dff'),
 };
 const haveFixtures = Object.values(fixtures).every((p) => existsSync(p));
 

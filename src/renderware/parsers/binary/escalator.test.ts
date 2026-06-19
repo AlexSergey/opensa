@@ -6,8 +6,8 @@ import { parseDff } from './dff';
 
 // Real 2dfx ESCALATOR case (plan 044): the LA mall pair — one model hosting two opposed
 // escalators (survey: escl_la, dir=1 at x≈-0.96 and dir=0 at x≈+0.98, same y/z path).
-const ESCALATOR_DFF = 'tests/dff/escalator/escl_la.dff';
-const LIGHTS_ONLY_DFF = 'tests/dff/trafficlight-backface-culling/trafficlight1.dff';
+const ESCALATOR_DFF = 'tests/original/dff/escalator/escl_la.dff';
+const LIGHTS_ONLY_DFF = 'tests/custom/proper-fixes-models/trafficlight1.dff';
 
 function load(path: string): ReturnType<typeof parseDff> {
   return parseDff(toArrayBuffer(new Uint8Array(readFileSync(path))));

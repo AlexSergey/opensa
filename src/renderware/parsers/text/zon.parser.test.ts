@@ -11,7 +11,7 @@ SF01, 3, -3000.0, -742.306, -500.0, -1270.53, 1530.24, 500.0, 2, UNUSED
 LA01, 3, 480.0, -3000.0, -500.0, 3000.0, -850.0, 500.0, 1, UNUSED
 end`;
 
-const ZON_PATH = join(process.cwd(), 'tests', 'data', 'info.zon');
+const ZON_PATH = join(process.cwd(), 'tests', 'original', 'data', 'info.zon');
 
 describe('parseZones', () => {
   describe('negative cases', () => {

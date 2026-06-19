@@ -14,7 +14,7 @@ const SAMPLE = [
 ].join('\n');
 
 function testData(file: string): null | string {
-  const path = join(process.cwd(), 'tests', 'data', file);
+  const path = join(process.cwd(), 'tests', 'original', 'data', file);
 
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }

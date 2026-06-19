@@ -16,13 +16,14 @@ import { buildInstancedMeshes } from './build-region';
 // mixed face winding, so front-side culling dropped half its housing. SA renders it whole because
 // its IDE def (dynamic.ide: `1315, trafficlight1, dyntraffic, 80, 2130048`) carries flag 0x200000 =
 // disable backface culling — which buildInstancedMeshes must honour.
-const CASE_DIR = 'tests/dff/trafficlight-backface-culling';
+const CASE_DIR = 'tests/original/dff/trafficlight-backface-culling'; // dyntraffic.txd (stock, regenerated)
+const TRAFFICLIGHT_DFF = 'tests/custom/proper-fixes-models/trafficlight1.dff'; // proper-fixes re-export (committed)
 const TRAFFICLIGHT_IDE_FLAGS = 2130048;
 
 function caseArchive(): ReturnType<typeof openArchive> {
   return openArchive(
     buildArchiveBuffer([
-      { data: readFileSync(`${CASE_DIR}/trafficlight1.dff`), name: 'trafficlight1.dff' },
+      { data: readFileSync(TRAFFICLIGHT_DFF), name: 'trafficlight1.dff' },
       { data: readFileSync(`${CASE_DIR}/dyntraffic.txd`), name: 'dyntraffic.txd' },
     ]),
   );
@@ -61,7 +62,7 @@ describe('buildInstancedMeshes (trafficlight1 backface-culling case)', () => {
 
   describe('positive cases', () => {
     it('confirms the re-export stores no normals (why culling needs the flag)', () => {
-      const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(`${CASE_DIR}/trafficlight1.dff`))));
+      const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(TRAFFICLIGHT_DFF))));
       expect(clump.geometries.length).toBeGreaterThan(0);
       expect(clump.geometries.every((geometry) => geometry.normals === null)).toBe(true);
     });
@@ -146,7 +147,7 @@ describe('buildInstancedMeshes (SA IDE render flags, plan 039)', () => {
       const archive = openArchive(
         buildArchiveBuffer([
           {
-            data: readFileSync('tests/dff/frame-offset-ignored/ce_grndpalcst05.dff'),
+            data: readFileSync('tests/original/dff/frame-offset-ignored/ce_grndpalcst05.dff'),
             name: 'ce_grndpalcst05.dff',
           },
         ]),

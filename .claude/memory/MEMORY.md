@@ -1,4 +1,4 @@
-- [Test fixtures](test-fixtures.md) — tests read assets from repo-root tests/ (committed), NOT static/ (live mutable game data)
+- [Test fixtures](test-fixtures.md) — tests/original = real Rockstar (gitignored, regenerate via `npm run test:fixtures` from game-src/non-modified — MANDATORY before tests); tests/custom = committed mods/curated; never read static/
 - [RenderWare DFF/TXD loader](renderware-loader.md) — how GTA SA model/texture loading is structured in src/renderware
 - [Map pipeline](map-pipeline.md) — DAT/IDE/IPL parsers + region builder, now under src/renderware/map
 - [Map render approach](binary-ipl-render-approach.md) — model catalog + InstancedMesh; tolerant asset loading
@@ -21,7 +21,7 @@
 - [Vehicle driving plan](vehicle-driving-plan.md) — plan 017; arcade WSAD driving — SUPERSEDED by plan 018 (real physics)
 - [Vehicle physics plan](vehicle-physics-plan.md) — plan 018; real Rapier dynamic car (COL convex-hull collider + gravity + raycast wheels), replaces arcade; iter 1 DONE, iters 2–4 (engine/steer, get-in polish, damage) pending
 - [Diagnostics logging](diagnostics-logging.md) — plan 020; gated log channel (Config.showLogs + Logger + 'log' event); use logger.debug at tricky spots, not console.log
-- [Vehicle LOD plan](vehicle-lod-plan.md) — plan 021 (DONE); _vlo low-detail + Config.vehicle distance thresholds (HD/vlo/cull/unload) via VehicleLodSystem
+- [Vehicle LOD plan](vehicle-lod-plan.md) — plan 021 (DONE); \_vlo low-detail + Config.vehicle distance thresholds (HD/vlo/cull/unload) via VehicleLodSystem
 - [In-game debugger](in-game-debugger.md) — plan 023 (DONE); F2 debug overlay (menu: player/vehicles/game/map), debugMode→mapViewer; old Ctrl+X overlay deleted
 - [Fog](fog.md) — plan 024 (DONE); distance fog (FogPlugin, Config.fog.distance default 800, Game.setFogDistance, debugger slider; off in mapViewer)
 - [Vehicle glass](vehicle-glass.md) — plan 025 (DONE); two-pass back/front glass in build-vehicle (SilentPatch/SkyGFX fix); windows no longer vanish at angles

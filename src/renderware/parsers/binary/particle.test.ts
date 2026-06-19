@@ -6,8 +6,8 @@ import { parseDff } from './dff';
 
 // Real 2dfx PARTICLE case (plan 044): the LV skull torch pillar by the pirate ship — the model
 // carries a `fire` FX-system emitter (survey: PARTICLE skullpillar01_lvs "fire" pos(0,-0.3,2.1)).
-const SKULL_DFF = 'tests/dff/particle/skullpillar01_lvs.dff';
-const LIGHTS_ONLY_DFF = 'tests/dff/trafficlight-backface-culling/trafficlight1.dff';
+const SKULL_DFF = 'tests/original/dff/particle/skullpillar01_lvs.dff';
+const LIGHTS_ONLY_DFF = 'tests/custom/proper-fixes-models/trafficlight1.dff';
 
 function load(path: string): ReturnType<typeof parseDff> {
   return parseDff(toArrayBuffer(new Uint8Array(readFileSync(path))));

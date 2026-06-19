@@ -137,7 +137,7 @@ describe('buildClump', () => {
 // Real regression case (plan 037): the gta3-pf.img re-export of the Casino Royale building stores
 // a normals block that is ~81% exact zeros (SA's prelit-only map pipeline never reads normals, so
 // the mod shipped garbage) — zero normals rendered the building black under our dynamic sun.
-const CASROYALE_DFF = 'tests/dff/casroyale-zero-normals/casroyale02_lvs.dff';
+const CASROYALE_DFF = 'tests/custom/proper-fixes-models/casroyale02_lvs.dff';
 
 /** Count of zero-length (or non-finite) normals in a packed xyz array. */
 function degenerateCount(normals: Float32Array): number {
@@ -185,7 +185,7 @@ describe('stored-normal sanitization (casroyale zero-normals case)', () => {
 });
 
 // Real prelit map model that ships BOTH day prelit and SA night (extra) vertex colours (plan 038).
-const WASHER_DFF = 'tests/dff/building/washer.dff';
+const WASHER_DFF = 'tests/original/dff/building/washer.dff';
 
 describe.skipIf(!existsSync(WASHER_DFF))('day/night vertex colours (real washer.dff)', () => {
   const clump = parseDff(toArrayBuffer(new Uint8Array(readFileSync(WASHER_DFF))));

@@ -79,6 +79,20 @@ re-fetches only the dropped chunk; a return visit downloads nothing.
 > **Note:** the boot fetches `static/original-${__APP_VERSION__}/manifest.json` (version from
 > `package.json`, wired in `src/ui/shell/use-asset-boot.ts`) — currently the `original` variant only.
 
+## 5. Test fixtures (to run the test suite)
+
+The real-asset test fixtures under `tests/original/` are Rockstar assets, so they are **not committed**
+(gitignored) — regenerate them locally from an **unmodified** GTA SA copy placed at `game-src/non-modified/`:
+
+```bash
+npm run test:fixtures   # extracts/copies the needed files from game-src/non-modified into tests/original/
+npm test                # now the unit tests have their fixtures
+```
+
+Custom (non-Rockstar) fixtures live in `tests/custom/` and are committed — no setup needed. A few fixtures
+that can't be reproduced from a stock copy are also committed (see `scripts/test-fixtures.ts`). Re-run
+`npm run test:fixtures` whenever you add a fixture to the manifest.
+
 ## Where to go next
 
 - [scripts.md](./scripts.md) — the build/asset pipeline and the offline debug tools under `scripts/debug/`.

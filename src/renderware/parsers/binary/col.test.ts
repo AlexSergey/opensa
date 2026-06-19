@@ -254,8 +254,8 @@ describe('parseDffCollision', () => {
   });
 });
 
-const COL2_PATH = join(process.cwd(), 'tests', 'col', 'barriers.col');
-const COL3_PATH = join(process.cwd(), 'tests', 'col', 'countn2_17.col');
+const COL2_PATH = join(process.cwd(), 'tests', 'original', 'col', 'barriers.col');
+const COL3_PATH = join(process.cwd(), 'tests', 'original', 'col', 'countn2_17.col');
 const colFixtures = existsSync(COL2_PATH) && existsSync(COL3_PATH);
 const loadCol = (path: string): ReturnType<typeof parseColLibrary> =>
   parseColLibrary(toArrayBuffer(new Uint8Array(readFileSync(path))));

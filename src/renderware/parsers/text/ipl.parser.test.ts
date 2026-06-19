@@ -32,7 +32,7 @@ describe('parseIpl', () => {
   });
 });
 
-const iplPath = join(process.cwd(), 'tests', 'data', 'int_cont.ipl');
+const iplPath = join(process.cwd(), 'tests', 'original', 'data', 'int_cont.ipl');
 const iplExists = existsSync(iplPath);
 
 describe.skipIf(!iplExists)('parseIpl (real int_cont.ipl)', () => {
