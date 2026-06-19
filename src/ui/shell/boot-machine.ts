@@ -42,6 +42,13 @@ export type LoadingPhase = 'core' | 'textures';
 /** Max retry clicks before the menu degrades (Play disabled). */
 export const MAX_RETRIES = 3;
 
+/**
+ * TEMP kill-switch: while we rework how the game is distributed (bring-your-own-files, for a clean
+ * legal setup), the playable demo is disabled — no assets download and Play is blocked. The shell
+ * boots straight to the menu. Set back to `true` to restore the normal boot.
+ */
+export const PLAY_ENABLED = false;
+
 export function bootReducer(state: BootState, event: BootEvent): BootState {
   switch (event.type) {
     case 'CORE_LOADED':

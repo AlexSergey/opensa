@@ -7,7 +7,7 @@ import type { BootState } from './boot-machine';
 import { AssetLoader } from '../../asset-loader';
 import { GAME_TYPE } from '../../game-config';
 import { Vfs } from '../../vfs';
-import { bootReducer, initialBootState } from './boot-machine';
+import { bootReducer, initialBootState, PLAY_ENABLED } from './boot-machine';
 import { CORE_STATUS, rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-status';
 import { readBootFlags, rememberDisclaimerAccepted, rememberIntroSeen } from './boot-storage';
 
@@ -43,7 +43,18 @@ export interface AssetBoot {
 
 export function useAssetBoot(): AssetBoot {
   const flags = useMemo(() => readBootFlags(), []);
-  const [state, dispatch] = useReducer(bootReducer, flags.disclaimerAccepted, initialBootState);
+  // While the playable demo is disabled, boot straight to a Play-disabled menu so nothing downloads.
+  const [state, dispatch] = useReducer(bootReducer, flags.disclaimerAccepted, (accepted) =>
+    PLAY_ENABLED
+      ? initialBootState(accepted)
+      : ({
+          degraded: true,
+          disclaimerAccepted: accepted,
+          failedPhase: null,
+          phase: 'menu',
+          retries: 0,
+        } satisfies BootState),
+  );
   const [snapshot, setSnapshot] = useState<ProgressSnapshot>(NO_PROGRESS);
   const [tick, setTick] = useState(0);
   const [detail, setDetail] = useState('');

@@ -3,6 +3,7 @@ import { lazy, type ReactElement, Suspense, useEffect } from 'react';
 import type { BootPhase } from './boot-machine';
 
 import { initAnalytics } from './analytics';
+import { PLAY_ENABLED } from './boot-machine';
 import { Disclaimer } from './disclaimer';
 import { ErrorPanel } from './error-panel';
 import { GameHint } from './game-hint';
@@ -17,6 +18,8 @@ import './shell.css';
 const GameCanvas = lazy(() => import('../canvas-host').then((module) => ({ default: module.CanvasHost })));
 
 const DEGRADED_NOTE = 'Sorry, the game is unavailable right now — something went wrong. Please try again later.';
+const MAINTENANCE_NOTE =
+  'The playable demo is temporarily offline while we rework how the game is distributed. Code and updates are on GitHub.';
 const SUBTITLED = 'sa-logo--small sa-logo--titled sa-logo--described';
 
 export function App(): ReactElement {
@@ -71,9 +74,9 @@ export function App(): ReactElement {
           <Logo className={SUBTITLED} />
           <p className="sa-tagline">Free and open source — a from-scratch re-creation of the RenderWare engine.</p>
           <Menu
-            note={boot.state.degraded ? DEGRADED_NOTE : undefined}
+            note={PLAY_ENABLED ? (boot.state.degraded ? DEGRADED_NOTE : undefined) : MAINTENANCE_NOTE}
             onPlay={boot.play}
-            playDisabled={boot.state.degraded}
+            playDisabled={!PLAY_ENABLED || boot.state.degraded}
           />
         </div>
       ) : null}
