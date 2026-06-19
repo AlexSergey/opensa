@@ -199,6 +199,7 @@ const DEV_ONLY_SCREENS = new Set<Screen>(['atmosphere', 'camera', 'graphics', 'm
 const TELEPORTS: Record<GameType, { coords: Vec3; label: string }[]> = {
   anderius: [],
   carcer: [],
+  gostown: [],
   original: [
     { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
     { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },

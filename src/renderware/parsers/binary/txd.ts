@@ -19,30 +19,23 @@ const TEXTURE_CHILDREN: ReadonlySet<number> = new Set([RwSection.EXTENSION, RwSe
  */
 export function parseTxd(buffer: ArrayBuffer): RWTextureDictionary {
   const stream = new BinaryStream(buffer);
-  const dictHeader = readDictHeader(stream);
-
-  const struct = findChild(stream, dictHeader.dataStart, dictHeader.end, RwSection.STRUCT);
-  const textures: RWTexture[] = [];
-  forEachChild(stream, dictHeader.dataStart, dictHeader.end, (child) => {
-    if (child.type === RwSection.TEXTURE_NATIVE) {
-      const texture = parseTextureNative(stream, child);
-      if (texture) {
-        textures.push(texture);
-      }
-    }
-  });
-
-  // Anti-rip "inflated size" recovery (e.g. yosemite.txd): the dictionary declares more textures than the
-  // boundary walk found because each TEXTURE_NATIVE's size is bloated to swallow the next. Re-read RW-style.
-  if (struct) {
-    stream.seek(struct.dataStart);
-    const declared = stream.u16(); // numTextures (deviceId follows)
-    if (textures.length < declared) {
-      return { textures: recoverTextures(stream, dictHeader, struct.end, declared) };
+  const dictHeader = findDictHeader(stream);
+  if (dictHeader) {
+    const textures = parseDictionary(stream, dictHeader);
+    if (textures.length > 0) {
+      return { textures };
     }
   }
 
-  return { textures };
+  // Anti-rip "obfuscated wrapper" lock (e.g. gostown's lodveg.txd): the outer TexDictionary header is hidden,
+  // so no 0x16 is found (or it yields nothing). The real TEXTURE_NATIVE chunks are still present — recover them
+  // RW-style by scanning the stream directly, like the engine tolerates locked streams.
+  const recovered = recoverLockedTextures(stream);
+  if (recovered.length > 0) {
+    return { textures: recovered };
+  }
+
+  throw new Error('Not a TXD: no TexDictionary (0x16) chunk and no recoverable TEXTURE_NATIVE chunks');
 }
 
 /** Map RW format identifiers to the adapter's format tag, or null if unsupported. */
@@ -116,6 +109,65 @@ function expandPalette(indices: Uint8Array, palette: Uint8Array): Uint8Array {
   return out;
 }
 
+function findDictHeader(stream: BinaryStream): ChunkHeader | null {
+  // Scan top-level chunks for the TexDictionary, like RW's RwStreamFindChunk — some mod/exporter TXDs
+  // prepend an empty type-0 chunk before the dictionary, so it isn't always the very first chunk.
+  stream.seek(0);
+  while (stream.position + 12 <= stream.length) {
+    const before = stream.position;
+    const header = readChunkHeader(stream);
+    if (header.type === RwSection.TEXTURE_DICTIONARY) {
+      return header;
+    }
+    // Advance past this chunk; guard against a 0-size chunk (would otherwise spin in place).
+    stream.seek(header.end > before ? header.end : before + 12);
+  }
+
+  return null;
+}
+
+/** A recovered texture is plausible if its name is printable ASCII and its dimensions are sane powers of two. */
+function isSaneTexture(texture: RWTexture): boolean {
+  const isPow2 = (value: number): boolean => value > 0 && value <= 4096 && (value & (value - 1)) === 0;
+  if (!isPow2(texture.width) || !isPow2(texture.height) || texture.name.length === 0) {
+    return false;
+  }
+  for (const char of texture.name) {
+    const code = char.charCodeAt(0);
+    if (code < 0x20 || code > 0x7e) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Parse a found TexDictionary: walk its TEXTURE_NATIVE children, with the inflated-size recovery. */
+function parseDictionary(stream: BinaryStream, dictHeader: ChunkHeader): RWTexture[] {
+  const struct = findChild(stream, dictHeader.dataStart, dictHeader.end, RwSection.STRUCT);
+  const textures: RWTexture[] = [];
+  forEachChild(stream, dictHeader.dataStart, dictHeader.end, (child) => {
+    if (child.type === RwSection.TEXTURE_NATIVE) {
+      const texture = parseTextureNative(stream, child);
+      if (texture) {
+        textures.push(texture);
+      }
+    }
+  });
+
+  // Anti-rip "inflated size" recovery (e.g. yosemite.txd): the dictionary declares more textures than the
+  // boundary walk found because each TEXTURE_NATIVE's size is bloated to swallow the next. Re-read RW-style.
+  if (struct) {
+    stream.seek(struct.dataStart);
+    const declared = stream.u16(); // numTextures (deviceId follows)
+    if (textures.length < declared) {
+      return recoverTextures(stream, dictHeader, struct.end, declared);
+    }
+  }
+
+  return textures;
+}
+
 function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | RWTexture {
   const struct = findChild(stream, header.dataStart, header.end, RwSection.STRUCT);
   if (!struct) {
@@ -167,22 +219,6 @@ function parseTextureNative(stream: BinaryStream, header: ChunkHeader): null | R
   };
 }
 
-function readDictHeader(stream: BinaryStream): ChunkHeader {
-  // Scan top-level chunks for the TexDictionary, like RW's RwStreamFindChunk — some mod/exporter TXDs
-  // prepend an empty type-0 chunk before the dictionary, so it isn't always the very first chunk.
-  let first: null | number = null;
-  while (stream.position + 12 <= stream.length) {
-    const header = readChunkHeader(stream);
-    if (header.type === RwSection.TEXTURE_DICTIONARY) {
-      return header;
-    }
-    first ??= header.type;
-    stream.seek(header.end);
-  }
-
-  throw new Error(`Not a TXD: no TexDictionary (0x16) chunk found (first chunk 0x${(first ?? 0).toString(16)})`);
-}
-
 function readMipmaps(
   stream: BinaryStream,
   width: number,
@@ -215,6 +251,46 @@ function readMipmaps(
   }
 
   return mipmaps;
+}
+
+/**
+ * Recover textures from an anti-rip-locked stream that has no readable TexDictionary wrapper: byte-scan for
+ * `TEXTURE_NATIVE` chunks (type 0x15 + a STRUCT child + a plausible RW stream version) and parse each. The
+ * inner chunks keep intact sizes (only the outer wrapper is tampered), so they parse normally. Sanity-checked
+ * (printable name + power-of-two dimensions) to avoid false hits in raster bytes; deduped by name.
+ */
+function recoverLockedTextures(stream: BinaryStream): RWTexture[] {
+  const textures: RWTexture[] = [];
+  const seen = new Set<string>();
+  for (let position = 0; position + 16 <= stream.length; position += 1) {
+    stream.seek(position);
+    if (stream.u32() !== RwSection.TEXTURE_NATIVE) {
+      continue;
+    }
+    const size = stream.u32();
+    const version = stream.u32();
+    if ((version & 0xffff) !== 0xffff) {
+      continue; // not a real RW stream chunk header
+    }
+    stream.seek(position + 12);
+    if (stream.u32() !== RwSection.STRUCT) {
+      continue; // a TEXTURE_NATIVE's first child is always its raster STRUCT
+    }
+    const header: ChunkHeader = {
+      dataStart: position + 12,
+      end: Math.min(position + 12 + size, stream.length),
+      size,
+      type: RwSection.TEXTURE_NATIVE,
+      version,
+    };
+    const texture = parseTextureNative(stream, header);
+    if (texture && isSaneTexture(texture) && !seen.has(texture.name.toLowerCase())) {
+      seen.add(texture.name.toLowerCase());
+      textures.push(texture);
+    }
+  }
+
+  return textures;
 }
 
 /** Re-read a texture dictionary by its declared count, RW-style ({@link recoverLockedList}), past the

@@ -4,9 +4,9 @@
  */
 import { parseModelList } from './game-build/env-list';
 
-export type GameType = 'anderius' | 'carcer' | 'original' | 'original-extend';
+export type GameType = 'anderius' | 'carcer' | 'gostown' | 'original' | 'original-extend';
 
-const GAME_TYPES: readonly GameType[] = ['carcer', 'original', 'anderius', 'original-extend'];
+const GAME_TYPES: readonly GameType[] = ['carcer', 'original', 'anderius', 'original-extend', 'gostown'];
 
 function resolveGameType(): GameType {
   const configured = import.meta.env.VITE_GAME_TYPE;

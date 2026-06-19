@@ -35,6 +35,7 @@
     "build": "tsc -b && vite build",
     "build:game:anderius": "tsx scripts/build-game.ts --game anderius",
     "build:game:carcer": "tsx scripts/build-game.ts --game carcer",
+    "build:game:gostown": "npm run timecyc && tsx scripts/build-game.ts --game gostown",
     "build:game:original": "npm run timecyc && tsx scripts/build-game.ts --game original",
     "build:game:original-extend": "npm run timecyc && tsx scripts/build-game.ts --game original-extend",
     "build:prod": "tsc -b && OPENSA_NO_VIEWERS=true OPENSA_DEBUGGER_HIDE=true vite build",

@@ -266,3 +266,21 @@ describe.skipIf(!yosemiteExists)('parseTxd (real asset yosemite.txd — leading 
     expect(names).toContain('F350_mix'); // the body texture a boundary walk misses
   });
 });
+
+// A real mod TXD (gostown's lodveg.txd) with an "obfuscated wrapper" anti-rip lock: NO readable TexDictionary
+// (0x16) header at all (zeroed leading sector) — every standard tool, incl. Magic.TXD, rejects it — but the
+// inner TEXTURE_NATIVE (0x15) chunks are intact. The byte-scan recovery restores the LOD vegetation textures.
+const lodvegPath = join(process.cwd(), 'tests', 'custom', 'txd', 'lodveg.txd');
+const lodvegExists = existsSync(lodvegPath);
+const lodvegDict = lodvegExists ? parseTxd(toArrayBuffer(new Uint8Array(readFileSync(lodvegPath)))) : null;
+
+describe.skipIf(!lodvegExists)('parseTxd (real asset lodveg.txd — locked, no TexDictionary wrapper)', () => {
+  it('recovers the textures by scanning for TEXTURE_NATIVE chunks despite the missing 0x16 wrapper', () => {
+    expect(lodvegDict!.textures).toHaveLength(6);
+    const names = lodvegDict!.textures.map((t) => t.name);
+    expect(names).toContain('Gp_Grandpalm1');
+    expect(names).toContain('Gp_petitpalm1');
+    // recovered textures carry real pixel data (mips), not empty placeholders
+    expect(lodvegDict!.textures.every((t) => t.mipmaps.length > 0)).toBe(true);
+  });
+});

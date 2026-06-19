@@ -132,12 +132,15 @@ function main(): void {
     }
   }
 
-  // Open both model archives (gta3.img primary, gta_int.img override). names are already lowercased.
-  const gta3 = openArchive(readFileSync(join(src, 'models', 'gta3.img')));
-  const gtaIntPath = join(src, 'models', 'gta_int.img');
-  const gtaInt: ImgArchive = statSync(gtaIntPath, { throwIfNoEntry: false })
-    ? openArchive(readFileSync(gtaIntPath))
-    : { get: (): null => null, names: [] };
+  // Model archives: `gta3.img` is primary; EVERY other `models/*.img` (gta_int + any mod archives the game
+  // ships, e.g. gostown's `gostown6.img`) is merged as the override/fallback. names are already lowercased.
+  const modelsDir = join(src, 'models');
+  const gta3 = openArchive(readFileSync(join(modelsDir, 'gta3.img')));
+  const overrides = readdirSync(modelsDir)
+    .filter((file) => file.toLowerCase().endsWith('.img') && file.toLowerCase() !== 'gta3.img')
+    .sort()
+    .map((file) => openArchive(readFileSync(join(modelsDir, file))));
+  const gtaInt: ImgArchive = mergeArchives(overrides);
   const gta3Names = new Set(gta3.names);
   const gtaIntNames = new Set(gtaInt.names);
 
@@ -149,6 +152,12 @@ function main(): void {
   const dynamic = dynamicRefs(dataDir, env.VITE_MAIN_CHARACTER, env.VITE_VEHICLES);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
   const { models, priority, textures } = partitionEntries(refs, gta3Names, gtaIntNames);
+  // `partitionEntries` only pulls world files (col/ipl/ifp/dat) from gta3.img; pull the rest from the
+  // override archives too (a mod's collision/anim lives there, e.g. gostown's `.col` in gostown6.img).
+  const worldExtensions = ['.col', '.ipl', '.ifp', '.dat'];
+  const overrideWorld: Entry[] = [...gtaIntNames]
+    .filter((name) => !gta3Names.has(name) && worldExtensions.some((ext) => name.endsWith(ext)))
+    .map((name) => ({ name, source: 'gta_int' }));
 
   // Load a partition entry's bytes from the right archive.
   const loadImg = (entry: Entry): LoadedEntry => {
@@ -158,12 +167,13 @@ function main(): void {
   };
 
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
-  // keyed by their lowercased relative path.
-  const excluded = new Set([join('anim', 'anim.img'), join('models', 'gta3.img'), join('models', 'gta_int.img')]);
+  // keyed by their lowercased relative path. ALL `models/*.img` are read above, so skip them here.
+  const excluded = new Set([join('anim', 'anim.img')]);
+  const isModelImg = new RegExp(`^models\\${sep}.+\\.img$`, 'i');
   const loose: LoadedEntry[] = [];
   for (const path of walk(src)) {
     const rel = relative(src, path);
-    if (excluded.has(rel) || path.endsWith('.DS_Store')) {
+    if (excluded.has(rel) || isModelImg.test(rel) || path.endsWith('.DS_Store')) {
       continue;
     }
     const bytes = new Uint8Array(readFileSync(path));
@@ -171,7 +181,11 @@ function main(): void {
   }
 
   // Pack each group into ~50MB content-hashed chunks (sequential so peak memory ≈ the largest group).
-  const priorityChunks = packChunks('priority', [...loose, ...priority.map(loadImg)], outDir);
+  const priorityChunks = packChunks(
+    'priority',
+    [...loose, ...priority.map(loadImg), ...overrideWorld.map(loadImg)],
+    outDir,
+  );
   const modelChunks = packChunks('models', models.map(loadImg), outDir);
   const textureChunks = packChunks('textures', textures.map(loadImg), outDir);
 
@@ -191,8 +205,25 @@ function main(): void {
   );
   console.log(`  models   — ${modelChunks.length} chunk(s), ${models.length} dff, ${mb(modelChunks)}`);
   console.log(`  textures — ${textureChunks.length} chunk(s), ${textures.length} txd, ${mb(textureChunks)}`);
-  console.log(`  from gta_int.img (override): ${fromInt} files`);
+  console.log(`  from override img(s) (gta_int/mods): ${fromInt} files`);
   console.log(`  → static/games/${version}/`);
+}
+
+/** Merge archives into one, earlier wins on name collisions — reads mod model archives alongside gta3.img. */
+function mergeArchives(archives: readonly ImgArchive[]): ImgArchive {
+  return {
+    get: (name: string): ArrayBuffer | null => {
+      for (const archive of archives) {
+        const bytes = archive.get(name);
+        if (bytes) {
+          return bytes;
+        }
+      }
+
+      return null;
+    },
+    names: [...new Set(archives.flatMap((archive) => archive.names))],
+  };
 }
 
 /** Split a group into ~50MB content-hashed zips, write them, and return one {@link ChunkInfo} per chunk. */
