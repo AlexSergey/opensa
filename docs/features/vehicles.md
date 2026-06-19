@@ -13,7 +13,9 @@ plans 015–021/025/030/033.
   wheels take precedence over a stray shared `wheel` atomic some exporters leave in. A lone corner
   atomic with no shared `wheel` but real `wheel_*_dummy` frames (a mis-named shared wheel some mods
   ship, e.g. comet with only `wheel_rf`) is treated as the shared wheel and instanced at all dummies,
-  so it renders four wheels instead of one.
+  so it renders four wheels instead of one. A third, wheel-mod convention is also handled: an
+  `f_wheel_<mask>` container frame (e.g. `f_wheel_1111`, cheetah) whose child atomics are the wheel
+  sub-model — its geometry is instanced at every dummy instead of rendered once as body.
 - **Paint**: carcols.dat palettes; SA editable-material markers — primary (60,255,0), secondary
   (255,0,175), tertiary (255,175,0), quaternary (255,60,0); colour spec strings `"p,s[,t,q]"`
   with omitted 3rd/4th defaulting to palette 0 (SA behaviour); RW modulate (texture × material

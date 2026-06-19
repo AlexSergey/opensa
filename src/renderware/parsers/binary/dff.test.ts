@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { chunk, concat, f32, f32a, fixedString, i32, toArrayBuffer, u8, u16, u32 } from '../../test-utils';
+import { parseDffCollision } from './col';
 import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 import { parseDff } from './dff';
 
@@ -408,5 +409,27 @@ describe.skipIf(!admiralExists)('parseDff (real vehicle admiral.dff) reflection 
     expect(reflective.every((m) => (m.effects!.envMap!.texture?.length ?? 0) > 0)).toBe(true);
     expect(materials.some((m) => m.effects?.specular?.texture === 'vehiclespecdot64')).toBe(true);
     expect(materials.some((m) => m.effects?.reflection)).toBe(true);
+  });
+});
+
+// Anti-rip lock Variant B (see docs/open-issues/locked-dff.md): cheetah.dff's clump Struct size is bloated
+// to 0x0100000C so a boundary-respecting walk sees only the Struct. forEachClumpChild recovers via the
+// canonical 12-byte struct payload. Committed custom fixture (a modified/locked mod model).
+const LOCKED_DFF = 'tests/custom/locked-models/cheetah.dff';
+
+describe('parseDff (locked DFF — inflated clump-struct size)', () => {
+  const buffer = toArrayBuffer(new Uint8Array(readFileSync(LOCKED_DFF)));
+
+  describe('positive cases', () => {
+    it('recovers the model hidden behind the bogus struct size', () => {
+      const clump = parseDff(buffer);
+      expect(clump.atomics).toHaveLength(57);
+      expect(clump.frames.length).toBeGreaterThan(0);
+      expect(clump.geometries.length).toBeGreaterThan(0);
+    });
+
+    it('recovers the embedded COL the lock hid in the clump Extension', () => {
+      expect(parseDffCollision(buffer)).not.toBeNull();
+    });
   });
 });

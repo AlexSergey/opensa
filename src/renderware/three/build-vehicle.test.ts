@@ -706,3 +706,23 @@ describe.skipIf(!existsSync(COMET))('buildVehicle (real comet.dff — lone wheel
     });
   });
 });
+
+const CHEETAH = 'tests/custom/locked-models/cheetah.dff';
+
+describe.skipIf(!existsSync(CHEETAH))('buildVehicle (f_wheel container convention — cheetah.dff)', () => {
+  const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(CHEETAH))), new Map(), OPTIONS);
+
+  describe('negative cases', () => {
+    it('does not render the wheel sub-model (stock84/stock87) as a single body mesh', () => {
+      expect(vehicle.root.children.some((c) => c.name.startsWith('stock8'))).toBe(false);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('instances the f_wheel_1111 sub-model at all four dummies (front pair steers)', () => {
+      expect(vehicle.wheels).toHaveLength(4);
+      expect(vehicle.wheels.filter((w) => w.front)).toHaveLength(2);
+      expect(vehicle.wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+  });
+});

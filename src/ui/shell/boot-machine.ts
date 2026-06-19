@@ -47,7 +47,7 @@ export const MAX_RETRIES = 3;
  * legal setup), the playable demo is disabled — no assets download and Play is blocked. The shell
  * boots straight to the menu. Set back to `true` to restore the normal boot.
  */
-export const PLAY_ENABLED = false;
+export const PLAY_ENABLED = true;
 
 export function bootReducer(state: BootState, event: BootEvent): BootState {
   switch (event.type) {

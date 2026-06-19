@@ -1,8 +1,9 @@
 # "Locked" (anti-rip protected) DFF models
 
-**Status: shelved.** Investigated thoroughly; full support not attempted by request — recorded for
-later. The **spawn crash is fixed** (a no-COL / locked vehicle now falls back to a box chassis instead
-of throwing), but locked models still render incomplete or invisible.
+**Status: Variant B fixed; Variant A still open.** `cheetah.dff` (inflated struct size) now parses and
+renders fully — model **and** embedded COL — via `forEachClumpChild` (2026-06-19). `yosemite.dff`
+(inflated counts) remains unrecoverable: the data is genuinely absent. The spawn crash was already fixed
+(a no-COL / locked vehicle falls back to a box chassis instead of throwing).
 
 Two distinct lock variants found so far — both falsify chunk-container metadata so a boundary-respecting
 parser (ours) chokes while RenderWare's count-based reader keeps going:
@@ -66,6 +67,16 @@ RenderWare survives because it reads the clump struct's fixed fields directly an
 size**, then finds each following chunk by scanning — so the game loads it. Unlike Variant A, the data
 is **recoverable** by an RW-faithful reader.
 
+## Fix — Variant B (`forEachClumpChild`, 2026-06-19)
+
+`parseDff` and `parseDffCollision` now iterate the clump via **`forEachClumpChild`** (in
+`parsers/binary/chunks.ts`) instead of the size-trusting `forEachChild`. When the leading Struct's
+declared size overshoots the clump end (impossible for a valid file), it uses the canonical **12-byte**
+SA clump-struct payload and resumes sibling iteration right after it — recovering the FrameList,
+GeometryList, all 57 atomics and the Extension (with COL3). Valid clumps are untouched (their Struct
+ends within the clump, so the recovery branch never fires) → near-zero regression surface. Covered by a
+committed custom fixture `tests/custom/locked-models/cheetah.dff` + tests in `dff.test.ts`.
+
 ## What is fixed vs. what remains
 
 - **Fixed — spawn no longer crashes (`physics-world.ts`).** Previously a locked/no-COL vehicle reached
@@ -74,9 +85,12 @@ is **recoverable** by an RW-faithful reader.
   of OA"_. `addConvexChassis` now only attempts the hull with enough points, wraps it in try/catch, and
   box-falls-back to the car's `halfExtents` (default `[1.2, 2.5, 0.7]`). This is a general robustness
   win for **any** vehicle with no usable COL, not just locked ones. Tests in `physics-world.test.ts`.
-- **Still broken — locked models don't render.** Variant A spawns a partial model; Variant B spawns an
-  **empty** group (the same lock also hides its frames/geometries/atomics from `parseDff`) + a box
-  collider. Making them render is the open work below.
+- **Fixed — Variant B renders (`forEachClumpChild`).** `cheetah.dff` now parses fully (83 frames / 57
+  atomics / 57 geometries) with its embedded COL — see the fix section above.
+- **Still broken — Variant A (`yosemite.dff`).** Spawns a partial model: the 8 atomics that reference
+  present geometries render; those indexing the missing 15 are skipped (`build-vehicle` guards
+  `if (!geometry) continue`). The absent geometry can't be recovered from the stream. Open work: detect +
+  report the declared-vs-present mismatch (Option 3) and audit other consumers for out-of-range indices.
 
 ## Options (when we return)
 

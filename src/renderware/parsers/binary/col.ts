@@ -1,7 +1,7 @@
 import type { ColBox, ColFace, ColModel, ColSphere, ColSurface, ColVersion } from './col-types';
 
 import { BinaryStream } from './binary-stream';
-import { findChild, forEachChild, readChunkHeader } from './chunks';
+import { findChild, forEachClumpChild, readChunkHeader } from './chunks';
 import { RwSection } from './constants';
 
 /** RenderWare chunk header size (type + size + libraryVersion). */
@@ -72,7 +72,7 @@ export function parseDffCollision(buffer: ArrayBuffer): ColModel | null {
   }
 
   let collision: ColModel | null = null;
-  forEachChild(stream, header.dataStart, header.end, (child) => {
+  forEachClumpChild(stream, header, (child) => {
     if (collision || child.type !== RwSection.EXTENSION) {
       return;
     }

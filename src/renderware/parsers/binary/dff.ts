@@ -18,7 +18,7 @@ import type {
 } from './types';
 
 import { BinaryStream } from './binary-stream';
-import { findChild, forEachChild, readChunkHeader, readStringChunk } from './chunks';
+import { findChild, forEachChild, forEachClumpChild, readChunkHeader, readStringChunk } from './chunks';
 import { GeometryFlag, MatFxEffect, RwSection } from './constants';
 
 /** RenderWare chunk header size (type + size + libraryVersion, 3 × u32). */
@@ -60,7 +60,7 @@ export function parseDff(buffer: ArrayBuffer): RWClump {
   let geometries: RWGeometry[] = [];
   const atomics: RWAtomic[] = [];
 
-  forEachChild(stream, clumpHeader.dataStart, clumpHeader.end, (child) => {
+  forEachClumpChild(stream, clumpHeader, (child) => {
     switch (child.type) {
       case RwSection.ATOMIC:
         atomics.push(parseAtomic(stream, child));

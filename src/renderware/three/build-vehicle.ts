@@ -90,6 +90,11 @@ const WHEEL_FRAME = 'wheel';
  *  middle axle (`m`) is for 3-axle trucks (e.g. petro). */
 const WHEEL_CORNER_RE = /^wheel_(lf|rf|lm|rm|lb|rb)$/;
 
+/** Wheel-mod container frame — `f_wheel_<mask>` (e.g. `f_wheel_1111`). Its child atomics are the wheel
+ *  sub-model, modelled once (at one corner) and meant to be instanced at every `wheel_*_dummy`. Distinct
+ *  from the shared {@link WHEEL_FRAME} atomic and the per-corner {@link WHEEL_CORNER_RE} convention. */
+const WHEEL_CONTAINER_RE = /^f_wheel/;
+
 /** Door body atomics — `door_{lf|rf|lr|rr}_ok` — wrapped in a hinge pivot so they swing. */
 const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
 
@@ -133,8 +138,9 @@ interface CornerWheel {
  * instanced at the four `wheel_*_dummy` frames (scaled per front/rear, mirrored
  * on the right), or per-corner `wheel_{lf|rf|lb|rb}` atomics placed at their own
  * frames (different front/rear wheels). A lone corner atomic with no shared
- * `wheel` but real dummies is treated as a mis-named shared wheel (see
- * {@link buildWheels}). Paint markers in material colours
+ * `wheel` but real dummies is treated as a mis-named shared wheel, and an
+ * `f_wheel_*` container sub-model (wheel-mod convention, e.g. cheetah) is
+ * instanced at the dummies too (see {@link buildWheels}). Paint markers in material colours
  * are replaced by the carcol primary/secondary. Result stays in native Z-up
  * (the caller's streaming root applies the Z-up→Y-up rotation). Wheels are
  * wrapped in pivot/spinner groups so a {@link BuiltWheel} rig can spin and steer
@@ -159,8 +165,14 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
 
   let wheelGeometryIndex: null | number = null;
   const cornerWheels: CornerWheel[] = [];
+  // `f_wheel_*` wheel-mod container: its sub-atomics are the wheel sub-model, instanced at the dummies
+  // (see addContainerWheels) rather than rendered as body. Empty unless that convention + real dummies.
+  const container = collectContainerWheels(clump);
 
   for (const atomic of clump.atomics) {
+    if (container.frames.has(atomic.frameIndex)) {
+      continue; // wheel sub-model — placed by the rig at the dummies, not as a body mesh
+    }
     const frame = clump.frames[atomic.frameIndex];
     const name = frame?.name.toLowerCase() ?? '';
     const geometry = clump.geometries[atomic.geometryIndex];
@@ -184,20 +196,21 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     if (name.endsWith('_dam')) {
       continue; // paired with its `_ok` (see collectDamGeometry)
     }
-    const built = addBodyAtomic(build, atomic, frame, name, geometry);
-    if (built.door) {
-      doors.push(built.door);
-    }
-    if (built.part) {
-      parts.push(built.part);
-    }
+    collectBuilt(addBodyAtomic(build, atomic, frame, name, geometry), doors, parts);
   }
   if (lod.children.length > 0) {
     root.add(lod);
   }
 
   const { worldCache } = build;
-  const wheels = buildWheels(root, clump, { cornerWheels, wheelGeometryIndex }, textures, options, worldCache);
+  const wheels = buildWheels(
+    root,
+    clump,
+    { containerWheels: container.geometries, cornerWheels, wheelGeometryIndex },
+    textures,
+    options,
+    worldCache,
+  );
   const seats = {
     backseat: seatMatrix(clump, 'ped_backseat', worldCache),
     frontseat: seatMatrix(clump, 'ped_frontseat', worldCache),
@@ -283,6 +296,63 @@ function addBodyAtomic(
   root.add(mesh);
 
   return {};
+}
+
+/**
+ * Instance an `f_wheel_*` container wheel sub-model at each `wheel_*_dummy` (the {@link WHEEL_CONTAINER_RE}
+ * convention — some mods, e.g. cheetah, model the wheel once at one corner under `f_wheel_<mask>` and rely
+ * on the engine to clone it to every dummy). The sub-model's atomics are centred on the hub, so each
+ * geometry is built once and placed at every dummy in a pivot → spinner rig (mirrored on the left, no
+ * wheel-scale — authored at size, like the per-corner wheels). Returns the rig handles.
+ */
+function addContainerWheels(
+  root: Group,
+  clump: RWClump,
+  container: readonly RWGeometry[],
+  textures: Map<string, Texture>,
+  options: VehicleOptions,
+  worldCache: Map<number, Matrix4>,
+): BuiltWheel[] {
+  const parts = container.map((rw) => {
+    const geometry = buildGeometry(rw);
+
+    return {
+      geometry,
+      materials: rw.materials.map((m, i) => buildVehicleMaterial(m, rw, textures, options, i)),
+      radius: geometry.boundingSphere?.radius ?? 0,
+    };
+  });
+  const radius = Math.max(0.5, ...parts.map((p) => p.radius));
+  const wheels: BuiltWheel[] = [];
+
+  clump.frames.forEach((frame, index) => {
+    const placement = wheelPlacement(frame.name.toLowerCase());
+    if (!placement) {
+      return;
+    }
+    const world = worldMatrix(clump, index, worldCache);
+    const pivot = new Group();
+    pivot.name = frame.name;
+    pivot.applyMatrix4(world);
+
+    const spinner = new Group();
+    spinner.name = `${frame.name}_spin`;
+    pivot.add(spinner);
+
+    // The sub-model is authored on the right (+X); mirror the left copies so they don't face inward.
+    const mirror = placement.right ? new Matrix4() : new Matrix4().makeRotationZ(Math.PI);
+    for (const part of parts) {
+      const mesh = new Mesh(part.geometry, part.materials);
+      mesh.applyMatrix4(mirror);
+      spinner.add(mesh);
+    }
+    root.add(pivot);
+
+    const hub = new Vector3().setFromMatrixPosition(world);
+    wheels.push({ connection: [hub.x, hub.y, hub.z], front: !placement.rear, radius, spinner });
+  });
+
+  return wheels;
 }
 
 /**
@@ -538,7 +608,11 @@ function buildVehicleMaterial(
 function buildWheels(
   root: Group,
   clump: RWClump,
-  source: { cornerWheels: readonly CornerWheel[]; wheelGeometryIndex: null | number },
+  source: {
+    containerWheels: readonly RWGeometry[];
+    cornerWheels: readonly CornerWheel[];
+    wheelGeometryIndex: null | number;
+  },
   textures: Map<string, Texture>,
   options: VehicleOptions,
   worldCache: Map<number, Matrix4>,
@@ -555,8 +629,71 @@ function buildWheels(
   if (source.wheelGeometryIndex !== null) {
     return addWheels(root, clump, source.wheelGeometryIndex, textures, options, worldCache);
   }
+  if (source.containerWheels.length > 0) {
+    return addContainerWheels(root, clump, source.containerWheels, textures, options, worldCache);
+  }
 
   return [];
+}
+
+/** Push a built body atomic's door/part handles into the clump's lists (kept out of the main loop). */
+function collectBuilt(built: ReturnType<typeof addBodyAtomic>, doors: BuiltDoor[], parts: BuiltPart[]): void {
+  if (built.door) {
+    doors.push(built.door);
+  }
+  if (built.part) {
+    parts.push(built.part);
+  }
+}
+
+/**
+ * Frame indices belonging to a `f_wheel_*` wheel-mod container subtree (the container frame plus all its
+ * descendants — the wheel sub-model's atomics sit on child frames). Empty when the clump uses no such
+ * container, so the new path is inert for every standard/shared/per-corner vehicle.
+ */
+function collectContainerFrames(clump: RWClump): Set<number> {
+  const roots = new Set<number>();
+  clump.frames.forEach((frame, index) => {
+    if (WHEEL_CONTAINER_RE.test(frame.name.toLowerCase())) {
+      roots.add(index);
+    }
+  });
+  if (roots.size === 0) {
+    return roots;
+  }
+  const inSubtree = new Set<number>();
+  clump.frames.forEach((_, index) => {
+    for (let cur = index; cur >= 0; cur = clump.frames[cur].parentIndex) {
+      if (roots.has(cur)) {
+        inSubtree.add(index);
+        break;
+      }
+    }
+  });
+
+  return inSubtree;
+}
+
+/**
+ * The `f_wheel_*` container wheel sub-model: the frame indices in the container subtree (diverted from the
+ * body) and their geometries (instanced at the dummies by {@link addContainerWheels}). Both empty unless
+ * the clump uses that convention AND has real `wheel_*_dummy` frames — so the path is inert for every
+ * standard / shared / per-corner vehicle (no behaviour change for them).
+ */
+function collectContainerWheels(clump: RWClump): { frames: Set<number>; geometries: RWGeometry[] } {
+  const frames = collectContainerFrames(clump);
+  if (frames.size === 0 || !hasWheelDummies(clump)) {
+    return { frames: new Set(), geometries: [] };
+  }
+  const geometries: RWGeometry[] = [];
+  for (const atomic of clump.atomics) {
+    const geometry = clump.geometries[atomic.geometryIndex];
+    if (geometry && frames.has(atomic.frameIndex)) {
+      geometries.push(geometry);
+    }
+  }
+
+  return { frames, geometries };
 }
 
 /** Index every `_dam` atomic's geometry by its part name (the prefix before `_dam`). */
