@@ -36,7 +36,9 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 
 Packs a variant (`game-src/<game>/`) into `static/<version>/`: priority + models + textures, each
 split into ~50MB content-hashed chunks (`game-build/chunk.ts`) listed in `manifest.json`. See plan 048
-for the full breakdown.
+for the full breakdown. It also reads the local `.env` (Vite `loadEnv`) and packs the **TEMP**
+`VITE_MAIN_CHARACTER` (`peds.ide`) + `VITE_VEHICLES` (`vehicles.ide`) — dynamically-spawned models the
+map-placement partition would otherwise miss (plan 053 step 7). Rebuild after changing them.
 
 ```sh
 npm run build:game:original          # npm run timecyc && tsx scripts/build-game.ts --game original

@@ -1,61 +1,96 @@
-# Asset loader
+# Asset loaders
 
-`src/asset-loader/` — standalone, framework-agnostic (no React, no `game`). Turns the build's chunk
-manifest into a cached, on-demand download pipeline. Plan [049](../plans/049-asset-loader.md).
+`src/loaders/` — standalone, framework-agnostic (no React, no `game`). Resolves the game's assets into the
+VFS behind one contract, selected at build time by `VITE_ASSET_LOADER`. Plans
+[049](../plans/049-asset-loader.md) (fetch) + [053](../plans/053-asset-local-loader.md) (local + restructure).
 
-## Implemented
+## Layout
 
-- **Manifest** (`manifest.ts`, pure): `parseManifest` (validates the build's `{ chunks: { priority,
-  models, textures }, game, version }` shape, throws on malformed data), `manifestDir`, `chunkUrl`,
-  `allChunks` (flatten priority → models → textures, group-tagged), `chunkUrls`.
-- **`AssetLoader`** (`asset-loader.ts`):
-  - `init()` — fetches the manifest (`cache: 'no-store'`), then **invalidates** stale cache entries
-    (URLs cached but absent from the manifest — old versions/hashes).
-  - `load(groups?)` — **on demand**: ensures the given groups' chunks are present (default all);
-    downloads missing chunks (streamed, with a concurrency limit), **skips any already cached**.
-  - Per chunk: cache hit → deliver from cache, no network; miss → `fetch` (streamed for progress) →
-    verify byte length (+ optional SHA-1 via `verifyHash`) → `cache.put` → deliver. Partial/failed
-    downloads are never cached, so a later `load()` retries just that chunk.
-  - Hands each ready chunk's **raw zip bytes** to an `AssetSink` (the VFS — next plan); the loader
-    never unzips.
-- **Progress** via its own typed emitter (`emitter.ts`): `progress` (global
-  `{ loadedBytes, loadedChunks, totalBytes, totalChunks }`), `chunk` (per-chunk lifecycle:
-  `cached`/`downloading`/`done`/`error`), `chunkReady`, `error`. Aggregation in `progress.ts` (pure).
-- **Cache** (`cache-store.ts`): Cache Storage API, one named bucket, keyed by content-hashed chunk URL.
-- **Invalidation diff** in `invalidate.ts` (pure: `staleKeys`).
+```
+src/loaders/
+  index.ts            # createAssetLoader(config) factory (env switch) + public re-exports
+  types.ts            # shared contract: AssetLoader + Manifest/GroupName/AssetSink/ProgressSnapshot/…
+  manifest.ts         # manifest helpers (parseManifest, allChunks, chunkUrl, …) — pure
+  emitter.ts          # typed event emitter   |   progress.ts — ProgressTracker (pure)
+  asset-fetch-loader/ # AssetFetchLoader (manifest + chunk download)  + cache-store.ts, invalidate.ts
+  asset-local-loader/ # AssetLocalLoader (user-picked raw GTA install) + dir-handle-store, img-reader, …
+```
+
+The boot flow (`use-asset-boot.ts`) drives **one** `AssetLoader` from `createAssetLoader(...)`; everything
+downstream (VFS, renderer) is loader-agnostic. `resolveLoaderKind()` reads `VITE_ASSET_LOADER` (`fetch`
+default | `local`).
+
+```ts
+interface AssetLoader {
+  readonly events: Emitter<AssetLoaderEvents>;
+  init(): Promise<Manifest>; // fetch+parse manifest / prompt+scan the install
+  load(groups?: readonly GroupName[]): Promise<void>; // make groups present in the VFS sink
+  prepare?(): Promise<void>; // local only: the user-gesture folder prompt
+  restore?(): Promise<void>; // local only: boot-time restore of the remembered folder
+  ready?(): boolean; // local only: folder acquired?
+}
+```
+
+## Fetch loader (`asset-fetch-loader/`, plan 049)
+
+Turns the build's chunk manifest into a cached, on-demand download pipeline.
+
+- **Manifest** (`manifest.ts`, pure): `parseManifest` (validates `{ chunks: { priority, models, textures },
+game, version }`), `manifestDir`, `chunkUrl`, `allChunks` (priority → models → textures, group-tagged), `chunkUrls`.
+- **`AssetFetchLoader`**: `init()` fetches the manifest (`cache: 'no-store'`) then **invalidates** stale cache
+  entries; `load(groups?)` ensures the given groups' chunks are present (download streamed, concurrency-limited,
+  **skips cached**), verifying byte length (+ optional SHA-1). Partial/failed downloads are never cached.
+  Hands each ready chunk's **raw zip bytes** to the `AssetSink` (the VFS); never unzips.
+- **Cache** (`cache-store.ts`): Cache Storage, one named bucket, keyed by content-hashed chunk URL.
+  **Invalidation** in `invalidate.ts` (pure `staleKeys`).
+
+## Local loader (`asset-local-loader/`, plan 053)
+
+Reads a **user-picked raw GTA San Andreas install** folder via the File System Access API and converts it
+in-browser to the same VFS — so the downstream flow is identical. **Chromium-only; opt-in** via
+`VITE_ASSET_LOADER=local`.
+
+- **Folder handle** (`dir-handle-store.ts`): persisted in IndexedDB and remembered across visits.
+  `restoreDir` (boot, no gesture) loads it; `pickDir` (the Play-folder gesture) makes the picker /
+  `requestPermission` its **first** await so the user activation isn't lost across an IndexedDB read.
+- **Lazy IMG reader** (`img-reader.ts`): reads only the VER2 directory up front, then slices each needed
+  entry's byte range from disk — never buffers the ~1 GB `gta3.img`. VER2 parsing shared from
+  `renderware/archive`.
+- **Selection** (`build-vfs.ts`): the in-browser port of `scripts/build-game.ts`'s partition (shared
+  `src/game-build/partition.ts`) — exterior-placed models/textures + loose + world, **plus** the env-named
+  dynamic models (`VITE_MAIN_CHARACTER` via `peds.ide`, `VITE_VEHICLES` via `vehicles.ide`).
+- **`AssetLocalLoader`**: `restore()` (mount) → `prepare()` (Play-folder gesture) → `init()` (scan+select →
+  one synthetic chunk per group) → `load()` (read selected bytes into the VFS, count-based progress).
+- **Boot gate**: the shell auto-loads `core` for fetch; for local it boots to the menu, then **Play → folder
+  prompt** (`FolderPrompt`, `boot-machine` `folder` phase) → load. See [ui-shell](ui-shell.md).
+
+## Progress + events
+
+Typed emitter (`emitter.ts`): `progress` (global `{ loadedBytes, loadedChunks, totalBytes, totalChunks }`),
+`chunk` (per-chunk `cached`/`downloading`/`done`/`error`), `chunkReady`, `error`. Fetch aggregates bytes;
+local emits count-based progress per file.
 
 ## Virtual File System — `src/vfs/` (plan 050)
 
-The `AssetSink` consumer. `Vfs` unzips each delivered chunk (fflate `unzipSync`) and indexes every entry
-by name, then serves them behind `AssetFileSystem` (the read interface, defined in
-`renderware/archive/asset-fs.ts` next to `ImgArchive` so renderware/game depend on the interface, not on
-the VFS):
+The `AssetSink` consumer. `Vfs implements AssetSink, AssetFileSystem`:
 
-- `Vfs implements AssetSink, AssetFileSystem` — `addChunk(group, zipBytes)`, `get`/`getText`/`has`/`names`,
-  `verify(manifest)` (delivered chunk + entry totals vs the manifest; `verify.ts` is pure-tested).
-- **Keys** = names as packed: bare for model-archive files (`cj.dff`, `la.col`, `lae_stream0.ipl`) and
-  relative paths for loose files (`data/gta.dat`, `text/american.gxt`).
-- The game reads everything through `AssetFileSystem`: `resolve-map` (sync now), the world adapter
-  (`fs.get`/`getText` for models/txd/data; binary IPL streams enumerated from `fs.names`), and
-  `canvas-host` (zones/gxt/particle/effects/water/player/anim). `asset-cache` is unchanged — `AssetFileSystem`
-  is a superset of the `ImgArchive` it already consumed.
-- **Boot wiring:** the UI shell (`src/ui/shell/`, plan 051) — `use-asset-boot.ts` runs loader → `Vfs` →
-  `verify` by phase (priority+models, then textures), and lazy-mounts `<CanvasHost fs={vfs} />`.
-
-Test anchors: `src/vfs/verify.test.ts`, `src/vfs/vfs.test.ts`; full-boot smoke validated against the real
-build output (loader → VFS → `resolveMap`).
+- `addChunk(group, file, zipBytes)` — unzip (fflate) + index by name (fetch loader).
+- `addFiles(chunkId, entries)` — raw ingest of already-unzipped name→bytes (local loader), accounting like
+  `addChunk` so `verify(manifest)` works against the local loader's **synthesised** manifest.
+- `get`/`getText`/`has`/`names`; `verify(manifest)` (delivered chunk + entry totals; `verify.ts` is pure).
+- **Keys** = names as packed: bare for archive files (`cj.dff`, `la.col`), relative paths for loose files
+  (`data/gta.dat`). The game reads everything through `AssetFileSystem`.
 
 ## Known gaps / candidates
 
-- **UI** (splash / preloader / progress bar bound to the events) — deferred (memory
-  `loader-ui-out-of-scope`); the bootstrap shows plain text only.
-- **Zone-lazy** (phase 2): per-chunk zone tag in the manifest; `load(groups)` is already partial, so
-  it's additive.
-- **Lazy per-file inflate** (keep raw chunks, decompress on `get`) behind the same interface, if the
-  ~800 MB eager-unzip footprint bites.
+- Local loader is **Chromium-only** (File System Access); `fetch` stays the default everywhere else.
+- The env-named peds/vehicles selection is a **temporary** bring-your-own-files stop-gap (plan 053 step 7)
+  until a proper ped/vehicle registry exists.
+- Lazy per-file inflate for the fetch path (decompress on `get`) if the eager-unzip footprint bites.
 
 ## Test coverage anchors
 
-- Unit: `manifest.test.ts`, `emitter.test.ts`, `progress.test.ts`, `invalidate.test.ts`.
-- e2e (browser IO — `asset-loader.ts` + `cache-store.ts`, in vitest `coverage.exclude`):
-  `e2e/asset-loader.spec.ts` (download/progress/sink, skip-if-cached, invalidation, error path).
+- Unit: `loaders/{manifest,emitter,progress}.test.ts`, `asset-fetch-loader/invalidate.test.ts`,
+  `asset-local-loader/{dir-handle-store,img-reader,build-vfs,asset-local-loader}.test.ts`, `vfs/{verify,vfs}.test.ts`.
+- e2e (browser IO): `e2e/asset-fetch-loader.spec.ts` (download/progress/sink, skip-if-cached, invalidation,
+  error) and `e2e/asset-local-loader.spec.ts` (fake FSA tree → walk + lazy reader + selection + VFS, verify clean).

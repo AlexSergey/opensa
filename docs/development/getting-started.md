@@ -76,6 +76,11 @@ The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). T
 verifies against the manifest, and the lazily-loaded game runs entirely from the VFS. A network blip
 re-fetches only the dropped chunk; a return visit downloads nothing.
 
+> **Bring your own files:** set `VITE_ASSET_LOADER=local` (Chromium only) to skip the download and read a
+> **raw GTA San Andreas install** you pick at Play time instead — Play → "Choose game folder". The folder is
+> remembered (IndexedDB). See [asset loaders](../features/asset-loader.md) and [build flags](build-flags.md)
+> for the full env list (incl. the temporary `VITE_MAIN_CHARACTER` / `VITE_VEHICLES`).
+
 > **Note:** the boot fetches `static/original-${__APP_VERSION__}/manifest.json` (version from
 > `package.json`, wired in `src/ui/shell/use-asset-boot.ts`) — currently the `original` variant only.
 

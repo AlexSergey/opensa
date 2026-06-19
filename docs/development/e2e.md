@@ -16,7 +16,10 @@ npm run e2e:update     # regenerate screenshot baselines
 
 - `npm run serve:static` — serves `static/` on :3001 (`VITE_STATIC_URL`): the committed `static/viewer/`
   fixtures **and** the built `static/games/<game>-<version>/` archives (gitignored).
-- `npm run dev -- --port 5173 --strictPort` — the Vite app on :5173 (`baseURL`).
+- `npm run dev -- --mode e2e --port 5174 --strictPort` — the Vite app on **:5174** (`baseURL`). The dedicated
+  port (not the usual 5173) means the lane never reuses a hand-started dev server in another mode (e.g. the
+  `local` loader). `--mode e2e` loads the committed **`.env.e2e`**, which forces `VITE_ASSET_LOADER=fetch` (it
+  takes precedence over your local, gitignored `.env`), so e2e is deterministic regardless of your dev config.
 
 Chromium is already installed under the repo's Playwright cache. If missing: `npx playwright install chromium`.
 
@@ -26,8 +29,11 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 **committed** `static/viewer/` — so it runs **anywhere, including CI**, with no game-src and no full archive
 (`npm run e2e` no longer pre-populates anything; regenerate the fixtures locally with
 `npm run viewer:assets:original`, which writes `static/viewer/`, and commit the trimmed result).
-`e2e/asset-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
-`e2e/shell.spec.ts` exercises the UI shell boot flow; its happy path needs the built
+`e2e/asset-fetch-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
+`e2e/asset-local-loader.spec.ts` runs the local loader's real pipeline (directory walk + lazy VER2 reader +
+selection + VFS) over an **in-page fake** File System Access tree — no real install / picker needed (the
+native folder dialog can't be driven by Playwright).
+`e2e/shell.spec.ts` exercises the UI shell boot flow (fetch mode); its happy path needs the built
 **`static/games/original-<version>/`** chunk archives (gitignored), so that spec only runs where those are
 present (not on GitHub-hosted CI). It stops before the full texture download + WebGL boot to stay fast.
 
