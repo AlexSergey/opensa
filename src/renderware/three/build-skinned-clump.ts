@@ -1,4 +1,4 @@
-import type { Texture } from 'three';
+import type { MeshStandardMaterial, Texture } from 'three';
 
 import { Bone, BufferAttribute, BufferGeometry, Group, Matrix4, Skeleton, SkinnedMesh } from 'three';
 
@@ -49,6 +49,7 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
 
   const materials = rw.materials.map((m) => buildMaterial(m, rw, textures));
   materials.forEach(applyNightFill); // plan 034: self-illuminate the player at night
+  materials.forEach(disableVertexColors); // skinned peds are dynamically lit and carry no vertex colours
   const mesh = new SkinnedMesh(buildSkinnedGeometry(rw, skin), materials.length > 1 ? materials : materials[0]);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -154,6 +155,20 @@ function buildSkinnedGeometry(rw: RWGeometry, skin: RWSkin): BufferGeometry {
   geometry.computeBoundingSphere();
 
   return geometry;
+}
+
+/**
+ * Drop vertex colouring on a skinned material. {@link buildMaterial} enables `vertexColors` whenever the
+ * geometry sets the RW PRELIT flag, but {@link buildSkinnedGeometry} never writes a `color` attribute (SA
+ * peds are dynamically lit, not prelit). A material asking for an absent attribute reads the GL default
+ * `(0,0,0)`, which multiplies the texture to **black** (e.g. the T800 mod ships PRELIT with all-black
+ * colours). Standard peds (army/tommy) don't set the flag, so this is a no-op for them.
+ */
+function disableVertexColors(material: MeshStandardMaterial): void {
+  if (material.vertexColors) {
+    material.vertexColors = false;
+    material.needsUpdate = true;
+  }
 }
 
 /**

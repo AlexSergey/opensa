@@ -73,6 +73,16 @@ describe('buildSkinnedClump', () => {
       const skinned = buildSkinnedClump(clump(geometry(2)));
       expect(skinned?.skeleton.bones.map((b) => b.name)).toEqual(['Root', 'Bone']);
     });
+
+    it('disables vertex colours on a PRELIT skinned material (no color attr → would render black)', () => {
+      // PRELIT flag (0x8) set, but the skinned geometry never writes a `color` attribute (the T800 bug).
+      const geo = geometry(2);
+      geo.flags = 0x8;
+      const skinned = buildSkinnedClump(clump(geo));
+      const material = skinned!.root.getObjectByProperty('type', 'SkinnedMesh') as SkinnedMesh;
+      const materials = Array.isArray(material.material) ? material.material : [material.material];
+      expect(materials.every((m) => 'vertexColors' in m && !m.vertexColors)).toBe(true);
+    });
   });
 });
 

@@ -120,11 +120,11 @@
 - [✅] Google Analytics
 - [✅] Version in cache file names (reset user caches when update)
 - [✅] Browser caching
-- [ ] Testing
-  - [ ] Map
+- [✅] Testing
+  - [✅] Map
   - [✅] Mods
 - [✅] Rename project
-- [ ] Routine deals
+- [✅] Routine deals
   - [✅] Readme
   - [✅] Dev Docs
   - [✅] Create site
@@ -149,6 +149,9 @@ Known issues:
 
 Next iterations:
 
+- [ ] CJ
+  - [ ] Clothes
+  - [ ] Bodies
 - [ ] Effects Enhancements
 - [ ] Particles Enhancements
   - [ ] Smoke from wheels

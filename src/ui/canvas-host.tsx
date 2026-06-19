@@ -541,7 +541,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
-    const model = await adapter.loadCharacter('player/shrek.dff', 'player/shrek.txd');
+    const model = await adapter.loadCharacter('player/t800.dff', 'player/t800.txd');
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
       bonesByName: model.bonesByName,
