@@ -23,11 +23,13 @@ export interface SkinnedClump {
  *
  * Bones come from the frame hierarchy (one `Bone` per frame, local transform from
  * the RW frame, parented per `parentIndex`). The skeleton's bones are ordered to
- * match the skin's bone indices — for GTA SA peds **skin bone `i` ↔ frame `i + 1`**
- * (frame 0 is the dummy clump root). Bone inverses are computed by three from the
- * bones' own bind world matrices (`new Skeleton(bones)`), which keeps the **bind
- * pose exactly the raw mesh** regardless of the frame↔bone mapping; the mapping
- * only affects animation (next task). No animation is applied here.
+ * match the skin's bone indices via the **HAnim** hierarchy (plan 052) — bone index
+ * `i` → the frame whose HAnim bone id is the hierarchy's `i`-th — falling back to the
+ * positional **frame `i + 1`** heuristic for models with no HAnim (frame 0 is the
+ * dummy clump root). Bone inverses come from the **skin plugin's** inverse bind
+ * matrices (`applySkinInverses`) — the authoritative bind pose — not the frame
+ * hierarchy, so peds whose frame bind differs from the skin's (standard SA peds)
+ * deform upright. No animation is applied here.
  */
 export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture>): null | SkinnedClump {
   const atomic = clump.atomics.find((a) => clump.geometries[a.geometryIndex]?.skin);
@@ -53,10 +55,9 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
   mesh.add(rootBone);
   mesh.updateMatrixWorld(true);
 
-  // Skin bone i ↔ frame i + 1 (frame 0 = dummy root); skeleton order matches skinIndex.
-  const skinBones = Array.from({ length: skin.numBones }, (_, i) => bones[i + 1]);
-  const skeleton = new Skeleton(skinBones);
-  mesh.bind(skeleton);
+  const skeleton = new Skeleton(skinBoneOrder(clump, bones, skin.numBones));
+  mesh.bind(skeleton); // computes bindMatrix (+ frame-derived inverses we override next)
+  applySkinInverses(skeleton, skin);
 
   const root = new Group();
   root.name = 'RWSkinnedClump';
@@ -70,6 +71,28 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
   }
 
   return { bonesByName, root, skeleton };
+}
+
+/**
+ * Replace three's frame-derived bone inverses with the skin plugin's **authoritative** inverse bind
+ * matrices (plan 052). RW stores the true bind pose there; deriving it from the frame hierarchy only works
+ * when the frames happen to match it (custom Tommy did; standard SA peds like army do not — their frame
+ * bind is rotated, so the mesh rendered lying down). The matrices are padded `RwMatrix` (right/up/at/pos,
+ * each with a 4th pad float), so force the homogeneous bottom row to `(0,0,0,1)`. No-op if malformed.
+ */
+function applySkinInverses(skeleton: Skeleton, skin: RWSkin): void {
+  if (skin.inverseBindMatrices.length < skeleton.bones.length * 16) {
+    return;
+  }
+  skeleton.boneInverses = skeleton.bones.map((_, i) => {
+    const matrix = new Matrix4().fromArray(skin.inverseBindMatrices, i * 16);
+    matrix.elements[3] = 0;
+    matrix.elements[7] = 0;
+    matrix.elements[11] = 0;
+    matrix.elements[15] = 1;
+
+    return matrix;
+  });
 }
 
 function boneFromFrame(frame: RWFrame): Bone {
@@ -131,4 +154,24 @@ function buildSkinnedGeometry(rw: RWGeometry, skin: RWSkin): BufferGeometry {
   geometry.computeBoundingSphere();
 
   return geometry;
+}
+
+/**
+ * Order the skeleton's bones to match the skin's bone indices. RW skins index into the HAnim hierarchy
+ * (the root frame's ordered bone ids); map each index → the bone whose frame carries that bone id. Falls
+ * back to the positional "skin bone `i` ↔ frame `i + 1`" heuristic for models with no HAnim.
+ */
+function skinBoneOrder(clump: RWClump, bones: Bone[], numBones: number): Bone[] {
+  const hierarchy = clump.frames.find((frame) => frame.boneHierarchy)?.boneHierarchy;
+  if (!hierarchy) {
+    return Array.from({ length: numBones }, (_, i) => bones[i + 1]);
+  }
+  const boneById = new Map<number, Bone>();
+  clump.frames.forEach((frame, i) => {
+    if (frame.boneId !== undefined) {
+      boneById.set(frame.boneId, bones[i]);
+    }
+  });
+
+  return Array.from({ length: numBones }, (_, i) => boneById.get(hierarchy[i]) ?? bones[i + 1]);
 }

@@ -22,11 +22,21 @@ export class AnimationController {
   private currentName: null | string = null;
   private readonly mixer: AnimationMixer;
 
-  /** `root` must contain the named bones in its subtree (the player wrapper). */
-  constructor(root: Object3D, clips: Map<string, AnimationClip>, bonesByName: Map<string, Bone>) {
+  /**
+   * `root` must contain the named bones in its subtree (the player wrapper). `rootBoneName` is the
+   * skeleton's actual root bone (e.g. `skeleton.bones[0].name`) — the IFP root track (`Root`/`Normal`)
+   * retargets onto it even when the model renamed its root (some mods do, e.g. Shrek's `MrAndres5555`),
+   * so the whole body is oriented by the animation instead of stuck at its bind facing.
+   */
+  constructor(
+    root: Object3D,
+    clips: Map<string, AnimationClip>,
+    bonesByName: Map<string, Bone>,
+    rootBoneName?: string,
+  ) {
     this.mixer = new AnimationMixer(root);
     for (const [name, clip] of clips) {
-      this.clips.set(name.toLowerCase(), retargetClip(clip, bonesByName));
+      this.clips.set(name.toLowerCase(), retargetClip(clip, bonesByName, rootBoneName));
     }
   }
 
@@ -71,9 +81,14 @@ export class AnimationController {
   }
 }
 
-/** Rename a clip's tracks onto a skeleton's actual bone names (drop unmatched); clip is cloned. */
-export function retargetClip(clip: AnimationClip, bonesByName: Map<string, Bone>): AnimationClip {
-  const resolve = boneResolver(bonesByName);
+/** Rename a clip's tracks onto a skeleton's actual bone names (drop unmatched); clip is cloned.
+ *  `rootBoneName` aliases the IFP root track (`Root`/`Normal`) onto a renamed skeleton root. */
+export function retargetClip(
+  clip: AnimationClip,
+  bonesByName: Map<string, Bone>,
+  rootBoneName?: string,
+): AnimationClip {
+  const resolve = boneResolver(bonesByName, rootBoneName);
   const tracks: KeyframeTrack[] = [];
   for (const track of clip.clone().tracks) {
     const dot = track.name.lastIndexOf('.');
@@ -88,10 +103,15 @@ export function retargetClip(clip: AnimationClip, bonesByName: Map<string, Bone>
   return new AnimationClip(clip.name, clip.duration, tracks);
 }
 
-function boneResolver(bonesByName: Map<string, Bone>): (name: string) => null | string {
+function boneResolver(bonesByName: Map<string, Bone>, rootBoneName?: string): (name: string) => null | string {
   const byKey = new Map<string, string>();
   for (const name of bonesByName.keys()) {
     byKey.set(normalizeBone(name), name);
+  }
+  // Map the animation's root key (`root`/`normal`) onto the skeleton's real root, even if it's renamed
+  // (mods sometimes rename it) — otherwise the root track is dropped and the body keeps its bind facing.
+  if (rootBoneName) {
+    byKey.set('root', rootBoneName);
   }
 
   return (name) => byKey.get(normalizeBone(name)) ?? null;

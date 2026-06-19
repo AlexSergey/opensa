@@ -38,7 +38,7 @@ function fakeFs(): Renderware.AssetFileSystem {
     ['anim/ped.ifp', buffer('tests/original/dff/anim-clump/counxref.ifp')],
     ['data/timecyc.dat', readFileSync('tests/original/data/timecyc.dat', 'utf8')],
     ['junk.txd', buffer('tests/original/txd/junk.txd')],
-    ['tommy.dff', buffer('tests/original/dff/skinned/tommy.dff')],
+    ['tommy.dff', buffer('tests/custom/character/tommy.dff')],
     ['tommy.txd', buffer('tests/original/txd/junk.txd')],
     ['washer.dff', buffer('tests/original/dff/building/washer.dff')],
   ]);

@@ -212,7 +212,8 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   async loadAnimations(ifpName: string): Promise<Map<string, AnimationClip>> {
     await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     const clips = new Map<string, AnimationClip>();
-    for (const anim of parseIfp(requireBuffer(this.fs, ifpName))) {
+    // The build lowercases all packed asset keys (case-insensitive like GTA), so normalise the lookup.
+    for (const anim of parseIfp(requireBuffer(this.fs, ifpName.toLowerCase()))) {
       clips.set(anim.name.toLowerCase(), buildAnimationClip(anim));
     }
 
@@ -228,8 +229,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
    */
   async loadCharacter(dffName: string, txdName: string): Promise<CharacterModel> {
     await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
-    const dffBuffer = requireBuffer(this.fs, dffName);
-    const textures = buildTextureMap(parseTxd(requireBuffer(this.fs, txdName)));
+    // The build lowercases all packed asset keys (case-insensitive like GTA), so normalise the lookup —
+    // e.g. a `player/Shrek.dff` request resolves to the packed `player/shrek.dff`.
+    const dffBuffer = requireBuffer(this.fs, dffName.toLowerCase());
+    const textures = buildTextureMap(parseTxd(requireBuffer(this.fs, txdName.toLowerCase())));
     const clump = parseDff(dffBuffer);
 
     const skinned = buildSkinnedClump(clump, textures);

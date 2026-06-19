@@ -19,8 +19,10 @@ into the repo-root **`tests/`** folder (committed) and read from there.
   RealVision; the game's `npm run timecyc` keeps its own enhanced merge). Add new real fixtures to the MANIFEST.
 - **`tests/custom/`** — committed (NOT Rockstar IP, or can't be reproduced from stock): mods
   (`dff/vehicle/comet.dff`, `petro-4/6wheels.dff`, `dff/uv-anim/visagesign04.dff`, `world/Lae2_roads03.dff`,
-  `txd/yosemite.txd`) and `proper-fixes-models/` (curated/version-pinned test models: `casroyale02_lvs.dff`,
-  `trafficlight1.dff`, `se_bit_17.dff`, `vegasnroad19.dff`).
+  `txd/yosemite.txd`), the custom `character/tommy.dff`, the `character/Shrek.dff` mod (renamed skeleton root
+  `MrAndres5555` — root-track aliasing regression guard), `proper-fixes-models/` (curated/version-pinned:
+  `casroyale02_lvs.dff`, `trafficlight1.dff`, `se_bit_17.dff`, `vegasnroad19.dff`), and `locked-models/`
+  (anti-rip `cheetah.dff`, `yosemite.dff`). Stock peds like `army.dff` regenerate into `tests/original/character/`.
 
 Read via `join(process.cwd(), 'tests', 'original'|'custom', ...)` or `'tests/original/...'` / `'tests/custom/...'`.
 CI tests are disabled for now (CI lacks game-src); run `npm run test:fixtures && npm test` locally.

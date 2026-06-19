@@ -17,6 +17,8 @@ export const RwSection = {
   FRAME_LIST: 0x0e,
   GEOMETRY: 0x0f,
   GEOMETRY_LIST: 0x1a,
+  // HAnim plugin (skeleton): per-frame bone id + the root's bone hierarchy (skin bone-index order)
+  HANIM_PLG: 0x11e,
   MATERIAL: 0x07,
   MATERIAL_LIST: 0x08,
   // Material Effects plugin (RpMatFX) — env-map / bump effect on a material

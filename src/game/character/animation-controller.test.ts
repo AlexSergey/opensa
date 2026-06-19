@@ -35,5 +35,16 @@ describe('retargetClip', () => {
       retargetClip(source, bones('Root', 'Spine1'));
       expect(source.tracks[0].name).toBe('Normal.quaternion');
     });
+
+    it('aliases the root track onto a renamed skeleton root (e.g. a mod renamed it)', () => {
+      // No bone named Root/Normal; the real root is `MrAndres5555` — the root track must still retarget.
+      const retargeted = retargetClip(clip(), bones('MrAndres5555', 'Spine1'), 'MrAndres5555');
+      expect(retargeted.tracks.map((t) => t.name)).toEqual(['MrAndres5555.quaternion', 'Spine1.position']);
+    });
+
+    it('drops the root track when the root is renamed and no rootBoneName is given', () => {
+      const retargeted = retargetClip(clip(), bones('MrAndres5555', 'Spine1'));
+      expect(retargeted.tracks.map((t) => t.name)).toEqual(['Spine1.position']);
+    });
   });
 });

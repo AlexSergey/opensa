@@ -541,7 +541,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     // Spawn the player (Tommy Vercetti DFF, a skinned mesh + skeleton) on CJ's
     // parking lot. The model is native GTA model-space (up = +Y); `orientCharacter`
     // stands it up in GTA Z-up under a wrapper the render-sync system positions.
-    const model = await adapter.loadCharacter('player/tommy.dff', 'player/tommy.txd');
+    const model = await adapter.loadCharacter('player/shrek.dff', 'player/shrek.txd');
     const player = orientCharacter(model.object, TOMMY_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
       bonesByName: model.bonesByName,
@@ -573,7 +573,8 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
 
     // Animations: ped.ifp loaded directly (like the original), driven by the movement state machine.
     const clips = await adapter.loadAnimations('anim/ped.ifp');
-    const animation = new AnimationController(player, clips, character.bonesByName);
+    // Pass the skeleton's real root bone so the IFP root track retargets even on models that renamed it.
+    const animation = new AnimationController(player, clips, character.bonesByName, character.skeleton?.bones[0]?.name);
     animation.play('idle_stance', 0);
     const animationSystem = new CharacterAnimationSystem(animation, character.playerEid, player, game.getConfig());
     game.addSystem(animationSystem);

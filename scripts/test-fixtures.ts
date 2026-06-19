@@ -56,7 +56,9 @@ const MANIFEST: readonly Fixture[] = [
   copy('models/effects.fxp', 'models/effects.fxp'),
   copy('models/effectsPC.txd', 'models/effectsPC.txd'),
   copy('text/american.gxt', 'text/american.gxt'),
-  copy('player/tommy.dff', 'dff/skinned/tommy.dff'),
+  // Tommy is a custom (non-Rockstar) model → committed in tests/custom/character/. army (a stock SA ped,
+  // skeleton frames in a different order than the HAnim hierarchy) regenerates here from gta3.img.
+  extract('army.dff', 'character/army.dff'),
 
   // --- Entries extracted from the IMG archives ---
   extract('barriers.col', 'col/barriers.col'),

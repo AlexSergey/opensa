@@ -70,6 +70,11 @@ export interface RWEscalator {
 
 /** A single frame: local transform + hierarchy link. */
 export interface RWFrame {
+  /** HAnim hierarchy: the ordered bone ids the skin's bone indices map into. Set only on the frame that
+   *  carries the hierarchy table (the skeleton root). */
+  boneHierarchy?: number[];
+  /** HAnim bone id (skeleton frames), or undefined when the frame has no HAnim plugin. */
+  boneId?: number;
   name: string;
   parentIndex: number;
   position: Vec3;

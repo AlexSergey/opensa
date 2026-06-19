@@ -68,13 +68,57 @@ describe('buildSkinnedClump', () => {
       const skinned = buildSkinnedClump(clump(geometry(2)));
       expect([...(skinned?.bonesByName.keys() ?? [])].sort()).toEqual(['Bone', 'Root']);
     });
+
+    it('falls back to frame order (skin bone i ↔ frame i+1) when there is no HAnim', () => {
+      const skinned = buildSkinnedClump(clump(geometry(2)));
+      expect(skinned?.skeleton.bones.map((b) => b.name)).toEqual(['Root', 'Bone']);
+    });
   });
 });
 
-// A real skinned player model (tommy.dff): a full 32-bone skeleton.
-const TOMMY_DFF = 'tests/original/dff/skinned/tommy.dff';
+// Plan 052: the skin's bone indices follow the HAnim hierarchy, which need NOT match the frame order
+// (true for standard SA peds, e.g. army). Frames here are stored A, C, B but the hierarchy is A, B, C.
+function hanimClump(): RWClump {
+  return {
+    atomics: [{ frameIndex: 0, geometryIndex: 0 }],
+    frames: [
+      frame('dummy', -1),
+      { ...frame('A', 0), boneHierarchy: [0, 1, 2], boneId: 0 }, // root carries the hierarchy table
+      { ...frame('C', 1), boneId: 2 },
+      { ...frame('B', 2), boneId: 1 },
+    ],
+    geometries: [geometry(3)],
+  };
+}
 
-describe.skipIf(!existsSync(TOMMY_DFF))('buildSkinnedClump (real tommy.dff)', () => {
+describe('buildSkinnedClump (HAnim bone order)', () => {
+  describe('positive cases', () => {
+    it('orders the skeleton by the HAnim hierarchy, not the frame order', () => {
+      const skinned = buildSkinnedClump(hanimClump());
+      expect(skinned?.skeleton.bones.map((b) => b.name)).toEqual(['A', 'B', 'C']);
+    });
+  });
+});
+
+describe('buildSkinnedClump (skin inverse bind matrices)', () => {
+  describe('positive cases', () => {
+    it('uses the skin plugin inverse binds, forcing the padded RwMatrix bottom row to (0,0,0,1)', () => {
+      const geo = geometry(2);
+      // Bone 0 = a translation (5,6,7); RW pads each RwMatrix vector with a 4th float (here the [15] pad
+      // is 0 in the file) — applySkinInverses must repair the homogeneous row so the matrix is valid.
+      geo.skin!.inverseBindMatrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, /* pad */ 0], 0);
+      const skinned = buildSkinnedClump(clump(geo));
+      const inverse = skinned!.skeleton.boneInverses[0].elements;
+      expect([inverse[12], inverse[13], inverse[14], inverse[15]]).toEqual([5, 6, 7, 1]);
+    });
+  });
+});
+
+// A real skinned player model — the custom Tommy (committed in tests/custom): a full 32-bone skeleton
+// whose frame order happens to match the HAnim hierarchy (so the old positional mapping worked on it).
+const TOMMY_DFF = 'tests/custom/character/tommy.dff';
+
+describe('buildSkinnedClump (real tommy.dff)', () => {
   const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(TOMMY_DFF))));
 
   describe('positive cases', () => {
@@ -93,6 +137,56 @@ describe.skipIf(!existsSync(TOMMY_DFF))('buildSkinnedClump (real tommy.dff)', ()
       for (const bone of ['Root', 'Pelvis', 'Spine', 'Head']) {
         expect(bonesByName.has(bone)).toBe(true);
       }
+    });
+  });
+});
+
+// A real mod whose skeleton root is RENAMED: Shrek's root bone is `MrAndres5555`, not the stock
+// `Root`/`Normal`. Animation retargeting matches the IFP root track by name, so a renamed root dropped
+// that track → the body kept its bind facing (spawned back-to-car, animations reversed). The fix passes
+// `skeleton.bones[0].name` to the AnimationController; this guards the model fact it relies on.
+const SHREK_DFF = 'tests/custom/character/Shrek.dff';
+
+describe('buildSkinnedClump (real Shrek.dff — renamed skeleton root)', () => {
+  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(SHREK_DFF))));
+
+  describe('positive cases', () => {
+    it('builds a full 32-bone skeleton whose root is renamed (no stock Root/Normal bone)', () => {
+      const { bonesByName, skeleton } = buildSkinnedClump(parsed)!;
+      expect(skeleton.bones).toHaveLength(32);
+      expect(skeleton.bones[0].name).toBe('MrAndres5555');
+      expect(bonesByName.has('Root')).toBe(false);
+      expect(bonesByName.has('Normal')).toBe(false);
+    });
+
+    it('still names the standard SA biped bones below the renamed root', () => {
+      const { bonesByName } = buildSkinnedClump(parsed)!;
+      for (const bone of ['Pelvis', 'Spine', 'Spine1', 'Head']) {
+        expect(bonesByName.has(bone)).toBe(true);
+      }
+    });
+  });
+});
+
+// A stock SA ped (army, from gta3.img via `npm run test:fixtures`): its skeleton FRAMES are in a
+// different order than the HAnim hierarchy (R Thigh/L Thigh precede Spine), so the old positional
+// `frame i+1` mapping bound vertices to the wrong bones (plan 052 regression guard).
+const ARMY_DFF = 'tests/original/character/army.dff';
+
+describe.skipIf(!existsSync(ARMY_DFF))('buildSkinnedClump (real army.dff — HAnim ≠ frame order)', () => {
+  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(ARMY_DFF))));
+
+  describe('positive cases', () => {
+    it('orders skin bones by the HAnim hierarchy, not the frame order', () => {
+      // Frame order has R Thigh/L Thigh at indices 3/4; the HAnim hierarchy puts Spine there.
+      const { skeleton } = buildSkinnedClump(parsed)!;
+      expect(skeleton.bones.slice(0, 4).map((b) => b.name)).toEqual(['Root', 'Pelvis', 'Spine', 'Spine1']);
+    });
+
+    it('uses the skin plugin inverse binds (so the mesh stands upright under animation)', () => {
+      const { skeleton } = buildSkinnedClump(parsed)!;
+      // Authoritative inverse binds have a valid homogeneous bottom row (frame-derived ones differ here).
+      expect(skeleton.boneInverses.every((m) => m.elements[15] === 1)).toBe(true);
     });
   });
 });

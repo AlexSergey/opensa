@@ -195,17 +195,22 @@ function parseFrameList(stream: BinaryStream, header: ChunkHeader): RWFrame[] {
     frames.push({ name: '', parentIndex, position, rotation });
   }
 
-  // Frame names live in per-frame Extension chunks following the Struct.
+  // Frame names + HAnim (skeleton bone id / hierarchy) live in per-frame Extension chunks after the Struct.
   let frameIndex = 0;
   forEachChild(stream, header.dataStart, header.end, (child) => {
-    if (child.type !== RwSection.EXTENSION) {
+    if (child.type !== RwSection.EXTENSION || frameIndex >= frames.length) {
+      if (child.type === RwSection.EXTENSION) {
+        frameIndex += 1;
+      }
+
       return;
     }
     const nameChunk = findChild(stream, child.dataStart, child.end, RwSection.FRAME);
-    if (nameChunk && frameIndex < frames.length) {
+    if (nameChunk) {
       stream.seek(nameChunk.dataStart);
       frames[frameIndex].name = stream.string(nameChunk.size);
     }
+    parseHAnim(stream, child, frames[frameIndex]);
     frameIndex += 1;
   });
 
@@ -284,6 +289,32 @@ function parseGeometryList(stream: BinaryStream, header: ChunkHeader): RWGeometr
   }
 
   return geometries;
+}
+
+/**
+ * Read a frame's HAnim plugin (`0x11e`) from its Extension: the frame's bone id, and — on the frame that
+ * carries the hierarchy table (the skeleton root) — the ordered bone ids the skin's bone indices map into.
+ * Layout: `version u32, boneId u32, numNodes u32`; if `numNodes > 0`: `flags u32, keyFrameSize u32`, then
+ * `numNodes × { nodeId u32, nodeIndex u32, flags u32 }`. No-op when the frame has no HAnim.
+ */
+function parseHAnim(stream: BinaryStream, extension: ChunkHeader, frame: RWFrame): void {
+  const hanim = findChild(stream, extension.dataStart, extension.end, RwSection.HANIM_PLG);
+  if (!hanim) {
+    return;
+  }
+  stream.seek(hanim.dataStart);
+  stream.u32(); // version
+  frame.boneId = stream.u32();
+  const numNodes = stream.u32();
+  if (numNodes > 0) {
+    stream.skip(8); // flags + keyFrameSize
+    const hierarchy: number[] = [];
+    for (let i = 0; i < numNodes; i += 1) {
+      hierarchy.push(stream.u32()); // nodeId
+      stream.skip(8); // nodeIndex + flags
+    }
+    frame.boneHierarchy = hierarchy;
+  }
 }
 
 /**
