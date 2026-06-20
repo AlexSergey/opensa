@@ -151,7 +151,7 @@ function main(): void {
   const env = loadEnv('production', ROOT, 'VITE_');
   const dynamic = dynamicRefs(dataDir, env.VITE_MAIN_CHARACTER, env.VITE_VEHICLES);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
-  const { models, priority, textures } = partitionEntries(refs, gta3Names, gtaIntNames);
+  const { models: modelEntries, priority, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
   // `partitionEntries` only pulls world files (col/ipl/ifp/dat) from gta3.img; pull the rest from the
   // override archives too (a mod's collision/anim lives there, e.g. gostown's `.col` in gostown6.img).
   const worldExtensions = ['.col', '.ipl', '.ifp', '.dat'];
@@ -168,8 +168,11 @@ function main(): void {
 
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
   // keyed by their lowercased relative path. ALL `models/*.img` are read above, so skip them here.
+  // Files under loose `player/` and `vehicles/` also get a **bare-name** alias that OVERRIDES the same-named
+  // entry extracted from the img archives (so a modder's loose `vehicles/admiral.dff` wins over gta3.img's).
   const excluded = new Set([join('anim', 'anim.img')]);
   const isModelImg = new RegExp(`^models\\${sep}.+\\.img$`, 'i');
+  const overrideBare = new Set<string>(); // bare names provided by loose player/ + vehicles/
   const loose: LoadedEntry[] = [];
   for (const path of walk(src)) {
     const rel = relative(src, path);
@@ -177,8 +180,19 @@ function main(): void {
       continue;
     }
     const bytes = new Uint8Array(readFileSync(path));
-    loose.push({ bytes, name: rel.split(sep).join('/').toLowerCase(), size: bytes.length });
+    const name = rel.split(sep).join('/').toLowerCase();
+    loose.push({ bytes, name, size: bytes.length });
+    if (name.startsWith('player/') || name.startsWith('vehicles/')) {
+      const bare = name.slice(name.lastIndexOf('/') + 1);
+      if (!overrideBare.has(bare)) {
+        overrideBare.add(bare);
+        loose.push({ bytes, name: bare, size: bytes.length }); // bare alias → overrides the img entry
+      }
+    }
   }
+  // Drop img model/texture entries the loose player/vehicles files override (their bytes are packed above).
+  const models = modelEntries.filter((entry) => !overrideBare.has(entry.name));
+  const textures = textureEntries.filter((entry) => !overrideBare.has(entry.name));
 
   // Pack each group into ~50MB content-hashed chunks (sequential so peak memory ≈ the largest group).
   const priorityChunks = packChunks(

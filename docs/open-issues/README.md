@@ -9,8 +9,8 @@ These are NOT plans (`docs/plans/*` are for work we intend to do soon) and NOT f
 (`docs/features/*` are for things that work). When an open issue gets a real fix, promote it to a
 plan/feature and delete the entry here.
 
-| Issue                                                       | Doc                                                      | Status                                                                                                                   |
-| ----------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Alpha cutout black edge (foliage/fences)                    | [alpha-edge.md](alpha-edge.md)                           | shelved — best partial fixes leave a residual artifact                                                                   |
-| "Locked" (anti-rip protected) DFF models                    | [locked-dff.md](locked-dff.md)                           | shelved — spawn crash fixed; two lock variants (inflated counts / inflated struct size) still render incomplete or empty |
-| Crash entering a freshly-spawned car (`readBody` null body) | [vehicle-enter-null-body.md](vehicle-enter-null-body.md) | shelved — narrowed to a streaming/physics handle-pool race (teleport-triggered); needs a runtime trace to pin            |
+| Issue                                                       | Doc                                                      | Status                                                                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Alpha cutout black edge (foliage/fences)                    | [alpha-edge.md](alpha-edge.md)                           | shelved — best partial fixes leave a residual artifact                                                                 |
+| "Locked" (anti-rip protected) DFF/TXD models                | [locked-dff.md](locked-dff.md)                           | ✅ solved — all 3 lock variants recover (inflated item/struct sizes + hidden TexDictionary wrapper); kept as reference |
+| Crash entering a freshly-spawned car (`readBody` null body) | [vehicle-enter-null-body.md](vehicle-enter-null-body.md) | shelved — narrowed to a streaming/physics handle-pool race (teleport-triggered); needs a runtime trace to pin          |

@@ -1,20 +1,22 @@
 # "Locked" (anti-rip protected) DFF models
 
-> **✅ SOLVED (2026-06-19).** Both lock variants are handled; `cheetah.dff` and `yosemite.dff` parse and
-> render fully — geometry, the embedded COL, **and** textures — verified in-game. Kept here (not deleted)
-> as a reference for the lock formats and the recovery, in case related regressions surface.
+> **✅ SOLVED (2026-06-19).** All three lock variants are handled; `cheetah.dff` / `yosemite.dff` parse and
+> render fully — geometry, the embedded COL, **and** textures — and gostown's `lodveg.txd` (TXD wrapper lock,
+> variant C) recovers its textures — verified in-game. Kept here (not deleted) as a reference for the lock
+> formats and the recovery, in case related regressions surface.
 
 Both locks bloat chunk **sizes** to swallow siblings; the data is all present (the game reads by count,
 ignoring sizes). Recovered the same way (see [Fix](#fix-2026-06-19) below). The spawn crash was already
 fixed separately (a no-COL / locked vehicle falls back to a box chassis instead of throwing).
 
-Two distinct lock variants — both falsify chunk metadata so a boundary-respecting parser (ours) chokes
-while RenderWare's count-based reader keeps going:
+Three distinct lock variants — all falsify chunk metadata so a boundary-respecting parser (ours) chokes
+while RenderWare's lenient (count- / scan-based) reader keeps going:
 
-| Variant                        | Example                    | Tamper                                                                                         | Fix                                            |
-| ------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| B — inflated clump-struct size | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings                             | `forEachClumpChild` (canonical 12-byte struct) |
-| A — inflated item sizes        | `yosemite.dff` (Ford F350) | every **atomic / geometry chunk size** is bloated (+ `0x0` padding) to swallow following items | count-based RW recovery (`findChunkFrom`)      |
+| Variant                          | Example                    | Tamper                                                                                                                                 | Fix                                            |
+| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| B — inflated clump-struct size   | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings                                                                     | `forEachClumpChild` (canonical 12-byte struct) |
+| A — inflated item sizes          | `yosemite.dff` (Ford F350) | every **atomic / geometry chunk size** is bloated (+ `0x0` padding) to swallow following items                                         | count-based RW recovery (`findChunkFrom`)      |
+| C — hidden TexDictionary wrapper | `lodveg.txd` (gostown)     | the outer **TexDictionary (`0x16`) header is zeroed/obfuscated** (no readable `0x16` at all); inner `TEXTURE_NATIVE` chunks are intact | byte-scan recovery (`recoverLockedTextures`)   |
 
 > **Correction:** Variant A was first (wrongly) read as "inflated counts → data absent". It is not —
 > the 31 atomics / 31 geometries are all present, each hidden behind the previous item's bloated size
@@ -76,6 +78,24 @@ RenderWare survives because it reads the clump struct's fixed fields directly an
 size**, then finds each following chunk by scanning — so the game loads it. Unlike Variant A, the data
 is **recoverable** by an RW-faithful reader.
 
+## Variant C — hidden TexDictionary wrapper (`lodveg.txd`, gostown)
+
+A TXD-only lock that does **not** bloat sizes: the outer **TexDictionary (`0x16`) header is gone** — the
+entry's first ~2 KB are zeroed and the chunk stream is obfuscated, so **no readable `0x16` exists anywhere**
+(even Magic.TXD rejects it: _"unknown RenderWare stream block"_). But the inner **`TEXTURE_NATIVE` (`0x15`)
+chunks are intact** — verified by byte-scanning `gostown6.img`'s `lodveg.txd`: 6 real textures
+(`Gp_Grandpalm1/2`, `Gp_Grospalm1`, `Gp_petitpalm1`, `Gp_Grandfeuillu2`, `boardside`), readable names,
+power-of-two dims, DXT3 + mips. The game renders them because RW's reader skips the unknown leading blocks
+and reads the texture-natives; a parser that requires the `0x16` wrapper at the start fails.
+
+**Recovered:** when `parseTxd` finds no usable TexDictionary, `recoverLockedTextures` **byte-scans** the
+stream for `TEXTURE_NATIVE` chunks (type `0x15` + a `STRUCT` child + a plausible RW stream version
+`…FFFF`) and parses each (the inner chunks keep intact sizes, so they parse normally). Hits are
+sanity-checked (printable name + power-of-two dimensions) to avoid false matches in raster bytes, and
+deduped by name. Triggers only when there's no `0x16` (or it yields nothing) → well-formed TXDs are
+untouched. Covered by `tests/custom/txd/lodveg.txd` + a test in `txd.test.ts`. Recovery is at **load time**
+(the locked bytes are packed as-is; the runtime parser reconstructs the dictionary), so no rebuild needed.
+
 ## Fix (2026-06-19)
 
 `parseDff` and `parseDffCollision` now iterate the clump via **`forEachClumpChild`** (in
@@ -106,6 +126,9 @@ Covered by `tests/custom/locked-models/yosemite.dff` (31 atomics / 31 geometries
   atomics / 57 geometries) with its embedded COL — see the fix section above.
 - **Fixed — Variant A renders (count-based recovery).** `yosemite.dff` now recovers all 31 atomics / 31
   geometries; `buildVehicle` produces the full truck (4 wheels, doors, panels).
+- **Fixed — Variant C textures recover (`recoverLockedTextures`).** gostown's `lodveg.txd` (no `0x16`
+  wrapper) now yields its 6 LOD-vegetation textures via the byte-scan fallback, so the LOD ensembles render
+  textured instead of flat grey.
 
 ## Reproduce
 
