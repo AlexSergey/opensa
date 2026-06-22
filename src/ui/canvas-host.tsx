@@ -23,6 +23,7 @@ import { CharacterAnimationSystem } from '../game/character/character-animation.
 import { orientCharacter } from '../game/character/orient-character';
 import { setupCharacter } from '../game/character/setup-character';
 import { Velocity } from '../game/ecs/components';
+import { TouchInputSource } from '../game/input';
 import { createWindMod } from '../game/mods/wind.mod';
 import { cloudProfile } from '../game/plugins/cloud-profile';
 import { FogPlugin } from '../game/plugins/fog.plugin';
@@ -78,6 +79,8 @@ import {
   worldShadowUniforms,
   worldTintUniform,
 } from '../renderware';
+import { isTouchDevice } from './controls/is-touch-device';
+import { TouchControls } from './controls/touch-controls';
 import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
@@ -118,8 +121,12 @@ const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
 ];
 
 interface Bootstrap {
+  /** Whether enter/exit-vehicle is actionable now — gates the mobile Enter button's visibility. */
+  canEnterExit: () => boolean;
   debugActions: DebugActions;
   game: Game;
+  /** On-screen touch input source (present only on touch devices); drives `<TouchControls>`. */
+  touchInput: null | TouchInputSource;
 }
 
 /** Read map.zon and map its boxes to city AABBs ([] when absent → everything classifies as Countryside). */
@@ -178,6 +185,8 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [actions, setActions] = useState<DebugActions | null>(null);
+  const [touchInput, setTouchInput] = useState<null | TouchInputSource>(null);
+  const [canEnterExit, setCanEnterExit] = useState<(() => boolean) | null>(null);
   const [phase, setPhase] = useState<'error' | 'loading' | 'ready'>('loading');
   const [errorText, setErrorText] = useState('');
   const [locked, setLocked] = useState(false);
@@ -195,6 +204,8 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
         if (!disposed) {
           setGame(ready.game);
           setActions(ready.debugActions);
+          setTouchInput(ready.touchInput);
+          setCanEnterExit(() => ready.canEnterExit);
           setPhase('ready');
         }
       })
@@ -315,11 +326,12 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
   return (
     <>
       <canvas onClick={handleClick} ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
-      {game && !locked && !paused ? (
+      {game && !locked && !paused && !touchInput ? (
         <button className="sa-capture" onClick={capture} type="button">
           Click to play
         </button>
       ) : null}
+      {game && touchInput && !paused && <TouchControls canEnterExit={canEnterExit ?? undefined} source={touchInput} />}
       {phase === 'loading' && <LoadOverlay text="Loading map…" />}
       {phase === 'error' && <LoadOverlay text={`Failed to load map: ${errorText}`} />}
       {game && (
@@ -1035,7 +1047,14 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       worldLight: () => game.getConfig().graphics.worldLight,
     };
 
-    return { debugActions, game };
+    // On a touch device, add an on-screen-controls input source (the overlay drives it); the combiner merges
+    // it with keyboard/mouse, so a 2-in-1 keeps both (plan 055).
+    const touchInput = isTouchDevice() ? new TouchInputSource() : null;
+    if (touchInput) {
+      game.addInputSource(touchInput);
+    }
+
+    return { canEnterExit: () => enterVehicle.canEnterExit(), debugActions, game, touchInput };
   })();
 
   return bootstrapped;

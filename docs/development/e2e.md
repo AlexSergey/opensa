@@ -29,6 +29,9 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 generated locally (gitignored) from a GTA copy via `npm run viewer:assets`. Run that once after a fresh clone
 before the viewer e2e (CI doesn't have game-src, so the e2e lane runs locally).
 `e2e/asset-fetch-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
+`e2e/touch-controls.spec.ts` drives the on-screen touch overlay (plan 055) on the asset-light
+**`controls-harness.html`** (no game boot) — move/look joysticks + Jump via the pointer, pinch via synthetic
+`TouchEvent`s — and asserts the `TouchInputSource` it exposes on `window.__touchSource`. No assets needed.
 `e2e/asset-local-loader.spec.ts` runs the local loader's real pipeline (directory walk + lazy VER2 reader +
 selection + VFS) over an **in-page fake** File System Access tree — no real install / picker needed (the
 native folder dialog can't be driven by Playwright).

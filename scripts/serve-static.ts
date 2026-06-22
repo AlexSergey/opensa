@@ -16,6 +16,6 @@ createServer((req, res) => {
     res.statusCode = 404;
     res.end('Not found');
   });
-}).listen(PORT, () => {
+}).listen(PORT, '0.0.0.0', () => {
   console.log(`static server on http://localhost:${PORT} (root: static)`);
 });

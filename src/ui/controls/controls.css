@@ -1,0 +1,70 @@
+/* On-screen touch controls (plan 055). The container is click-through; only the controls capture pointers,
+   so taps on the rest of the screen still reach the canvas. Sizes use safe-area insets for notches/home bars. */
+
+.sa-touch {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  touch-action: none;
+  user-select: none;
+  z-index: 20;
+}
+
+.sa-joystick {
+  align-items: center;
+  background: rgb(255 255 255 / 8%);
+  border: 2px solid rgb(255 255 255 / 25%);
+  border-radius: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  display: flex;
+  height: 132px;
+  justify-content: center;
+  pointer-events: auto;
+  position: absolute;
+  touch-action: none;
+  width: 132px;
+}
+
+.sa-touch__move {
+  left: calc(env(safe-area-inset-left, 0px) + 24px);
+}
+
+.sa-touch__look {
+  right: calc(env(safe-area-inset-right, 0px) + 24px);
+}
+
+.sa-joystick__knob {
+  background: rgb(255 255 255 / 35%);
+  border: 2px solid rgb(255 255 255 / 55%);
+  border-radius: 50%;
+  height: 56px;
+  pointer-events: none;
+  width: 56px;
+  will-change: transform;
+}
+
+.sa-touch__actions {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 172px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  pointer-events: none;
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 24px);
+}
+
+.sa-touch-btn {
+  background: rgb(0 0 0 / 35%);
+  border: 2px solid rgb(255 255 255 / 35%);
+  border-radius: 50%;
+  color: rgb(255 255 255 / 90%);
+  font-size: 14px;
+  height: 68px;
+  pointer-events: auto;
+  touch-action: none;
+  width: 68px;
+}
+
+.sa-touch-btn.is-pressed {
+  background: rgb(255 255 255 / 30%);
+}

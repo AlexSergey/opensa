@@ -168,6 +168,16 @@ export class EnterVehicleSystem implements System {
     this.doors.set(vehicle, 0);
   }
 
+  /** Whether pressing enter/exit now would do something: seated → can exit, idle with a car in range → can
+   *  enter (mid-sequence the edge is a no-op). Drives the mobile Enter button's visibility (plan 055). */
+  canEnterExit(): boolean {
+    if (this.phase === 'seated') {
+      return true;
+    }
+
+    return this.phase === 'idle' && this.nearestEnterable() !== null;
+  }
+
   /**
    * Driving + the seated rider run on the fixed step (lockstep with physics, after
    * the physics step and before render-sync) so the rider doesn't lag/jitter behind
@@ -303,22 +313,7 @@ export class EnterVehicleSystem implements System {
 
   /** Lock onto the nearest in-range car and send the player to its driver door. */
   private beginApproach(): void {
-    const [px, py] = this.playerPosition();
-    let nearest: EnterableVehicle | null = null;
-    let nearestDistance = ENTER_RANGE * ENTER_RANGE;
-    for (const vehicle of this.vehicles) {
-      // Can't get into an overturned / on-its-side car (must be roughly on its wheels).
-      if (!this.isUpright(vehicle)) {
-        continue;
-      }
-      const dx = vehicle.position[0] - px;
-      const dy = vehicle.position[1] - py;
-      const distance = dx * dx + dy * dy;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = vehicle;
-      }
-    }
+    const nearest = this.nearestEnterable();
     if (!nearest) {
       return;
     }
@@ -332,7 +327,7 @@ export class EnterVehicleSystem implements System {
     this.physics.ignoreVehicles(this.playerCollider, true);
     this.restoreWhenClear = false; // entering again — keep ignoring cars
     this.controller.runPath(this.driverDoorPath(nearest));
-    this.logger.debug('enter-vehicle', 'approach', { distance: Math.sqrt(nearestDistance) });
+    this.logger.debug('enter-vehicle', 'approach');
   }
 
   /** Abort an in-progress run-to-door: restore manual control and go idle. The player keeps ignoring the
@@ -490,6 +485,28 @@ export class EnterVehicleSystem implements System {
     const [x, y] = this.physics.readBody(vehicle.body).quaternion;
 
     return 1 - 2 * (x * x + y * y) > UPRIGHT_MIN; // world-Z component of the body's local up
+  }
+
+  /** The nearest upright car within enter range, or null — the car Enter would target from idle. */
+  private nearestEnterable(): EnterableVehicle | null {
+    const [px, py] = this.playerPosition();
+    let nearest: EnterableVehicle | null = null;
+    let nearestDistance = ENTER_RANGE * ENTER_RANGE;
+    for (const vehicle of this.vehicles) {
+      // Can't get into an overturned / on-its-side car (must be roughly on its wheels).
+      if (!this.isUpright(vehicle)) {
+        continue;
+      }
+      const dx = vehicle.position[0] - px;
+      const dy = vehicle.position[1] - py;
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = vehicle;
+      }
+    }
+
+    return nearest;
   }
 
   /** True once the player is outside the car's footprint (+ clearance) — safe to re-collide. */

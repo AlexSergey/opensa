@@ -219,9 +219,28 @@ describe('EnterVehicleSystem', () => {
       h.system.fixedUpdate(0.1);
       expect(h.system.isBraking()).toBe(false);
     });
+
+    it('canEnterExit is false when idle with no car in range', () => {
+      const h = setup();
+      expect(h.system.canEnterExit()).toBe(false); // no cars
+      h.system.add(vehicleAt([10, 0, 0])); // beyond ENTER_RANGE
+      expect(h.system.canEnterExit()).toBe(false);
+    });
   });
 
   describe('positive cases', () => {
+    it('canEnterExit reports a car in range while idle', () => {
+      const h = setup();
+      h.system.add(vehicleAt([2, 0, 0]));
+      expect(h.system.canEnterExit()).toBe(true);
+    });
+
+    it('canEnterExit stays true while seated (can exit)', () => {
+      const h = setup();
+      seatPlayer(h, vehicleAt([2, 0, 0]));
+      expect(h.system.canEnterExit()).toBe(true);
+    });
+
     it('approaches the driver door directly from the driver side', () => {
       const h = setup();
       h.system.add(vehicleAt([2, 0, 0])); // player local x = -2 (driver side) → straight

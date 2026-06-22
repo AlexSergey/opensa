@@ -1,10 +1,23 @@
 # 055 — Pluggable input sources + mobile on-screen controls
 
-**Status: 🟡 PHASE 1 DONE (2026-06-22); Phase 2 (mobile) pending.** Two phases — (1) a device-agnostic input
-layer the game reads (behaviour-preserving refactor), (2) the mobile on-screen controls + touch look as an
-additive UI module. Builds on the existing `src/game/input/` (`Keyboard`), the `ControlsConfig` keymap, the
-movement systems ([016](./016-enter-vehicle.md)/[017](./017-vehicle-driving.md), character-controller) and the
-camera ([036](./036-follow-camera.md), [022](./022-debug-viewers.md)).
+**Status: ✅ DONE (2026-06-22).** Two phases — (1) a device-agnostic input layer the game reads
+(behaviour-preserving refactor), (2) the mobile on-screen controls + touch look as an additive UI module.
+Builds on the existing `src/game/input/` (`Keyboard`), the `ControlsConfig` keymap, the movement systems
+([016](./016-enter-vehicle.md)/[017](./017-vehicle-driving.md), character-controller) and the camera
+([036](./036-follow-camera.md), [022](./022-debug-viewers.md)).
+
+> **Phase 2 implemented (2026-06-22).** `TouchInputSource` (`src/game/input/touch/`) — a headless source the
+> overlay drives (`setMove`/`setAction`/`setLookRate`/`addZoom`); full move deflection sets `run`. Overlay in
+> `src/ui/controls/`: `Joystick` + `ActionButton` + `TouchControls` (move joystick left, look joystick right,
+> Jump/Enter stacked above the look stick) + `controls.css` + `is-touch-device.ts`. `canvas-host` creates +
+> registers the source and renders the overlay only on touch devices (the desktop "Click to play" capture is
+> hidden there). `PointerLookSource` now ignores `pointerType: 'touch'`, so dragging a joystick never also
+> orbits the camera. **Pinch-zoom** is a `usePinchZoom` hook (two-finger `touchmove` → `addZoom`). Tests:
+> `TouchInputSource` unit + a Playwright spec (`e2e/touch-controls.spec.ts`) that drives the real overlay on a
+> dev-only harness page (`controls-harness.html` → `src/standalone/controls-harness.tsx`, exposing the source
+> on `window.__touchSource`) — move/look/run/jump via the pointer, pinch via synthetic `TouchEvent`s. The
+> **Enter button is contextual**: `EnterVehicleSystem.canEnterExit()` (seated, or idle with a car in range) is
+> threaded to `<TouchControls>`, which polls it and shows Enter only when actionable.
 
 > **Phase 1 implemented (2026-06-22).** `InputState` contract (`move()`/`isActive()`/`consumeLook()`/
 > `consumeZoom()`), `CombinedInput` combiner, `KeyboardSource` (WASD/actions) and `PointerLookSource`
@@ -88,14 +101,89 @@ Multiple sources coexist (keyboard + touch both wired); the combiner handles ove
 
 Outcome: keyboard + mouse play exactly as today, but the game reads intents. Fully under green tests.
 
-## Phase 2 — mobile controls (additive, UI only)
+## Phase 2 — mobile on-screen controls (additive, UI only)
 
-- `src/ui/controls/` — touch overlay React components over the canvas: a movement joystick (→ `move`), action
-  buttons (jump/enter/brake → actions), a look-pad or right-half drag region (→ `look`), pinch-to-zoom
-  (→ `zoom`). Each feeds the Phase-1 combiner. `pointer` events (touch + stylus).
-- Platform detection (coarse pointer / no hover) decides whether the overlay mounts; desktop keeps keyboard +
-  pointer. Safe-area insets + layout.
-- No game-core changes — sources only.
+Mounted only on touch devices. **Left thumb = movement, right thumb = look** (the requested layout); the
+action buttons sit by the left controls. No game-core changes — a touch source feeds the Phase-1 combiner.
+
+### Layout (mockup)
+
+```
+┌────────────────────────────────────────────────┐
+│ ⏱ 12:00                                  LOS …  │  HUD (unchanged)
+│                                                  │
+│                                    [ ⇄ Enter ]   │  contextual: near a car / seated
+│                                    [ ⭡ Jump  ]   │  Jump on foot · Handbrake in a car
+│    ╭─────╮                          ╭─────╮      │
+│    │  ◉  │  move                     │  ◉  │     │  look
+│    ╰─────╯                          ╰─────╯      │
+└────────────────────────────────────────────────┘
+   translucent · ≥44px targets · safe-area insets on every edge
+```
+
+Left thumb drives the move joystick; the right thumb drives the look joystick and taps the action buttons
+stacked just above it.
+
+### Controls → signals
+
+| Control                   | Signal                | Notes                                                             |
+| ------------------------- | --------------------- | ----------------------------------------------------------------- |
+| **Move joystick** (left)  | `move: Vec2` (analog) | full deflection (>~0.85) also sets `run` — no run button          |
+| **Look joystick** (right) | `look` delta          | rate × elapsed (holding orbits the follow camera; dt-independent) |
+| **Jump** button           | `jump`                | doubles as **handbrake** in a car (same action)                   |
+| **Enter/Exit** button     | `enterExit`           | held ≥1 frame → the system's existing edge logic fires            |
+| **Pinch** (two fingers)   | `zoom`                | optional — defer if it complicates the MVP                        |
+
+### Source — `src/game/input/touch/touch-input-source.ts`
+
+`TouchInputSource implements InputState` (headless, no React); the overlay drives it via setters:
+
+- `setMove(x, y)` → `move()`; `isActive('run')` = `hypot(x, y) > RUN_THRESHOLD`.
+- `setAction(action, held)` → `isActive(action)`.
+- `setLookRate(x, y)` → `consumeLook()` integrates `rate × (now − lastConsume)` (smooth, frame-rate independent).
+- `addZoom(delta)` → `consumeZoom()`.
+
+Registered with `game.addInputSource(touch)`, so it merges with keyboard/pointer in `CombinedInput`.
+Unit-tested in isolation (setters → signals, run threshold, look integrates + clears, zoom accumulates).
+
+### Overlay — `src/ui/controls/` (React, DOM over the canvas)
+
+- `touch-controls.tsx` — container; renders the two joysticks + buttons and forwards their `onChange` to the
+  source setters. `pointer-events: none` on the container, `auto` on each control, so taps elsewhere fall
+  through to the canvas. Safe-area padding.
+- `joystick.tsx` — reusable on-screen stick: `pointerdown/move/up` with pointer capture → normalized offset
+  (`onChange(x, y)`), recentres on release. Used for both move and look.
+- `action-button.tsx` — press-and-hold button → `onChange(held)`.
+- `controls.css` — layout/sizing/translucency (Tailwind classes per the styling rules).
+
+### Platform detection + wiring
+
+- `is-touch-device.ts` (ui) — `matchMedia('(pointer: coarse)')` + no-hover / `navigator.maxTouchPoints`.
+- `canvas-host.tsx` — on a touch device: create the `TouchInputSource`, `game.addInputSource(it)`, and render
+  `<TouchControls source={it} />` above the canvas. Desktop is unchanged (keyboard + pointer only). Both can
+  coexist (a 2-in-1) — the combiner merges them.
+
+### Phase-2 decisions
+
+- **Look = rate joystick** (hold to orbit), dt-scaled — per the requested layout. (Alt considered: a drag-to-
+  look region mapping 1:1 like the mouse; rejected in favour of the joystick.)
+- **Auto-run** at full move deflection — no separate run button (fewer controls).
+- **Enter/Exit is contextual** — shown only when actionable: `EnterVehicleSystem.canEnterExit()` (seated → can
+  exit; idle with an upright car in range → can enter) is threaded through `canvas-host` to `<TouchControls>`,
+  which polls it per frame (`usePolledFlag`) and renders the Enter button only when true.
+- Action buttons sit **above the right (look) joystick** — the right thumb taps Jump/Enter between look
+  gestures while the left thumb keeps moving. Position is CSS-only, easy to retune.
+
+### Phase-2 files
+
+- New: `src/game/input/touch/touch-input-source.ts` (+ test); `src/ui/controls/{touch-controls,joystick,
+action-button}.tsx` + `controls.css` + the touch-detection helper.
+- Changed: `canvas-host.tsx` (mount + register on touch). **No game-core changes.**
+
+### Phase-2 out of scope (later)
+
+Key/button remap UI; gamepad; contextual Enter visibility; pinch-zoom if deferred; haptics; orientation lock;
+on-screen debug-camera controls.
 
 ## Scope
 

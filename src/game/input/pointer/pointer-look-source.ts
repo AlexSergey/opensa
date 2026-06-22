@@ -52,6 +52,9 @@ export class PointerLookSource implements InputState {
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      return; // touch look comes from the on-screen joystick (TouchInputSource), not raw canvas drags
+    }
     this.lookX += event.movementX;
     this.lookY += event.movementY;
   };

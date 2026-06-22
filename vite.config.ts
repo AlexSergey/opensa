@@ -66,6 +66,7 @@ const isProdDeploy = excludeViewers && hideDebugger;
 
 const viewerInputs = {
   characterViewer: resolve(__dirname, 'character-viewer.html'),
+  controlsHarness: resolve(__dirname, 'controls-harness.html'),
   objectViewer: resolve(__dirname, 'object-viewer.html'),
   vehicleViewer: resolve(__dirname, 'vehicle-viewer.html'),
 };
