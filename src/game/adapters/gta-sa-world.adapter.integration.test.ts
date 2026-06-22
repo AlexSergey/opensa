@@ -36,10 +36,10 @@ function cfg(): ConstructorParameters<typeof GtaSaWorldAdapter>[0] {
 function fakeFs(): Renderware.AssetFileSystem {
   const files = new Map<string, ArrayBuffer | string>([
     ['anim/ped.ifp', buffer('tests/original/dff/anim-clump/counxref.ifp')],
+    ['bmypol1.dff', buffer('tests/original/character/bmypol1.dff')],
+    ['bmypol1.txd', buffer('tests/original/character/bmypol1.txd')],
     ['data/timecyc.dat', readFileSync('tests/original/data/timecyc.dat', 'utf8')],
     ['junk.txd', buffer('tests/original/txd/junk.txd')],
-    ['tommy.dff', buffer('tests/custom/character/tommy.dff')],
-    ['tommy.txd', buffer('tests/original/txd/junk.txd')],
     ['washer.dff', buffer('tests/original/dff/building/washer.dff')],
   ]);
 
@@ -103,8 +103,8 @@ describe('GtaSaWorldAdapter integration', () => {
       expect(result.weathers[0].hours).toHaveLength(24);
     });
 
-    it('loads a skinned character end-to-end (tommy.dff → 32-bone skeleton)', async () => {
-      const character = await new GtaSaWorldAdapter(cfg()).loadCharacter('tommy.dff', 'tommy.txd');
+    it('loads a skinned character end-to-end (bmypol1.dff → 32-bone skeleton)', async () => {
+      const character = await new GtaSaWorldAdapter(cfg()).loadCharacter('bmypol1.dff', 'bmypol1.txd');
       expect(character.skeleton?.bones).toHaveLength(32);
       expect(character.bonesByName.has('Root')).toBe(true);
       expect(character.object).toBeDefined();

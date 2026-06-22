@@ -124,12 +124,13 @@ describe('buildSkinnedClump (skin inverse bind matrices)', () => {
   });
 });
 
-// A real skinned player model — the custom Tommy (committed in tests/custom): a full 32-bone skeleton
-// whose frame order happens to match the HAnim hierarchy (so the old positional mapping worked on it).
-const TOMMY_DFF = 'tests/custom/character/tommy.dff';
+// A real skinned player model — bmypol1 (a stock SA cop, extracted into tests/original via
+// `npm run test:fixtures`): a full 32-bone standard SA biped. The tests' player character now that no
+// custom character model is committed.
+const BMYPOL1_DFF = 'tests/original/character/bmypol1.dff';
 
-describe('buildSkinnedClump (real tommy.dff)', () => {
-  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(TOMMY_DFF))));
+describe.skipIf(!existsSync(BMYPOL1_DFF))('buildSkinnedClump (real bmypol1.dff)', () => {
+  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(BMYPOL1_DFF))));
 
   describe('positive cases', () => {
     it('builds a SkinnedMesh whose skeleton matches the DFF skin bone count', () => {

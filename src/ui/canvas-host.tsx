@@ -97,7 +97,7 @@ const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0
 
 // Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
 // omitted 3rd/4th default to palette 0, like SA).
-const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3', petro: '10,1' };
+const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3' };
 
 // Default timecyc weather on load (index into WEATHER_NAMES).
 const DEFAULT_WEATHER = WEATHER_NAMES.indexOf('EXTRASUNNY_SMOG_LA');
