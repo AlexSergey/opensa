@@ -5,7 +5,8 @@ import { expect, type Page, test } from '@playwright/test';
  * real `fetch` streaming + Cache Storage, which node units can't exercise. Network is mocked with
  * `page.route` (no served fixtures needed); the loader doesn't parse the zip bytes, so fake chunk bodies
  * of the manifest-declared lengths are enough. Runs on the Vite origin so `import('/src/...')` resolves
- * and Cache Storage is available.
+ * and Cache Storage is available. The `data` group is `cached: false` — always re-fetched, never stored,
+ * and a 404 there wipes the whole cache (build revoked).
  */
 const ORIGIN = 'http://localhost:3001';
 const DIR = `${ORIGIN}/loader-e2e`;
@@ -15,14 +16,20 @@ const MODULE = '/src/loaders/index.ts';
 
 const manifest = {
   chunks: {
-    models: [{ bytes: 6, entries: 1, file: 'models-bbbb.zip', hash: 'bbbb' }],
-    priority: [{ bytes: 4, entries: 1, file: 'priority-aaaa.zip', hash: 'aaaa' }],
-    textures: [{ bytes: 8, entries: 2, file: 'textures-cccc.zip', hash: 'cccc' }],
+    data: [{ bytes: 4, cached: false, entries: 1, file: 'data-aaaa.zip', hash: 'aaaa' }],
+    models: [{ bytes: 6, cached: true, entries: 1, file: 'models-bbbb.zip', hash: 'bbbb' }],
+    others: [{ bytes: 5, cached: true, entries: 1, file: 'others-eeee.zip', hash: 'eeee' }],
+    textures: [{ bytes: 8, cached: true, entries: 2, file: 'textures-cccc.zip', hash: 'cccc' }],
   },
   game: 'test',
   version: 'test-1',
 };
-const lengthByFile: Record<string, number> = { 'models-bbbb.zip': 6, 'priority-aaaa.zip': 4, 'textures-cccc.zip': 8 };
+const lengthByFile: Record<string, number> = {
+  'data-aaaa.zip': 4,
+  'models-bbbb.zip': 6,
+  'others-eeee.zip': 5,
+  'textures-cccc.zip': 8,
+};
 
 interface RunResult {
   delivered: [string, number][];
@@ -97,24 +104,45 @@ test.describe('asset loader', () => {
     await page.evaluate((name) => caches.delete(name), CACHE_NAME);
   });
 
-  test('downloads every chunk, reports progress, caches, and delivers to the sink', async ({ page }) => {
+  test('downloads every chunk, reports progress, caches the cacheable groups, and delivers to the sink', async ({
+    page,
+  }) => {
     await mockNetwork(page);
     const result = await run(page);
 
-    expect(result.statuses.filter((s) => s === 'done')).toHaveLength(3);
-    expect(result.delivered.map(([, len]) => len).sort((a, b) => a - b)).toEqual([4, 6, 8]);
-    expect(result.progress).toEqual({ loadedBytes: 18, loadedChunks: 3, totalBytes: 18, totalChunks: 3 });
-    expect(result.keys).toHaveLength(3);
+    expect(result.statuses.filter((s) => s === 'done')).toHaveLength(4);
+    expect(result.delivered.map(([, len]) => len).sort((a, b) => a - b)).toEqual([4, 5, 6, 8]);
+    expect(result.progress).toEqual({ loadedBytes: 23, loadedChunks: 4, totalBytes: 23, totalChunks: 4 });
+    expect(result.keys).toHaveLength(3); // data (cached: false) is delivered but never persisted
   });
 
-  test('skips chunks already in the cache on a second run', async ({ page }) => {
+  test('reuses cached chunks but always re-fetches the data group on a second run', async ({ page }) => {
     await mockNetwork(page);
     await run(page); // warms the cache
     const second = await run(page);
 
-    expect(second.statuses).toHaveLength(3);
-    expect(second.statuses.every((s) => s === 'cached')).toBe(true);
-    expect(second.delivered).toHaveLength(3); // still delivered to the sink, from cache
+    expect(second.statuses.filter((s) => s === 'cached')).toHaveLength(3); // models/others/textures from cache
+    expect(second.statuses.filter((s) => s === 'done')).toHaveLength(1); // data re-fetched (never cached)
+    expect(second.delivered).toHaveLength(4); // every group still delivered to the sink
+  });
+
+  test('fetches the non-cached data probe before any cacheable chunk', async ({ page }) => {
+    const requested: string[] = [];
+    await page.route(MANIFEST_URL, (route) =>
+      route.fulfill({ body: JSON.stringify(manifest), contentType: 'application/json' }),
+    );
+    await page.route(`${DIR}/*.zip`, (route) => {
+      const file = route.request().url().split('/').pop() ?? '';
+      requested.push(file);
+
+      return route.fulfill({ body: Buffer.alloc(lengthByFile[file], 1), contentType: 'application/zip' });
+    });
+    await run(page);
+
+    // Phase 1 is the data probe alone; the three cacheable groups are only requested after it resolves —
+    // this ordering is what makes a build-revoke wipe atomic.
+    expect(requested[0]).toBe('data-aaaa.zip');
+    expect(requested.slice(1).sort()).toEqual(['models-bbbb.zip', 'others-eeee.zip', 'textures-cccc.zip']);
   });
 
   test('invalidates cached chunks no longer in the manifest', async ({ page }) => {
@@ -165,5 +193,41 @@ test.describe('asset loader', () => {
 
     expect(outcome.rejected).toBe(true);
     expect(outcome.errorFile).toBe('textures-cccc.zip');
+  });
+
+  test('wipes the whole cache when the data chunk is unavailable (build revoked)', async ({ page }) => {
+    await mockNetwork(page); // warm run: everything ok
+    const warm = await run(page);
+    expect(warm.keys).toHaveLength(3); // models/others/textures cached
+
+    await page.unroute(MANIFEST_URL);
+    await page.unroute(`${DIR}/*.zip`);
+    await mockNetwork(page, 'data-aaaa.zip'); // the data chunk now 404s
+
+    const after = await page.evaluate(
+      async ({ cacheName, manifestUrl, module }) => {
+        interface LoaderModule {
+          AssetFetchLoader: new (config: { cacheName?: string; manifestUrl: string }) => {
+            init(): Promise<unknown>;
+            load(): Promise<void>;
+          };
+        }
+        const mod = (await import(/* @vite-ignore */ module)) as LoaderModule;
+        // Default concurrency: the data probe runs (and fails) before any cacheable chunk is fetched.
+        const loader = new mod.AssetFetchLoader({ cacheName, manifestUrl });
+        await loader.init();
+        let rejected = false;
+        await loader.load().catch(() => {
+          rejected = true;
+        });
+        const cache = await caches.open(cacheName);
+
+        return { keys: (await cache.keys()).map((request) => request.url), rejected };
+      },
+      { cacheName: CACHE_NAME, manifestUrl: MANIFEST_URL, module: MODULE },
+    );
+
+    expect(after.rejected).toBe(true);
+    expect(after.keys).toHaveLength(0); // entire cache wiped → stale cached chunks gone
   });
 });

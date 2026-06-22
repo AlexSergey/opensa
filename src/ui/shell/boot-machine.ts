@@ -17,11 +17,11 @@ export type BootEvent =
   | { type: 'WORLD_READY' };
 
 export type BootPhase =
-  | 'core' // downloading priority + models (intro animation)
+  | 'core' // downloading data + others + models (intro animation)
   | 'disclaimer' // first-time Play popup
   | 'error' // a load failed; offer retry
   | 'folder' // local loader: bring-your-own-files prompt (pick the GTA install)
-  | 'menu' // priority + models ready
+  | 'menu' // data + others + models ready
   | 'paused' // in-game, Esc → menu overlay
   | 'playing' // game visible
   | 'textures' // downloading textures

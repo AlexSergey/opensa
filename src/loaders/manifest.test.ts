@@ -4,11 +4,12 @@ import { allChunks, chunkUrl, chunkUrls, manifestDir, parseManifest } from './ma
 
 const valid = {
   chunks: {
-    models: [{ bytes: 200, entries: 5, file: 'models-bbbb.zip', hash: 'bbbb' }],
-    priority: [{ bytes: 100, entries: 3, file: 'priority-aaaa.zip', hash: 'aaaa' }],
+    data: [{ bytes: 100, cached: false, entries: 3, file: 'data-aaaa.zip', hash: 'aaaa' }],
+    models: [{ bytes: 200, cached: true, entries: 5, file: 'models-bbbb.zip', hash: 'bbbb' }],
+    others: [{ bytes: 150, cached: true, entries: 4, file: 'others-eeee.zip', hash: 'eeee' }],
     textures: [
-      { bytes: 300, entries: 7, file: 'textures-cccc.zip', hash: 'cccc' },
-      { bytes: 400, entries: 9, file: 'textures-dddd.zip', hash: 'dddd' },
+      { bytes: 300, cached: true, entries: 7, file: 'textures-cccc.zip', hash: 'cccc' },
+      { bytes: 400, cached: true, entries: 9, file: 'textures-dddd.zip', hash: 'dddd' },
     ],
   },
   game: 'original',
@@ -34,9 +35,17 @@ describe('parseManifest', () => {
     it('throws when a chunk has invalid fields', () => {
       const broken = {
         ...valid,
-        chunks: { ...valid.chunks, priority: [{ bytes: '100', entries: 3, file: 'p.zip', hash: 'a' }] },
+        chunks: { ...valid.chunks, data: [{ bytes: '100', cached: false, entries: 3, file: 'd.zip', hash: 'a' }] },
       };
-      expect(() => parseManifest(broken)).toThrow('chunks.priority[0] has invalid fields');
+      expect(() => parseManifest(broken)).toThrow('chunks.data[0] has invalid fields');
+    });
+
+    it('throws when a chunk cached flag is not a boolean', () => {
+      const broken = {
+        ...valid,
+        chunks: { ...valid.chunks, models: [{ bytes: 1, cached: 'yes', entries: 1, file: 'm.zip', hash: 'm' }] },
+      };
+      expect(() => parseManifest(broken)).toThrow('chunks.models[0] has invalid fields');
     });
   });
 
@@ -61,7 +70,7 @@ describe('manifestDir', () => {
 describe('chunkUrl', () => {
   describe('positive cases', () => {
     it('joins the directory and chunk file, tolerating a trailing slash', () => {
-      const info = { bytes: 1, entries: 1, file: 'textures-cccc.zip', hash: 'cccc' };
+      const info = { bytes: 1, cached: true, entries: 1, file: 'textures-cccc.zip', hash: 'cccc' };
       expect(chunkUrl('http://host/v', info)).toBe('http://host/v/textures-cccc.zip');
       expect(chunkUrl('http://host/v/', info)).toBe('http://host/v/textures-cccc.zip');
     });
@@ -70,11 +79,12 @@ describe('chunkUrl', () => {
 
 describe('allChunks', () => {
   describe('positive cases', () => {
-    it('flattens every chunk in priority → models → textures order, tagged by group', () => {
+    it('flattens every chunk in data → others → models → textures order, tagged by group', () => {
       const chunks = allChunks(parseManifest(valid));
-      expect(chunks.map((c) => c.group)).toEqual(['priority', 'models', 'textures', 'textures']);
+      expect(chunks.map((c) => c.group)).toEqual(['data', 'others', 'models', 'textures', 'textures']);
       expect(chunks.map((c) => c.file)).toEqual([
-        'priority-aaaa.zip',
+        'data-aaaa.zip',
+        'others-eeee.zip',
         'models-bbbb.zip',
         'textures-cccc.zip',
         'textures-dddd.zip',
@@ -87,7 +97,8 @@ describe('chunkUrls', () => {
   describe('positive cases', () => {
     it('builds every chunk URL under the given directory', () => {
       expect(chunkUrls(parseManifest(valid), 'http://host/v')).toEqual([
-        'http://host/v/priority-aaaa.zip',
+        'http://host/v/data-aaaa.zip',
+        'http://host/v/others-eeee.zip',
         'http://host/v/models-bbbb.zip',
         'http://host/v/textures-cccc.zip',
         'http://host/v/textures-dddd.zip',

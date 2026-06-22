@@ -5,7 +5,7 @@ import type { AssetFileSystem } from '../../renderware';
 import type { BootState } from './boot-machine';
 
 import { GAME_TYPE, MAIN_CHARACTER, VEHICLES } from '../../game-config';
-import { createAssetLoader, GROUP_NAMES } from '../../loaders';
+import { CORE_GROUPS, createAssetLoader, GROUP_NAMES } from '../../loaders';
 import { Vfs } from '../../vfs';
 import { bootReducer, initialBootState, PLAY_ENABLED } from './boot-machine';
 import { CORE_STATUS, rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-status';
@@ -115,7 +115,7 @@ export function useAssetBoot(): AssetBoot {
     };
   }, [loader]);
 
-  // Run the active loading phase (core = priority+models, textures), once per attempt (retry/StrictMode-safe).
+  // Run the active loading phase (core = data+others+models, textures), once per attempt (retry/StrictMode-safe).
   useEffect(() => {
     const { phase, retries } = state;
     if (phase !== 'core' && phase !== 'textures') {
@@ -138,12 +138,12 @@ export function useAssetBoot(): AssetBoot {
 
     const runCore = async (): Promise<void> => {
       manifestRef.current ??= await loader.init();
-      await loader.load(['priority', 'models']);
+      await loader.load(CORE_GROUPS);
       rememberIntroSeen();
       setCoreReady(true); // the menu waits for the intro animation too (see below)
     };
     const runTextures = async (): Promise<void> => {
-      // Fetch already loaded core (priority+models); local skipped it, so it loads everything here.
+      // Fetch already loaded core (data+others+models); local skipped it, so it loads everything here.
       manifestRef.current ??= await loader.init();
       await loader.load(requiresGesture ? GROUP_NAMES : ['textures']);
       const problems = vfs.verify(manifestRef.current);

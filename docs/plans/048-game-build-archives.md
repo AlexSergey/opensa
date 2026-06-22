@@ -19,6 +19,16 @@ variant** (the script still takes `--game`, but we build/verify `original`). **S
 >   switched to `zipSync` (in-memory, build run with `NODE_OPTIONS=--max-old-space-size`), which is correct.
 >   `.txd` stored, the rest deflated (level 6).
 
+> **Update (2026-06-22) — four groups.** The single `priority` bucket was split, so the build now emits
+> **four** groups (`GROUP_NAMES = data → others → models → textures`; `CORE_GROUPS` = all but textures):
+> **data** (the loose `data/` folder only — ide/ipl/dat/cfg/zon), **models** (referenced `.dff` **+ every
+> `.col`** — collision pairs with the geometry), **textures** (referenced `.txd`), **others** (`.ipl`/`.ifp`/
+> `.dat` from `gta3.img` + loose anim/text — ifp/gxt/fxp). Loose files are bucketed by the shared
+> `looseGroup()` helper (so the build and the local loader agree); the override-archive world files split the
+> same way (`.col` → models, ipl/ifp/dat → others). Each chunk also gets a `cached` boolean from a `CACHED`
+> map (`data: false`, the rest `true`) so the runtime can skip caching `data` and use it as a build-liveness
+> probe (see plan 049's update note). The body below describes the original 3-group, no-`cached` design.
+
 ## Why
 
 The full game is too heavy for one download. Split it so the app boots + shows the menu while the priority

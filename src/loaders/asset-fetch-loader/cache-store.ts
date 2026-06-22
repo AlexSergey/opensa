@@ -6,6 +6,11 @@
 export class CacheStore {
   constructor(private readonly name: string) {}
 
+  /** Drop the entire cache bucket — used to revoke a build (the always-fresh `data` group failed to fetch). */
+  async clear(): Promise<void> {
+    await caches.delete(this.name);
+  }
+
   /** Remove a cached chunk by URL. */
   async delete(url: string): Promise<void> {
     const cache = await caches.open(this.name);

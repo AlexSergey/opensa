@@ -1,3 +1,5 @@
+import type { GroupName } from '../loaders/types';
+
 import { parseIde, parseTimedObjects } from '../renderware/parsers/text/ide.parser';
 
 /** One file to pack: its bare lowercased name (`cj.dff`) + which img to read it from. */
@@ -12,12 +14,12 @@ export interface ModelRef {
   txd: string;
 }
 
-/** The three output buckets. */
+/** The img-sourced output buckets (loose files are grouped separately by {@link looseGroup}). */
 export interface Partition {
-  /** Referenced `.dff` geometry. */
+  /** Referenced `.dff` geometry + every `.col` collision (collision pairs with the geometry). */
   models: Entry[];
-  /** World layout files (col/ipl/ifp/dat) — go alongside the loose files in priority.zip. */
-  priority: Entry[];
+  /** Placement/anim/data world files (ipl/ifp/dat) — packed in the others group. */
+  others: Entry[];
   /** Referenced `.txd` textures. */
   textures: Entry[];
 }
@@ -31,8 +33,11 @@ export interface PlacedRefs {
 /** Which model archive a file's bytes come from: gta3.img (primary) or gta_int.img (override). */
 export type Source = 'gta3' | 'gta_int';
 
-/** World-layout files taken wholesale from gta3.img into the priority bucket (collision/placement/anim/data). */
-const WORLD_EXTENSIONS = ['.col', '.ipl', '.ifp', '.dat'] as const;
+/** Collision taken wholesale from gta3.img into the models bucket (it pairs with the geometry). */
+const MODEL_WORLD_EXTENSIONS = ['.col'] as const;
+
+/** Placement/anim/data taken wholesale from gta3.img into the others bucket. */
+const OTHER_WORLD_EXTENSIONS = ['.ipl', '.ifp', '.dat'] as const;
 
 /**
  * id → model/txd refs from one IDE's drawable, **placed** sections: `objs`/anim (`parseIde`) AND `tobj`
@@ -50,25 +55,42 @@ export function ideRefs(ideText: string): Map<number, ModelRef> {
 }
 
 /**
- * Split build entries into three buckets:
- * - priority: every world file (col/ipl/ifp/dat) from gta3.img (the loose files are added by the caller).
- * - models: each referenced `.dff` (gta3 → gta_int).
+ * The group a loose file (keyed by its lowercased relative path) is packed into: everything under `data/`
+ * goes to `data`; otherwise by extension — `.dff` → models, `.txd` → textures, the rest (ifp/gxt) → others.
+ */
+export function looseGroup(name: string): GroupName {
+  if (name.startsWith('data/')) {
+    return 'data';
+  }
+  if (name.endsWith('.dff')) {
+    return 'models';
+  }
+  if (name.endsWith('.txd')) {
+    return 'textures';
+  }
+
+  return 'others';
+}
+
+/**
+ * Split img-sourced entries into three buckets:
+ * - models: each referenced `.dff` (gta3 → gta_int) + every `.col` from gta3.img.
+ * - others: every placement/anim/data file (ipl/ifp/dat) from gta3.img.
  * - textures: each referenced `.txd` (gta3 → gta_int).
- * Referenced dff/txd present in neither img are dropped.
+ * Referenced dff/txd present in neither img are dropped. Loose files are grouped by {@link looseGroup}.
  */
 export function partitionEntries(refs: PlacedRefs, gta3: ReadonlySet<string>, gtaInt: ReadonlySet<string>): Partition {
-  const priority: Entry[] = [];
+  const models = resolveBucket(refs.models, '.dff', gta3, gtaInt);
+  const others: Entry[] = [];
   for (const name of gta3) {
-    if (WORLD_EXTENSIONS.some((ext) => name.endsWith(ext))) {
-      priority.push({ name, source: 'gta3' });
+    if (MODEL_WORLD_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      models.push({ name, source: 'gta3' });
+    } else if (OTHER_WORLD_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      others.push({ name, source: 'gta3' });
     }
   }
 
-  return {
-    models: resolveBucket(refs.models, '.dff', gta3, gtaInt),
-    priority,
-    textures: resolveBucket(refs.txds, '.txd', gta3, gtaInt),
-  };
+  return { models, others, textures: resolveBucket(refs.txds, '.txd', gta3, gtaInt) };
 }
 
 /** Resolve placed instance ids to the unique set of referenced model + txd base names via the IDE id map. */

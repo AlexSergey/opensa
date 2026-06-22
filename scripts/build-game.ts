@@ -2,9 +2,10 @@
  * Game build (plan 048). Packs `game-src/<game>/` into content-hashed fflate chunks under
  * `static/games/<version>/` (one `manifest.json` lists them; `static/games` is gitignored, `static/viewer`
  * is committed):
- *  - priority — loose data/player/vehicles/anim/etc. + world files (col/ipl/ifp/dat); NO dff/txd.
- *  - models   — the `.dff` geometry the EXTERIOR map references (interiors excluded).
+ *  - data     — the contents of the loose `data/` folder (ide/ipl/dat/cfg/zon); NO dff/txd/col.
+ *  - models   — the `.dff` geometry the EXTERIOR map references (interiors excluded) + every `.col`.
  *  - textures — the `.txd` textures the EXTERIOR map references.
+ *  - others   — everything else: `.ipl`/`.ifp`/`.dat` from gta3.img + loose anim/text (ifp/gxt).
  * Each group is split into ~50MB chunks (see `game-build/chunk.ts`) so a dropped download re-fetches
  * one chunk, not the whole group. Model bytes come from gta3.img, falling back to gta_int.img for the
  * few props it lacks (override pattern). Usage: `tsx scripts/build-game.ts --game original`.
@@ -15,10 +16,18 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync }
 import { join, relative, sep } from 'node:path';
 import { loadEnv } from 'vite';
 
+import type { GroupName } from '../src/loaders/types';
 import type { ImgArchive } from '../src/renderware/archive/img-archive';
 
 import { parseModelList } from '../src/game-build/env-list';
-import { type Entry, ideRefs, type ModelRef, partitionEntries, placedModels } from '../src/game-build/partition';
+import {
+  type Entry,
+  ideRefs,
+  looseGroup,
+  type ModelRef,
+  partitionEntries,
+  placedModels,
+} from '../src/game-build/partition';
 import { openArchive } from '../src/renderware/archive/img-archive';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
@@ -32,9 +41,18 @@ const ROOT = process.cwd();
  *  hash / filename, stable across builds so the browser cache survives a version bump. */
 const ZIP_MTIME = new Date('1985-01-01T00:00:00Z');
 
+/**
+ * Per-group caching policy, written onto every chunk in the manifest (`cached`). `true` ⇒ the client
+ * persists it in Cache Storage; `false` ⇒ it is re-fetched on every load (never cached). `data` is kept
+ * `false` so it doubles as a liveness probe: deleting the data zip on the server (a build revoke) makes
+ * clients 404 on it and wipe their whole cache. See `asset-fetch-loader.ts`.
+ */
+const CACHED: Record<GroupName, boolean> = { data: false, models: true, others: true, textures: true };
+
 /** One written chunk, recorded in the manifest. */
 interface ChunkInfo {
   bytes: number;
+  cached: boolean;
   entries: number;
   file: string;
   hash: string;
@@ -151,13 +169,15 @@ function main(): void {
   const env = loadEnv('production', ROOT, 'VITE_');
   const dynamic = dynamicRefs(dataDir, env.VITE_MAIN_CHARACTER, env.VITE_VEHICLES);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
-  const { models: modelEntries, priority, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
-  // `partitionEntries` only pulls world files (col/ipl/ifp/dat) from gta3.img; pull the rest from the
-  // override archives too (a mod's collision/anim lives there, e.g. gostown's `.col` in gostown6.img).
-  const worldExtensions = ['.col', '.ipl', '.ifp', '.dat'];
-  const overrideWorld: Entry[] = [...gtaIntNames]
-    .filter((name) => !gta3Names.has(name) && worldExtensions.some((ext) => name.endsWith(ext)))
-    .map((name) => ({ name, source: 'gta_int' }));
+  const { models: modelEntries, others, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
+  // `partitionEntries` only pulls world files from gta3.img; pull a mod's from the override archives too
+  // (e.g. gostown's `.col` in gostown6.img). `.col` joins models, the rest (ipl/ifp/dat) joins others.
+  const overrideName = (extensions: readonly string[]): Entry[] =>
+    [...gtaIntNames]
+      .filter((name) => !gta3Names.has(name) && extensions.some((ext) => name.endsWith(ext)))
+      .map((name) => ({ name, source: 'gta_int' }));
+  const overrideCol = overrideName(['.col']);
+  const overrideOthers = overrideName(['.ipl', '.ifp', '.dat']);
 
   // Load a partition entry's bytes from the right archive.
   const loadImg = (entry: Entry): LoadedEntry => {
@@ -167,13 +187,14 @@ function main(): void {
   };
 
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
-  // keyed by their lowercased relative path. ALL `models/*.img` are read above, so skip them here.
-  // Files under loose `player/` and `vehicles/` also get a **bare-name** alias that OVERRIDES the same-named
-  // entry extracted from the img archives (so a modder's loose `vehicles/admiral.dff` wins over gta3.img's).
+  // keyed by their lowercased relative path and bucketed by `looseGroup` (data folder → data, dff → models,
+  // txd → textures, the rest → others). ALL `models/*.img` are read above, so skip them here. Files under
+  // loose `player/` and `vehicles/` also get a **bare-name** alias that OVERRIDES the same-named entry from
+  // the img archives (so a modder's loose `vehicles/admiral.dff` wins over gta3.img's).
   const excluded = new Set([join('anim', 'anim.img')]);
   const isModelImg = new RegExp(`^models\\${sep}.+\\.img$`, 'i');
   const overrideBare = new Set<string>(); // bare names provided by loose player/ + vehicles/
-  const loose: LoadedEntry[] = [];
+  const loose: Record<GroupName, LoadedEntry[]> = { data: [], models: [], others: [], textures: [] };
   for (const path of walk(src)) {
     const rel = relative(src, path);
     if (excluded.has(rel) || isModelImg.test(rel) || path.endsWith('.DS_Store')) {
@@ -181,12 +202,12 @@ function main(): void {
     }
     const bytes = new Uint8Array(readFileSync(path));
     const name = rel.split(sep).join('/').toLowerCase();
-    loose.push({ bytes, name, size: bytes.length });
+    loose[looseGroup(name)].push({ bytes, name, size: bytes.length });
     if (name.startsWith('player/') || name.startsWith('vehicles/')) {
       const bare = name.slice(name.lastIndexOf('/') + 1);
       if (!overrideBare.has(bare)) {
         overrideBare.add(bare);
-        loose.push({ bytes, name: bare, size: bytes.length }); // bare alias → overrides the img entry
+        loose[looseGroup(bare)].push({ bytes, name: bare, size: bytes.length }); // bare alias → overrides img
       }
     }
   }
@@ -195,30 +216,40 @@ function main(): void {
   const textures = textureEntries.filter((entry) => !overrideBare.has(entry.name));
 
   // Pack each group into ~50MB content-hashed chunks (sequential so peak memory ≈ the largest group).
-  const priorityChunks = packChunks(
-    'priority',
-    [...loose, ...priority.map(loadImg), ...overrideWorld.map(loadImg)],
+  const dataChunks = packChunks('data', loose.data, outDir);
+  const othersChunks = packChunks(
+    'others',
+    [...loose.others, ...others.map(loadImg), ...overrideOthers.map(loadImg)],
     outDir,
   );
-  const modelChunks = packChunks('models', models.map(loadImg), outDir);
-  const textureChunks = packChunks('textures', textures.map(loadImg), outDir);
+  const modelChunks = packChunks(
+    'models',
+    [...loose.models, ...models.map(loadImg), ...overrideCol.map(loadImg)],
+    outDir,
+  );
+  const textureChunks = packChunks('textures', [...loose.textures, ...textures.map(loadImg)], outDir);
 
   const manifest = {
-    chunks: { models: modelChunks, priority: priorityChunks, textures: textureChunks },
+    chunks: { data: dataChunks, models: modelChunks, others: othersChunks, textures: textureChunks },
     game,
     version,
   };
   writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
-  const fromInt = [...priority, ...models, ...textures].filter((e) => e.source === 'gta_int').length;
+  const fromInt = [...others, ...overrideOthers, ...models, ...overrideCol, ...textures].filter(
+    (e) => e.source === 'gta_int',
+  ).length;
   const mb = (chunks: ChunkInfo[]): string =>
     `${(chunks.reduce((sum, c) => sum + c.bytes, 0) / 1024 / 1024).toFixed(1)} MB`;
+  const othersCount = loose.others.length + others.length + overrideOthers.length;
+  const modelsCount = loose.models.length + models.length + overrideCol.length;
   console.log(`build ${version}:`);
+  console.log(`  data     — ${dataChunks.length} chunk(s), ${loose.data.length} files, ${mb(dataChunks)}`);
+  console.log(`  others   — ${othersChunks.length} chunk(s), ${othersCount} files, ${mb(othersChunks)}`);
+  console.log(`  models   — ${modelChunks.length} chunk(s), ${modelsCount} dff/col, ${mb(modelChunks)}`);
   console.log(
-    `  priority — ${priorityChunks.length} chunk(s), ${loose.length + priority.length} files, ${mb(priorityChunks)}`,
+    `  textures — ${textureChunks.length} chunk(s), ${loose.textures.length + textures.length} txd, ${mb(textureChunks)}`,
   );
-  console.log(`  models   — ${modelChunks.length} chunk(s), ${models.length} dff, ${mb(modelChunks)}`);
-  console.log(`  textures — ${textureChunks.length} chunk(s), ${textures.length} txd, ${mb(textureChunks)}`);
   console.log(`  from override img(s) (gta_int/mods): ${fromInt} files`);
   console.log(`  → static/games/${version}/`);
 }
@@ -241,15 +272,17 @@ function mergeArchives(archives: readonly ImgArchive[]): ImgArchive {
 }
 
 /** Split a group into ~50MB content-hashed zips, write them, and return one {@link ChunkInfo} per chunk. */
-function packChunks(prefix: string, entries: readonly LoadedEntry[], outDir: string): ChunkInfo[] {
+function packChunks(group: GroupName, entries: readonly LoadedEntry[], outDir: string): ChunkInfo[] {
+  const cached = CACHED[group];
+
   return chunkByHash(entries).map((bucket) => {
     const sorted = [...bucket].sort((a, b) => a.name.localeCompare(b.name)); // stable order → stable bytes
     const zip = buildZip(sorted);
     const hash = createHash('sha1').update(zip).digest('hex').slice(0, 12);
-    const file = `${prefix}-${hash}.zip`;
+    const file = `${group}-${hash}.zip`;
     writeFileSync(join(outDir, file), zip);
 
-    return { bytes: zip.length, entries: bucket.length, file, hash };
+    return { bytes: zip.length, cached, entries: bucket.length, file, hash };
   });
 }
 

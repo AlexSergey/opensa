@@ -1,8 +1,10 @@
 /**
  * The fetch asset loader (plan 049): fetches the build manifest, downloads chunk zips on demand with a small
- * concurrency limit, caches each in Cache Storage (skipping cached ones), invalidates stale chunks, and
- * pushes every ready chunk's RAW bytes to the sink (the VFS). Progress goes out on `events`. Browser-only
- * (fetch streaming + Cache Storage) — exercised on the Playwright e2e lane. Implements {@link AssetLoader}.
+ * concurrency limit, caches each cacheable chunk in Cache Storage (skipping already-cached ones), invalidates
+ * stale chunks, and pushes every ready chunk's RAW bytes to the sink (the VFS). Chunks with `cached: false`
+ * (the `data` group) are always re-fetched and never stored; a failure to fetch one wipes the whole cache
+ * (build revoked). Progress goes out on `events`. Browser-only (fetch streaming + Cache Storage) — exercised
+ * on the Playwright e2e lane. Implements {@link AssetLoader}.
  */
 import type { AssetLoader, AssetLoaderEvents, AssetSink, GroupChunk, GroupName, Manifest } from '../types';
 
@@ -63,7 +65,12 @@ export class AssetFetchLoader implements AssetLoader {
     const tracker = new ProgressTracker(chunks);
     this.events.emit('progress', tracker.snapshot());
 
-    await runWithConcurrency(chunks, this.concurrency, (chunk) => this.fetchChunk(chunk, tracker));
+    // Two passes so a build-revoke is atomic: fetch the always-fresh (non-cached) chunks — the `data` group,
+    // the liveness probe — FIRST. If one fails it wipes the cache and rejects here, before any cacheable
+    // chunk is stored, so no chunk can race back into the cache after the wipe (regardless of concurrency).
+    const [probe, cacheable] = partition(chunks, (chunk) => !chunk.cached);
+    await runWithConcurrency(probe, this.concurrency, (chunk) => this.fetchChunk(chunk, tracker));
+    await runWithConcurrency(cacheable, this.concurrency, (chunk) => this.fetchChunk(chunk, tracker));
   }
 
   private async deliver(chunk: GroupChunk, bytes: Uint8Array): Promise<void> {
@@ -103,22 +110,34 @@ export class AssetFetchLoader implements AssetLoader {
   private async fetchChunk(chunk: GroupChunk, tracker: ProgressTracker): Promise<void> {
     const url = chunkUrl(this.dir, chunk);
     try {
-      const cached = await this.cache.match(url);
-      if (cached) {
-        tracker.complete(chunk.file);
-        this.emitChunk(chunk, 'cached', chunk.bytes);
-        this.events.emit('progress', tracker.snapshot());
-        await this.deliver(chunk, cached);
+      // Only cacheable groups are read from / written to Cache Storage; the `data` group (cached: false) is
+      // always re-fetched fresh so it can act as the build-liveness probe (see the catch below).
+      if (chunk.cached) {
+        const hit = await this.cache.match(url);
+        if (hit) {
+          tracker.complete(chunk.file);
+          this.emitChunk(chunk, 'cached', chunk.bytes);
+          this.events.emit('progress', tracker.snapshot());
+          await this.deliver(chunk, hit);
 
-        return;
+          return;
+        }
       }
       const bytes = await this.download(url, chunk, tracker);
-      await this.cache.put(url, bytes);
+      if (chunk.cached) {
+        await this.cache.put(url, bytes);
+      }
       tracker.complete(chunk.file);
       this.emitChunk(chunk, 'done', chunk.bytes);
       this.events.emit('progress', tracker.snapshot());
       await this.deliver(chunk, bytes);
     } catch (error) {
+      // A non-cached chunk (the `data` group) failing means the build was revoked or removed — wipe the whole
+      // client cache so stale cached chunks (models/textures/others) don't linger. `load` fetches these before
+      // any cacheable chunk, so the wipe is atomic — nothing races back into the cache after it.
+      if (!chunk.cached) {
+        await this.cache.clear().catch(() => undefined);
+      }
       this.emitChunk(chunk, 'error', 0);
       this.events.emit('error', { error, file: chunk.file });
       throw error;
@@ -136,6 +155,17 @@ function concat(parts: readonly Uint8Array[], total: number): Uint8Array<ArrayBu
   }
 
   return out;
+}
+
+/** Split `items` into `[matching, rest]` by `predicate`, preserving order. */
+function partition<T>(items: readonly T[], predicate: (item: T) => boolean): [T[], T[]] {
+  const matching: T[] = [];
+  const rest: T[] = [];
+  for (const item of items) {
+    (predicate(item) ? matching : rest).push(item);
+  }
+
+  return [matching, rest];
 }
 
 /** Run `worker` over `items` with at most `limit` in flight. */

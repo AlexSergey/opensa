@@ -4,7 +4,7 @@
  */
 import type { ProgressSnapshot } from '../../loaders';
 
-/** Rotating status lines for the core (priority + models) phase. */
+/** Rotating status lines for the core (data + others + models) phase. */
 export const CORE_STATUS: readonly string[] = ['Loading', 'Loading assets…', 'Preparing the world…', 'Almost there…'];
 
 /** Richer rotation for the heavier textures phase. */

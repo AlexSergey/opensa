@@ -6,11 +6,12 @@ import { manifestTotals, verifyTotals } from './verify';
 
 const manifest: Manifest = {
   chunks: {
-    models: [{ bytes: 1, entries: 5, file: 'm.zip', hash: 'm' }],
-    priority: [{ bytes: 1, entries: 3, file: 'p.zip', hash: 'p' }],
+    data: [{ bytes: 1, cached: false, entries: 3, file: 'd.zip', hash: 'd' }],
+    models: [{ bytes: 1, cached: true, entries: 5, file: 'm.zip', hash: 'm' }],
+    others: [],
     textures: [
-      { bytes: 1, entries: 7, file: 't0.zip', hash: 't0' },
-      { bytes: 1, entries: 2, file: 't1.zip', hash: 't1' },
+      { bytes: 1, cached: true, entries: 7, file: 't0.zip', hash: 't0' },
+      { bytes: 1, cached: true, entries: 2, file: 't1.zip', hash: 't1' },
     ],
   },
   game: 'test',

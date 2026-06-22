@@ -11,7 +11,7 @@ import { AssetLocalLoader } from './asset-local-loader';
 export { AssetFetchLoader, type AssetFetchLoaderConfig } from './asset-fetch-loader';
 export { AssetLocalLoader, type AssetLocalLoaderConfig } from './asset-local-loader';
 export { Emitter, type Listener } from './emitter';
-export { allChunks, chunkUrl, chunkUrls, GROUP_NAMES, manifestDir, parseManifest } from './manifest';
+export { allChunks, chunkUrl, chunkUrls, CORE_GROUPS, GROUP_NAMES, manifestDir, parseManifest } from './manifest';
 export type {
   AssetLoader,
   AssetLoaderEvents,

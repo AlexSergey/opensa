@@ -12,6 +12,7 @@ import type { AssetLoader, AssetLoaderEvents, ChunkInfo, GroupName, Manifest } f
 import type { InstallPlan, InstallSource } from './build-vfs';
 import type { RestoredDir } from './dir-handle-store';
 
+import { looseGroup } from '../../game-build/partition';
 import { Emitter } from '../emitter';
 import { GROUP_NAMES } from '../manifest';
 import { readEntry, selectInstallEntries } from './build-vfs';
@@ -149,35 +150,41 @@ function entryTask(entry: InstallPlan['models'][number]): FileTask {
   return { name: entry.name, read: (source) => readEntry(source, entry) };
 }
 
-/** The files to ingest for one group (priority = loose files + world archive entries). */
+/** The files to ingest for one group: the loose files bucketed into it + its img archive entries. */
 function filesForGroup(plan: InstallPlan, group: GroupName): FileTask[] {
+  const loose = plan.loose
+    .filter((path) => looseGroup(path) === group)
+    .map((path): FileTask => ({ name: path, read: (source) => source.readLoose(path) }));
   if (group === 'models') {
-    return plan.models.map(entryTask);
+    return [...loose, ...plan.models.map(entryTask)];
   }
   if (group === 'textures') {
-    return plan.textures.map(entryTask);
+    return [...loose, ...plan.textures.map(entryTask)];
+  }
+  if (group === 'others') {
+    return [...loose, ...plan.others.map(entryTask)];
   }
 
-  return [
-    ...plan.loose.map((path): FileTask => ({ name: path, read: (source) => source.readLoose(path) })),
-    ...plan.world.map(entryTask),
-  ];
+  return loose; // data — loose files under data/ only
 }
 
 /** A manifest mirroring the selection (one synthetic chunk per group) so `Vfs.verify` matches the ingest. */
 function synthManifest(config: AssetLocalLoaderConfig, plan: InstallPlan): Manifest {
   const chunk = (group: GroupName, count: number): ChunkInfo => ({
     bytes: count,
+    cached: false, // the local loader reads from disk every boot — nothing goes through Cache Storage
     entries: count,
     file: `local-${group}`,
     hash: '',
   });
+  const groupCount = (group: GroupName): number => filesForGroup(plan, group).length;
 
   return {
     chunks: {
-      models: [chunk('models', plan.models.length)],
-      priority: [chunk('priority', plan.loose.length + plan.world.length)],
-      textures: [chunk('textures', plan.textures.length)],
+      data: [chunk('data', groupCount('data'))],
+      models: [chunk('models', groupCount('models'))],
+      others: [chunk('others', groupCount('others'))],
+      textures: [chunk('textures', groupCount('textures'))],
     },
     game: config.game,
     version: config.version,

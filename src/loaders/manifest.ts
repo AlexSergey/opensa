@@ -4,10 +4,13 @@
  */
 import type { ChunkInfo, GroupChunk, GroupName, Manifest } from './types';
 
-/** The groups in load-priority order (priority first, then the heavy HD payload). */
-export const GROUP_NAMES: readonly GroupName[] = ['priority', 'models', 'textures'];
+/** The groups in load order (config/world/geometry first, then the heavy HD textures last). */
+export const GROUP_NAMES: readonly GroupName[] = ['data', 'others', 'models', 'textures'];
 
-/** Every chunk flattened across groups (priority → models → textures), each tagged with its group. */
+/** Groups loaded in the first (core) phase — everything but the heavy textures. */
+export const CORE_GROUPS: readonly GroupName[] = ['data', 'others', 'models'];
+
+/** Every chunk flattened across groups (data → others → models → textures), each tagged with its group. */
 export function allChunks(manifest: Manifest): GroupChunk[] {
   return GROUP_NAMES.flatMap((group) => manifest.chunks[group].map((chunk) => ({ ...chunk, group })));
 }
@@ -59,9 +62,10 @@ function parseChunk(value: unknown, where: string): ChunkInfo {
   if (!isRecord(value)) {
     throw new Error(`manifest ${where} is not an object`);
   }
-  const { bytes, entries, file, hash } = value;
+  const { bytes, cached, entries, file, hash } = value;
   if (
     typeof bytes !== 'number' ||
+    typeof cached !== 'boolean' ||
     typeof entries !== 'number' ||
     typeof file !== 'string' ||
     typeof hash !== 'string'
@@ -69,5 +73,5 @@ function parseChunk(value: unknown, where: string): ChunkInfo {
     throw new Error(`manifest ${where} has invalid fields`);
   }
 
-  return { bytes, entries, file, hash };
+  return { bytes, cached, entries, file, hash };
 }

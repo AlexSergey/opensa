@@ -12,8 +12,9 @@ playing`, plus `paused` and `error`. Retry up to `MAX_RETRIES` (3), then a degra
   **Play → `folder`** (pick the install) → `textures` (loads everything) — `initialBootState(autoLoad)` +
   the `CHOOSE_FOLDER`/`FOLDER_READY` events.
 - **Hook** (`use-asset-boot.ts`): one `Vfs` + `AssetLoader` (via `createAssetLoader`); manifest at
-  `${VITE_STATIC_URL}/<game>-${__APP_VERSION__}/manifest.json`. Fetch loads **priority + models** for the
-  menu then **textures** after Play; local `restore()`s the remembered folder on mount and only reads after
+  `${VITE_STATIC_URL}/<game>-${__APP_VERSION__}/manifest.json`. Fetch loads the **core groups** (`CORE_GROUPS`
+  = data + others + models) for the menu then **textures** after Play; local `restore()`s the remembered
+  folder on mount and only reads after
   the folder gesture (`chooseFolder → prepare()`). Each phase runs once per attempt (retry/StrictMode-safe);
   reports progress + rotating status; persists `intro`/`disclaimer` flags in localStorage.
 - **Instant shell, lazy game:** the initial bundle is React + shell + asset-loader + vfs + fflate

@@ -53,7 +53,7 @@
   animation: sa-pulse 4s ease-in-out infinite;
 }
 
-/* Shrunk + nudged up once priority is in. */
+/* Shrunk + nudged up once the core assets are in. */
 .sa-logo--small {
   width: 400px;
   transform: translateY(-12vh);

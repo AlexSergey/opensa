@@ -16,7 +16,7 @@
 - URL helpers (`datChildUrl`, `iplBasename`, `streamIplUrl`, `standaloneIplUrl`,
   `normalizeDatPath`).
 - Build tooling: `scripts/build-game.ts` (`npm run build:game:original`) packs a variant into the staged
-  priority/models/textures archives — reads the stock `gta3.img`/`gta_int.img` directly via `openArchive`.
+  data/models/textures/others archives — reads the stock `gta3.img`/`gta_int.img` directly via `openArchive`.
 
 ## Known gaps / candidates
 

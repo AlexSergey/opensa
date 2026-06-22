@@ -14,16 +14,16 @@ import { parseIpl } from '../../renderware/parsers/text/ipl.parser';
 import { parsePedDefs } from '../../renderware/parsers/text/ped-defs.parser';
 import { parseVehicleDefs } from '../../renderware/parsers/text/vehicle-defs.parser';
 
-/** What to materialise into the VFS — mirrors the build's three buckets (world+loose → priority group). */
+/** What to materialise into the VFS — mirrors the build's buckets (loose files are grouped by `looseGroup`). */
 export interface InstallPlan {
-  /** Loose file paths, ingested by their relative path. */
+  /** Loose file paths, ingested by their relative path (bucketed by `looseGroup`). */
   loose: string[];
-  /** Referenced `.dff` archive entries. */
+  /** Referenced `.dff` + every `.col` archive entries. */
   models: Entry[];
+  /** Placement/anim/data world files (ipl/ifp/dat) from `gta3.img`, ingested by bare name. */
+  others: Entry[];
   /** Referenced `.txd` archive entries. */
   textures: Entry[];
-  /** World files (col/ipl/ifp/dat) from `gta3.img`, ingested by bare name. */
-  world: Entry[];
 }
 
 /** A raw GTA install folder, abstracted for the conversion (FSA-backed in production, faked in tests). */
@@ -68,13 +68,13 @@ export async function selectInstallEntries(source: InstallSource, options: Selec
   const placed = placedModels(await placedInstanceIds(source), await ideById(source));
   const extra = await dynamicModelRefs(source, options.peds ?? [], options.vehicles ?? []);
   const refs = { models: [...placed.models, ...extra.models], txds: [...placed.txds, ...extra.txds] };
-  const { models, priority, textures } = partitionEntries(
+  const { models, others, textures } = partitionEntries(
     refs,
     new Set(source.gta3.names),
     new Set(source.gtaInt?.names ?? []),
   );
 
-  return { loose: await source.looseFiles(), models, textures, world: priority };
+  return { loose: await source.looseFiles(), models, others, textures };
 }
 
 /** Model + txd base names for the named dynamically-spawned set: the requested peds + vehicles. */

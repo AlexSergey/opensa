@@ -96,7 +96,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  a([main → App]):::ui --> b["core&nbsp;&middot; load priority + models<br/>loader → vfs"]:::infra
+  a([main → App]):::ui --> b["core&nbsp;&middot; load data + others + models<br/>loader → vfs"]:::infra
   b --> m["MENU"]:::ui
   m -->|Play| d["disclaimer"]:::ui
   d --> t["textures&nbsp;&middot; load + verify"]:::infra
@@ -122,7 +122,7 @@ Return visits skip the intro animation (a localStorage flag) and re-use the Cach
 flowchart LR
   src[("game-src/&lt;game&gt;/<br/>your GTA SA files")]:::data
   build["scripts/build-game.ts<br/>partition + ~50MB hashed chunks"]:::infra
-  out[("static/&lt;game&gt;-&lt;version&gt;/<br/>priority &middot; models &middot; textures &middot; manifest")]:::data
+  out[("static/&lt;game&gt;-&lt;version&gt;/<br/>data &middot; others &middot; models &middot; textures &middot; manifest")]:::data
 
   src -->|npm run build:game:original| build --> out
   out -.->|served at runtime| loader[["asset-loader"]]:::infra

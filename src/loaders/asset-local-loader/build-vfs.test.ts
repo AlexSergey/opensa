@@ -47,12 +47,15 @@ describe('selectInstallEntries', () => {
   });
 
   describe('positive cases', () => {
-    it('selects the placed model + its txd from gta3, and world files into the world bucket', async () => {
+    it('selects the placed model + its txd + col into models, and no other world files', async () => {
       const plan = await selectInstallEntries(source());
 
-      expect(plan.models).toEqual([{ name: 'cj.dff', source: 'gta3' }]);
+      expect(plan.models).toEqual([
+        { name: 'cj.dff', source: 'gta3' },
+        { name: 'la.col', source: 'gta3' },
+      ]);
       expect(plan.textures).toEqual([{ name: 'cjtxd.txd', source: 'gta3' }]);
-      expect(plan.world).toEqual([{ name: 'la.col', source: 'gta3' }]);
+      expect(plan.others).toEqual([]);
       expect(plan.loose).toEqual(['data/gta.dat', 'data/maps/test.ide', 'data/maps/test.ipl']);
     });
 

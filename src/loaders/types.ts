@@ -56,6 +56,9 @@ export interface AssetSink {
 export interface ChunkInfo {
   /** Compressed chunk size in bytes (the download size). */
   bytes: number;
+  /** Whether the client persists this chunk in Cache Storage. `false` ⇒ always re-fetched (the `data`
+   *  group): it acts as a liveness probe — if it can't be fetched the build is revoked and the cache is wiped. */
+  cached: boolean;
   /** Number of files packed in the chunk. */
   entries: number;
   /** Content-hashed file name, e.g. `textures-2a7909a5bfec.zip`. */
@@ -72,8 +75,8 @@ export interface GroupChunk extends ChunkInfo {
   group: GroupName;
 }
 
-/** A build group — the three partition buckets the build emits (see scripts/build-game.ts). */
-export type GroupName = 'models' | 'priority' | 'textures';
+/** A build group — the four buckets the build emits (see scripts/build-game.ts). */
+export type GroupName = 'data' | 'models' | 'others' | 'textures';
 
 /** The build manifest at `static/games/<game>-<version>/manifest.json`. */
 export interface Manifest {

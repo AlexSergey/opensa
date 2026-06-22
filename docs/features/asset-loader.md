@@ -35,14 +35,22 @@ interface AssetLoader {
 
 Turns the build's chunk manifest into a cached, on-demand download pipeline.
 
-- **Manifest** (`manifest.ts`, pure): `parseManifest` (validates `{ chunks: { priority, models, textures },
-game, version }`), `manifestDir`, `chunkUrl`, `allChunks` (priority → models → textures, group-tagged), `chunkUrls`.
+- **Manifest** (`manifest.ts`, pure): `parseManifest` (validates `{ chunks: { data, models, others, textures },
+game, version }`; each chunk is `{ bytes, cached, entries, file, hash }`), `manifestDir`, `chunkUrl`, `allChunks`
+  (data → others → models → textures, group-tagged), `chunkUrls`. `GROUP_NAMES` is the load order; `CORE_GROUPS`
+  (everything but textures) is the first boot phase.
 - **`AssetFetchLoader`**: `init()` fetches the manifest (`cache: 'no-store'`) then **invalidates** stale cache
   entries; `load(groups?)` ensures the given groups' chunks are present (download streamed, concurrency-limited,
   **skips cached**), verifying byte length (+ optional SHA-1). Partial/failed downloads are never cached.
   Hands each ready chunk's **raw zip bytes** to the `AssetSink` (the VFS); never unzips.
+- **Caching policy** (per-chunk `cached`, set by the build's `CACHED` map): `cached: true` chunks
+  (models/textures/others) are read from / written to Cache Storage. `cached: false` chunks (the `data`
+  group) are **always re-fetched** and never stored — `data` doubles as a **build-liveness probe**.
+  `load` fetches the non-cached probe **before** any cacheable chunk; if it fails (e.g. the server returns
+  404 because the build was revoked), the loader **wipes the entire cache** (`CacheStore.clear`) and rejects.
+  Doing the probe first makes the wipe atomic — no cacheable chunk can race back in after it.
 - **Cache** (`cache-store.ts`): Cache Storage, one named bucket, keyed by content-hashed chunk URL.
-  **Invalidation** in `invalidate.ts` (pure `staleKeys`).
+  **Invalidation** in `invalidate.ts` (pure `staleKeys`); **`clear()`** drops the whole bucket (revoke).
 
 ## Local loader (`asset-local-loader/`, plan 053)
 
@@ -57,8 +65,9 @@ in-browser to the same VFS — so the downstream flow is identical. **Chromium-o
   entry's byte range from disk — never buffers the ~1 GB `gta3.img`. VER2 parsing shared from
   `renderware/archive`.
 - **Selection** (`build-vfs.ts`): the in-browser port of `scripts/build-game.ts`'s partition (shared
-  `src/game-build/partition.ts`) — exterior-placed models/textures + loose + world, **plus** the env-named
-  dynamic models (`VITE_MAIN_CHARACTER` via `peds.ide`, `VITE_VEHICLES` via `vehicles.ide`).
+  `src/game-build/partition.ts` — `partitionEntries` + `looseGroup`) — exterior-placed models/textures,
+  `.col`, the loose `data/`/anim/text files, and the `gta3.img` ipl/ifp/dat, **plus** the env-named dynamic
+  models (`VITE_MAIN_CHARACTER` via `peds.ide`, `VITE_VEHICLES` via `vehicles.ide`).
 - **`AssetLocalLoader`**: `restore()` (mount) → `prepare()` (Play-folder gesture) → `init()` (scan+select →
   one synthetic chunk per group) → `load()` (read selected bytes into the VFS, count-based progress).
 - **Boot gate**: the shell auto-loads `core` for fetch; for local it boots to the menu, then **Play → folder

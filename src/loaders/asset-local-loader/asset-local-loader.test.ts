@@ -75,10 +75,11 @@ describe('AssetLocalLoader', () => {
       await local.prepare();
       const manifest = await local.init();
 
-      // priority = 3 loose + 1 world (la.col); models = cj.dff; textures = cjtxd.txd.
-      expect(manifest.chunks.priority[0].entries).toBe(4);
-      expect(manifest.chunks.models[0].entries).toBe(1);
+      // data = 3 loose (all under data/); models = cj.dff + la.col; textures = cjtxd.txd; others = none.
+      expect(manifest.chunks.data[0].entries).toBe(3);
+      expect(manifest.chunks.models[0].entries).toBe(2);
       expect(manifest.chunks.textures[0].entries).toBe(1);
+      expect(manifest.chunks.others[0].entries).toBe(0);
       expect(manifest.game).toBe('gta-sa');
     });
 
@@ -98,20 +99,19 @@ describe('AssetLocalLoader', () => {
       await local.load(['models', 'textures']);
 
       expect(addFiles.mock.calls.map((call) => call[0])).toEqual(['local-models', 'local-textures']);
-      expect([...addFiles.mock.calls[0][1]].map(([name]) => name)).toEqual(['cj.dff']);
+      expect([...addFiles.mock.calls[0][1]].map(([name]) => name)).toEqual(['cj.dff', 'la.col']);
     });
 
-    it('load ingests loose files and world entries together in the priority group', async () => {
+    it('load ingests the data folder files in the data group', async () => {
       const addFiles = vi.fn<AddFiles>();
       const local = make({ sink: { addFiles } });
       await local.prepare();
-      await local.load(['priority']);
+      await local.load(['data']);
 
       expect([...addFiles.mock.calls[0][1]].map(([name]) => name)).toEqual([
         'data/gta.dat',
         'data/maps/test.ide',
         'data/maps/test.ipl',
-        'la.col',
       ]);
     });
 
@@ -123,8 +123,8 @@ describe('AssetLocalLoader', () => {
       await local.load(['models']);
 
       const last = snapshots[snapshots.length - 1];
-      expect(last.totalBytes).toBe(1);
-      expect(last.loadedBytes).toBe(1);
+      expect(last.totalBytes).toBe(2); // models = cj.dff + la.col
+      expect(last.loadedBytes).toBe(2);
     });
 
     it('prepare resolves the directory once (idempotent)', async () => {

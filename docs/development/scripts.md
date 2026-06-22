@@ -34,11 +34,16 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 
 ### build-game.ts
 
-Packs a variant (`game-src/<game>/`) into `static/<version>/`: priority + models + textures, each
-split into ~50MB content-hashed chunks (`game-build/chunk.ts`) listed in `manifest.json`. See plan 048
-for the full breakdown. It also reads the local `.env` (Vite `loadEnv`) and packs the **TEMP**
-`VITE_MAIN_CHARACTER` (`peds.ide`) + `VITE_VEHICLES` (`vehicles.ide`) — dynamically-spawned models the
-map-placement partition would otherwise miss (plan 053 step 7). Rebuild after changing them.
+Packs a variant (`game-src/<game>/`) into `static/<version>/` in four groups — data + models + textures
+
+- others (`data/` folder · referenced `.dff` + every `.col` · referenced `.txd` · `.ipl`/`.ifp`/`.dat`
+  from `gta3.img` + loose anim/text), each split into ~50MB content-hashed chunks (`game-build/chunk.ts`)
+  listed in `manifest.json`. Every chunk gets a `cached` flag from the `CACHED` map (`data: false`, the rest
+  `true`) — the runtime caches only `cached` chunks and treats the always-fresh `data` group as a build-liveness
+  probe (a 404 there wipes the client cache; see [asset-loader.md](../features/asset-loader.md)). See plan 048
+  for the full breakdown. It also reads the local `.env` (Vite `loadEnv`) and packs the **TEMP**
+  `VITE_MAIN_CHARACTER` (`peds.ide`) + `VITE_VEHICLES` (`vehicles.ide`) — dynamically-spawned models the
+  map-placement partition would otherwise miss (plan 053 step 7). Rebuild after changing them.
 
 ```sh
 npm run build:game:original          # npm run timecyc && tsx scripts/build-game.ts --game original

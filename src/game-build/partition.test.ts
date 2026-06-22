@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ModelRef } from './partition';
 
-import { ideRefs, partitionEntries, placedModels, resolveSource } from './partition';
+import { ideRefs, looseGroup, partitionEntries, placedModels, resolveSource } from './partition';
 
 const ide = new Map<number, ModelRef>([
   [1, { model: 'house', txd: 'htex' }],
@@ -46,7 +46,7 @@ describe('placedModels', () => {
 });
 
 describe('partitionEntries', () => {
-  const { models, priority, textures } = partitionEntries(placedModels([1, 2, 3, 4], ide), gta3, gtaInt);
+  const { models, others, textures } = partitionEntries(placedModels([1, 2, 3, 4], ide), gta3, gtaInt);
 
   describe('negative cases', () => {
     it('drops dff/txd present in neither img', () => {
@@ -55,26 +55,43 @@ describe('partitionEntries', () => {
     });
 
     it('keeps the three buckets disjoint by extension', () => {
-      expect(models.every((e) => e.name.endsWith('.dff'))).toBe(true);
+      expect(models.every((e) => /\.(?:dff|col)$/.test(e.name))).toBe(true);
       expect(textures.every((e) => e.name.endsWith('.txd'))).toBe(true);
-      expect(priority.every((e) => /\.(?:col|ipl|ifp|dat)$/.test(e.name))).toBe(true);
+      expect(others.every((e) => /\.(?:ipl|ifp|dat)$/.test(e.name))).toBe(true);
     });
   });
 
   describe('positive cases', () => {
-    it('puts only world files (col/ipl/ifp/dat) in priority — no dff/txd', () => {
-      expect(names(priority)).toEqual(['la.ipl', 'nodes.dat', 'ped.ifp', 'roads.col']);
+    it('puts placement/anim/data world files (ipl/ifp/dat) in others — no col/dff/txd', () => {
+      expect(names(others)).toEqual(['la.ipl', 'nodes.dat', 'ped.ifp']);
     });
 
-    it('puts every referenced dff in models, resolved across both imgs', () => {
-      expect(names(models)).toEqual(['house.dff', 'shed.dff', 'tree.dff']);
+    it('puts every referenced dff plus every col in models, resolved across both imgs', () => {
+      expect(names(models)).toEqual(['house.dff', 'roads.col', 'shed.dff', 'tree.dff']);
       expect(models.find((e) => e.name === 'tree.dff')?.source).toBe('gta_int'); // override
       expect(models.find((e) => e.name === 'house.dff')?.source).toBe('gta3');
+      expect(models.find((e) => e.name === 'roads.col')?.source).toBe('gta3');
     });
 
     it('puts every referenced txd in textures (deduped), resolved across both imgs', () => {
       expect(names(textures)).toEqual(['htex.txd', 'ttex.txd']);
       expect(textures.find((e) => e.name === 'ttex.txd')?.source).toBe('gta_int');
+    });
+  });
+});
+
+describe('looseGroup', () => {
+  describe('positive cases', () => {
+    it('routes data-folder files to data regardless of extension', () => {
+      expect(looseGroup('data/gta.dat')).toBe('data');
+      expect(looseGroup('data/maps/la.ipl')).toBe('data');
+    });
+
+    it('routes dff to models, txd to textures, and the rest (ifp/gxt) to others', () => {
+      expect(looseGroup('player/tommy.dff')).toBe('models');
+      expect(looseGroup('vehicles/admiral.txd')).toBe('textures');
+      expect(looseGroup('anim/ped.ifp')).toBe('others');
+      expect(looseGroup('text/american.gxt')).toBe('others');
     });
   });
 });

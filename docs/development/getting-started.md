@@ -55,13 +55,20 @@ tsx scripts/build-game.ts --game <name>
 is split into **~50MB content-hashed chunks** (`<group>-<hash>.zip`) so a dropped download re-fetches
 one chunk, not the whole group; `manifest.json` lists them:
 
-- `priority` — loose data/player/vehicles/anim + world files (col/ipl/ifp/dat); no dff/txd.
-- `models` — the `.dff` geometry the exterior map references (interiors excluded).
+- `data` — the contents of the loose `data/` folder (ide/ipl/dat/cfg/zon); no dff/txd/col.
+- `models` — the `.dff` geometry the exterior map references (interiors excluded) + every `.col`.
 - `textures` — the `.txd` textures the exterior map references (the bulk → ~10 chunks).
+- `others` — everything else: `.ipl`/`.ifp`/`.dat` from `gta3.img` + loose anim/text (ifp/gxt/fxp).
 
 Chunk assignment is a stable hash bucket, so changing one file leaves the other chunks byte-identical
 (same hash/filename → the browser cache survives a version bump). See [build-flags.md](./build-flags.md)
 and plan 048 for the full breakdown.
+
+Each chunk also carries a `cached` flag from the build's `CACHED` map (`scripts/build-game.ts`). `models`,
+`textures`, and `others` are cached in the browser (Cache Storage); `data` is `cached: false` — always
+re-downloaded and never stored. That makes `data` a **build-liveness probe**: delete its zip on the server
+(to revoke a build) and clients 404 on it, which wipes their whole asset cache. See
+[asset-loader.md](../features/asset-loader.md).
 
 ## 4. Run
 
