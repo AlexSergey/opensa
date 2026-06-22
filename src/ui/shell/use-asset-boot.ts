@@ -52,7 +52,7 @@ export function useAssetBoot(): AssetBoot {
       createAssetLoader({
         game: GAME_TYPE,
         manifestUrl: MANIFEST_URL,
-        peds: MAIN_CHARACTER ? [MAIN_CHARACTER] : [],
+        peds: [MAIN_CHARACTER],
         sink: vfs,
         vehicles: VEHICLES,
         version: __APP_VERSION__,

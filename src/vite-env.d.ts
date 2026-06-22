@@ -17,7 +17,7 @@ interface ImportMetaEnv {
   readonly VITE_GA_ID?: string;
   /** Game variant to boot (`original` | `carcer`). Default `original`. */
   readonly VITE_GAME_TYPE?: string;
-  /** TEMP: player ped model from `peds.ide` (e.g. `BMYPOL1`); unset → loose `player/*` fallback. */
+  /** TEMP: player ped model from `peds.ide` (e.g. `BMYPOL1`); unset → defaults to `BMYPOL1`. */
   readonly VITE_MAIN_CHARACTER?: string;
   readonly VITE_STATIC_URL: string;
   /** TEMP: vehicle models to make available, via `vehicles.ide` (e.g. `['admiral','comet']` or `admiral,comet`). */

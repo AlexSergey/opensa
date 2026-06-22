@@ -32,7 +32,7 @@ Client-visible config read from `.env` (copy `.env.example` → `.env`; `.env` i
 | `VITE_STATIC_URL`     | `http://localhost:3001` | Where built game archives are served (fetch loader; see `npm run serve:static`).                                                                          |
 | `VITE_GAME_TYPE`      | `original`              | Game variant to boot — `original` \| `original-extend` \| `carcer` \| `anderius` (archive set + spawn).                                                   |
 | `VITE_ASSET_LOADER`   | `fetch`                 | `fetch` = download manifest + chunks; `local` = read a user-picked **raw GTA install** (Chromium only). See [asset loaders](../features/asset-loader.md). |
-| `VITE_MAIN_CHARACTER` | _(unset)_               | **TEMP**: player ped model from `peds.ide` (e.g. `BMYPOL1`); unset → loose `player/*` fallback.                                                           |
+| `VITE_MAIN_CHARACTER` | `BMYPOL1`               | **TEMP**: player ped model from `peds.ide`; unset → defaults to `BMYPOL1`.                                                                                |
 | `VITE_VEHICLES`       | _(unset)_               | **TEMP**: vehicles to make available, from `vehicles.ide` (e.g. `['admiral','comet']` or `admiral,comet`).                                                |
 | `VITE_GA_ID`          | _(unset)_               | Google Analytics id; unset → analytics skipped.                                                                                                           |
 

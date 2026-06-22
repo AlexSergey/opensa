@@ -85,7 +85,7 @@ import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
 import { Overlay } from './hud/overlay';
-import { GANTON_CJ_HOME, GANTON_RADIUS, PLAYER_SPAWN } from './locations';
+import { PLAYER_SPAWN, SPAWN_COLLISION_RADIUS } from './locations';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
 
@@ -547,17 +547,18 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     await game.init();
     // Corona Points live on GLOW_LAYER (excluded from the SSAO normal prepass) — the camera must see it.
     game.getCamera().layers.enable(GLOW_LAYER);
-    // 6:00, EXTRASUNNY (weather is a load/session param like the start time, not engine config).
-    await game.loadGame(GANTON_CJ_HOME, { radius: GANTON_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
+    // Single source of truth for where the player starts: the variant spawn seeds the initial collision zone
+    // (so there's ground under the drop) AND the player capsule. 6:00, EXTRASUNNY (weather is a load/session
+    // param like the start time, not engine config).
+    const spawn = PLAYER_SPAWN[GAME_TYPE];
+    await game.loadGame(spawn, { radius: SPAWN_COLLISION_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
 
-    // Spawn the player on CJ's parking lot. The model is native GTA model-space (up = +Y);
-    // `orientCharacter` stands it up in GTA Z-up under a wrapper the render-sync system positions.
-    // TEMP: `VITE_MAIN_CHARACTER` picks a ped model from peds.ide (bring-your-own-files); else the loose DFF.
-    const model = MAIN_CHARACTER
-      ? await adapter.loadCharacterByModel(MAIN_CHARACTER)
-      : await adapter.loadCharacter('player/t800.dff', 'player/t800.txd');
+    // The model is native GTA model-space (up = +Y); `orientCharacter` stands it up in GTA Z-up under a
+    // wrapper the render-sync system positions.
+    // TEMP: `VITE_MAIN_CHARACTER` picks the player ped from peds.ide (bring-your-own-files).
+    const model = await adapter.loadCharacterByModel(MAIN_CHARACTER);
     const player = orientCharacter(model.object, PLAYER_PLACEMENT);
-    const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
+    const character = await setupCharacter(game, player, spawn, {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,
       skeleton: model.skeleton,
@@ -1036,7 +1037,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
       streaming: () => game.getConfig().streaming,
       sunSize: () => game.getConfig().graphics.sun.sunSize,
       teleport: (coords) => character.placePlayer(coords, true),
-      teleportToGanton: () => character.placePlayer(PLAYER_SPAWN[GAME_TYPE], true),
+      teleportToGanton: () => character.placePlayer(spawn, true),
       toneMapping: () => game.getConfig().graphics.toneMapping,
       topDownView: () => game.topDownView(),
       vehicleModels: () => vehicleModels,

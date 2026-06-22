@@ -19,5 +19,6 @@
     "allowSyntheticDefaultImports": true,
     "resolvePackageJsonExports": true,
     "types": ["node"]
-  }
+  },
+  "exclude": ["./game-src"]
 }

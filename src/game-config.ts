@@ -16,11 +16,14 @@ function resolveGameType(): GameType {
 
 export const GAME_TYPE: GameType = resolveGameType();
 
+/** Default player ped when `VITE_MAIN_CHARACTER` is unset — a stock SA ped present in any install. */
+const DEFAULT_MAIN_CHARACTER = 'BMYPOL1';
+
 /**
  * TEMPORARY (bring-your-own-files): the player ped model name, resolved via `peds.ide` (e.g. `BMYPOL1`).
- * Unset → the loose `player/*.dff` fallback is used. See {@link VEHICLES}.
+ * Always set — falls back to {@link DEFAULT_MAIN_CHARACTER} when the env var is empty. See {@link VEHICLES}.
  */
-export const MAIN_CHARACTER: string | undefined = import.meta.env.VITE_MAIN_CHARACTER?.trim() || undefined;
+export const MAIN_CHARACTER: string = import.meta.env.VITE_MAIN_CHARACTER?.trim() || DEFAULT_MAIN_CHARACTER;
 
 /**
  * TEMPORARY: vehicle model names to make available in-game, resolved via `vehicles.ide` (e.g.
