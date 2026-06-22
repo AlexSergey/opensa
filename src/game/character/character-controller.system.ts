@@ -3,7 +3,7 @@ import { type PerspectiveCamera, Vector3 } from 'three';
 
 import type { System } from '../core/system';
 import type { EcsWorld } from '../ecs/world';
-import type { KeyboardInput } from '../input/keyboard';
+import type { InputState } from '../input';
 import type { Config } from '../interfaces/config.interface';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
 import type { CharacterController, PhysicsWorld } from '../physics/physics-world';
@@ -40,7 +40,7 @@ export class CharacterControllerSystem implements System {
   private readonly controller: CharacterController;
   private enabled = true;
   private readonly forward = new Vector3();
-  private readonly keyboard: KeyboardInput;
+  private readonly input: InputState;
   private readonly physics: PhysicsWorld;
   private readonly right = new Vector3();
 
@@ -49,14 +49,14 @@ export class CharacterControllerSystem implements System {
   constructor(
     world: EcsWorld,
     physics: PhysicsWorld,
-    keyboard: KeyboardInput,
+    input: InputState,
     config: Readonly<Config>,
     controller: CharacterController,
     camera: PerspectiveCamera,
   ) {
     this.world = world;
     this.physics = physics;
-    this.keyboard = keyboard;
+    this.input = input;
     this.config = config;
     this.controller = controller;
     this.camera = camera;
@@ -115,10 +115,6 @@ export class CharacterControllerSystem implements System {
     }
   }
 
-  private axis(positive: string, negative: string): number {
-    return (this.keyboard.isDown(positive) ? 1 : 0) - (this.keyboard.isDown(negative) ? 1 : 0);
-  }
-
   /** Planar velocity (Z-up) for a forward/right input at `speed`, relative to the camera. */
   private cameraRelativeMove(forwardInput: number, rightInput: number, speed: number): { x: number; y: number } {
     // Camera look direction (scene Y-up) projected to the ground, converted to
@@ -142,21 +138,21 @@ export class CharacterControllerSystem implements System {
     return { x, y };
   }
 
-  /** Desired planar velocity + jump for this step — scripted auto-run if active, else keyboard. */
+  /** Desired planar velocity + jump for this step — scripted auto-run if active, else player input. */
   private desiredMove(players: ArrayLike<number>): { jump: boolean; target: { x: number; y: number } } {
-    const { controls, movement } = this.config;
+    const { movement } = this.config;
     if (this.autoIndex < this.autoPath.length && players.length > 0) {
-      // Scripted auto-run (e.g. around to a car door) — ignore the keyboard until arrival.
+      // Scripted auto-run (e.g. around to a car door) — ignore manual input until arrival.
       return { jump: false, target: this.moveToward(players[0], movement.runSpeed) };
     }
-    const running = Boolean(controls.run) && this.keyboard.isDown(controls.run as string);
+    const move = this.input.move();
     const target = this.cameraRelativeMove(
-      this.axis(controls.forward, controls.back),
-      this.axis(controls.right, controls.left),
-      running ? movement.runSpeed : movement.walkSpeed,
+      move.y,
+      move.x,
+      this.input.isActive('run') ? movement.runSpeed : movement.walkSpeed,
     );
 
-    return { jump: this.keyboard.isDown(controls.jump), target };
+    return { jump: this.input.isActive('jump'), target };
   }
 
   /** Planar velocity toward the current path waypoint; advances/flags arrival as points are reached. */

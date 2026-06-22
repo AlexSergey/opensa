@@ -3,11 +3,12 @@ import { type Bone, Box3, type Object3D, type Skeleton, Vector3 } from 'three';
 
 import type { EcsWorld } from '../ecs/world';
 import type { Game } from '../game';
+import type { InputState } from '../input';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
 
 import { PlayerControlled, RigidBody, Transform, Velocity } from '../ecs/components';
 import { createEcsWorld } from '../ecs/world';
-import { Keyboard } from '../input/keyboard';
+import { Keyboard, KeyboardSource } from '../input';
 import { PhysicsWorld } from '../physics/physics-world';
 import { PhysicsSystem } from '../physics/physics.system';
 import { initRapier } from '../physics/rapier';
@@ -26,7 +27,8 @@ export interface CharacterContext {
   controllerSystem: CharacterControllerSystem;
   /** Player collision-box half-extents (the controller's grounding half-height is `[2]`). */
   halfExtents: Vec3;
-  keyboard: Keyboard;
+  /** Device-agnostic player input the systems read (keyboard today; pluggable sources — plan 055). */
+  input: InputState;
   physics: PhysicsWorld;
   /**
    * Place the player at a world point (Z-up) + sync its Transform this frame (no render lag).
@@ -108,16 +110,13 @@ export async function setupCharacter(
   keyboard.start();
 
   const config = game.getConfig();
+  // The systems read the game's combined InputState; the keyboard joins as a source (plan 055). The pointer
+  // look/zoom source is already registered by the game; a touch overlay can add another later.
+  game.addInputSource(new KeyboardSource(keyboard, config.controls));
+  const input = game.getInput();
   const renderSync = new RenderSyncSystem(world, renderRefs);
   // Order matters: controller moves the capsule → physics steps → render syncs.
-  const controllerSystem = new CharacterControllerSystem(
-    world,
-    physics,
-    keyboard,
-    config,
-    controller,
-    game.getCamera(),
-  );
+  const controllerSystem = new CharacterControllerSystem(world, physics, input, config, controller, game.getCamera());
   game.addSystem(controllerSystem);
   game.addSystem(new PhysicsSystem(world, physics, config));
   game.addSystem(renderSync);
@@ -143,7 +142,7 @@ export async function setupCharacter(
     bonesByName: options.bonesByName ?? new Map<string, Bone>(),
     controllerSystem,
     halfExtents: extents,
-    keyboard,
+    input,
     physics,
     placePlayer,
     playerCollider: RigidBody.collider[playerEid],

@@ -22,6 +22,7 @@ import { type System, SystemRegistry } from './core/system';
 import { Logger } from './diagnostics/logger';
 import { EventBus } from './events/event-bus';
 import { type GameEvents } from './events/events.global';
+import { CombinedInput, type InputState, PointerLookSource } from './input';
 import {
   type BloomConfig,
   type CameraConfig,
@@ -91,6 +92,7 @@ export class Game {
   private currentZone = ''; // district display name (GXT text); '' = no zone
   private readonly entityRoot = new Group();
   private readonly gameClock = new GameClock();
+  private input!: CombinedInput;
   private lastRequest: null | RegionRequest = null;
   private readonly logger: Logger;
   /** Debug normals view (plan: Map → Show Normals): scene-wide MeshNormalMaterial override, rendered
@@ -98,6 +100,7 @@ export class Game {
   private normalMaterial: MeshNormalMaterial | null = null;
   private pipeline!: RenderPipeline;
   private readonly plugins: Plugin[] = [];
+  private pointerSource!: PointerLookSource;
   private readonly raycaster = new Raycaster();
   private renderer!: WebGLRenderer;
   private scene!: Scene;
@@ -134,6 +137,11 @@ export class Game {
     return Game.instance;
   }
 
+  /** Register another input source (e.g. the keyboard once the character exists, or a touch overlay). */
+  addInputSource(source: InputState): void {
+    this.input.add(source);
+  }
+
   addPlugin(plugin: Plugin): this {
     this.plugins.push(plugin);
 
@@ -149,6 +157,7 @@ export class Game {
 
   dispose(): void {
     this.renderer.setAnimationLoop(null);
+    this.pointerSource.stop();
     this.cameraController.dispose();
     for (const plugin of this.plugins) {
       plugin.dispose?.();
@@ -194,6 +203,11 @@ export class Game {
   /** Continuous in-game time of day in hours (0–24, fractional) — for smooth consumers (sun/sky). */
   getHours(): number {
     return this.gameClock.exactMinutes / 60;
+  }
+
+  /** The combined player input the systems + camera read (plan 055); add sources via {@link addInputSource}. */
+  getInput(): InputState {
+    return this.input;
   }
 
   /** Shared diagnostics logger; pass to systems so they can emit gated `'log'` events. */
@@ -246,7 +260,11 @@ export class Game {
     this.scene = scene;
     this.scene.add(this.entityRoot);
     this.scene.add(this.streamingRoot);
-    this.cameraController = new CameraController(camera, renderer.domElement, this.config);
+    // Mouse look/zoom is an input source; other sources (keyboard, touch) join via addInputSource (plan 055).
+    this.pointerSource = new PointerLookSource(renderer.domElement);
+    this.pointerSource.start();
+    this.input = new CombinedInput([this.pointerSource]);
+    this.cameraController = new CameraController(camera, renderer.domElement, this.config, this.input);
     this.pipeline = new BasicRenderPipeline(renderer, scene, camera);
     this.context = {
       camera,

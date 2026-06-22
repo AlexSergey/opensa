@@ -2,12 +2,13 @@ import { addComponent, addEntity } from 'bitecs';
 import { PerspectiveCamera } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import type { KeyboardInput } from '../input/keyboard';
+import type { KeyboardInput } from '../input';
 import type { Config } from '../interfaces/config.interface';
 import type { CharacterController } from '../physics/physics-world';
 
 import { PlayerControlled, RigidBody, Velocity } from '../ecs/components';
 import { createEcsWorld } from '../ecs/world';
+import { KeyboardSource } from '../input';
 import { PhysicsWorld } from '../physics/physics-world';
 import { initRapier } from '../physics/rapier';
 import { CharacterControllerSystem } from './character-controller.system';
@@ -133,7 +134,7 @@ function run(player: Player, cfg: Config, ...held: string[]): void {
   new CharacterControllerSystem(
     player.world,
     player.physics,
-    keys(...held),
+    new KeyboardSource(keys(...held), cfg.controls),
     cfg,
     player.controller,
     CAMERA,

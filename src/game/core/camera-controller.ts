@@ -1,6 +1,7 @@
 import { Box3, MOUSE, type Object3D, type PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import type { InputState } from '../input';
 import type { Config } from '../interfaces/config.interface';
 
 type CameraMode = 'debug' | 'fly' | 'follow';
@@ -47,6 +48,7 @@ export class CameraController {
   private following = false; // a direction change engaged auto-follow; eases until settled behind, then clears
   private hasHeading = false;
   private hasPrevTarget = false;
+  private readonly input: InputState;
   private lastManualMs = 0; // performance.now() of the last mouse look — suppresses auto-follow for a grace window
   private mode: CameraMode = 'follow';
   private polar: number;
@@ -55,10 +57,11 @@ export class CameraController {
   private target: null | Object3D = null;
   private readonly targetPosition = new Vector3();
 
-  constructor(camera: PerspectiveCamera, domElement: HTMLElement, config: Readonly<Config>) {
+  constructor(camera: PerspectiveCamera, domElement: HTMLElement, config: Readonly<Config>, input: InputState) {
     this.camera = camera;
     this.domElement = domElement;
     this.config = config;
+    this.input = input;
     this.distance = config.camera.followDistance;
     this.polar = clamp(config.camera.followPolar, config.camera.followMinPolar, config.camera.followMaxPolar);
 
@@ -71,15 +74,13 @@ export class CameraController {
     this.controls.minPolarAngle = 0; // straight down …
     this.controls.maxPolarAngle = Math.PI / 2; // … to the horizon (don't orbit under the ground)
 
-    domElement.addEventListener('pointermove', this.onPointerMove);
-    domElement.addEventListener('wheel', this.onWheel, { passive: false });
+    // Look/zoom come from the InputState (a PointerLookSource on desktop; a touch look-pad on mobile — plan
+    // 055). Fly-mode arrow-key translation stays a local dev-tool binding.
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
   }
 
   dispose(): void {
-    this.domElement.removeEventListener('pointermove', this.onPointerMove);
-    this.domElement.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     this.controls.dispose();
@@ -170,15 +171,34 @@ export class CameraController {
   }
 
   update(delta: number): void {
+    // Look/zoom deltas are consumed (cleared) every frame regardless of mode (debug discards them).
+    const look = this.input.consumeLook();
+    const zoom = this.input.consumeZoom();
     if (this.mode === 'debug') {
       this.controls.update();
 
       return;
     }
     if (this.mode === 'fly') {
+      this.flyYaw -= look.x * FLY_LOOK_SENSITIVITY;
+      this.flyPitch = clamp(this.flyPitch - look.y * FLY_LOOK_SENSITIVITY, -MAX_FLY_PITCH, MAX_FLY_PITCH);
       this.flyUpdate(delta);
 
       return;
+    }
+    // Follow: plain look orbits (no button), suppressing auto-follow for a grace window; wheel zooms.
+    if (look.x !== 0 || look.y !== 0) {
+      this.lastManualMs = performance.now();
+      this.azimuth -= look.x * LOOK_SENSITIVITY;
+      this.polar = clamp(
+        this.polar - look.y * LOOK_SENSITIVITY,
+        this.config.camera.followMinPolar,
+        this.config.camera.followMaxPolar,
+      );
+    }
+    if (zoom !== 0 && this.config.camera.followZoom) {
+      const { followZoomMax, followZoomMin } = this.config.camera;
+      this.distance = clamp(this.distance + zoom * ZOOM_SENSITIVITY, followZoomMin, followZoomMax);
     }
     if (!this.target) {
       return;
@@ -300,35 +320,6 @@ export class CameraController {
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.flyKeys.delete(event.code);
-  };
-
-  private readonly onPointerMove = (event: PointerEvent): void => {
-    if (this.mode === 'fly') {
-      this.flyYaw -= event.movementX * FLY_LOOK_SENSITIVITY;
-      this.flyPitch = clamp(this.flyPitch - event.movementY * FLY_LOOK_SENSITIVITY, -MAX_FLY_PITCH, MAX_FLY_PITCH);
-
-      return;
-    }
-    if (this.mode !== 'follow' || (event.movementX === 0 && event.movementY === 0)) {
-      return;
-    }
-    // Plain mouse movement orbits (no button). This is a manual look → hold off auto-follow for a grace window.
-    this.lastManualMs = performance.now();
-    this.azimuth -= event.movementX * LOOK_SENSITIVITY;
-    this.polar = clamp(
-      this.polar - event.movementY * LOOK_SENSITIVITY,
-      this.config.camera.followMinPolar,
-      this.config.camera.followMaxPolar,
-    );
-  };
-
-  private readonly onWheel = (event: WheelEvent): void => {
-    if (this.mode !== 'follow' || !this.config.camera.followZoom) {
-      return;
-    }
-    event.preventDefault();
-    const { followZoomMax, followZoomMin } = this.config.camera;
-    this.distance = clamp(this.distance + event.deltaY * ZOOM_SENSITIVITY, followZoomMin, followZoomMax);
   };
 }
 

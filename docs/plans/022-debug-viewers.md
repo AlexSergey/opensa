@@ -1,5 +1,13 @@
 # 022 — Debug viewers (object / vehicle / character)
 
+> **Update (2026-06-22) — viewer fixtures regenerated, not committed.** All of `static/` is now gitignored,
+> so the viewer fixtures (`static/viewer/`) are no longer committed. `scripts/copy-viewer.ts` +
+> `scripts/extract-viewer-collision.ts` were replaced by a single `scripts/build-viewer-assets.ts`
+> (`npm run viewer:assets`) that extracts everything from `game-src/non-modified` — character (now
+> **bmypol1**, not the custom Tommy) + `ped.ifp`, vehicles (admiral/comet), and the object models + their
+> baked `*.col.json`. References to `extract-viewer-collision.ts` below are historical; the COL-baking logic
+> moved into `build-viewer-assets.ts` unchanged.
+
 ## Goal
 
 Standalone, browser-based dev tools to inspect assets in isolation from the game, streaming and
@@ -30,16 +38,17 @@ the script after adding a model to `MODELS`.
 ### `/vehicle-viewer.html` — vehicles (`vehicle-viewer.ts`)
 
 Loads `static/vehicles/<name>.dff|.txd` (admiral / admiral2 / camper) via `buildVehicle` (debug paint
-+ neutral wheel scale; generic wheel/light textures from `gta3.img` are **not** loaded → those bits
-render untextured, the body uses the car's own TXD). UI:
 
-- **Model select** + **part select** — parts come from `BuiltVehicle.parts`; the selected one is
+- neutral wheel scale; generic wheel/light textures from `gta3.img` are **not** loaded → those bits
+  render untextured, the body uses the car's own TXD). UI:
+
+* **Model select** + **part select** — parts come from `BuiltVehicle.parts`; the selected one is
   highlighted with a `Box3Helper`.
-- **Open / close door** (button or `E`) — matches the selected part to `BuiltVehicle.doors` by side
+* **Open / close door** (button or `E`) — matches the selected part to `BuiltVehicle.doors` by side
   and swings the hinge.
-- **Damage / repair** — swaps the selected part's `_ok`/`_dam` meshes.
-- **Collision** — the embedded vehicle COL (`parseDffCollision` → `buildCollisionWireframe`).
-- **LOD (chassis_vlo)** — shows `BuiltVehicle.lod`, hides the HD body (same swap the game's LOD system
+* **Damage / repair** — swaps the selected part's `_ok`/`_dam` meshes.
+* **Collision** — the embedded vehicle COL (`parseDffCollision` → `buildCollisionWireframe`).
+* **LOD (chassis_vlo)** — shows `BuiltVehicle.lod`, hides the HD body (same swap the game's LOD system
   does).
 
 Robustness: camera framing **and** the selection box are derived from the **COL bounds** (authored

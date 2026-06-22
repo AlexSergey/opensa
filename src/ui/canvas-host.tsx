@@ -767,7 +767,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     const vehicleDamage = new VehicleDamageSystem(character.physics, game.getLogger());
     game.addSystem(vehicleDamage);
     const enterVehicle = new EnterVehicleSystem(
-      character.keyboard,
+      character.input,
       character.viewOf,
       character.controllerSystem,
       character.placePlayer,

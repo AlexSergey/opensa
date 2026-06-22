@@ -6,7 +6,7 @@ import type { CharacterAnimationSystem } from '../character/character-animation.
 import type { CharacterControllerSystem } from '../character/character-controller.system';
 import type { System } from '../core/system';
 import type { Logger } from '../diagnostics/logger';
-import type { KeyboardInput } from '../input/keyboard';
+import type { InputState } from '../input';
 import type { Config } from '../interfaces/config.interface';
 import type { Vec3, VehicleHandling, VehicleWheelPlacement } from '../interfaces/world-adapter.interface';
 import type { PhysicsWorld, VehicleController } from '../physics/physics-world';
@@ -41,7 +41,6 @@ export interface EnterableVehicle {
   wheels: VehicleWheelPlacement[];
 }
 
-const ENTER_KEY = 'Enter';
 /** Planar distance (m) from the car within which Enter starts the sequence. */
 const ENTER_RANGE = 4;
 /** How far out from the hinge (m, driver −X side) the player stands to open the door. */
@@ -124,7 +123,7 @@ export class EnterVehicleSystem implements System {
   private getinFrom: Vec3 = [0, 0, 0];
   private holdPos: Vec3 = [0, 0, 0]; // parked car pose, held still while the player slides in/out
   private holdQuat: [number, number, number, number] = [0, 0, 0, 1];
-  private readonly keyboard: KeyboardInput;
+  private readonly input: InputState;
   private readonly logger: Logger;
   private phase: Phase = 'idle';
   private readonly physics: PhysicsWorld;
@@ -139,7 +138,7 @@ export class EnterVehicleSystem implements System {
   private readonly vehicles: EnterableVehicle[] = [];
 
   constructor(
-    keyboard: KeyboardInput,
+    input: InputState,
     playerPosition: () => Vec3,
     controller: CharacterControllerSystem,
     placePlayer: (position: Vec3, moveBody?: boolean) => void,
@@ -151,7 +150,7 @@ export class EnterVehicleSystem implements System {
     playerCollider: number,
     logger: Logger,
   ) {
-    this.keyboard = keyboard;
+    this.input = input;
     this.playerPosition = playerPosition;
     this.controller = controller;
     this.placePlayer = placePlayer;
@@ -215,7 +214,7 @@ export class EnterVehicleSystem implements System {
   }
 
   update(delta: number): void {
-    const pressed = this.keyboard.isDown(ENTER_KEY);
+    const pressed = this.input.isActive('enterExit');
     const edge = pressed && !this.enterHeld;
     this.enterHeld = pressed;
     if (edge && this.phase === 'idle') {
@@ -302,11 +301,6 @@ export class EnterVehicleSystem implements System {
     }
   }
 
-  /** Keyboard axis from two keys: +1 positive, −1 negative, 0 neither/both. */
-  private axis(positive: string, negative: string): number {
-    return (this.keyboard.isDown(positive) ? 1 : 0) - (this.keyboard.isDown(negative) ? 1 : 0);
-  }
-
   /** Lock onto the nearest in-range car and send the player to its driver door. */
   private beginApproach(): void {
     const [px, py] = this.playerPosition();
@@ -369,11 +363,11 @@ export class EnterVehicleSystem implements System {
    * steering (lock shrinks with speed). Forces are integrated by the physics step.
    */
   private drive(car: EnterableVehicle, step: number): void {
-    const { controls } = this.config;
     const stopping = this.phase === 'stopping'; // braking to a halt before the player climbs out
-    const throttle = stopping ? 0 : this.axis(controls.forward, controls.back);
-    const steerInput = stopping ? 0 : this.axis(controls.right, controls.left);
-    const handbrake = stopping || this.keyboard.isDown(controls.jump); // Space = brake / handbrake
+    const move = this.input.move();
+    const throttle = stopping ? 0 : move.y;
+    const steerInput = stopping ? 0 : move.x;
+    const handbrake = stopping || this.input.isActive('jump'); // Space = brake / handbrake
     const hnd = car.handling;
     // Real forward speed from the body's *horizontal* velocity (the controller's
     // currentVehicleSpeed carries a phantom ~0.95 at rest → would misread reverse).
@@ -614,8 +608,8 @@ export class EnterVehicleSystem implements System {
    * progress for {@link APPROACH_STALL_TIMEOUT} — auto-cancels so Tommy doesn't run in place forever.
    */
   private updateApproachCancel(delta: number): void {
-    const { controls } = this.config;
-    const moving = this.axis(controls.forward, controls.back) !== 0 || this.axis(controls.right, controls.left) !== 0;
+    const move = this.input.move();
+    const moving = move.x !== 0 || move.y !== 0;
     this.approachHeld = moving ? this.approachHeld + delta : 0;
 
     const [px, py] = this.playerPosition();

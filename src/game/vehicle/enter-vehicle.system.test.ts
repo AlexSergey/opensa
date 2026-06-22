@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { CharacterAnimationSystem } from '../character/character-animation.system';
 import type { CharacterControllerSystem } from '../character/character-controller.system';
-import type { Config } from '../interfaces/config.interface';
+import type { Config, ControlsConfig } from '../interfaces/config.interface';
 import type { Vec3 } from '../interfaces/world-adapter.interface';
 import type { PhysicsWorld, VehicleController } from '../physics/physics-world';
 import type { EnterableVehicle } from './enter-vehicle.system';
 import type { VehicleRig } from './vehicle-rig';
 
 import { Logger } from '../diagnostics/logger';
+import { KeyboardSource } from '../input';
 import { EnterVehicleSystem } from './enter-vehicle.system';
 
 const CONTROLS = { back: 'KeyS', forward: 'KeyW', left: 'KeyA', right: 'KeyD' };
@@ -47,6 +48,7 @@ function seatPlayer(h: Harness, car: EnterableVehicle): void {
 function setup(player: Vec3 = [0, 0, 0]): Harness {
   const held = new Set<string>();
   const keyboard = { isDown: (code: string): boolean => held.has(code) };
+  const input = new KeyboardSource(keyboard, CONTROLS as unknown as ControlsConfig);
 
   const ctrl = { arrived: false, enabled: true, path: null as null | Vec3[] };
   const controller = {
@@ -101,7 +103,7 @@ function setup(player: Vec3 = [0, 0, 0]): Harness {
     anim.cameraAzimuth = yaw;
   };
   const system = new EnterVehicleSystem(
-    keyboard,
+    input,
     () => player,
     controller,
     placePlayer,
