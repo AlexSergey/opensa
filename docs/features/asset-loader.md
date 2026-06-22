@@ -51,6 +51,9 @@ game, version }`; each chunk is `{ bytes, cached, entries, file, hash }`), `mani
   Doing the probe first makes the wipe atomic — no cacheable chunk can race back in after it.
 - **Cache** (`cache-store.ts`): Cache Storage, one named bucket, keyed by content-hashed chunk URL.
   **Invalidation** in `invalidate.ts` (pure `staleKeys`); **`clear()`** drops the whole bucket (revoke).
+  Cache Storage needs a **secure context** (https / localhost); over plain `http://` (e.g. a phone on a LAN
+  IP) `caches` is undefined, so every op degrades to a no-op — nothing is cached and assets re-download each
+  visit (no crash).
 
 ## Local loader (`asset-local-loader/`, plan 053)
 

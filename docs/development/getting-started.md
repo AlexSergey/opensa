@@ -91,6 +91,11 @@ re-fetches only the dropped chunk; a return visit downloads nothing.
 > **Note:** the boot fetches `static/original-${__APP_VERSION__}/manifest.json` (version from
 > `package.json`, wired in `src/ui/shell/use-asset-boot.ts`) — currently the `original` variant only.
 
+> **Testing on a phone (LAN):** Cache Storage needs a **secure context** (https / localhost). Over plain
+> `http://<your-ip>:port` `caches` is undefined, so the loader skips caching and **re-downloads every visit**
+> (it no longer crashes — see [asset loaders](../features/asset-loader.md)). For on-device caching, serve over
+> https (Vite `server.https`) or a tunnel (ngrok / cloudflared).
+
 ## 5. Test fixtures (to run the test suite)
 
 The real-asset test fixtures under `tests/original/` are Rockstar assets, so they are **not committed**
