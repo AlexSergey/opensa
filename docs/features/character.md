@@ -7,7 +7,8 @@
 
 - **Skinned model**: Skin plugin → `SkinnedMesh` + `Skeleton`; bones from the frame hierarchy
   (skin bone i ↔ frame i+1, frame 0 = dummy root); bind pose = raw mesh regardless of mapping;
-  named-bone map for animation retargeting. Current model: Tommy (custom).
+  named-bone map for animation retargeting. Current model: `VITE_MAIN_CHARACTER` (a `peds.ide` ped, default
+  `BMYPOL1`); unset falls back to the loose `player/*` DFF.
 - **Animation** (plan 012): ANP3 IFP parsing (quaternions i16/4096, times i16, root translation
   i16/1024), `buildAnimationClip` (quaternion tracks by bone name; translation opt-in);
   `ped.ifp` is loaded **directly** (`loadAnimations(ifpUrl)` → `anim/ped.ifp`, no packed archive);

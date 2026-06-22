@@ -41,7 +41,7 @@ import { buildClump } from '../renderware/three/build-clump';
 import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe';
 import { buildTextureMap } from '../renderware/three/build-texture';
 
-/** Serialised COL (from scripts/extract-viewer-collision.ts) — vertices as a plain array. */
+/** Serialised COL (baked by scripts/build-viewer-assets.ts) — vertices as a plain array. */
 type ColJson = Omit<ColModel, 'vertices'> & { vertices: number[] };
 
 interface ModelEntry {
@@ -194,7 +194,7 @@ async function loadCollision(model: ModelEntry): Promise<void> {
   const base = model.dff.replace(/\.dff$/, '');
   const response = await fetch(`${BASE}/viewer/objects/${base}.col.json`);
   if (!response.ok) {
-    return; // no extracted COL for this model — re-run scripts/extract-viewer-collision.ts
+    return; // no extracted COL for this model — re-run scripts/build-viewer-assets.ts
   }
   const json = (await response.json()) as ColJson;
   const col: ColModel = { ...json, vertices: new Float32Array(json.vertices) };

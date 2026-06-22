@@ -105,6 +105,16 @@ Custom (non-Rockstar) fixtures live in `tests/custom/` and are committed — no 
 that can't be reproduced from a stock copy are also committed (see `scripts/test-fixtures.ts`). Re-run
 `npm run test:fixtures` whenever you add a fixture to the manifest.
 
+## 6. Viewer fixtures (for the standalone viewers + their e2e)
+
+The standalone model viewers (`object-viewer.html`, `vehicle-viewer.html`, `character-viewer.html`) and the
+object-viewer e2e read from `static/viewer/`, which — like everything under `static/` — is **gitignored**.
+Regenerate it by extracting from the same `game-src/non-modified/` copy:
+
+```bash
+npm run viewer:assets   # extracts character (bmypol1) + vehicles + objects (+ baked COL) into static/viewer/
+```
+
 ## Where to go next
 
 - [scripts.md](./scripts.md) — the build/asset pipeline and the offline debug tools under `scripts/debug/`.

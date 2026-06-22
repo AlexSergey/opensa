@@ -36,12 +36,12 @@ import { buildAnimationClip } from '../renderware/three/build-anim-clip';
 import { buildSkinnedClump } from '../renderware/three/build-skinned-clump';
 import { buildTextureMap } from '../renderware/three/build-texture';
 
-/** Tommy ped (the player model) + the locomotion IFP (loaded directly, like the original). */
-const DFF = 'tommy.dff';
-const TXD = 'tommy.txd';
+/** Player ped (bmypol1) + the locomotion IFP (loaded directly, like the game). */
+const DFF = 'bmypol1.dff';
+const TXD = 'bmypol1.txd';
 const IFP = 'ped.ifp';
 const DEFAULT_CLIP = 'idle_stance';
-/** Stand the SA bind pose up (matches canvas-host's TOMMY_PLACEMENT). */
+/** Stand the SA bind pose up (matches canvas-host's PLAYER_PLACEMENT). */
 const PLACEMENT = {
   offset: [0, 0, 0.04] as [number, number, number],
   rotation: [0, 0, 0] as [number, number, number],
@@ -163,7 +163,7 @@ async function loadCharacter(): Promise<void> {
   const [dffBuffer, txdBuffer] = await Promise.all([fetchBuffer(DFF), fetchBuffer(TXD)]);
   const skinned = buildSkinnedClump(parseDff(dffBuffer), buildTextureMap(parseTxd(txdBuffer)));
   if (!skinned) {
-    throw new Error('tommy.dff is not skinned (no skeleton)');
+    throw new Error('bmypol1.dff is not skinned (no skeleton)');
   }
   const player = orientCharacter(skinned.root, PLACEMENT);
   content.add(player);

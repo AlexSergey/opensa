@@ -8,9 +8,8 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 - [Build / asset pipeline](#build--asset-pipeline)
   - [build-game.ts](#build-gamets)
   - [gen-wind-list.ts](#gen-wind-listts)
-  - [copy-viewer.ts](#copy-viewerts)
+  - [build-viewer-assets.ts](#build-viewer-assetsts)
   - [serve-static.ts](#serve-staticts)
-  - [extract-viewer-collision.ts](#extract-viewer-collisionts)
   - [test-fixtures.ts](#test-fixturests)
 - [Debugging / auditing](#debugging--auditing)
   - [audit-rw-coverage.ts](#audit-rw-coveragets)
@@ -60,35 +59,28 @@ models.
 npx tsx scripts/gen-wind-list.ts
 ```
 
-### copy-viewer.ts
+### build-viewer-assets.ts
 
-Regenerates the viewer fixtures from `game-src/viewer/` (the gitignored, local source of truth) into
-**`static/viewer/`** (the only committed path under `static/`), preserving the per-viewer subfolders
-(`objects/`, `vehicles/`, `character/`), so the standalone viewers and the e2e lane have their models without
-the full archive (and run in CI). Local/dev only (needs game-src). Run together with
-`extract-viewer-collision.ts` via the combined `viewer:assets:original` script, then **commit the trimmed
-`static/viewer/`**.
+Builds the standalone viewers' fixtures into **`static/viewer/`** by extracting from a clean, unmodified GTA
+copy under `game-src/non-modified` (same source as `test-fixtures.ts`): `character/` (bmypol1 dff+txd + a
+copied `ped.ifp`), `vehicles/` (admiral, comet), and `objects/` (the object-viewer's models + their txds, plus
+a pre-baked `<model>.col.json` — map-object collision lives in the IMG, not the DFF). **Nothing under
+`static/` is committed** (all of `static/` is gitignored); regenerate locally after a fresh clone. Local/dev
+only (needs game-src). Re-run when the viewers' model lists or the COL parser change.
 
 ```sh
-npm run viewer:assets:original      # tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original
+npm run viewer:assets               # tsx scripts/build-viewer-assets.ts
 ```
 
 ### serve-static.ts
 
 The local + e2e static origin (`npm run serve:static`, port 3001 = `VITE_STATIC_URL`). Serves `static/`,
-which holds both the committed `static/viewer/` fixtures (`/viewer/*`) and the built
-`static/games/<game>-<version>/` archives (gitignored). CORS is on; dev mode reads files fresh.
+which holds the generated viewer fixtures (`/viewer/*`, `npm run viewer:assets`) and the built
+`static/games/<game>-<version>/` archives — all gitignored. CORS is on; dev mode reads files fresh.
 
 ```sh
 npm run serve:static                # tsx scripts/serve-static.ts
 ```
-
-### extract-viewer-collision.ts
-
-Maintenance tool: re-bakes the COL of the object-viewer's model list out of the variant's
-`game-src/<game>/models/gta3.img` into `<model>.col.json` (written into `game-src/viewer/objects/`, which
-`copy-viewer` syncs to `static/viewer/objects/`). Use when the collision parser changes. Bundled into
-`viewer:assets:original` (above), so the regenerated col ships with the next copy.
 
 ### timecyc-builder (`npm run timecyc`)
 

@@ -93,7 +93,7 @@ const WORLD_READY_TIMEOUT_MS = 12000; // reveal the game even if grounding is de
 const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
 // The animation (idle/walk) stands the skeleton up in GTA Z-up, so the model needs
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
-const TOMMY_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
+const PLAYER_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
 
 // Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
 // omitted 3rd/4th default to palette 0, like SA).
@@ -544,7 +544,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     const model = MAIN_CHARACTER
       ? await adapter.loadCharacterByModel(MAIN_CHARACTER)
       : await adapter.loadCharacter('player/t800.dff', 'player/t800.txd');
-    const player = orientCharacter(model.object, TOMMY_PLACEMENT);
+    const player = orientCharacter(model.object, PLAYER_PLACEMENT);
     const character = await setupCharacter(game, player, PLAYER_SPAWN[GAME_TYPE], {
       bonesByName: model.bonesByName,
       halfExtents: PLAYER_HALF_EXTENTS,

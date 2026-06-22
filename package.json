@@ -61,7 +61,7 @@
     "test:fixtures": "tsx scripts/test-fixtures.ts",
     "test:watch": "vitest",
     "timecyc": "tsx ./timecyc-builder/index.ts",
-    "viewer:assets:original": "tsx scripts/copy-viewer.ts && tsx scripts/extract-viewer-collision.ts --game original"
+    "viewer:assets": "tsx scripts/build-viewer-assets.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.3",

@@ -28,7 +28,7 @@ npm run dev                   # Vite dev server — open the printed URL
 ```bash
 npm run lint                  # tsc --noEmit + eslint
 npm test                      # Vitest unit suite
-npm run e2e                   # Playwright browser lane (needs the built archives)
+npm run e2e                   # Playwright browser lane (needs the built archives + `npm run viewer:assets`)
 ```
 
 - **Every code change ships with tests** in the same PR. Pure logic → Vitest units; GL/DOM/app-loop code →

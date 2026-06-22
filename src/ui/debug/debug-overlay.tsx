@@ -79,7 +79,7 @@ export interface DebugActions {
   playerCoords(): Vec3;
   /** Current procedural-clutter tuning (per category; plan 042). */
   procObj(): ProcObjConfig;
-  /** Re-drop Tommy at his current spot (to unstick). */
+  /** Re-drop the player at their current spot (to unstick). */
   respawnPlayer(): void;
   /** Tune bloom (enabled/intensity/threshold). */
   setBloom(patch: Partial<BloomConfig>): void;

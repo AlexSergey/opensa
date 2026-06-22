@@ -14,8 +14,8 @@ npm run e2e:update     # regenerate screenshot baselines
 
 `playwright.config.ts` starts two `webServer`s for you (reused if already running locally):
 
-- `npm run serve:static` — serves `static/` on :3001 (`VITE_STATIC_URL`): the committed `static/viewer/`
-  fixtures **and** the built `static/games/<game>-<version>/` archives (gitignored).
+- `npm run serve:static` — serves `static/` on :3001 (`VITE_STATIC_URL`): the `static/viewer/` fixtures
+  (`npm run viewer:assets`) **and** the built `static/games/<game>-<version>/` archives — all gitignored.
 - `npm run dev -- --mode e2e --port 5174 --strictPort` — the Vite app on **:5174** (`baseURL`). The dedicated
   port (not the usual 5173) means the lane never reuses a hand-started dev server in another mode (e.g. the
   `local` loader). `--mode e2e` loads the committed **`.env.e2e`**, which forces `VITE_ASSET_LOADER=fetch` (it
@@ -25,10 +25,9 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 
 ## Assets
 
-`e2e/object-viewer.spec.ts` targets **`object-viewer.html`**, whose models live in the small,
-**committed** `static/viewer/` — so it runs **anywhere, including CI**, with no game-src and no full archive
-(`npm run e2e` no longer pre-populates anything; regenerate the fixtures locally with
-`npm run viewer:assets:original`, which writes `static/viewer/`, and commit the trimmed result).
+`e2e/object-viewer.spec.ts` targets **`object-viewer.html`**, whose models live in `static/viewer/` —
+generated locally (gitignored) from a GTA copy via `npm run viewer:assets`. Run that once after a fresh clone
+before the viewer e2e (CI doesn't have game-src, so the e2e lane runs locally).
 `e2e/asset-fetch-loader.spec.ts` mocks all network (`page.route`) — no assets needed.
 `e2e/asset-local-loader.spec.ts` runs the local loader's real pipeline (directory walk + lazy VER2 reader +
 selection + VFS) over an **in-page fake** File System Access tree — no real install / picker needed (the
