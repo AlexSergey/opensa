@@ -41,12 +41,12 @@ describe('encodeDff', () => {
       expect(() => encodeDff(bytes, ir)).toThrow(/geometry count mismatch/);
     });
 
-    it('throws when a sub-mesh vertex count changed (topology edit)', () => {
-      const { arrayBuffer, bytes } = load(FIXTURES[0]);
+    it('routes a vertex-count change to rebuild, which refuses a skinned model', () => {
+      const { arrayBuffer, bytes } = load(FIXTURES[0]); // a skinned character
       const ir = clumpToIr(parseDff(arrayBuffer));
-      ir.meshes[0].positions = ir.meshes[0].positions.slice(0, -3); // drop a vertex
+      ir.meshes[0].positions = ir.meshes[0].positions.slice(0, -3); // drop a vertex → count change
 
-      expect(() => encodeDff(bytes, ir)).toThrow(/topology change unsupported/);
+      expect(() => encodeDff(bytes, ir)).toThrow(/skinned/);
     });
   });
 

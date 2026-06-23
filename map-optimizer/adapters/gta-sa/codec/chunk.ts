@@ -15,12 +15,17 @@
 const HEADER_BYTES = 12;
 
 export const RW_STRUCT = 0x01;
+export const RW_EXTENSION = 0x03;
 export const RW_GEOMETRY = 0x0f;
 export const RW_CLUMP = 0x10;
 export const RW_GEOMETRY_LIST = 0x1a;
+export const RW_SKIN = 0x116;
+export const RW_BIN_MESH_PLG = 0x50e;
+export const RW_NIGHT_VERTEX_COLORS = 0x253f2f9;
 
-/** Section types we descend into to reach a Geometry's Struct; everything else is a leaf (raw bytes). */
-const CONTAINER_TYPES = new Set<number>([RW_CLUMP, RW_GEOMETRY, RW_GEOMETRY_LIST]);
+/** Section types we descend into to reach a Geometry's Struct + its Extension (for BinMeshPLG / night colour
+ *  rebuild); everything else (incl. the plugin chunks inside an Extension) is a leaf (raw bytes). */
+const CONTAINER_TYPES = new Set<number>([RW_CLUMP, RW_EXTENSION, RW_GEOMETRY, RW_GEOMETRY_LIST]);
 
 const EMPTY = new Uint8Array(0);
 

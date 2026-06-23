@@ -1,12 +1,13 @@
 import type { OptimizerConfig } from './core/asset';
 
-import { passThrough } from './plugins/pass-through';
+import { createRecomputeNormals } from './plugins/recompute-normals';
+import { createWeldVertices } from './plugins/weld-vertices';
 
 /**
- * The default pipeline (the "gulpfile"). No transforms yet — just the no-op stage that validates the
- * read → pipeline → write loop. Add ordered plugins here as they land.
+ * The default pipeline (the "gulpfile"). Runs the ordered plugins over every map model; add stages here as
+ * they land. `pass-through` (the no-op loop validator) stays available in `plugins/pass-through.ts`.
  */
 export const config: OptimizerConfig = {
   concurrency: 4,
-  plugins: [passThrough],
+  plugins: [createRecomputeNormals(), createWeldVertices()],
 };
