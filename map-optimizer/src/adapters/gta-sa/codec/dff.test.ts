@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { parseDff } from '../../../../src/renderware/parsers/binary/dff';
+import { parseDff } from '../../../../../src/renderware/parsers/binary/dff';
 import { clumpToIr } from '../read';
 import { readRw, writeRw } from './chunk';
 import { encodeDff } from './dff';

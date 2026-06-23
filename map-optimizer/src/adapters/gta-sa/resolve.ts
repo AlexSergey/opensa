@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ModelRef } from '../../../src/game-build/partition';
-import type { ImgArchive } from '../../../src/renderware/archive/img-archive';
+import type { ModelRef } from '../../../../src/game-build/partition';
+import type { ImgArchive } from '../../../../src/renderware/archive/img-archive';
 
-import { ideRefs, placedModels } from '../../../src/game-build/partition';
-import { parseBinaryIpl } from '../../../src/renderware/parsers/text/ipl-binary.parser';
-import { parseIpl } from '../../../src/renderware/parsers/text/ipl.parser';
+import { ideRefs, placedModels } from '../../../../src/game-build/partition';
+import { parseBinaryIpl } from '../../../../src/renderware/parsers/text/ipl-binary.parser';
+import { parseIpl } from '../../../../src/renderware/parsers/text/ipl.parser';
 
 /**
  * Unique DFF base names the game's EXTERIOR map references (deduped, lowercased). Reuses the build

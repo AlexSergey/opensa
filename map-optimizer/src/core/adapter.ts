@@ -3,7 +3,7 @@ import type { Asset, AssetRef, WriteResult } from './asset';
 /**
  * Game-specific I/O behind one interface, so a new game = a new adapter and the core stays game-agnostic.
  * The core never imports a parser or a game format directly — only this. Implementations live under
- * `map-optimizer/adapters/<game>/`; they own all reading, writing and resolution of that game's assets.
+ * `map-optimizer/src/adapters/<game>/`; they own all reading, writing and resolution of that game's assets.
  */
 export interface GameAdapter {
   /** Optional persist/repack step after every asset is written (e.g. rebuild an IMG archive). */

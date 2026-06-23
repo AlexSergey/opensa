@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { GameAdapter } from './adapter';
 import type { Asset, MapPlugin, OptimizerConfig, PipelineContext } from './asset';
+import type { MeshIR } from './ir';
 import type { AssetFailure, AssetReport, RunReport } from './report';
 
 const DEFAULT_CONCURRENCY = 4;
@@ -21,10 +22,22 @@ export async function runPipeline(adapter: GameAdapter, config: OptimizerConfig,
   await runWithConcurrency(refs, config.concurrency ?? DEFAULT_CONCURRENCY, async (ref) => {
     try {
       const asset = await adapter.read(ref);
+      const before = countGeometry(asset.ir);
       await applyPlugins(asset, config.plugins, context);
+      const after = countGeometry(asset.ir);
       const { bytes, fileName } = await adapter.write(asset);
       writeFileSync(join(outDir, fileName), bytes);
-      assets.push({ applied: asset.log.map((entry) => entry.plugin), dirty: asset.dirty, name: asset.name });
+      assets.push({
+        applied: asset.log.map((entry) => entry.plugin),
+        bytesAfter: bytes.length,
+        bytesBefore: asset.source.length,
+        dirty: asset.dirty,
+        name: asset.name,
+        trianglesAfter: after.triangles,
+        trianglesBefore: before.triangles,
+        verticesAfter: after.vertices,
+        verticesBefore: before.vertices,
+      });
     } catch (error) {
       failures.push({ error: error instanceof Error ? error.message : String(error), name: ref.name });
     }
@@ -42,6 +55,18 @@ async function applyPlugins(asset: Asset, plugins: readonly MapPlugin[], context
     }
     await plugin.transform(asset, context);
   }
+}
+
+/** Total vertices + triangles across a model's sub-meshes (for before/after report stats). */
+function countGeometry(ir: MeshIR): { triangles: number; vertices: number } {
+  let vertices = 0;
+  let triangles = 0;
+  for (const mesh of ir.meshes) {
+    vertices += mesh.positions.length / 3;
+    triangles += mesh.triangles.length;
+  }
+
+  return { triangles, vertices };
 }
 
 function makeContext(game: string): PipelineContext {

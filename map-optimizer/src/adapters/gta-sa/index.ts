@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { GameAdapter } from '../../core/adapter';
 import type { Asset, AssetRef, WriteResult } from '../../core/asset';
 
-import { openArchive } from '../../../src/renderware/archive/img-archive';
-import { parseDff } from '../../../src/renderware/parsers/binary/dff';
+import { buildVer2Buffer, openArchive } from '../../../../src/renderware/archive/img-archive';
+import { parseDff } from '../../../../src/renderware/parsers/binary/dff';
 import { encodeDff } from './codec/dff';
 import { clumpToIr } from './read';
 import { resolveMapModels } from './resolve';
@@ -13,9 +13,10 @@ import { resolveMapModels } from './resolve';
 /**
  * GTA-SA (RenderWare) adapter. Encapsulates all of this game's I/O behind {@link GameAdapter}: resolving the
  * map's models, reading DFFs into the neutral IR (read-only reuse of `../src` parsers), and writing them back
- * via the in-house DFF serializer ({@link encodeDff}) — the write code lives here in `map-optimizer`, never in
- * `../src`. The serializer patches vertex attributes in place (positions/normals/prelit/UVs); topology edits
- * and anti-rip recovered geometry are not yet expressible and surface as per-asset failures.
+ * via the in-house DFF serializer ({@link encodeDff}). On `finalize` it also packs every optimized model into
+ * a stock VER2 `<game>.img` — the same archive format the input ships in — so the output is drop-in usable.
+ * The serializer patches vertex attributes in place (positions/normals/prelit/UVs); topology edits and
+ * anti-rip recovered geometry are not yet expressible and surface as per-asset failures.
  */
 export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
   const modelsDir = join(gameDir, 'models');
@@ -39,7 +40,17 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
     return null;
   };
 
+  // Optimized models collected during write(), packed into a VER2 .img on finalize().
+  const packed: { data: Uint8Array; name: string }[] = [];
+
   return {
+    finalize(outDir: string): void {
+      if (packed.length === 0) {
+        return;
+      }
+      const entries = [...packed].sort((a, b) => a.name.localeCompare(b.name)); // deterministic order
+      writeFileSync(join(outDir, `${game}.img`), buildVer2Buffer(entries));
+    },
     game,
     read(ref: AssetRef): Asset {
       const bytes = getModel(`${ref.name}.dff`);
@@ -60,7 +71,10 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
       return resolveMapModels(dataDir, gta3).map((name) => ({ name }));
     },
     write(asset: Asset): WriteResult {
-      return { bytes: encodeDff(asset.source, asset.ir), fileName: `${asset.name}.dff` };
+      const bytes = encodeDff(asset.source, asset.ir);
+      packed.push({ data: bytes, name: `${asset.name}.dff` });
+
+      return { bytes, fileName: `${asset.name}.dff` };
     },
   };
 }

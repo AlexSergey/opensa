@@ -1,4 +1,4 @@
-import type { RWClump, RWGeometry } from '../../../src/renderware/parsers/binary/types';
+import type { RWClump, RWGeometry } from '../../../../src/renderware/parsers/binary/types';
 import type { MeshIR, SubMesh } from '../../core/ir';
 
 /** RenderWare clump → neutral mesh IR (one {@link SubMesh} per geometry). Read-only reuse of the main

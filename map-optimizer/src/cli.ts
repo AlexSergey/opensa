@@ -6,9 +6,9 @@
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createGtaSaAdapter } from '../adapters/gta-sa';
-import { printReport, runPipeline } from '../core';
-import { config } from '../optimizer.config';
+import { createGtaSaAdapter } from './adapters/gta-sa';
+import { printReport, runPipeline, writeReport } from './core';
+import { config } from './optimizer.config';
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -30,7 +30,9 @@ async function main(): Promise<void> {
 
   const outDir = config.out ?? join(root, 'map-optimizer', 'out', game);
   const adapter = createGtaSaAdapter(game, gameDir);
-  printReport(await runPipeline(adapter, config, outDir));
+  const report = await runPipeline(adapter, config, outDir);
+  printReport(report);
+  writeReport(report);
 }
 
 main().catch((error: unknown) => {
