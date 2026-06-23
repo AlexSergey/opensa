@@ -123,7 +123,7 @@
   text-transform: uppercase;
 }
 
-/* Open-source tagline under the logo (the logo's own subtitle already says "in your browser"). */
+/* Tagline under the logo (the logo's own subtitle reads "open world. open source."). */
 .sa-tagline {
   max-width: 360px;
   margin-top: -8px;
@@ -181,6 +181,22 @@
   color: var(--sa-muted);
   font-size: 13px;
   text-align: center;
+}
+
+/* Small-print legal/disclaimer at the foot of the menu. */
+.sa-menu__legal {
+  max-width: 380px;
+  margin-top: 6px;
+  color: rgb(255 255 255 / 35%);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.sa-menu__legal a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* --- Overlay panels (disclaimer / error / pause) --- */

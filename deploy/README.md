@@ -56,7 +56,14 @@ Upload (FTP/SFTP/SSH) so the served layout is:
 <web root>/
   index.html
   .htaccess              # from dist/ (already configured: HTTPS, SPA fallback, caching, MIME)
-  assets/                # hashed js/css/fonts/og.png
+  favicon.ico            # favicon set + site.webmanifest emitted to the root (src/assets/favicon/)
+  favicon-16x16.png
+  favicon-32x32.png
+  apple-touch-icon.png
+  android-chrome-192x192.png
+  android-chrome-512x512.png
+  site.webmanifest
+  assets/                # hashed js/css/fonts + stable og.jpg
   static/
     games/
       original-<version>/
@@ -69,6 +76,13 @@ Upload (FTP/SFTP/SSH) so the served layout is:
 - Everything inside `dist/` → the web root.
 - The `static/games/<game>-<version>/` folder → under the web root (or wherever `VITE_STATIC_URL` points).
 - Make sure `.htaccess` made it (dotfiles are hidden in some FTP clients — enable "show hidden files").
+
+**Game chunks (important):** the production menu offers only **San Andreas**, which uses the **local** loader
+(reads the user's own install) and fetches **no** `static/games/` chunks at runtime — so a vanilla SA deploy
+needs no game chunks hosted at all. Only `fetch` games need their chunks uploaded, and the **dev-only**
+`gostown` demo (`devOnly` in `GAME_CONFIG`) is excluded from production builds — **do not upload
+`static/games/gostown-*`** to the public CDN (it would distribute mod content). See
+[build-flags.md](../docs/development/build-flags.md#dev-only-games-gated-by-processenvnode_env).
 
 ## 5. (Optional) Offload the heavy assets
 

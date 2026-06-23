@@ -35,6 +35,10 @@ export function Menu({ onPlay }: MenuProps): ReactElement {
           {link.label}
         </a>
       ))}
+      <p className="sa-menu__legal">
+        Unofficial, non-commercial fan project — not affiliated with Rockstar Games / Take-Two. No game files included;
+        you bring your own copy. Rights holders: <a href="mailto:gooddev.sergey@gmail.com">contact us</a>.
+      </p>
     </nav>
   );
 }

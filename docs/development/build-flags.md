@@ -55,10 +55,24 @@ Types are declared in `src/vite-env.d.ts` (`__APP_VERSION__`, `__DEBUGGER_HIDE__
 ProcObj, Map**. They show in `dev` and the plain `build`, and are hidden only in `build:prod`. The always-on
 sections are Player, Vehicles, Time, Weather, Position.
 
+### Dev-only games gated by `process.env.NODE_ENV`
+
+A game in `GAME_CONFIG` (`src/game-config.tsx`) flagged `devOnly: true` is dropped from the menu in **any**
+production build (`vite build` / `build:prod`) and kept only under `npm run dev` (and the e2e dev server). The
+filter is the pure `selectGameIds(config, isDev)` (`src/game-config.select.ts`), with `isDev =
+process.env.NODE_ENV !== 'production'`. Today **gostown** (a `fetch` demo that would distribute mod content
+from the CDN) is `devOnly`, so a deployed site offers only **San Andreas** (local, bring-your-own-files) — see
+[Legal & takedowns](../../README.md#legal--takedowns). The dev-only game's config strings still sit inert in
+the bundle (the catalogue is indexed by id), but it is never listed, selectable, or fetched; just as
+importantly, **its built chunks (`static/games/gostown-*`) must not be uploaded** to the prod CDN.
+
 ## Other build-time injection (`vite.config.ts` plugins)
 
-- **`emit-og-image`** — copies `src/assets/og.png` → `dist/assets/og.png` with a **stable** name (no content
-  hash), so `og:image` / `twitter:image` in `index.html` can point at `https://opensa.cc/assets/og.png`.
+- **`emit-og-image`** — copies `src/assets/og.jpg` → `dist/assets/og.jpg` with a **stable** name (no content
+  hash), so `og:image` / `twitter:image` in `index.html` can point at `https://opensa.cc/assets/og.jpg`.
+- **`emit-favicons`** — copies the favicon set + `site.webmanifest` from `src/assets/favicon/` to the build
+  **root** with stable names, matching the `<link rel="icon"/manifest>` tags in `index.html` and the
+  manifest's root-relative icon paths.
 - **`inject-version-comment`** — stamps `<!-- OpenSA v<version> -->` at the top of `index.html`'s `<head>`
   (main entry only; viewer pages are skipped).
 
@@ -69,4 +83,5 @@ npm run build      && npm run preview   # F2 → all debugger sections present; 
 npm run build:prod && npm run preview   # F2 → Atmosphere/Camera/Graphics/ProcObj/Map gone; viewers 404
 ```
 
-Both builds emit `dist/assets/og.png` and the version comment in `dist/index.html`.
+Both builds emit `dist/assets/og.jpg`, the favicon set + `site.webmanifest` at the `dist/` root, and the
+version comment in `dist/index.html`.

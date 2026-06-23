@@ -92,21 +92,28 @@ flowchart LR
   classDef lib fill:#d8f5e0,stroke:#1f9d55,color:#111
 ```
 
-## Boot flow (first visit)
+## Boot flow
+
+The menu is the first screen — **nothing downloads until a game is picked** (no eager pre-menu load). Each
+game in `GAME_CONFIG` carries its own loader: a **fetch** game (e.g. Gostown) downloads chunk archives; a
+**local** game (San Andreas) reads a user-picked install. The disclaimer is remembered per game.
 
 ```mermaid
 flowchart TB
-  a([main → App]):::ui --> b["core&nbsp;&middot; load data + others + models<br/>loader → vfs"]:::infra
-  b --> m["MENU"]:::ui
-  m -->|Play| d["disclaimer"]:::ui
-  d --> t["textures&nbsp;&middot; load + verify"]:::infra
-  t --> w["warmup&nbsp;&middot; lazy canvas-host,<br/>build Game + adapter, loadGame"]:::engine
+  a([main → App]):::ui --> m["MENU&nbsp;&middot; lists GAME_CONFIG games<br/>(nothing downloads yet)"]:::ui
+  m -->|pick a fetch game| d["disclaimer&nbsp;&middot; once per game"]:::ui
+  m -->|pick a local game| f["folder prompt&nbsp;&middot; + that game's disclaimer"]:::ui
+  d --> l["loading&nbsp;&middot; all groups in one screen<br/>data → others → models → textures<br/>loader → vfs → verify"]:::infra
+  f --> l
+  l --> w["warmup&nbsp;&middot; lazy canvas-host,<br/>build Game + adapter, loadGame"]:::engine
   w -->|world-ready| p([PLAYING]):::engine
-  p -->|Esc| m
+  p -->|Esc| pa["paused"]:::ui
+  pa -->|continue| p
 
-  b -. fail .-> e["error + retry"]:::data
-  t -. fail .-> e
-  e -->|retry &times;3 exhausted| m
+  l -. fail .-> e["error + retry"]:::data
+  w -. fail .-> e
+  e -->|retry| l
+  e -->|&times;3 exhausted| m
 
   classDef ui fill:#ffe6cc,stroke:#f55c07,color:#111
   classDef infra fill:#e8e0ff,stroke:#6b4fbb,color:#111
@@ -114,7 +121,10 @@ flowchart TB
   classDef data fill:#f5efe1,stroke:#b08900,color:#111
 ```
 
-Return visits skip the intro animation (a localStorage flag) and re-use the Cache-Storage chunks.
+A fetch game whose disclaimer was already accepted skips straight to **loading**. Cache-Storage chunks are
+re-used across visits (keyed by build version); a revoked build — a missing `data` probe or `manifest.json`
+— wipes the cache. See [features/ui-shell.md](./features/ui-shell.md) and
+[features/asset-loader.md](./features/asset-loader.md).
 
 ## Build pipeline (offline)
 

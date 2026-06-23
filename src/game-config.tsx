@@ -9,10 +9,15 @@ import type { Vec3 } from './game';
 import type { VehiclePlacement } from './game/vehicle/vehicle-lod.system';
 import type { AssetLoaderKind } from './loaders';
 
+import { selectGameIds } from './game-config.select';
+
 /** Everything needed to launch and run one game. */
 export interface GameConfig {
   /** Loader: `fetch` (download chunk archives) or `local` (read a user-picked raw install). */
   assetLoader: AssetLoaderKind;
+  /** Dev-only: dropped from production builds (kept under `npm run dev`). Used for `fetch` demos that would
+   *  otherwise distribute mod content from the CDN — see {@link GAME_IDS}. */
+  devOnly?: boolean;
   /** Greyed out in the menu when true. */
   disable?: boolean;
   /** Why the game is disabled (shown under it in the menu). */
@@ -60,7 +65,7 @@ const SA_TELEPORTS: readonly Teleport[] = [
 ];
 
 /** A launchable game id. */
-export type GameId = 'gostown' | 'original';
+export type GameId = 'gostown' | 'original' | 'original-extend';
 
 export const GAME_CONFIG: Record<GameId, GameConfig> = {
   gostown: {
@@ -135,10 +140,31 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
       { colour: '6,3', heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
     ],
   },
+  'original-extend': {
+    assetLoader: 'fetch',
+    devOnly: true,
+    disclaimer: <div />,
+    label: 'Run Extended SA [local only]',
+    loadGame: { radius: 400, startMinutes: 360, weather: 'EXTRASUNNY_SMOG_LA' },
+    mainCharacter: 'BMYPOL1',
+    playerSpawn: [2495, -1675, 16],
+    teleports: [...SA_TELEPORTS],
+    vehicles: ['admiral', 'comet'],
+    vehiclesSpawn: [
+      { colour: '57,57', heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
+      { colour: '6,3', heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
+    ],
+  },
 };
 
-/** All game ids, in menu order. */
-export const GAME_IDS = Object.keys(GAME_CONFIG) as GameId[];
+/** True in `npm run dev` (Vite serve); false in any production build. Vite statically replaces
+ *  `process.env.NODE_ENV` (see `vite.config.ts`), so the dev-only games are dropped at build time. */
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
+/** Launchable game ids, in menu order. `devOnly` games (fetch demos that would distribute mod content from
+ *  the CDN) are dropped from production builds, so a deployed site offers only the bring-your-own-files
+ *  titles (San Andreas). They remain available under `npm run dev`. */
+export const GAME_IDS = selectGameIds(GAME_CONFIG, IS_DEV);
 
 /** Default player collision-box half-extents (Z-up) — a human; per-game `playerHalfExtents` overrides it. */
 export const HUMAN_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];

@@ -1,8 +1,8 @@
 # Contributing to OpenSA
 
-Thanks for your interest! OpenSA is an open-source, from-scratch re-creation of the RenderWare engine
-running GTA San Andreas in the browser. It's an **unofficial, non-commercial fan project** — contributions
-are welcome.
+Thanks for your interest! OpenSA is an open-source, from-scratch **game engine, built compatible with
+RenderWare** — the engine behind GTA San Andreas — running in the browser. It's an **unofficial,
+non-commercial fan project** — contributions are welcome.
 
 ## Ways to contribute
 
@@ -61,3 +61,7 @@ enforce most of it.
 
 By contributing, you agree your contributions are licensed under the project's **AGPL-3.0**
 license. See [LICENSE](./LICENSE).
+
+**Do not contribute game assets.** No Rockstar/Take-Two content (models, textures, maps, audio) or any
+copyrighted assets you don't have the right to share — PRs add **code and docs only**; everyone supplies
+their own game files. See the [Legal & takedowns](./README.md#legal--takedowns) note.

@@ -1,7 +1,8 @@
 # OpenSA Blog
 
-Dev notes and progress on **OpenSA** - GTA San Andreas re-created in the browser. Newest first.
+Dev notes and progress on **OpenSA** - an open-source game engine, built compatible with RenderWare (the tech
+behind GTA San Andreas), running in the browser. Newest first.
 
 ## Posts
 
-- 2026-06-18 - [I built GTA San Andreas in the browser in three weeks - solo, with Claude Code](./2026-06-18-i-built-gta-san-andreas-in-the-browser-in-three-weeks-solo-with-claude-code.md)
+- 2026-06-18 - [I built a RenderWare-compatible game engine in the browser that runs GTA San Andreas - solo, in three weeks, with Claude Code](./2026-06-18-i-built-a-renderware-compatible-game-engine-in-the-browser-that-runs-gta-san-andreas.md)

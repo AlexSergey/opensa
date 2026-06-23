@@ -1,7 +1,7 @@
 {
   "name": "opensa",
   "version": "0.1.0",
-  "description": "GTA San Andreas in your browser — an open-source RenderWare engine re-creation (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics.",
+  "description": "An open-source, from-scratch game engine built compatible with RenderWare (the GTA San Andreas engine) — runs SA assets and mods in the browser (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics.",
   "keywords": [
     "opensa",
     "gta",
@@ -19,6 +19,9 @@
     "typescript",
     "rapier",
     "game-engine",
+    "renderware-engine",
+    "total-conversion",
+    "mods",
     "browser"
   ],
   "homepage": "https://opensa.cc",

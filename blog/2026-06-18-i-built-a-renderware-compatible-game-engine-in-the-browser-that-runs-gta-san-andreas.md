@@ -1,4 +1,4 @@
-# I built GTA San Andreas in the browser in three weeks — solo, with Claude Code
+# I built a RenderWare-compatible game engine in the browser that runs GTA San Andreas — solo, in three weeks, with Claude Code
 
 ## Intro
 
@@ -7,7 +7,15 @@ If you can't be bothered to read — here are the important links right away:
 - [Demo](https://opensa.cc)
 - [Repo](https://github.com/AlexSergey/opensa)
 
-And below is the detailed story of how I made a GTA San Andreas clone that runs in the browser.
+And below is the detailed story of how I built it — a from-scratch game engine, made **compatible with
+RenderWare** (the engine behind GTA San Andreas), running in the browser.
+
+> **What this is — and what it isn't.** OpenSA is an **experiment** and a learning project. The goal is the
+> _engine_: a browser-based runtime built to be **compatible with the RenderWare formats** that GTA San
+> Andreas uses — **not** to clone the game or redistribute it. It ships **no game assets**; you bring your
+> own legitimate copy (or a community mod). Think of it as an alternative way to _run_ a game you already
+> own, in the browser. GTA San Andreas, its assets and trademarks belong to Rockstar Games / Take-Two — this
+> is an unofficial, non-commercial fan project.
 
 ---
 
@@ -94,7 +102,7 @@ This gave us a fully independent system:
 
 Since from the start I wanted to fully reproduce the engine, I had to work with the existing file system and existing formats. Parsers were implemented for every kind of file.
 
-In the end I got an engine capable of opening not only the original game but, for example, mods for it too. More on that below.
+In the end I got an engine capable of opening not only the original game but, for example, mods for it too — because it targets the RenderWare formats themselves, not one specific game. That compatible engine, not the San Andreas demo, is the real point of the project. More on that below.
 
 The architecture will keep changing along the way.
 
@@ -257,6 +265,8 @@ In short, if you have a full understanding of the task, technical competence, an
 Honestly, this is far from a complete account of all the problems, subtleties, and nuances of the development. At almost every step there was something new, something I hadn't explored before.
 
 The point of all this is that this project is a vivid example of how modern tools like Claude Code Opus, combined with a solid understanding of the domain and of programming in general, make it possible to do — solo, in three weeks — what used to take teams of hundreds or even thousands of people.
+
+And to be clear about the goal: OpenSA is an experiment and a tech demo — not a way to copy or redistribute the game. The real deliverable is the **engine**: a browser-based, RenderWare-compatible runtime that happens to run GTA San Andreas (and its mods). It ships no game content — you bring your own files. It's simply an alternative way to run a game you already own.
 
 I want to keep developing the project and bring it to a stable state. If anyone can help with contributing — I'd be very glad.
 

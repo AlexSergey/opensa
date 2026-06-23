@@ -74,7 +74,10 @@ export function App(): ReactElement {
       {phase === 'menu' ? (
         <div className="sa-stage sa-stage--col">
           <Logo className={SUBTITLED} />
-          <p className="sa-tagline">Free and open source — a from-scratch re-creation of the RenderWare engine.</p>
+          <p className="sa-tagline">
+            Free and open source — a from-scratch game engine, built compatible with RenderWare (the tech behind GTA San
+            Andreas).
+          </p>
           <Menu onPlay={boot.play} />
         </div>
       ) : null}

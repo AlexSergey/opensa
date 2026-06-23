@@ -1,9 +1,27 @@
 import react from '@vitejs/plugin-react';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version: string };
+
+/**
+ * Emit the favicon set (icons + `site.webmanifest`) to the build ROOT with STABLE names, so index.html's
+ * `<link rel="icon"/manifest>` and the manifest's own root-relative icon paths resolve. Source of truth:
+ * `src/assets/favicon/`.
+ */
+function emitFavicons(): Plugin {
+  const dir = resolve(__dirname, 'src/assets/favicon');
+
+  return {
+    generateBundle(): void {
+      for (const file of readdirSync(dir)) {
+        this.emitFile({ fileName: file, source: readFileSync(resolve(dir, file)), type: 'asset' });
+      }
+    },
+    name: 'emit-favicons',
+  };
+}
 
 /** Copy `deploy/.htaccess` into the build output so the Apache config (HTTPS/SPA/caching/MIME) ships with
  *  `dist/` — upload the whole folder to the web root. See `deploy/README.md`. */
@@ -21,16 +39,16 @@ function emitHtaccess(): Plugin {
 }
 
 /**
- * Emit the social-share preview to `dist/assets/og.png` with a STABLE name (no content hash), so the
- * `og:image` / `twitter:image` meta can point at a fixed URL (https://opensa.cc/assets/og.png).
- * Source of truth: `src/assets/og.png`.
+ * Emit the social-share preview to `dist/assets/og.jpg` with a STABLE name (no content hash), so the
+ * `og:image` / `twitter:image` meta can point at a fixed URL (https://opensa.cc/assets/og.jpg).
+ * Source of truth: `src/assets/og.jpg`.
  */
 function emitOgImage(): Plugin {
   return {
     generateBundle(): void {
       this.emitFile({
-        fileName: 'assets/og.png',
-        source: readFileSync(resolve(__dirname, 'src/assets/og.png')),
+        fileName: 'assets/og.jpg',
+        source: readFileSync(resolve(__dirname, 'src/assets/og.jpg')),
         type: 'asset',
       });
     },
@@ -90,6 +108,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     emitOgImage(),
+    emitFavicons(),
     injectVersionComment(pkg.version),
     ...(isProdDeploy ? [emitHtaccess()] : []), // ship deploy/.htaccess in dist only for build:prod
   ],

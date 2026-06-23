@@ -3,10 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenSA</title>
+
+    <!-- Favicons (emitted to the build root by vite.config.ts; source: src/assets/favicon/) -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+
+    <title>OpenSA — an open-source game engine compatible with RenderWare (GTA San Andreas), in the browser</title>
     <meta
       name="description"
-      content="GTA San Andreas in your browser — an open-source RenderWare engine re-creation (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics."
+      content="An open-source, from-scratch game engine built compatible with RenderWare — the engine behind GTA San Andreas. Runs SA assets and mods in the browser (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics. No install."
     />
 
     <!-- Open Graph -->
@@ -15,19 +24,19 @@
     <meta property="og:title" content="OpenSA" />
     <meta
       property="og:description"
-      content="GTA San Andreas, re-created in your browser. An open-source, from-scratch RenderWare engine — real world streaming, models and physics. No install."
+      content="An open-source game engine, built compatible with RenderWare — the tech behind GTA San Andreas. From-scratch, in the browser: streams real worlds, models and physics, and runs SA's mods. No install."
     />
     <meta property="og:url" content="https://opensa.cc" />
-    <meta property="og:image" content="https://opensa.cc/assets/og.png" />
+    <meta property="og:image" content="https://opensa.cc/assets/og.jpg" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="OpenSA" />
     <meta
       name="twitter:description"
-      content="GTA San Andreas, re-created in your browser. An open-source, from-scratch RenderWare engine — real world streaming, models and physics. No install."
+      content="An open-source game engine, built compatible with RenderWare — the tech behind GTA San Andreas. From-scratch, in the browser: streams real worlds, models and physics, and runs SA's mods. No install."
     />
-    <meta name="twitter:image" content="https://opensa.cc/assets/og.png" />
+    <meta name="twitter:image" content="https://opensa.cc/assets/og.jpg" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { background: #000; }
