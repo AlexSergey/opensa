@@ -6,16 +6,16 @@ import type { Asset, AssetRef, WriteResult } from '../../core/asset';
 
 import { openArchive } from '../../../src/renderware/archive/img-archive';
 import { parseDff } from '../../../src/renderware/parsers/binary/dff';
+import { encodeDff } from './codec/dff';
 import { clumpToIr } from './read';
 import { resolveMapModels } from './resolve';
 
 /**
  * GTA-SA (RenderWare) adapter. Encapsulates all of this game's I/O behind {@link GameAdapter}: resolving the
- * map's models, reading DFFs into the neutral IR (read-only reuse of `../src` parsers), and writing them back.
- *
- * NOTE: the writer is **identity-only** for now — it returns the original bytes when an asset is unchanged
- * and throws if a plugin mutated the geometry. The real DFF serializer is the next focused task and will live
- * here, inside `map-optimizer` (the core/`../src` never gains write code).
+ * map's models, reading DFFs into the neutral IR (read-only reuse of `../src` parsers), and writing them back
+ * via the in-house DFF serializer ({@link encodeDff}) — the write code lives here in `map-optimizer`, never in
+ * `../src`. The serializer patches vertex attributes in place (positions/normals/prelit/UVs); topology edits
+ * and anti-rip recovered geometry are not yet expressible and surface as per-asset failures.
  */
 export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
   const modelsDir = join(gameDir, 'models');
@@ -60,11 +60,7 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
       return resolveMapModels(dataDir, gta3).map((name) => ({ name }));
     },
     write(asset: Asset): WriteResult {
-      if (asset.dirty) {
-        throw new Error(`DFF serialization not implemented yet — "${asset.name}" was modified by a plugin`);
-      }
-
-      return { bytes: asset.source, fileName: `${asset.name}.dff` };
+      return { bytes: encodeDff(asset.source, asset.ir), fileName: `${asset.name}.dff` };
     },
   };
 }

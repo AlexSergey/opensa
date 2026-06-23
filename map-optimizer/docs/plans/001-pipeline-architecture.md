@@ -1,11 +1,20 @@
 # 001 — Map optimizer: pipeline architecture (base)
 
-**Status: 📝 Draft (proposed).** A standalone, offline CLI that conditions a game's **map models** through a
+**Status: ✅ Base implemented.** A standalone, offline CLI that conditions a game's **map models** through a
 composable, Gulp-style plugin pipeline — fix normals, weld/dedupe geometry, fill holes, refine meshes, etc.
 This plan defines **only the base architecture** (no transform plugins): the CLI + game-param input, source
 resolution, the pipeline runner + plugin contract, the intermediate mesh representation (IR), the DFF
 read↔write codecs (incl. an identity round-trip), output, and reporting. Each actual transform is a follow-up
 plan (002+).
+
+> **Implemented.** `core/*` (game-agnostic: `ir`, `asset`, `adapter`, `pipeline`, `report`) + `adapters/gta-sa/*`
+> (RenderWare adapter: `resolve`/`read` reuse `../src` read-only; `codec/*` is the in-house **DFF serializer** —
+> a faithful chunk-container codec (`chunk.ts`, byte-exact `writeRw(readRw())`), an in-place vertex-attribute
+> patcher (`geometry-struct.ts`), and the `encodeDff` orchestrator) + the `pass-through` plugin +
+> `optimizer.config.ts` + `src/cli.ts`. Verified: `tsc`/`eslint` clean; core + serializer unit tests; and
+> `--game gostown` round-trips **836/836** map models **byte-identical**. The serializer patches
+> positions/normals/prelit/UVs only — topology edits and anti-rip recovered geometry throw (full re-encoder =
+> later). Build wiring: eslint `scripts`-config + `vitest` include + `.gitignore` cover `map-optimizer/**`.
 
 Reuses the main project's renderware parsers + build partition (the engine in `../src`); separate project,
 one-directional dependency. Related: the runtime in-memory alternative in
