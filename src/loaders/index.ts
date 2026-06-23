@@ -1,7 +1,7 @@
 /**
- * Asset loaders (plans 049 + 053): the boot flow drives one {@link AssetLoader} chosen by
- * `VITE_ASSET_LOADER` — `fetch` (default; manifest + chunk download) or `local` (a user-picked raw install).
- * Both fill the same VFS, so everything downstream is loader-agnostic. Public surface of the loaders module.
+ * Asset loaders (plans 049 + 053): the boot flow drives one {@link AssetLoader} chosen per game by its
+ * `assetLoader` — `fetch` (manifest + chunk download) or `local` (a user-picked raw install). Both fill the
+ * same VFS, so everything downstream is loader-agnostic. Public surface of the loaders module.
  */
 import type { AssetLoader, AssetLoaderKind, AssetSink } from './types';
 
@@ -27,7 +27,9 @@ export type {
 
 /** Everything {@link createAssetLoader} needs for either loader; unused fields are ignored by the other. */
 export interface CreateAssetLoaderConfig {
-  /** Build variant (e.g. `original-extend`) — labels the local loader's synthesised manifest. */
+  /** Which loader to build for this game. */
+  assetLoader: AssetLoaderKind;
+  /** Build variant (e.g. `gostown`) — labels the local loader's synthesised manifest. */
   game: string;
   /** Full URL to `manifest.json` — used by the fetch loader. */
   manifestUrl: string;
@@ -41,9 +43,9 @@ export interface CreateAssetLoaderConfig {
   version: string;
 }
 
-/** Build the loader selected by `VITE_ASSET_LOADER` (default `fetch`). */
+/** Build the loader for a game's configured `assetLoader`. */
 export function createAssetLoader(config: CreateAssetLoaderConfig): AssetLoader {
-  if (resolveLoaderKind() === 'local') {
+  if (config.assetLoader === 'local') {
     return new AssetLocalLoader({
       game: config.game,
       peds: config.peds,
@@ -54,9 +56,4 @@ export function createAssetLoader(config: CreateAssetLoaderConfig): AssetLoader 
   }
 
   return new AssetFetchLoader({ manifestUrl: config.manifestUrl, sink: config.sink });
-}
-
-/** The configured loader kind, defaulting to `fetch` for any unset/unknown value. */
-export function resolveLoaderKind(): AssetLoaderKind {
-  return import.meta.env.VITE_ASSET_LOADER === 'local' ? 'local' : 'fetch';
 }

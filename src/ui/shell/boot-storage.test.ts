@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readBootFlags, rememberDisclaimerAccepted, rememberIntroSeen } from './boot-storage';
+import { isDisclaimerAccepted, rememberDisclaimerAccepted } from './boot-storage';
 
 /** Minimal in-memory Storage stand-in. */
 function fakeStorage(): Pick<Storage, 'getItem' | 'setItem'> {
@@ -11,22 +11,22 @@ function fakeStorage(): Pick<Storage, 'getItem' | 'setItem'> {
 
 describe('boot-storage', () => {
   describe('negative cases', () => {
-    it('reads all-false from empty storage', () => {
-      expect(readBootFlags(fakeStorage())).toEqual({ disclaimerAccepted: false, introSeen: false });
+    it('reports not-accepted from empty storage', () => {
+      expect(isDisclaimerAccepted('gostown', fakeStorage())).toBe(false);
     });
 
-    it('degrades to all-false when storage is unavailable', () => {
-      expect(readBootFlags(null)).toEqual({ disclaimerAccepted: false, introSeen: false });
-      expect(() => rememberIntroSeen(null)).not.toThrow();
+    it('degrades to not-accepted / no-op when storage is unavailable', () => {
+      expect(isDisclaimerAccepted('gostown', null)).toBe(false);
+      expect(() => rememberDisclaimerAccepted('gostown', null)).not.toThrow();
     });
   });
 
   describe('positive cases', () => {
-    it('persists and reads the intro + disclaimer flags', () => {
+    it('remembers acceptance independently per game', () => {
       const storage = fakeStorage();
-      rememberIntroSeen(storage);
-      rememberDisclaimerAccepted(storage);
-      expect(readBootFlags(storage)).toEqual({ disclaimerAccepted: true, introSeen: true });
+      rememberDisclaimerAccepted('gostown', storage);
+      expect(isDisclaimerAccepted('gostown', storage)).toBe(true);
+      expect(isDisclaimerAccepted('original', storage)).toBe(false);
     });
   });
 });

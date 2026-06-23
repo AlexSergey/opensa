@@ -25,23 +25,18 @@ Both are plain `process.env` flags read in `vite.config.ts` (mac/linux inline sy
 ## Runtime config (`.env`, `VITE_`-prefixed)
 
 Client-visible config read from `.env` (copy `.env.example` → `.env`; `.env` is gitignored). Typed in
-`src/vite-env.d.ts`, resolved in `src/game-config.ts`.
+`src/vite-env.d.ts`. Only two env vars remain — per-game settings (loader, character, vehicles, spawn,
+teleports, …) live in the runtime catalogue **`src/game-config.tsx`** (`GAME_CONFIG`), picked from the menu
+(plan 056).
 
-| Env var               | Default                 | Effect                                                                                                                                                    |
-| --------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_STATIC_URL`     | `http://localhost:3001` | Where built game archives are served (fetch loader; see `npm run serve:static`).                                                                          |
-| `VITE_GAME_TYPE`      | `original`              | Game variant to boot — `original` \| `original-extend` \| `carcer` \| `anderius` (archive set + spawn).                                                   |
-| `VITE_ASSET_LOADER`   | `fetch`                 | `fetch` = download manifest + chunks; `local` = read a user-picked **raw GTA install** (Chromium only). See [asset loaders](../features/asset-loader.md). |
-| `VITE_MAIN_CHARACTER` | `BMYPOL1`               | **TEMP**: player ped model from `peds.ide`; unset → defaults to `BMYPOL1`.                                                                                |
-| `VITE_VEHICLES`       | _(unset)_               | **TEMP**: vehicles to make available, from `vehicles.ide` (e.g. `['admiral','comet']` or `admiral,comet`).                                                |
-| `VITE_GA_ID`          | _(unset)_               | Google Analytics id; unset → analytics skipped.                                                                                                           |
+| Env var           | Default                 | Effect                                                                               |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| `VITE_STATIC_URL` | `http://localhost:3001` | Where built game archives + viewer fixtures are served (see `npm run serve:static`). |
+| `VITE_GA_ID`      | _(unset)_               | Google Analytics id; unset → analytics skipped.                                      |
 
-`VITE_MAIN_CHARACTER` / `VITE_VEHICLES` are also read by **`scripts/build-game.ts`** (via Vite `loadEnv`), so
-the chosen character + cars are packed into the fetch archives too — they're spawned dynamically, not placed
-on the map, so the partition would otherwise miss them (plan 053 stop-gap). Rebuild after changing them.
-
-The e2e lane forces `VITE_ASSET_LOADER=fetch` via a committed `.env.e2e` (`vite --mode e2e`) — see
-[e2e](e2e.md).
+**`scripts/build-game.ts`** reads the per-game `mainCharacter` + `vehicles` from `GAME_CONFIG` (by `--game`),
+so the chosen character + cars are packed into the fetch archives too — they're spawned dynamically, not
+placed on the map, so the partition would otherwise miss them. Rebuild after changing them.
 
 ## Client constants (`define` — statically replaced)
 

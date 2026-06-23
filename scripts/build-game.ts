@@ -14,12 +14,11 @@ import { type Zippable, zipSync } from 'fflate';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { loadEnv } from 'vite';
 
+import type { GameConfig } from '../src/game-config';
 import type { GroupName } from '../src/loaders/types';
 import type { ImgArchive } from '../src/renderware/archive/img-archive';
 
-import { parseModelList } from '../src/game-build/env-list';
 import {
   type Entry,
   ideRefs,
@@ -28,6 +27,7 @@ import {
   partitionEntries,
   placedModels,
 } from '../src/game-build/partition';
+import { GAME_CONFIG } from '../src/game-config';
 import { openArchive } from '../src/renderware/archive/img-archive';
 import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
@@ -87,8 +87,8 @@ function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
  */
 function dynamicRefs(
   dataDir: string,
-  mainCharacter?: string,
-  vehiclesEnv?: string,
+  mainCharacter: string | undefined,
+  vehicles: readonly string[],
 ): { models: string[]; txds: string[] } {
   const models: string[] = [];
   const txds: string[] = [];
@@ -102,7 +102,6 @@ function dynamicRefs(
     }
   }
 
-  const vehicles = parseModelList(vehiclesEnv);
   if (vehicles.length > 0) {
     const defs = parseVehicleDefs(readIde(dataDir, 'vehicles.ide'));
     for (const name of vehicles) {
@@ -164,10 +163,11 @@ function main(): void {
 
   const dataDir = join(src, 'data');
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
-  // TEMP (bring-your-own-files): also pack the env-named main character (peds.ide) + vehicles (vehicles.ide),
-  // since peds/cars are spawned dynamically, not placed on the map. Reads the local `.env` like the app does.
-  const env = loadEnv('production', ROOT, 'VITE_');
-  const dynamic = dynamicRefs(dataDir, env.VITE_MAIN_CHARACTER, env.VITE_VEHICLES);
+  // TEMP (bring-your-own-files): also pack the game's main character (peds.ide) + vehicles (vehicles.ide),
+  // since peds/cars are spawned dynamically, not placed on the map. Source of truth is GAME_CONFIG (the same
+  // the app reads); games not in the catalogue just pack no dynamic models.
+  const cfg: GameConfig | undefined = (GAME_CONFIG as Record<string, GameConfig>)[game];
+  const dynamic = dynamicRefs(dataDir, cfg?.mainCharacter, cfg?.vehicles ?? []);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
   const { models: modelEntries, others, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
   // `partitionEntries` only pulls world files from gta3.img; pull a mod's from the override archives too

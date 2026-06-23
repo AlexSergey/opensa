@@ -2,9 +2,9 @@
  * The fetch asset loader (plan 049): fetches the build manifest, downloads chunk zips on demand with a small
  * concurrency limit, caches each cacheable chunk in Cache Storage (skipping already-cached ones), invalidates
  * stale chunks, and pushes every ready chunk's RAW bytes to the sink (the VFS). Chunks with `cached: false`
- * (the `data` group) are always re-fetched and never stored; a failure to fetch one wipes the whole cache
- * (build revoked). Progress goes out on `events`. Browser-only (fetch streaming + Cache Storage) — exercised
- * on the Playwright e2e lane. Implements {@link AssetLoader}.
+ * (the `data` group) are always re-fetched and never stored; a failure to fetch one — or to fetch the
+ * manifest itself — wipes the whole cache (build revoked). Progress goes out on `events`. Browser-only
+ * (fetch streaming + Cache Storage) — exercised on the Playwright e2e lane. Implements {@link AssetLoader}.
  */
 import type { AssetLoader, AssetLoaderEvents, AssetSink, GroupChunk, GroupName, Manifest } from '../types';
 
@@ -44,11 +44,20 @@ export class AssetFetchLoader implements AssetLoader {
 
   /** Fetch + parse the manifest (always fresh), then evict cached chunks it no longer references. */
   async init(): Promise<Manifest> {
-    const response = await fetch(this.config.manifestUrl, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`manifest fetch failed: ${response.status}`);
+    let manifest: Manifest;
+    try {
+      const response = await fetch(this.config.manifestUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`manifest fetch failed: ${response.status}`);
+      }
+      manifest = parseManifest(await response.json());
+    } catch (error) {
+      // The manifest is the build's entry point: if it can't be fetched/parsed (404/revoked or network), the
+      // build is gone — treat it like a failed `data` probe and wipe the whole cache so stale cached chunks
+      // (models/textures/others) for a dead build don't linger.
+      await this.cache.clear().catch(() => undefined);
+      throw error;
     }
-    const manifest = parseManifest(await response.json());
     this.manifest = manifest;
     this.dir = manifestDir(this.config.manifestUrl);
 

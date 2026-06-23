@@ -5,87 +5,68 @@ import type { BootEvent, BootState } from './boot-machine';
 import { bootReducer, initialBootState, MAX_RETRIES } from './boot-machine';
 
 const run = (state: BootState, events: BootEvent[]): BootState => events.reduce(bootReducer, state);
+const select = (assetLoader: 'fetch' | 'local', accepted = false): BootEvent => ({
+  accepted,
+  assetLoader,
+  game: 'gostown',
+  type: 'SELECT',
+});
 
 describe('bootReducer', () => {
   describe('negative cases', () => {
     it('ignores out-of-phase events', () => {
-      const menu = run(initialBootState(false), [{ type: 'CORE_LOADED' }]);
+      const menu = initialBootState();
       expect(bootReducer(menu, { type: 'WORLD_READY' }).phase).toBe('menu'); // no warmup yet
       expect(bootReducer(menu, { type: 'RESUME' }).phase).toBe('menu'); // not paused
-      expect(bootReducer(initialBootState(false), { type: 'TEXTURES_LOADED' }).phase).toBe('core');
-    });
+      expect(bootReducer(menu, { type: 'DISCLAIMER_OK' }).phase).toBe('menu'); // no disclaimer up
 
-    it('does not start the game from a degraded menu', () => {
-      const degraded: BootState = {
-        degraded: true,
-        disclaimerAccepted: false,
-        failedPhase: null,
-        phase: 'menu',
-        retries: MAX_RETRIES,
-      };
-      expect(bootReducer(degraded, { type: 'PLAY' }).phase).toBe('menu'); // Play is inert
+      const loading = run(menu, [select('fetch', true)]);
+      expect(bootReducer(loading, select('fetch')).phase).toBe('loading'); // can't re-select mid-flow
     });
   });
 
   describe('positive cases', () => {
-    it('runs the happy path: core → menu → disclaimer → textures → warmup → playing', () => {
-      const state = run(initialBootState(false), [
-        { type: 'CORE_LOADED' },
-        { type: 'PLAY' },
+    it('fetch happy path: menu → disclaimer → loading → warmup → playing', () => {
+      const state = run(initialBootState(), [
+        select('fetch', false),
         { type: 'DISCLAIMER_OK' },
-        { type: 'TEXTURES_LOADED' },
+        { type: 'LOADED' },
         { type: 'WORLD_READY' },
       ]);
       expect(state.phase).toBe('playing');
-      expect(state.disclaimerAccepted).toBe(true);
+      expect(state.game).toBe('gostown');
     });
 
-    it('skips the disclaimer when already accepted', () => {
-      const state = run(initialBootState(true), [{ type: 'CORE_LOADED' }, { type: 'PLAY' }]);
-      expect(state.phase).toBe('textures');
+    it('skips the disclaimer when already accepted (fetch → loading)', () => {
+      expect(run(initialBootState(), [select('fetch', true)]).phase).toBe('loading');
     });
 
-    it('local loader (autoLoad off): boots to the menu, then Play → folder → textures', () => {
-      const start = initialBootState(true, false);
-      expect(start.phase).toBe('menu'); // nothing loads until the folder is picked
-
-      const state = run(start, [{ type: 'CHOOSE_FOLDER' }, { type: 'FOLDER_READY' }]);
-      expect(state.phase).toBe('textures');
-    });
-
-    it('local loader with a remembered folder goes menu → textures directly', () => {
-      const state = run(initialBootState(true, false), [{ type: 'FOLDER_READY' }]);
-      expect(state.phase).toBe('textures');
+    it('local always routes through the folder prompt, then loads', () => {
+      const folder = run(initialBootState(), [select('local', true)]);
+      expect(folder.phase).toBe('folder'); // folder pick is needed even when the disclaimer was accepted
+      expect(run(folder, [{ type: 'FOLDER_READY' }]).phase).toBe('loading');
     });
 
     it('pauses and resumes from playing', () => {
-      let state = run(initialBootState(true), [
-        { type: 'CORE_LOADED' },
-        { type: 'PLAY' },
-        { type: 'TEXTURES_LOADED' },
-        { type: 'WORLD_READY' },
-      ]);
+      let state = run(initialBootState(), [select('fetch', true), { type: 'LOADED' }, { type: 'WORLD_READY' }]);
       state = bootReducer(state, { type: 'PAUSE' });
       expect(state.phase).toBe('paused');
       expect(bootReducer(state, { type: 'RESUME' }).phase).toBe('playing');
     });
 
-    it('retries the failed phase, then degrades after MAX_RETRIES', () => {
-      let state = run(initialBootState(true), [{ type: 'CORE_LOADED' }, { type: 'PLAY' }]); // textures
-      state = bootReducer(state, { phase: 'textures', type: 'FAIL' });
+    it('retries loading, then returns to the menu after MAX_RETRIES', () => {
+      let state = bootReducer(run(initialBootState(), [select('fetch', true)]), { type: 'FAIL' });
       expect(state.phase).toBe('error');
 
-      // each retry re-enters the textures phase, up to the limit
       for (let i = 1; i <= MAX_RETRIES; i += 1) {
         state = bootReducer(state, { type: 'RETRY' });
-        expect(state.phase).toBe('textures');
+        expect(state.phase).toBe('loading');
         expect(state.retries).toBe(i);
-        state = bootReducer(state, { phase: 'textures', type: 'FAIL' });
+        state = bootReducer(state, { type: 'FAIL' });
       }
-      // the next retry exhausts the budget → degraded menu
-      state = bootReducer(state, { type: 'RETRY' });
+      state = bootReducer(state, { type: 'RETRY' }); // budget spent → back to the menu
       expect(state.phase).toBe('menu');
-      expect(state.degraded).toBe(true);
+      expect(state.game).toBeNull();
     });
   });
 });

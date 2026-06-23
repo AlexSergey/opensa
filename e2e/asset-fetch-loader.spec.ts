@@ -230,4 +230,34 @@ test.describe('asset loader', () => {
     expect(after.rejected).toBe(true);
     expect(after.keys).toHaveLength(0); // entire cache wiped → stale cached chunks gone
   });
+
+  test('wipes the whole cache when the manifest is unavailable (build revoked)', async ({ page }) => {
+    await mockNetwork(page); // warm run: everything ok
+    const warm = await run(page);
+    expect(warm.keys).toHaveLength(3); // models/others/textures cached
+
+    await page.unroute(MANIFEST_URL);
+    await page.route(MANIFEST_URL, (route) => route.fulfill({ status: 404 })); // manifest now gone
+
+    const after = await page.evaluate(
+      async ({ cacheName, manifestUrl, module }) => {
+        interface LoaderModule {
+          AssetFetchLoader: new (config: { cacheName?: string; manifestUrl: string }) => { init(): Promise<unknown> };
+        }
+        const mod = (await import(/* @vite-ignore */ module)) as LoaderModule;
+        const loader = new mod.AssetFetchLoader({ cacheName, manifestUrl });
+        let rejected = false;
+        await loader.init().catch(() => {
+          rejected = true;
+        });
+        const cache = await caches.open(cacheName);
+
+        return { keys: (await cache.keys()).map((request) => request.url), rejected };
+      },
+      { cacheName: CACHE_NAME, manifestUrl: MANIFEST_URL, module: MODULE },
+    );
+
+    expect(after.rejected).toBe(true);
+    expect(after.keys).toHaveLength(0); // entire cache wiped → stale cached chunks gone
+  });
 });

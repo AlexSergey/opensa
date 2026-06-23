@@ -1,28 +1,18 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 interface DisclaimerProps {
+  /** The selected game's disclaimer body. */
+  children: ReactNode;
   onAccept: () => void;
 }
 
-export function Disclaimer({ onAccept }: DisclaimerProps): ReactElement {
+/** Pre-launch disclaimer popup (fetch games): shows the game's notice + an OK button that starts loading. */
+export function Disclaimer({ children, onAccept }: DisclaimerProps): ReactElement {
   return (
     <div className="sa-overlay">
       <div aria-modal className="sa-panel" role="dialog">
         <h2 className="sa-panel__title">Before you play</h2>
-        <div className="sa-panel__body">
-          <p>
-            OpenSA is a <strong>technical, non-commercial demo</strong> for learning and preservation. It is not an
-            official product and is <strong>not affiliated with Rockstar Games or Take-Two</strong>. No money is made
-            from it.
-          </p>
-          <p>
-            Game data is cached in your browser (Cache Storage) so reloads are fast. We use Google Analytics only to
-            count visitors — no personal data is collected.
-          </p>
-          <p>
-            Thanks to <strong>mad_driver</strong> for several of the vehicle models.
-          </p>
-        </div>
+        <div className="sa-panel__body">{children}</div>
         <div className="sa-panel__actions">
           <button className="sa-button" onClick={onAccept} type="button">
             OK

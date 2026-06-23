@@ -40,9 +40,9 @@ Packs a variant (`game-src/<game>/`) into `static/<version>/` in four groups —
   listed in `manifest.json`. Every chunk gets a `cached` flag from the `CACHED` map (`data: false`, the rest
   `true`) — the runtime caches only `cached` chunks and treats the always-fresh `data` group as a build-liveness
   probe (a 404 there wipes the client cache; see [asset-loader.md](../features/asset-loader.md)). See plan 048
-  for the full breakdown. It also reads the local `.env` (Vite `loadEnv`) and packs the **TEMP**
-  `VITE_MAIN_CHARACTER` (`peds.ide`) + `VITE_VEHICLES` (`vehicles.ide`) — dynamically-spawned models the
-  map-placement partition would otherwise miss (plan 053 step 7). Rebuild after changing them.
+  for the full breakdown. It also reads the game's **TEMP** `mainCharacter` (`peds.ide`) + `vehicles`
+  (`vehicles.ide`) from `GAME_CONFIG` (`src/game-config.tsx`, by `--game`) and packs them — dynamically-spawned
+  models the map-placement partition would otherwise miss. Rebuild after changing them.
 
 ```sh
 npm run build:game:original          # npm run timecyc && tsx scripts/build-game.ts --game original

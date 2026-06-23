@@ -1,34 +1,20 @@
-export interface BootFlags {
-  disclaimerAccepted: boolean;
-  introSeen: boolean;
-}
-
 /**
- * localStorage-backed boot flags (plan 051): whether the intro animation has played (skip it on repeat
- * visits) and whether the disclaimer was accepted. All access is guarded so SSR/blocked-storage degrades
- * to "nothing remembered" rather than throwing.
+ * localStorage-backed boot flags (plans 051 / 056): whether each game's disclaimer has been accepted, keyed
+ * by game id so it is remembered per game. All access is guarded so SSR / blocked storage degrades to
+ * "nothing remembered" rather than throwing.
  */
 type ReadWriteStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
-const DISCLAIMER_KEY = 'opensa.disclaimer.v1';
-const INTRO_KEY = 'opensa.intro.v1';
+const DISCLAIMER_PREFIX = 'opensa.disclaimer.v2.';
 
-/** Read the persisted boot flags (defaults to all-false when storage is unavailable). */
-export function readBootFlags(storage: null | ReadWriteStorage = defaultStorage()): BootFlags {
-  return {
-    disclaimerAccepted: storage?.getItem(DISCLAIMER_KEY) === '1',
-    introSeen: storage?.getItem(INTRO_KEY) === '1',
-  };
+/** Whether the disclaimer for `gameId` was accepted before. */
+export function isDisclaimerAccepted(gameId: string, storage: null | ReadWriteStorage = defaultStorage()): boolean {
+  return storage?.getItem(DISCLAIMER_PREFIX + gameId) === '1';
 }
 
-/** Persist that the disclaimer was accepted. */
-export function rememberDisclaimerAccepted(storage: null | ReadWriteStorage = defaultStorage()): void {
-  storage?.setItem(DISCLAIMER_KEY, '1');
-}
-
-/** Persist that the intro animation has played. */
-export function rememberIntroSeen(storage: null | ReadWriteStorage = defaultStorage()): void {
-  storage?.setItem(INTRO_KEY, '1');
+/** Persist that the disclaimer for `gameId` was accepted. */
+export function rememberDisclaimerAccepted(gameId: string, storage: null | ReadWriteStorage = defaultStorage()): void {
+  storage?.setItem(DISCLAIMER_PREFIX + gameId, '1');
 }
 
 /** The real localStorage when present, else null (private mode / SSR / blocked). */

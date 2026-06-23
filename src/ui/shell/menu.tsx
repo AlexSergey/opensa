@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
 
+import { GAME_CONFIG, GAME_IDS, type GameId } from '../../game-config';
+
 /** External menu links. (Videos is a placeholder until the YouTube channel exists.) */
 const LINKS: readonly { href: string; label: string }[] = [
   { href: 'https://github.com/AlexSergey/opensa', label: 'GitHub' },
@@ -8,28 +10,31 @@ const LINKS: readonly { href: string; label: string }[] = [
 ];
 
 interface MenuProps {
-  /** Shown under the items (e.g. the degraded-mode explanation). */
-  note?: string;
-  onPlay: () => void;
-  /** Disable Play (degraded mode) — the links stay usable. */
-  playDisabled?: boolean;
-  /** "Play Game" in the menu, "Continue" when paused. */
-  playLabel?: string;
+  /** Launch a game by id (one button per `GAME_CONFIG` entry). */
+  onPlay: (game: GameId) => void;
 }
 
-export function Menu({ note, onPlay, playDisabled = false, playLabel = 'Play Game' }: MenuProps): ReactElement {
+export function Menu({ onPlay }: MenuProps): ReactElement {
   return (
     <nav className="sa-menu">
-      <button className="sa-menu__item" disabled={playDisabled} onClick={onPlay} type="button">
-        {playLabel}
-      </button>
+      {GAME_IDS.map((id) => {
+        const { disable, disabledNote, label } = GAME_CONFIG[id];
+
+        return (
+          <div className="sa-menu__game" key={id}>
+            <button className="sa-menu__item" disabled={disable} onClick={() => onPlay(id)} type="button">
+              {label}
+            </button>
+            {disable && disabledNote ? <p className="sa-menu__note">{disabledNote}</p> : null}
+          </div>
+        );
+      })}
       <hr className="sa-menu__divider" />
       {LINKS.map((link) => (
         <a className="sa-menu__item" href={link.href} key={link.label} rel="noopener noreferrer" target="_blank">
           {link.label}
         </a>
       ))}
-      {note ? <p className="sa-menu__note">{note}</p> : null}
     </nav>
   );
 }

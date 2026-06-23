@@ -16,7 +16,7 @@ import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-l
 import type { DebugActions } from './debug/debug-overlay';
 
 import { Game } from '../game';
-import { GAME_TYPE, MAIN_CHARACTER, VEHICLES } from '../game-config';
+import { GAME_CONFIG, type GameId, HUMAN_HALF_EXTENTS } from '../game-config';
 import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
 import { AnimationController } from '../game/character/animation-controller';
 import { CharacterAnimationSystem } from '../game/character/character-animation.system';
@@ -85,25 +85,15 @@ import { DebugOverlay } from './debug/debug-overlay';
 import { Hud } from './hud/hud';
 import { loadFonts } from './hud/load-fonts';
 import { Overlay } from './hud/overlay';
-import { PLAYER_SPAWN, SPAWN_COLLISION_RADIUS } from './locations';
 
 const BASE = import.meta.env.VITE_STATIC_URL;
 
 const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
 const WORLD_READY_TIMEOUT_MS = 12000; // reveal the game even if grounding is delayed
 
-// Player collision box (half-extents) — a human, decoupled from the T-pose mesh bbox.
-const PLAYER_HALF_EXTENTS: Vec3 = [0.3, 0.3, 0.9];
 // The animation (idle/walk) stands the skeleton up in GTA Z-up, so the model needs
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
 const PLAYER_PLACEMENT: CharacterPlacement = { offset: [0, 0, 0.04], rotation: [0, 0, 0], scale: 1 };
-
-// Initial paint per model — carcols.dat palette indices (primary, secondary, then optional 3rd/4th;
-// omitted 3rd/4th default to palette 0, like SA).
-const CAR_COLORS: Record<string, string> = { admiral: '57,57', comet: '6,3' };
-
-// Default timecyc weather on load (index into WEATHER_NAMES).
-const DEFAULT_WEATHER = WEATHER_NAMES.indexOf('EXTRASUNNY_SMOG_LA');
 
 // Selectable weathers for the debug Weather tab — all timecyc weathers except rain/storm/underwater
 // and the cutscene EXTRACOLOURS entries (per the "sunny/cloudy/etc, no rain/storm" ask).
@@ -111,14 +101,6 @@ const WEATHERS: readonly { index: number; label: string }[] = WEATHER_NAMES.map(
   index,
   label,
 })).filter(({ label }) => !/RAINY|SANDSTORM|UNDERWATER|EXTRACOLOUR/.test(label));
-
-// Static cars parked on the Ganton lot near the spawn (native Z-up; heading about Z).
-// admiral = 2-colour paint, comet = 2-colour. Positions/z/heading tuned in-browser.
-const VEHICLE_PLACEMENTS: readonly VehiclePlacement[] = [
-  { colour: CAR_COLORS.admiral, heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
-  // Comet next to the admiral on the same flat strip (to compare start behaviour at a known-OK spot).
-  { colour: CAR_COLORS.comet, heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
-];
 
 interface Bootstrap {
   /** Whether enter/exit-vehicle is actionable now — gates the mobile Enter button's visibility. */
@@ -175,13 +157,15 @@ let bootstrapped: null | Promise<Bootstrap> = null;
  */
 interface CanvasHostProps {
   fs: AssetFileSystem;
+  /** The selected game id — selects its `GAME_CONFIG` entry (spawn, vehicles, teleports, …). */
+  gameId: GameId;
   /** Called once the world has settled (player grounded) — the shell reveals the game on this. */
   onWorldReady?: () => void;
   /** Freeze the game (physics + control + clock) while the pause menu is up. */
   paused?: boolean;
 }
 
-export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps): ReactElement {
+export function CanvasHost({ fs, gameId, onWorldReady, paused = false }: CanvasHostProps): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [actions, setActions] = useState<DebugActions | null>(null);
@@ -199,7 +183,7 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
     }
     let disposed = false;
 
-    bootstrap(canvas, fs, onWorldReady)
+    bootstrap(canvas, fs, gameId, onWorldReady)
       .then((ready) => {
         if (!disposed) {
           setGame(ready.game);
@@ -219,7 +203,7 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
     return (): void => {
       disposed = true;
     };
-  }, [fs, onWorldReady]);
+  }, [fs, gameId, onWorldReady]);
 
   // Pause/resume the game (frozen physics + control + clock) when the shell shows the pause menu.
   useEffect(() => {
@@ -339,7 +323,9 @@ export function CanvasHost({ fs, onWorldReady, paused = false }: CanvasHostProps
           <Hud game={game} />
         </Overlay>
       )}
-      {game && actions && <DebugOverlay actions={actions} game={game} />}
+      {game && actions && (
+        <DebugOverlay actions={actions} game={game} teleports={GAME_CONFIG[gameId].teleports ?? []} />
+      )}
     </>
   );
 }
@@ -365,8 +351,14 @@ export function LoadOverlay({ text }: { text: string }): ReactElement {
   );
 }
 
-function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?: () => void): Promise<Bootstrap> {
+function bootstrap(
+  canvas: HTMLCanvasElement,
+  fs: AssetFileSystem,
+  gameId: GameId,
+  onWorldReady?: () => void,
+): Promise<Bootstrap> {
   bootstrapped ??= (async (): Promise<Bootstrap> => {
+    const config = GAME_CONFIG[gameId];
     const game = Game.getInstance(canvas, {
       camera: {
         followDistance: 7,
@@ -547,20 +539,22 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
     await game.init();
     // Corona Points live on GLOW_LAYER (excluded from the SSAO normal prepass) — the camera must see it.
     game.getCamera().layers.enable(GLOW_LAYER);
-    // Single source of truth for where the player starts: the variant spawn seeds the initial collision zone
-    // (so there's ground under the drop) AND the player capsule. 6:00, EXTRASUNNY (weather is a load/session
-    // param like the start time, not engine config).
-    const spawn = PLAYER_SPAWN[GAME_TYPE];
-    await game.loadGame(spawn, { radius: SPAWN_COLLISION_RADIUS, startMinutes: 360, weather: DEFAULT_WEATHER });
+    // Single source of truth for where the player starts: the game's spawn seeds the initial collision zone
+    // (so there's ground under the drop) AND the player capsule. Clock/weather are load/session params.
+    const spawn = config.playerSpawn;
+    await game.loadGame(spawn, {
+      radius: config.loadGame.radius,
+      startMinutes: config.loadGame.startMinutes,
+      weather: WEATHER_NAMES.indexOf(config.loadGame.weather),
+    });
 
     // The model is native GTA model-space (up = +Y); `orientCharacter` stands it up in GTA Z-up under a
-    // wrapper the render-sync system positions.
-    // TEMP: `VITE_MAIN_CHARACTER` picks the player ped from peds.ide (bring-your-own-files).
-    const model = await adapter.loadCharacterByModel(MAIN_CHARACTER);
+    // wrapper the render-sync system positions. `mainCharacter` picks the player ped from peds.ide.
+    const model = await adapter.loadCharacterByModel(config.mainCharacter);
     const player = orientCharacter(model.object, PLAYER_PLACEMENT);
     const character = await setupCharacter(game, player, spawn, {
       bonesByName: model.bonesByName,
-      halfExtents: PLAYER_HALF_EXTENTS,
+      halfExtents: config.playerHalfExtents ?? HUMAN_HALF_EXTENTS,
       skeleton: model.skeleton,
     });
     game.frameEntity(player, 12);
@@ -929,7 +923,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
 
     const vehicleLod = new VehicleLodSystem(character.viewOf, game.getConfig(), spawnVehicle);
     game.addSystem(vehicleLod);
-    for (const placement of VEHICLE_PLACEMENTS) {
+    for (const placement of config.vehiclesSpawn ?? []) {
       vehicleLod.add(placement, await spawnVehicle(placement));
     }
 
@@ -953,7 +947,7 @@ function bootstrap(canvas: HTMLCanvasElement, fs: AssetFileSystem, onWorldReady?
 
     // Cars available in-game → drives the debug spawn list. TEMP: `VITE_VEHICLES` (resolved via vehicles.ide,
     // for bring-your-own-files) takes precedence; otherwise the loose `vehicles/*.dff` packed in the archive.
-    const vehicleModels = VEHICLES.length > 0 ? VEHICLES : vehicleModelsFromNames(fs.names);
+    const vehicleModels = config.vehicles.length > 0 ? config.vehicles : vehicleModelsFromNames(fs.names);
 
     // Cycle each car's OWN carcols combos on repeated debug spawns (so re-spawning gives a different
     // colour); undefined when the car has no carcols entry → loadVehicle picks its default.

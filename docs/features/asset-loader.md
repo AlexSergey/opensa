@@ -1,14 +1,15 @@
 # Asset loaders
 
 `src/loaders/` — standalone, framework-agnostic (no React, no `game`). Resolves the game's assets into the
-VFS behind one contract, selected at build time by `VITE_ASSET_LOADER`. Plans
-[049](../plans/049-asset-loader.md) (fetch) + [053](../plans/053-asset-local-loader.md) (local + restructure).
+VFS behind one contract; the loader kind is chosen **per game** by its `assetLoader` in `GAME_CONFIG`
+(plan 056). Plans [049](../plans/049-asset-loader.md) (fetch) + [053](../plans/053-asset-local-loader.md)
+(local + restructure).
 
 ## Layout
 
 ```
 src/loaders/
-  index.ts            # createAssetLoader(config) factory (env switch) + public re-exports
+  index.ts            # createAssetLoader(config) factory (per-game assetLoader) + public re-exports
   types.ts            # shared contract: AssetLoader + Manifest/GroupName/AssetSink/ProgressSnapshot/…
   manifest.ts         # manifest helpers (parseManifest, allChunks, chunkUrl, …) — pure
   emitter.ts          # typed event emitter   |   progress.ts — ProgressTracker (pure)
@@ -16,9 +17,8 @@ src/loaders/
   asset-local-loader/ # AssetLocalLoader (user-picked raw GTA install) + dir-handle-store, img-reader, …
 ```
 
-The boot flow (`use-asset-boot.ts`) drives **one** `AssetLoader` from `createAssetLoader(...)`; everything
-downstream (VFS, renderer) is loader-agnostic. `resolveLoaderKind()` reads `VITE_ASSET_LOADER` (`fetch`
-default | `local`).
+The boot flow (`use-asset-boot.ts`) creates **one** `AssetLoader` per selected game via `createAssetLoader(...)`
+(passing the game's `assetLoader`); everything downstream (VFS, renderer) is loader-agnostic.
 
 ```ts
 interface AssetLoader {
@@ -48,7 +48,9 @@ game, version }`; each chunk is `{ bytes, cached, entries, file, hash }`), `mani
   group) are **always re-fetched** and never stored — `data` doubles as a **build-liveness probe**.
   `load` fetches the non-cached probe **before** any cacheable chunk; if it fails (e.g. the server returns
   404 because the build was revoked), the loader **wipes the entire cache** (`CacheStore.clear`) and rejects.
-  Doing the probe first makes the wipe atomic — no cacheable chunk can race back in after it.
+  Doing the probe first makes the wipe atomic — no cacheable chunk can race back in after it. The **manifest
+  itself** is the same liveness signal: if `init()` can't fetch/parse it (404/revoked or network/parse error),
+  it likewise wipes the whole cache before rejecting.
 - **Cache** (`cache-store.ts`): Cache Storage, one named bucket, keyed by content-hashed chunk URL.
   **Invalidation** in `invalidate.ts` (pure `staleKeys`); **`clear()`** drops the whole bucket (revoke).
   Cache Storage needs a **secure context** (https / localhost); over plain `http://` (e.g. a phone on a LAN
@@ -58,8 +60,8 @@ game, version }`; each chunk is `{ bytes, cached, entries, file, hash }`), `mani
 ## Local loader (`asset-local-loader/`, plan 053)
 
 Reads a **user-picked raw GTA San Andreas install** folder via the File System Access API and converts it
-in-browser to the same VFS — so the downstream flow is identical. **Chromium-only; opt-in** via
-`VITE_ASSET_LOADER=local`.
+in-browser to the same VFS — so the downstream flow is identical. **Chromium-only; opt-in** per game
+(`assetLoader: 'local'` in `GAME_CONFIG`).
 
 - **Folder handle** (`dir-handle-store.ts`): persisted in IndexedDB and remembered across visits.
   `restoreDir` (boot, no gesture) loads it; `pickDir` (the Play-folder gesture) makes the picker /
@@ -69,12 +71,12 @@ in-browser to the same VFS — so the downstream flow is identical. **Chromium-o
   `renderware/archive`.
 - **Selection** (`build-vfs.ts`): the in-browser port of `scripts/build-game.ts`'s partition (shared
   `src/game-build/partition.ts` — `partitionEntries` + `looseGroup`) — exterior-placed models/textures,
-  `.col`, the loose `data/`/anim/text files, and the `gta3.img` ipl/ifp/dat, **plus** the env-named dynamic
-  models (`VITE_MAIN_CHARACTER` via `peds.ide`, `VITE_VEHICLES` via `vehicles.ide`).
-- **`AssetLocalLoader`**: `restore()` (mount) → `prepare()` (Play-folder gesture) → `init()` (scan+select →
+  `.col`, the loose `data/`/anim/text files, and the `gta3.img` ipl/ifp/dat, **plus** the game's dynamic
+  models (`GAME_CONFIG[game].mainCharacter` via `peds.ide`, `.vehicles` via `vehicles.ide`).
+- **`AssetLocalLoader`**: `restore()` (boot) → `prepare()` (folder gesture) → `init()` (scan+select →
   one synthetic chunk per group) → `load()` (read selected bytes into the VFS, count-based progress).
-- **Boot gate**: the shell auto-loads `core` for fetch; for local it boots to the menu, then **Play → folder
-  prompt** (`FolderPrompt`, `boot-machine` `folder` phase) → load. See [ui-shell](ui-shell.md).
+- **Boot gate**: the shell shows the game menu; picking a local game opens the **folder prompt**
+  (`FolderPrompt`, `boot-machine` `folder` phase, with the game's disclaimer) → load. See [ui-shell](ui-shell.md).
 
 ## Progress + events
 
@@ -96,8 +98,8 @@ The `AssetSink` consumer. `Vfs implements AssetSink, AssetFileSystem`:
 ## Known gaps / candidates
 
 - Local loader is **Chromium-only** (File System Access); `fetch` stays the default everywhere else.
-- The env-named peds/vehicles selection is a **temporary** bring-your-own-files stop-gap (plan 053 step 7)
-  until a proper ped/vehicle registry exists.
+- The per-game `mainCharacter` / `vehicles` selection (`GAME_CONFIG`) is a **temporary** bring-your-own-files
+  stop-gap until a proper ped/vehicle registry exists.
 - Lazy per-file inflate for the fetch path (decompress on `get`) if the eager-unzip footprint bites.
 
 ## Test coverage anchors
@@ -105,4 +107,5 @@ The `AssetSink` consumer. `Vfs implements AssetSink, AssetFileSystem`:
 - Unit: `loaders/{manifest,emitter,progress}.test.ts`, `asset-fetch-loader/invalidate.test.ts`,
   `asset-local-loader/{dir-handle-store,img-reader,build-vfs,asset-local-loader}.test.ts`, `vfs/{verify,vfs}.test.ts`.
 - e2e (browser IO): `e2e/asset-fetch-loader.spec.ts` (download/progress/sink, skip-if-cached, invalidation,
-  error) and `e2e/asset-local-loader.spec.ts` (fake FSA tree → walk + lazy reader + selection + VFS, verify clean).
+  error, cache-wipe on a revoked `data` probe **or** manifest) and `e2e/asset-local-loader.spec.ts`
+  (fake FSA tree → walk + lazy reader + selection + VFS, verify clean).

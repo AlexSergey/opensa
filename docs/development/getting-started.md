@@ -67,8 +67,8 @@ and plan 048 for the full breakdown.
 Each chunk also carries a `cached` flag from the build's `CACHED` map (`scripts/build-game.ts`). `models`,
 `textures`, and `others` are cached in the browser (Cache Storage); `data` is `cached: false` — always
 re-downloaded and never stored. That makes `data` a **build-liveness probe**: delete its zip on the server
-(to revoke a build) and clients 404 on it, which wipes their whole asset cache. See
-[asset-loader.md](../features/asset-loader.md).
+(to revoke a build) and clients 404 on it, which wipes their whole asset cache. Deleting the whole build
+(so `manifest.json` 404s) wipes the cache the same way. See [asset-loader.md](../features/asset-loader.md).
 
 ## 4. Run
 
@@ -77,19 +77,18 @@ npm run serve:static            # serves ./static (viewer fixtures + built game 
 npm run dev                     # Vite dev server for the app
 ```
 
-The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). The UI shell (plan 051,
-`src/ui/shell/`) boots instantly, then the **asset loader** (plan 049) downloads the chunks from
-`static/<game>-<version>/` (caching each in Cache Storage), the **VFS** (plan 050) unzips them and
-verifies against the manifest, and the lazily-loaded game runs entirely from the VFS. A network blip
-re-fetches only the dropped chunk; a return visit downloads nothing.
+The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). The UI shell (plans 051 / 056,
+`src/ui/shell/`) shows a **menu of the games in `GAME_CONFIG`** (`src/game-config.tsx`); picking one runs its
+disclaimer → the **asset loader** (plan 049) loads `static/<game>-<version>/` into the **VFS** (plan 050,
+unzip + verify) → the lazily-loaded game runs entirely from the VFS.
 
-> **Bring your own files:** set `VITE_ASSET_LOADER=local` (Chromium only) to skip the download and read a
-> **raw GTA San Andreas install** you pick at Play time instead — Play → "Choose game folder". The folder is
-> remembered (IndexedDB). See [asset loaders](../features/asset-loader.md) and [build flags](build-flags.md)
-> for the full env list (incl. the temporary `VITE_MAIN_CHARACTER` / `VITE_VEHICLES`).
+> **Per-game config (`src/game-config.tsx`):** each game sets its `assetLoader` (`fetch` = download chunks;
+> `local` = read a user-picked **raw GTA install**, Chromium only), `mainCharacter`, `vehicles`, `playerSpawn`,
+> teleports, and a `disclaimer`. `original` is `local` (bring-your-own-files → "Choose game folder", remembered
+> in IndexedDB); `gostown` is `fetch`. See [asset loaders](../features/asset-loader.md).
 
-> **Note:** the boot fetches `static/original-${__APP_VERSION__}/manifest.json` (version from
-> `package.json`, wired in `src/ui/shell/use-asset-boot.ts`) — currently the `original` variant only.
+> **Note:** the boot fetches `static/<game>-${__APP_VERSION__}/manifest.json` for the picked game (version from
+> `package.json`, wired in `src/ui/shell/use-asset-boot.ts`).
 
 > **Testing on a phone (LAN):** Cache Storage needs a **secure context** (https / localhost). Over plain
 > `http://<your-ip>:port` `caches` is undefined, so the loader skips caching and **re-downloads every visit**

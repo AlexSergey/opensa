@@ -24,11 +24,10 @@ import type {
   WaterConfig,
   WorldLightConfig,
 } from '../../game';
+import type { Teleport } from '../../game-config';
 
-import { GAME_TYPE, type GameType } from '../../game-config';
 import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
 import { GameClock } from '../../game/time/game-clock';
-import { PLAYER_SPAWN } from '../locations';
 import { styles } from './debug-styles';
 import { MapInspector } from './map-inspector';
 
@@ -195,46 +194,6 @@ type Screen =
 /** Authoring / live-tuning screens hidden only in the deploy build (`build:prod` sets `__DEBUGGER_HIDE__`). */
 const DEV_ONLY_SCREENS = new Set<Screen>(['atmosphere', 'camera', 'graphics', 'map', 'procobj']);
 
-/** Quick teleport destinations per game variant (native GTA Z-up world coords). Empty → no Position tab. */
-const TELEPORTS: Record<GameType, { coords: Vec3; label: string }[]> = {
-  anderius: [],
-  carcer: [],
-  gostown: [],
-  original: [
-    { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
-    { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
-    { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
-    { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
-    { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
-    { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
-    { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
-    { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
-    { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
-    { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
-    { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
-    { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
-    { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
-  ],
-  'original-extend': [
-    { coords: PLAYER_SPAWN.original, label: 'LS - Ganton' },
-    { coords: [1481.0, -1744.0, 13.5], label: 'LS - Downtown' },
-    { coords: [2860.28, -1887.01, 10.86], label: 'LS - Long Beach' },
-    { coords: [342.0, -1803.0, 4.8], label: 'LS - Santa Maria Beach' },
-    { coords: [2020.0, 1007.0, 10.86], label: 'LV - City Center' },
-    { coords: [2031.09, 1539.7, 10.74], label: 'LV - Pirate' },
-    { coords: [2019.8, 1007.7, 10.86], label: 'LV - Four Dragons' },
-    { coords: [1697.0, 1447.0, 10.86], label: 'LV - Airport' },
-    { coords: [-1905.0, 277.0, 41.0], label: 'SF - Doherty' },
-    { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
-    { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
-    { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
-    { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
-  ],
-};
-
-/** Teleports for the active variant; when empty, the Position tab is hidden. */
-const TELEPORTS_FOR_GAME = TELEPORTS[GAME_TYPE];
-
 const ALL_MENU: { label: string; screen: Screen }[] = [
   { label: 'Player', screen: 'player' },
   { label: 'Vehicles', screen: 'vehicles' },
@@ -248,12 +207,11 @@ const ALL_MENU: { label: string; screen: Screen }[] = [
   { label: 'Map', screen: 'map' },
 ];
 
-const MENU: { label: string; screen: Screen }[] = ALL_MENU.filter(
-  (item) =>
-    (!__DEBUGGER_HIDE__ || !DEV_ONLY_SCREENS.has(item.screen)) &&
-    // No teleports for this variant → hide the Position tab entirely.
-    (item.screen !== 'position' || TELEPORTS_FOR_GAME.length > 0),
-);
+/** Menu items visible for this game: hide dev-only screens in the deploy build. The Position screen always
+ *  shows (coords readout + city); its teleport list is just empty when the game defines none. */
+function menuFor(): { label: string; screen: Screen }[] {
+  return ALL_MENU.filter((item) => !__DEBUGGER_HIDE__ || !DEV_ONLY_SCREENS.has(item.screen));
+}
 
 /** ProcObj screen rows — display order for the clutter categories (plan 042). */
 const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [
@@ -271,7 +229,16 @@ const PROCOBJ_CATEGORIES: readonly ProcObjCategory[] = [
  * actions; opening it has **no** effect on the simulation — only the Map screen's
  * "Activate Map Viewer" enters the map-viewer mode (and leaving it exits cleanly).
  */
-export function DebugOverlay({ actions, game }: { actions: DebugActions; game: Game }): null | ReactElement {
+export function DebugOverlay({
+  actions,
+  game,
+  teleports,
+}: {
+  actions: DebugActions;
+  game: Game;
+  teleports: Teleport[];
+}): null | ReactElement {
+  const menu = menuFor();
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState<Screen>('root');
   const [showCoords, setShowCoords] = useState(false);
@@ -383,7 +350,7 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
 
       {screen === 'root' ? (
         <div style={styles.group}>
-          {MENU.map((item) => (
+          {menu.map((item) => (
             <button key={item.screen} onClick={() => resetTo(item.screen)} style={styles.menuButton} type="button">
               {item.label} <span>›</span>
             </button>
@@ -453,17 +420,21 @@ export function DebugOverlay({ actions, game }: { actions: DebugActions; game: G
                 </>
               )}
 
-              <div style={styles.groupLabel}>TELEPORT</div>
-              {TELEPORTS_FOR_GAME.map((t) => (
-                <button
-                  key={t.label}
-                  onClick={() => actions.teleport(t.coords)}
-                  style={styles.actionButton}
-                  type="button"
-                >
-                  {t.label}
-                </button>
-              ))}
+              {teleports.length > 0 && (
+                <>
+                  <div style={styles.groupLabel}>TELEPORT</div>
+                  {teleports.map((t) => (
+                    <button
+                      key={t.label}
+                      onClick={() => actions.teleport(t.coords)}
+                      style={styles.actionButton}
+                      type="button"
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
