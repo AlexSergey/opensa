@@ -86,6 +86,70 @@ describe('buildSkinnedClump', () => {
   });
 });
 
+/** Identity inverse-bind (zero translation) for `numBones`, with the RW 4th-float pad left 0. */
+function identityInverseBinds(numBones: number): Float32Array {
+  const out = new Float32Array(numBones * 16);
+  for (let b = 0; b < numBones; b += 1) {
+    out.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], b * 16);
+  }
+
+  return out;
+}
+
+describe('buildSkinnedClump (root bone anchored to skin bind)', () => {
+  describe('positive cases', () => {
+    it('snaps a root frame offset back to the skin bind (mods that offset Root, e.g. gostown BMYPOL1)', () => {
+      // Root frame authored at +2 on X, but the skin bind puts it at the origin (identity inverse bind).
+      // Dropped root translation track would otherwise leave the body shoved by 2 off the entity pivot.
+      const geo = geometry(2);
+      geo.skin!.inverseBindMatrices = identityInverseBinds(2);
+      const model = clump(geo);
+      model.frames[1].position = [2, 0, 0];
+
+      const { skeleton } = buildSkinnedClump(model)!;
+      const { x, y, z } = skeleton.bones[0].position;
+      expect([x, y, z]).toEqual([0, 0, 0]);
+    });
+
+    it('keeps the root where the frame and skin bind already agree (no-op for standard peds)', () => {
+      // Skin bind = translate(1,2,3) (its inverse), frame authored at the same place → unchanged.
+      const geo = geometry(2);
+      const binds = identityInverseBinds(2);
+      binds.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -1, -2, -3, 0], 0);
+      geo.skin!.inverseBindMatrices = binds;
+      const model = clump(geo);
+      model.frames[1].position = [1, 2, 3];
+
+      const { skeleton } = buildSkinnedClump(model)!;
+      const { x, y, z } = skeleton.bones[0].position;
+      expect([x, y, z].map((n) => +n.toFixed(3))).toEqual([1, 2, 3]);
+    });
+  });
+});
+
+// A real custom mod ped (gostown's BMYPOL1) whose `Root` FRAME is authored at +2.16 on X while its skin bind
+// puts the root at the origin. The IFP root translation track is dropped (locomotion stays in-place), so the
+// frame offset would otherwise shove the whole body off the entity pivot. `anchorRootBone` snaps it back.
+const GOSTOWN_BMYPOL1_DFF = 'tests/custom/character/gostown-bmypol1.dff';
+
+describe('buildSkinnedClump (real gostown BMYPOL1.dff — offset root frame)', () => {
+  const parsed = parseDff(toArrayBuffer(new Uint8Array(readFileSync(GOSTOWN_BMYPOL1_DFF))));
+
+  describe('positive cases', () => {
+    it('the model authors its Root frame with a large offset (the fact the fix guards)', () => {
+      expect(parsed.frames[1].name.trim()).toBe('Root');
+      expect(parsed.frames[1].position[0]).toBeGreaterThan(2);
+    });
+
+    it('anchors the skeleton root to the skin bind (origin), not the offset frame position', () => {
+      const { skeleton } = buildSkinnedClump(parsed)!;
+      expect(skeleton.bones[0].name).toBe('Root');
+      const { x, y, z } = skeleton.bones[0].position;
+      expect([x, y, z].map((n) => +n.toFixed(2))).toEqual([0, 0, 0]);
+    });
+  });
+});
+
 // Plan 052: the skin's bone indices follow the HAnim hierarchy, which need NOT match the frame order
 // (true for standard SA peds, e.g. army). Frames here are stored A, C, B but the hierarchy is A, B, C.
 function hanimClump(): RWClump {

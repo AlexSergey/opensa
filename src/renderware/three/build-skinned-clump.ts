@@ -59,6 +59,7 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
   const skeleton = new Skeleton(skinBoneOrder(clump, bones, skin.numBones));
   mesh.bind(skeleton); // computes bindMatrix (+ frame-derived inverses we override next)
   applySkinInverses(skeleton, skin);
+  anchorRootBone(skeleton);
 
   const root = new Group();
   root.name = 'RWSkinnedClump';
@@ -72,6 +73,22 @@ export function buildSkinnedClump(clump: RWClump, textures?: Map<string, Texture
   }
 
   return { bonesByName, root, skeleton };
+}
+
+/**
+ * Anchor the skeleton's root bone to the skin's **authoritative** bind position. The IFP root track's
+ * translation is intentionally dropped (locomotion is kept in-place — see `build-anim-clip.ts`), so the root
+ * bone keeps its DFF **frame** position. Standard SA peds author that at the origin (matching the skin bind),
+ * but some mods offset the root frame (e.g. gostown's `BMYPOL1` puts `Root` at +2.16) — which, with no track
+ * to override it, shoves the whole body off the entity pivot (off-centre, rotation orbits the offset). Snap
+ * it back to the skin-bind translation (`inverse(boneInverse)`); a no-op when the frame already agrees.
+ */
+function anchorRootBone(skeleton: Skeleton): void {
+  const inverse = skeleton.boneInverses[0];
+  const root = skeleton.bones[0];
+  if (inverse && root) {
+    root.position.setFromMatrixPosition(inverse.clone().invert());
+  }
 }
 
 /**

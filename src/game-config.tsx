@@ -104,7 +104,7 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
     ),
     label: 'Run Gostown Paradise [web]',
     loadGame: { radius: 400, startMinutes: 360, weather: 'EXTRASUNNY_SMOG_LA' },
-    mainCharacter: 'player',
+    mainCharacter: 'BMYPOL1',
     playerSpawn: [1531.15, -1271.89, 581.74],
     teleports: [{ coords: [1531.15, -1271.89, 581.74], label: 'Downtown' }],
     vehicles: ['admiral', 'comet'],
