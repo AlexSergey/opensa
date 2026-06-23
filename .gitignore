@@ -67,8 +67,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /static/
 game-src
 issues
-map-optimizer
+ideas
 blog-src
+
+# map-optimizer is a tracked sub-project; ignore only its generated output + local scratch.
+map-optimizer/out/
+map-optimizer/*.jpg
 
 # Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
 # copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /

@@ -211,9 +211,9 @@ const customJsConfig = {
   ...js.configs.recommended,
 };
 
-// Node build/pack scripts: Node globals (Buffer, process, …), allow console.
+// Node build/pack scripts + the map-optimizer tool: Node globals (Buffer, process, …), allow console.
 const scriptsConfig = {
-  files: ['scripts/**/*.{js,mjs,cjs,ts}'],
+  files: ['scripts/**/*.{js,mjs,cjs,ts}', 'map-optimizer/**/*.{js,mjs,cjs,ts}'],
   languageOptions: {
     globals: {
       ...globals.node,
