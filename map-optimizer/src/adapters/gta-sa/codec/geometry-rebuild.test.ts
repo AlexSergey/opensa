@@ -3,8 +3,17 @@ import { describe, expect, it } from 'vitest';
 import type { SubMesh } from '../../../core/ir';
 import type { GeometryStruct } from './geometry-struct';
 
-import { RW_BIN_MESH_PLG, RW_EXTENSION, RW_SKIN, RW_STRUCT, type RwChunk } from './chunk';
-import { rebuildGeometry } from './geometry-rebuild';
+import {
+  readRw,
+  RW_BIN_MESH_PLG,
+  RW_EXTENSION,
+  RW_NIGHT_VERTEX_COLORS,
+  RW_SKIN,
+  RW_STRUCT,
+  type RwChunk,
+  writeRw,
+} from './chunk';
+import { addNightColorsIfMissing, rebuildGeometry } from './geometry-rebuild';
 import { decodeGeometryStruct, encodeGeometryStruct } from './geometry-struct';
 
 function geometryChunk(numVertices: number, numTriangles: number, extras: RwChunk[] = []): RwChunk {
@@ -33,6 +42,12 @@ function mesh(numVertices: number, triangles: SubMesh['triangles']): SubMesh {
     triangles,
     uvs: null,
   };
+}
+
+function nightChunkOf(geometry: RwChunk): RwChunk | undefined {
+  return geometry.children
+    ?.find((child) => child.type === RW_EXTENSION)
+    ?.children?.find((child) => child.type === RW_NIGHT_VERTEX_COLORS);
 }
 
 function struct(numVertices: number, numTriangles: number): GeometryStruct {
@@ -81,6 +96,40 @@ describe('rebuildGeometry', () => {
       expect(view.getUint32(12, true)).toBe(3); // split: numIndices
       expect(view.getUint32(16, true)).toBe(0); // split: materialIndex
       expect([view.getUint32(20, true), view.getUint32(24, true), view.getUint32(28, true)]).toEqual([0, 1, 2]);
+    });
+  });
+});
+
+describe('addNightColorsIfMissing', () => {
+  describe('negative cases', () => {
+    it('does nothing when the mesh has no synthesized night set', () => {
+      const geometry = geometryChunk(4, 2);
+      addNightColorsIfMissing(geometry, mesh(4, []));
+      expect(nightChunkOf(geometry)).toBeUndefined();
+    });
+
+    it('leaves an existing night chunk untouched (byte-faithful)', () => {
+      const existing = new Uint8Array([1, 0, 0, 0, 9, 9, 9, 9]);
+      const geometry = geometryChunk(4, 2, [{ data: existing, type: RW_NIGHT_VERTEX_COLORS, version: 0 }]);
+      const withNight = mesh(4, []);
+      withNight.nightColors = new Uint8Array(16).fill(200);
+      addNightColorsIfMissing(geometry, withNight);
+      expect(nightChunkOf(geometry)!.data).toBe(existing); // same reference — not rewritten
+    });
+  });
+
+  describe('positive cases', () => {
+    it('appends a NIGHT_VERTEX_COLORS chunk (present=1 + RGBA) that round-trips', () => {
+      const geometry = geometryChunk(2, 0);
+      const withNight = mesh(2, []);
+      withNight.nightColors = new Uint8Array([10, 20, 30, 255, 40, 50, 60, 255]);
+      addNightColorsIfMissing(geometry, withNight);
+
+      const roundTripped = readRw(writeRw({ chunks: [geometry], trailing: new Uint8Array(0) })).chunks[0];
+      const night = nightChunkOf(roundTripped)!.data!;
+      expect(night.length).toBe(4 + 8); // present u32 + 2 × RGBA
+      expect(new DataView(night.buffer, night.byteOffset).getUint32(0, true)).toBe(1);
+      expect([...night.subarray(4)]).toEqual([10, 20, 30, 255, 40, 50, 60, 255]);
     });
   });
 });

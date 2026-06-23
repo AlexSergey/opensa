@@ -18,13 +18,17 @@ normals, welding duplicate vertices, and removing degenerate / duplicate faces �
 ```bash
 # from the repo root — <game> is a folder under game-src/ (e.g. gostown)
 npx tsx map-optimizer/src/cli.ts --game gostown
+
+# opt-in texture pass:
+npx tsx map-optimizer/src/cli.ts --game gostown --textures   # generate mip chains (plan 010)
 ```
 
 - Reads `game-src/<game>/` (models `*.img` + `data/` IDE/IPL to resolve the map's models).
 - Writes a **complete, drop-in build** to **`map-optimizer/out/<game>/`** (gitignored; the source is never
   modified) — the whole `game-src/<game>/` tree mirrored, with each `models/*.img` **rebuilt**: optimized
   entries swapped in, everything else (vehicles, peds, interiors, data, …) preserved. Point the game at it
-  and it runs. Also kept for inspection: the loose optimized **`.dff`/`.txd`** + **`report.json`**.
+  and it runs. A **`report.json`** is written alongside.
+- `--textures` is **opt-in** (off by default).
 - Prints a summary: models processed/changed, vertices & faces removed, size reduction, and any per-asset
   failures (isolated — one bad model never aborts the run).
 
@@ -47,6 +51,12 @@ Edit `src/optimizer.config.ts` (the "gulpfile") to choose/reorder stages. The de
 3. **remove-degenerate-triangles** — drop zero-area faces (coincident/collinear/equal-index).
 4. **dedupe-faces** — remove exact duplicate triangles (keeps two-sided/reversed-winding faces and decals).
 5. **prune-vertices** — drop vertices no triangle references.
+6. **condition-prelit** — re-level pathologically dark/bright day-prelit toward a neutral target (RGB only,
+   alpha preserved); healthy models keep their baked AO. Visual heuristic — calibrate `targetLuma` in-game.
+7. **synthesize-night** — give night-less, opaque, bright-enough models a night vertex-colour set derived from
+   their day prelit, so they don't go dark at night (the engine darkens night-less models). Map-wide visual
+   heuristic — tune `minLuma`/`nightScale` (or restrict it) in-game; models that already have night colours
+   are untouched.
 
 Every stage is a small, independently-tested pure transform wrapped in a `MapPlugin`.
 

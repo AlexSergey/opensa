@@ -1,9 +1,11 @@
 import type { OptimizerConfig } from './core/asset';
 
+import { createConditionPrelit } from './plugins/condition-prelit';
 import { createDedupeFaces } from './plugins/dedupe-faces';
 import { createRemoveDegenerateTriangles } from './plugins/degenerate-triangles';
 import { createPruneVertices } from './plugins/prune-vertices';
 import { createRecomputeNormals } from './plugins/recompute-normals';
+import { createSynthesizeNight } from './plugins/synthesize-night';
 import { createWeldVertices } from './plugins/weld-vertices';
 
 /**
@@ -18,5 +20,7 @@ export const config: OptimizerConfig = {
     createRemoveDegenerateTriangles(),
     createDedupeFaces(),
     createPruneVertices(),
+    createConditionPrelit(),
+    createSynthesizeNight({ nightScale: 0.7 }),
   ],
 };

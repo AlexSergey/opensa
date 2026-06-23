@@ -2,7 +2,7 @@ import type { MeshIR } from '../../../core/ir';
 import type { RwChunk } from './chunk';
 
 import { readRw, RW_CLUMP, RW_GEOMETRY, RW_GEOMETRY_LIST, RW_STRUCT, writeRw } from './chunk';
-import { rebuildGeometry } from './geometry-rebuild';
+import { addNightColorsIfMissing, rebuildGeometry } from './geometry-rebuild';
 import { applyMeshToStruct } from './geometry-struct';
 
 /** Every Geometry chunk, in document order (matches the IR's `meshes` order). */
@@ -62,6 +62,7 @@ export function encodeDff(source: Uint8Array, ir: MeshIR): Uint8Array {
     } else {
       rebuildGeometry(geometry, mesh);
     }
+    addNightColorsIfMissing(geometry, mesh); // synthesized night sets (plan 013); no-op otherwise
   });
 
   return writeRw(file);

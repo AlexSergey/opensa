@@ -16,6 +16,35 @@ import { decodeGeometryStruct, encodeGeometryStruct } from './geometry-struct';
 const PRELIT_FLAG = 0x0008;
 const NORMALS_FLAG = 0x0010;
 
+/**
+ * Add a `NIGHT_VERTEX_COLORS` chunk to a geometry that has none (plan 013 — synthesized night sets for
+ * night-less models). No-op when the geometry already carries a night chunk (its bytes stay untouched) or when
+ * `mesh.nightColors` is absent / count-mismatched. Appends into the EXTENSION (creating one if needed); the
+ * chunk codec recomputes all container sizes on write. The new chunk inherits the geometry's RW version.
+ */
+export function addNightColorsIfMissing(geometry: RwChunk, mesh: SubMesh): void {
+  const vertexCount = mesh.positions.length / 3;
+  if (!mesh.nightColors || mesh.nightColors.length !== vertexCount * 4) {
+    return;
+  }
+  const children = geometry.children ?? [];
+  let extension = children.find((child) => child.type === RW_EXTENSION);
+  if (extension?.children?.some((child) => child.type === RW_NIGHT_VERTEX_COLORS)) {
+    return; // already has a night set — leave it byte-faithful
+  }
+  if (!extension) {
+    extension = { children: [], type: RW_EXTENSION, version: geometry.version };
+    children.push(extension);
+    geometry.children = children;
+  }
+  extension.children ??= [];
+  extension.children.push({
+    data: buildNightColors(mesh.nightColors),
+    type: RW_NIGHT_VERTEX_COLORS,
+    version: geometry.version,
+  });
+}
+
 export function rebuildGeometry(geometry: RwChunk, mesh: SubMesh): void {
   const children = geometry.children ?? [];
   const structChunk = children.find((child) => child.type === RW_STRUCT && child.data);
