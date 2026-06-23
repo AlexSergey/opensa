@@ -1,6 +1,6 @@
 {
   "name": "opensa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An open-source, from-scratch game engine built compatible with RenderWare (the GTA San Andreas engine) — runs SA assets and mods in the browser (DFF/TXD/COL/IMG, IPL/IDE world streaming) with Rapier physics.",
   "keywords": [
     "opensa",

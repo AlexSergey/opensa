@@ -1,5 +1,48 @@
 # Changelog
 
+# 0.2.0 (2026-06-23)
+
+### Added
+
+- **Multi-game runtime catalogue** — `GAME_CONFIG` (`src/game-config.tsx`) replaces the single-game `.env`
+  setup: the menu lists every game and you pick one at runtime, each with its own loader, world/player setup,
+  parked vehicles, teleports, and a disclaimer remembered per game.
+- **Pluggable asset loaders** — a `fetch` loader (download content-hashed chunk archives) and a new **local
+  raw-install loader**: point the app at your own GTA install folder via the File System Access API; nothing
+  is uploaded, files are read locally in the browser (bring-your-own-files).
+- **Locked / anti-rip model support** — recover protected (encrypted) DFF/TXD so community mod models load.
+- **Mobile / touch controls** — on-screen move & look joysticks, jump, and pinch-zoom.
+- **Branding** — new OpenSA logo, a full favicon set + web manifest, and a social-share (`og.jpg`) image.
+
+### Changed
+
+- **Repositioned as a RenderWare-compatible game engine** — README, blog, docs, package metadata and the
+  in-app tagline now lead with the engine (compatible with RenderWare; runs GTA San Andreas and its mods)
+  rather than "GTA San Andreas in the browser".
+- **Boot flow is menu-first** — nothing downloads until a game is picked; a single loading screen pulls all
+  groups; removed the eager pre-menu core download and the first-visit intro animation.
+- **Cache management reworked** — per-build-version Cache Storage with a fallback strategy; a revoked build
+  (a missing `data` probe **or** `manifest.json`) wipes the client cache.
+- **Unified player spawn** — a single `playerSpawn` per game seeds both the capsule and the initial collision
+  zone.
+- **Input refactored** into pluggable sources (keyboard / pointer / touch).
+- **Debugger** — the Position tab (live coords + city) is always available; teleport lists are per-game.
+
+### Fixed
+
+- Custom-ped **root-bone offset** — peds whose `Root` frame is authored off-origin (some mods) no longer
+  render off-centre or orbit the pivot when turning.
+- Character **material issues** and animation retargeting on custom / renamed-skeleton models.
+
+### Removed
+
+- **All bundled game assets** — dropped the committed player model and other assets; the project ships **no
+  game files**, you supply your own copy. Test fixtures use local, gitignored real assets.
+
+### Legal & safety
+
+- Added a **Legal & takedowns** section (README) and an in-app disclaimer with a rights-holder contact.
+
 # 0.1.0 (2026-06-18)
 
 ### Added
