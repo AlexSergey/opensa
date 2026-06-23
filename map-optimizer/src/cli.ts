@@ -1,9 +1,9 @@
 /**
  * Map-optimizer CLI. Mirrors `scripts/build-game.ts`: takes `--game <name>`, reads `game-src/<name>/`, runs
- * the configured model pipeline (and, with `--textures`, the texture mip pass), and writes the results +
- * `<game>.img` under `map-optimizer/out/<name>/`. Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures]`.
+ * the configured model pipeline (and, with `--textures`, the texture mip pass), and emits a full drop-in
+ * build under `map-optimizer/out/<name>/`. Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures]`.
  */
-import { mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createGtaSaAdapter } from './adapters/gta-sa';
@@ -29,13 +29,11 @@ async function main(): Promise<void> {
   }
 
   const outDir = config.out ?? join(root, 'map-optimizer', 'out', game);
-  mkdirSync(outDir, { recursive: true });
   const adapter = createGtaSaAdapter(game, gameDir);
 
-  // Texture mip pass (opt-in — DXT is converted to uncompressed 8888, which inflates size; plan 010). Runs
-  // before the model run so both end up in the one finalized .img.
+  // Texture mip pass (opt-in). Runs before the model run so both end up in the one finalized build.
   if (process.argv.includes('--textures')) {
-    optimizeTextures(adapter, outDir);
+    optimizeTextures(adapter);
   }
 
   const report = await runPipeline(adapter, config, outDir);
@@ -43,7 +41,7 @@ async function main(): Promise<void> {
   writeReport(report);
 }
 
-function optimizeTextures(adapter: ReturnType<typeof createGtaSaAdapter>, outDir: string): void {
+function optimizeTextures(adapter: ReturnType<typeof createGtaSaAdapter>): void {
   let processed = 0;
   let mipped = 0;
   let failed = 0;
@@ -55,9 +53,6 @@ function optimizeTextures(adapter: ReturnType<typeof createGtaSaAdapter>, outDir
     } else if (result.failed) {
       failed += 1; // unparseable TXD — skipped, run continues
     } else {
-      if (result.bytes) {
-        writeFileSync(join(outDir, `${name}.txd`), result.bytes);
-      }
       processed += 1;
       mipped += result.mipped;
     }

@@ -21,11 +21,10 @@ npx tsx map-optimizer/src/cli.ts --game gostown
 ```
 
 - Reads `game-src/<game>/` (models `*.img` + `data/` IDE/IPL to resolve the map's models).
-- Writes to **`map-optimizer/out/<game>/`** (gitignored; the source is never modified):
-  - **`<game>.img`** — a stock **VER2 archive** of every optimized model (the same format the input ships in,
-    so it's drop-in usable in the game);
-  - the individual optimized **`.dff`** files (for inspection/diffing);
-  - **`report.json`** — per-model + total stats.
+- Writes a **complete, drop-in build** to **`map-optimizer/out/<game>/`** (gitignored; the source is never
+  modified) — the whole `game-src/<game>/` tree mirrored, with each `models/*.img` **rebuilt**: optimized
+  entries swapped in, everything else (vehicles, peds, interiors, data, …) preserved. Point the game at it
+  and it runs. Also kept for inspection: the loose optimized **`.dff`/`.txd`** + **`report.json`**.
 - Prints a summary: models processed/changed, vertices & faces removed, size reduction, and any per-asset
   failures (isolated — one bad model never aborts the run).
 

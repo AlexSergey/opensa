@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,15 +8,26 @@ import type { Asset, AssetRef, MapPlugin, WriteResult } from './asset';
 
 import { runPipeline } from './pipeline';
 
-/** An in-memory adapter (no game, no `../src`) that records what it wrote. */
+/** An in-memory adapter (no game, no `../src`): accumulates on write, emits the files on finalize. */
 function fakeAdapter(names: string[]): GameAdapter {
   const assets = new Map(names.map((name) => [name, makeAsset(name)]));
+  const written: WriteResult[] = [];
 
   return {
+    finalize: (dir: string): void => {
+      for (const result of written) {
+        writeFileSync(join(dir, result.fileName), result.bytes);
+      }
+    },
     game: 'fake',
     read: (ref: AssetRef): Asset => assets.get(ref.name)!,
     resolve: (): AssetRef[] => names.map((name) => ({ name })),
-    write: (asset: Asset): WriteResult => ({ bytes: asset.source, fileName: `${asset.name}.bin` }),
+    write: (asset: Asset): WriteResult => {
+      const result = { bytes: asset.source, fileName: `${asset.name}.bin` };
+      written.push(result);
+
+      return result;
+    },
   };
 }
 

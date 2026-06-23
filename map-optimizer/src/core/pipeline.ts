@@ -1,5 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 
 import type { GameAdapter } from './adapter';
 import type { Asset, MapPlugin, OptimizerConfig, PipelineContext } from './asset';
@@ -10,7 +9,8 @@ const DEFAULT_CONCURRENCY = 4;
 
 /**
  * Run the configured pipeline for one adapter: resolve → (read → plugins → write) per model → finalize.
- * Per-asset errors are isolated and recorded — one bad model never aborts the run. Returns a {@link RunReport}.
+ * `write` hands the optimized bytes to the adapter (which accumulates them); the adapter's `finalize` emits
+ * all output. Per-asset errors are isolated and recorded — one bad model never aborts the run.
  */
 export async function runPipeline(adapter: GameAdapter, config: OptimizerConfig, outDir: string): Promise<RunReport> {
   mkdirSync(outDir, { recursive: true });
@@ -25,8 +25,7 @@ export async function runPipeline(adapter: GameAdapter, config: OptimizerConfig,
       const before = countGeometry(asset.ir);
       await applyPlugins(asset, config.plugins, context);
       const after = countGeometry(asset.ir);
-      const { bytes, fileName } = await adapter.write(asset);
-      writeFileSync(join(outDir, fileName), bytes);
+      const { bytes } = await adapter.write(asset); // adapter accumulates; finalize emits the build
       assets.push({
         applied: asset.log.map((entry) => entry.plugin),
         bytesAfter: bytes.length,
