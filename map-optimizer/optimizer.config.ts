@@ -1,5 +1,6 @@
 import type { OptimizerConfig } from './core/asset';
 
+import { createDedupeFaces } from './plugins/dedupe-faces';
 import { createRecomputeNormals } from './plugins/recompute-normals';
 import { createWeldVertices } from './plugins/weld-vertices';
 
@@ -9,5 +10,5 @@ import { createWeldVertices } from './plugins/weld-vertices';
  */
 export const config: OptimizerConfig = {
   concurrency: 4,
-  plugins: [createRecomputeNormals(), createWeldVertices()],
+  plugins: [createRecomputeNormals(), createWeldVertices(), createDedupeFaces()],
 };
