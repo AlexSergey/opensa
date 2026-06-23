@@ -9,14 +9,14 @@ import { parseBinaryIpl } from '../../../../src/renderware/parsers/text/ipl-bina
 import { parseIpl } from '../../../../src/renderware/parsers/text/ipl.parser';
 
 /**
- * Unique DFF base names the game's EXTERIOR map references (deduped, lowercased). Reuses the build
- * partition + IPL/IDE parsers read-only — the same logic `scripts/build-game.ts` uses to know which models
- * the map needs. Interiors are skipped (the optimizer targets the visible world).
+ * The unique DFF **models** and TXD **textures** the game's EXTERIOR map references (deduped, lowercased).
+ * Reuses the build partition + IPL/IDE parsers read-only — the same logic `scripts/build-game.ts` uses to
+ * know what the map needs. Interiors are skipped (the optimizer targets the visible world).
  */
-export function resolveMapModels(dataDir: string, gta3: ImgArchive): string[] {
+export function resolveMap(dataDir: string, gta3: ImgArchive): { models: string[]; txds: string[] } {
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
 
-  return [...new Set(placed.models)];
+  return { models: [...new Set(placed.models)], txds: [...new Set(placed.txds)] };
 }
 
 /** id → {model, txd} (lowercased) from every IDE under the game's data folder. */

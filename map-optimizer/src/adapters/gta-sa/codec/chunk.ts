@@ -18,14 +18,23 @@ export const RW_STRUCT = 0x01;
 export const RW_EXTENSION = 0x03;
 export const RW_GEOMETRY = 0x0f;
 export const RW_CLUMP = 0x10;
+export const RW_TEXTURE_NATIVE = 0x15;
+export const RW_TEXTURE_DICTIONARY = 0x16;
 export const RW_GEOMETRY_LIST = 0x1a;
 export const RW_SKIN = 0x116;
 export const RW_BIN_MESH_PLG = 0x50e;
 export const RW_NIGHT_VERTEX_COLORS = 0x253f2f9;
 
-/** Section types we descend into to reach a Geometry's Struct + its Extension (for BinMeshPLG / night colour
- *  rebuild); everything else (incl. the plugin chunks inside an Extension) is a leaf (raw bytes). */
-const CONTAINER_TYPES = new Set<number>([RW_CLUMP, RW_EXTENSION, RW_GEOMETRY, RW_GEOMETRY_LIST]);
+/** Section types we descend into: down to a Geometry's Struct/Extension (BinMeshPLG / night rebuild) and a
+ *  TextureNative's Struct (mip rebuild); everything else (incl. the plugin chunks in an Extension) is a leaf. */
+const CONTAINER_TYPES = new Set<number>([
+  RW_CLUMP,
+  RW_EXTENSION,
+  RW_GEOMETRY,
+  RW_GEOMETRY_LIST,
+  RW_TEXTURE_DICTIONARY,
+  RW_TEXTURE_NATIVE,
+]);
 
 const EMPTY = new Uint8Array(0);
 

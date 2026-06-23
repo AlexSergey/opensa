@@ -1,9 +1,9 @@
 /**
  * Map-optimizer CLI. Mirrors `scripts/build-game.ts`: takes `--game <name>`, reads `game-src/<name>/`, runs
- * the configured pipeline over the map's models, and writes the results under `map-optimizer/out/<name>/`.
- * Usage: `tsx map-optimizer/src/cli.ts --game <name>`.
+ * the configured model pipeline (and, with `--textures`, the texture mip pass), and writes the results +
+ * `<game>.img` under `map-optimizer/out/<name>/`. Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures]`.
  */
-import { statSync } from 'node:fs';
+import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createGtaSaAdapter } from './adapters/gta-sa';
@@ -19,7 +19,7 @@ function argValue(flag: string): string | undefined {
 async function main(): Promise<void> {
   const game = argValue('--game');
   if (!game) {
-    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <name>');
+    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <name> [--textures]');
   }
 
   const root = process.cwd();
@@ -29,10 +29,42 @@ async function main(): Promise<void> {
   }
 
   const outDir = config.out ?? join(root, 'map-optimizer', 'out', game);
+  mkdirSync(outDir, { recursive: true });
   const adapter = createGtaSaAdapter(game, gameDir);
+
+  // Texture mip pass (opt-in — DXT is converted to uncompressed 8888, which inflates size; plan 010). Runs
+  // before the model run so both end up in the one finalized .img.
+  if (process.argv.includes('--textures')) {
+    optimizeTextures(adapter, outDir);
+  }
+
   const report = await runPipeline(adapter, config, outDir);
   printReport(report);
   writeReport(report);
+}
+
+function optimizeTextures(adapter: ReturnType<typeof createGtaSaAdapter>, outDir: string): void {
+  let processed = 0;
+  let mipped = 0;
+  let failed = 0;
+  let missing = 0;
+  for (const name of adapter.resolveTextures()) {
+    const result = adapter.optimizeTexture(name);
+    if (!result) {
+      missing += 1;
+    } else if (result.failed) {
+      failed += 1; // unparseable TXD — skipped, run continues
+    } else {
+      if (result.bytes) {
+        writeFileSync(join(outDir, `${name}.txd`), result.bytes);
+      }
+      processed += 1;
+      mipped += result.mipped;
+    }
+  }
+  console.log(
+    `  textures — ${processed} TXD processed, ${mipped} textures mipped, ${failed} failed, ${missing} not found`,
+  );
 }
 
 main().catch((error: unknown) => {

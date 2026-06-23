@@ -8,7 +8,26 @@ import { buildVer2Buffer, openArchive } from '../../../../src/renderware/archive
 import { parseDff } from '../../../../src/renderware/parsers/binary/dff';
 import { encodeDff } from './codec/dff';
 import { clumpToIr } from './read';
-import { resolveMapModels } from './resolve';
+import { resolveMap } from './resolve';
+import { optimizeTxd } from './textures';
+
+/** GTA-SA texture-pass ops, exposed alongside the {@link GameAdapter} for the optional mip pass (plan 010). */
+export interface GtaSaTextureOps {
+  /** Read `<name>.txd`, generate mip chains, pack the result into the output `.img`; null if not in archives. */
+  optimizeTexture(name: string): null | TextureOutcome;
+  /** The TXD names the map references. */
+  resolveTextures(): string[];
+}
+
+/** Outcome of optimizing one TXD. `null` (from `optimizeTexture`) means it wasn't in the archives. */
+export interface TextureOutcome {
+  /** Rebuilt TXD bytes (present unless it failed to parse). */
+  bytes?: Uint8Array;
+  /** True when the TXD couldn't be read/optimized (isolated — not packed into the `.img`). */
+  failed: boolean;
+  /** How many textures gained a mip chain. */
+  mipped: number;
+}
 
 /**
  * GTA-SA (RenderWare) adapter. Encapsulates all of this game's I/O behind {@link GameAdapter}: resolving the
@@ -18,7 +37,7 @@ import { resolveMapModels } from './resolve';
  * The serializer patches vertex attributes in place (positions/normals/prelit/UVs); topology edits and
  * anti-rip recovered geometry are not yet expressible and surface as per-asset failures.
  */
-export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
+export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter & GtaSaTextureOps {
   const modelsDir = join(gameDir, 'models');
   const dataDir = join(gameDir, 'data');
   const gta3 = openArchive(readArchive(join(modelsDir, 'gta3.img')));
@@ -40,7 +59,9 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
     return null;
   };
 
-  // Optimized models collected during write(), packed into a VER2 .img on finalize().
+  const placed = resolveMap(dataDir, gta3); // map's models + txds, resolved once
+
+  // Optimized models + textures collected during the run, packed into a VER2 .img on finalize().
   const packed: { data: Uint8Array; name: string }[] = [];
 
   return {
@@ -52,6 +73,20 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
       writeFileSync(join(outDir, `${game}.img`), buildVer2Buffer(entries));
     },
     game,
+    optimizeTexture(name: string): null | TextureOutcome {
+      const bytes = getModel(`${name}.txd`);
+      if (!bytes) {
+        return null;
+      }
+      try {
+        const result = optimizeTxd(new Uint8Array(bytes));
+        packed.push({ data: result.bytes, name: `${name}.txd` });
+
+        return { bytes: result.bytes, failed: false, mipped: result.processed };
+      } catch {
+        return { failed: true, mipped: 0 }; // unparseable TXD — isolate, leave it out of the .img
+      }
+    },
     read(ref: AssetRef): Asset {
       const bytes = getModel(`${ref.name}.dff`);
       if (!bytes) {
@@ -68,7 +103,10 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter {
       };
     },
     resolve(): AssetRef[] {
-      return resolveMapModels(dataDir, gta3).map((name) => ({ name }));
+      return placed.models.map((name) => ({ name }));
+    },
+    resolveTextures(): string[] {
+      return placed.txds;
     },
     write(asset: Asset): WriteResult {
       const bytes = encodeDff(asset.source, asset.ir);
