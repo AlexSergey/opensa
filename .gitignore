@@ -70,9 +70,10 @@ issues
 ideas
 blog-src
 
-# map-optimizer is a tracked sub-project; ignore only its generated output + local scratch.
+# map-optimizer / lod-generator are tracked sub-projects; ignore only their generated output + local scratch.
 map-optimizer/out/
 map-optimizer/*.jpg
+lod-generator/out/
 
 # Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
 # copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /
