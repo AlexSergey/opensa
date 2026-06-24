@@ -1,22 +1,23 @@
 # "Locked" (anti-rip protected) DFF models
 
-> **✅ SOLVED (2026-06-19).** All three lock variants are handled; `cheetah.dff` / `yosemite.dff` parse and
-> render fully — geometry, the embedded COL, **and** textures — and gostown's `lodveg.txd` (TXD wrapper lock,
-> variant C) recovers its textures — verified in-game. Kept here (not deleted) as a reference for the lock
-> formats and the recovery, in case related regressions surface.
+> **✅ SOLVED (2026-06-19; Variant D added 2026-06-24).** All four lock variants are handled; `cheetah.dff` /
+> `yosemite.dff` / `walton.dff` parse fully — geometry, frames, atomics **and** the embedded COL — and
+> gostown's `lodveg.txd` (TXD wrapper lock, variant C) recovers its textures. Kept here (not deleted) as a
+> reference for the lock formats and the recovery, in case related regressions surface.
 
 Both locks bloat chunk **sizes** to swallow siblings; the data is all present (the game reads by count,
 ignoring sizes). Recovered the same way (see [Fix](#fix-2026-06-19) below). The spawn crash was already
 fixed separately (a no-COL / locked vehicle falls back to a box chassis instead of throwing).
 
-Three distinct lock variants — all falsify chunk metadata so a boundary-respecting parser (ours) chokes
+Four distinct lock variants — all falsify chunk metadata so a boundary-respecting parser (ours) chokes
 while RenderWare's lenient (count- / scan-based) reader keeps going:
 
-| Variant                          | Example                    | Tamper                                                                                                                                 | Fix                                            |
-| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| B — inflated clump-struct size   | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings                                                                     | `forEachClumpChild` (canonical 12-byte struct) |
-| A — inflated item sizes          | `yosemite.dff` (Ford F350) | every **atomic / geometry chunk size** is bloated (+ `0x0` padding) to swallow following items                                         | count-based RW recovery (`findChunkFrom`)      |
-| C — hidden TexDictionary wrapper | `lodveg.txd` (gostown)     | the outer **TexDictionary (`0x16`) header is zeroed/obfuscated** (no readable `0x16` at all); inner `TEXTURE_NATIVE` chunks are intact | byte-scan recovery (`recoverLockedTextures`)   |
+| Variant                          | Example                    | Tamper                                                                                                                                                                              | Fix                                                                                                             |
+| -------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| B — inflated clump-struct size   | `cheetah.dff`              | the clump **Struct chunk size** is bloated to swallow all siblings                                                                                                                  | `forEachClumpChild` (canonical 12-byte struct)                                                                  |
+| A — inflated item sizes          | `yosemite.dff` (Ford F350) | every **atomic / geometry chunk size** is bloated (+ `0x0` padding) to swallow following items                                                                                      | count-based RW recovery (`findChunkFrom`)                                                                       |
+| C — hidden TexDictionary wrapper | `lodveg.txd` (gostown)     | the outer **TexDictionary (`0x16`) header is zeroed/obfuscated** (no readable `0x16` at all); inner `TEXTURE_NATIVE` chunks are intact                                              | byte-scan recovery (`recoverLockedTextures`)                                                                    |
+| D — every container size bloated | `walton.dff` (Willys jeep) | **every** container size is bloated (clump Struct = B, FrameList → 1.2 GB past EOF, GeometryList swallows the Atomics) + versions scrambled; struct counts + leaf sizes stay honest | `forEachClumpChild` recomputes each child's end from its honest children (`contentEnd` / `CLUMP_CHILD_CONTENT`) |
 
 > **Correction:** Variant A was first (wrongly) read as "inflated counts → data absent". It is not —
 > the 31 atomics / 31 geometries are all present, each hidden behind the previous item's bloated size
@@ -96,6 +97,31 @@ deduped by name. Triggers only when there's no `0x16` (or it yields nothing) →
 untouched. Covered by `tests/custom/txd/lodveg.txd` + a test in `txd.test.ts`. Recovery is at **load time**
 (the locked bytes are packed as-is; the runtime parser reconstructs the dictionary), so no rebuild needed.
 
+## Variant D — every container size bloated (`walton.dff`)
+
+The most aggressive lock seen: it combines A + B and bloats **every container chunk's size**. Byte-probed:
+the clump **Struct** declares `0x2798000C` (640 MB, = Variant B); the very first sibling **FrameList**
+declares `0x48A81B0D` (→ 1.2 GB, overruns EOF); the **GeometryList** size swallows the 43 Atomics that follow
+it; and **versions are scrambled** (`0x1803` kept, low 16 randomized vs `0x1803FFFF`). But the **honest signal
+survives**: struct payload **counts** (`numAtomics = 43`, FrameList `numFrames = 77`) and all **leaf / child
+sizes** are intact (the FrameList's inner Struct is exactly `4 + 77*56`; the 43 geometries have sane vert/tri
+counts). So the data is fully recoverable **by count**, not by byte-scanning (a naive type-scan false-matches
+`0x1A`/`0x0F`/`0x14` inside vertex/raster bytes — one probe "found" a 69 894-geometry list).
+
+Without recovery, `parseDff` overruns on the first sibling (FrameList) and throws before ever reaching the
+list-level Variant-A recovery; `recoverLockedAtomics`'s scan can't help either (`findChunkFrom` advances by the
+bloated clump-Struct / FrameList sizes and bails). The version scramble turned out **not** to matter — version
+is never a parse gate, so structural recovery alone suffices.
+
+**Recovered:** `forEachClumpChild` detects the lock by the same bloated leading Struct (Variant B signature) and,
+on a locked clump, recomputes **every** child's real end from its honest-sized children — `contentEnd` over a
+per-container `CLUMP_CHILD_CONTENT` map (FrameList → `{Struct, Extension}`; GeometryList → `{Struct, Geometry}`;
+Atomic → `{Struct, Extension}` with `stopAfter Extension` so the last Atomic doesn't swallow the trailing
+clump-level Extension that holds the COL; clump Extension → `{Collision, Struct}`). Each child's parse then stays
+bounded and the sibling walk lands on the next real chunk, so the geometry/atomic list parsers (and their own
+A-recovery) take over. Valid clumps never trigger it (the leading Struct ends within the clump). Covered by
+`tests/custom/locked-models/walton.dff` + tests in `dff.test.ts` (77 frames / 43 geometries / 43 atomics + COL).
+
 ## Fix (2026-06-19)
 
 `parseDff` and `parseDffCollision` now iterate the clump via **`forEachClumpChild`** (in
@@ -129,6 +155,16 @@ Covered by `tests/custom/locked-models/yosemite.dff` (31 atomics / 31 geometries
 - **Fixed — Variant C textures recover (`recoverLockedTextures`).** gostown's `lodveg.txd` (no `0x16`
   wrapper) now yields its 6 LOD-vegetation textures via the byte-scan fallback, so the LOD ensembles render
   textured instead of flat grey.
+- **Fixed — Variant D parses (`forEachClumpChild` content-walk).** `walton.dff` (every container size
+  bloated) now recovers 77 frames / 43 geometries / 43 atomics + the embedded COL — see the Variant D
+  section above.
+- **Remains — byte-editing tools don't recover locks yet.** The engine `parseDff` / `parseDffCollision`
+  handle all four variants, so in-game loading is fine. But the offline byte-editing tools (vehicle-optimizer
+  scale / copy-effects, via **map-optimizer's** own size-trusting `readRw` in `codec/chunk.ts`) re-serialize
+  raw chunks and still trust declared sizes — `readRw(walton)` finds **0 geometries**, so using a locked DFF
+  as a `--prototype`/target there fails. To support that, add an `unlockDff(bytes)` that re-serializes clean
+  headers (honest sizes) using the same recovery, so the generic codec reads a locked DFF as a standard one.
+  Lower priority than in-game loading; not needed for clean Rockstar/most mod assets.
 
 ## Reproduce
 

@@ -454,3 +454,27 @@ describe('parseDff (locked DFF — inflated atomic/geometry sizes)', () => {
     });
   });
 });
+
+// Anti-rip lock Variant D (see docs/open-issues/locked-dff.md): walton.dff bloats *every* container size —
+// the clump Struct (640 MB, Variant B), the FrameList (1.2 GB, overruns EOF) and the GeometryList (swallows
+// the trailing Atomics). Struct payload counts + leaf/child sizes stay honest, so forEachClumpChild recovers
+// each container's real end from its honest children. Committed custom fixture (a locked mod model).
+const OVERLOCKED_DFF = 'tests/custom/locked-models/walton.dff';
+
+describe('parseDff (locked DFF — every container size bloated)', () => {
+  const buffer = toArrayBuffer(new Uint8Array(readFileSync(OVERLOCKED_DFF)));
+
+  describe('positive cases', () => {
+    it('recovers frames, geometries and atomics past the bloated container sizes', () => {
+      const clump = parseDff(buffer);
+      expect(clump.frames).toHaveLength(77);
+      expect(clump.geometries).toHaveLength(43);
+      expect(clump.atomics).toHaveLength(43);
+      expect(clump.atomics.every((a) => a.geometryIndex < clump.geometries.length)).toBe(true);
+    });
+
+    it('recovers the embedded COL the lock hid in the clump Extension', () => {
+      expect(parseDffCollision(buffer)).not.toBeNull();
+    });
+  });
+});

@@ -79,6 +79,8 @@ const MANIFEST: readonly Fixture[] = [
   extract('dyntraffic.txd', 'dff/trafficlight-backface-culling/dyntraffic.txd'),
   extract('admiral.dff', 'dff/vehicle/admiral.dff'),
   extract('squalo.dff', 'dff/vehicle/squalo.dff'),
+  // infernus: the vehicle-optimizer scale test fixture — a hierarchical rig (dummies) + embedded COL3 collision.
+  extract('infernus.dff', 'dff/vehicle/infernus.dff'),
   extract('admiral.dff', 'vehicles/admiral.dff'),
   extract('junk.txd', 'txd/junk.txd'),
   extract('compfukhouse3.dff', 'world/compfukhouse3.dff'),

@@ -5,6 +5,22 @@ import { RwSection } from './constants';
 /** SA Clump Struct payload: numAtomics + numLights + numCameras (3 × u32). */
 const CLUMP_STRUCT_BYTES = 12;
 
+/**
+ * Direct children of each clump-level container, used to recompute a container's real end from its
+ * honest-sized children when its own declared size is bloated past the clump (anti-rip lock — see
+ * {@link forEachClumpChild}). The leaf/child sizes stay intact; only the outer container size is tampered.
+ */
+const CLUMP_CHILD_CONTENT: Readonly<Record<number, { allowed: ReadonlySet<number>; stopAfter?: ReadonlySet<number> }>> =
+  {
+    [RwSection.ATOMIC]: {
+      allowed: new Set([RwSection.EXTENSION, RwSection.STRUCT]),
+      stopAfter: new Set([RwSection.EXTENSION]),
+    },
+    [RwSection.EXTENSION]: { allowed: new Set([RwSection.COLLISION, RwSection.STRUCT]) },
+    [RwSection.FRAME_LIST]: { allowed: new Set([RwSection.EXTENSION, RwSection.STRUCT]) },
+    [RwSection.GEOMETRY_LIST]: { allowed: new Set([RwSection.GEOMETRY, RwSection.STRUCT]) },
+  };
+
 /** A parsed 12-byte RenderWare chunk header plus its data bounds. */
 export interface ChunkHeader {
   /** Stream offset where the chunk's payload begins. */
@@ -26,6 +42,7 @@ export function contentEnd(
   dataStart: number,
   limit: number,
   allowed: ReadonlySet<number>,
+  stopAfter?: ReadonlySet<number>,
 ): number {
   let cursor = dataStart;
   let end = dataStart;
@@ -37,6 +54,12 @@ export function contentEnd(
     }
     end = header.end;
     cursor = header.end;
+    // Stop once we've consumed a terminal child (e.g. an Atomic's single Extension), so the walk doesn't
+    // greedily swallow a same-typed sibling that follows the item (the trailing clump Extension after the
+    // last Atomic — both are EXTENSION).
+    if (stopAfter?.has(header.type)) {
+      break;
+    }
   }
 
   return end;
@@ -96,18 +119,34 @@ export function forEachChild(
 }
 
 /**
- * Iterate a Clump's children, tolerant of the "inflated struct size" anti-rip lock (e.g. cheetah.dff):
- * the leading Struct's declared size is bloated to swallow its siblings, so a boundary-respecting walk
- * sees only the Struct and misses the FrameList / GeometryList / Atomics / Extension. When the Struct
- * overshoots the clump (impossible for a valid file), its real SA payload is a fixed 12 bytes — resume
- * sibling iteration right after it. Valid clumps are untouched (their Struct ends within the clump).
+ * Iterate a Clump's children, tolerant of the "inflated size" anti-rip locks:
+ *
+ * - **Variant B** (e.g. cheetah.dff): the leading Struct's declared size is bloated to swallow its
+ *   siblings, so a boundary-respecting walk sees only the Struct and misses everything after it. When the
+ *   Struct overshoots the clump (impossible for a valid file), its real SA payload is a fixed 12 bytes —
+ *   resume sibling iteration right after it.
+ * - **Variant D** (e.g. walton.dff): *every* container size is bloated — the FrameList overruns the clump
+ *   (→ 1.2 GB) and the GeometryList swallows the Atomics that follow it. Detecting the lock by the same
+ *   bloated leading Struct, every child's real end is recomputed from its honest-sized children
+ *   ({@link contentEnd} over {@link CLUMP_CHILD_CONTENT}) and `cb` gets the corrected header — so each
+ *   child's own parse stays bounded and the sibling walk lands on the next real chunk.
+ *
+ * Valid clumps are untouched (the leading Struct ends within the clump → `locked` is false → plain walk).
  */
 export function forEachClumpChild(stream: BinaryStream, clump: ChunkHeader, cb: (header: ChunkHeader) => void): void {
   stream.seek(clump.dataStart);
   const first = readChunkHeader(stream);
-  const start =
-    first.type === RwSection.STRUCT && first.end > clump.end ? first.dataStart + CLUMP_STRUCT_BYTES : clump.dataStart;
-  forEachChild(stream, start, clump.end, cb);
+  const locked = first.type === RwSection.STRUCT && first.end > clump.end;
+  let cursor = locked ? first.dataStart + CLUMP_STRUCT_BYTES : clump.dataStart;
+  while (cursor + 12 <= clump.end) {
+    stream.seek(cursor);
+    const header = readChunkHeader(stream);
+    // On a locked clump, trust each child's honest-sized children over its bloated declared size.
+    const spec = locked || header.end > clump.end ? CLUMP_CHILD_CONTENT[header.type] : undefined;
+    const end = spec ? contentEnd(stream, header.dataStart, clump.end, spec.allowed, spec.stopAfter) : header.end;
+    cb({ ...header, end });
+    cursor = Math.max(end, header.dataStart); // always advance ≥ 12 (header is ≥ 12 from cursor)
+  }
 }
 
 /** Read a chunk header at the current cursor (cursor left at payload start). */

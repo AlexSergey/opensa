@@ -213,7 +213,12 @@ const customJsConfig = {
 
 // Node build/pack scripts + the map-optimizer / lod-generator tools: Node globals (Buffer, process, …), console.
 const scriptsConfig = {
-  files: ['scripts/**/*.{js,mjs,cjs,ts}', 'map-optimizer/**/*.{js,mjs,cjs,ts}', 'lod-generator/**/*.{js,mjs,cjs,ts}'],
+  files: [
+    'scripts/**/*.{js,mjs,cjs,ts}',
+    'map-optimizer/**/*.{js,mjs,cjs,ts}',
+    'lod-generator/**/*.{js,mjs,cjs,ts}',
+    'vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
+  ],
   languageOptions: {
     globals: {
       ...globals.node,

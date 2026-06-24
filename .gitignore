@@ -74,6 +74,7 @@ blog-src
 map-optimizer/out/
 map-optimizer/*.jpg
 lod-generator/out/
+vehicle-optimizer/out/
 
 # Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
 # copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /
