@@ -108,6 +108,8 @@ export interface DebugActions {
   setProcObj(category: ProcObjCategory, patch: Partial<ProcObjTypeConfig>): void;
   /** Toggle sun shadows. */
   setShadows(patch: Partial<ShadowsConfig>): void;
+  /** Toggle the debug wireframe view (scene-wide wireframe override, bypasses post-FX). */
+  setShowFaces(enabled: boolean): void;
   /** Toggle the debug normals view (scene-wide normal-colour override, bypasses post-FX). */
   setShowNormals(enabled: boolean): void;
   /** Tune the god-rays shader (density/exposure/weight). */
@@ -246,6 +248,7 @@ export function DebugOverlay({
   const [city, setCity] = useState<City>(() => actions.city());
   const [mapActive, setMapActive] = useState(false);
   const [normals, setNormals] = useState(false);
+  const [faces, setFaces] = useState(false);
   const [time, setTime] = useState(() => actions.gameTime());
   const [godrays, setGodrays] = useState(() => actions.godrays());
   const [godraysSize, setGodraysSize] = useState(() => actions.godraysSize());
@@ -276,7 +279,9 @@ export function DebugOverlay({
       setShowCoords(false);
       setMapActive(false);
       setNormals(false);
-      actions.setShowNormals(false); // leaving the screen / closing always drops the debug normals view
+      setFaces(false);
+      actions.setShowNormals(false); // leaving the screen / closing always drops the debug overrides
+      actions.setShowFaces(false);
     },
     [actions],
   );
@@ -1084,9 +1089,11 @@ export function DebugOverlay({
           {screen === 'map' && (
             <MapScreen
               actions={actions}
+              faces={faces}
               game={game}
               mapActive={mapActive}
               normals={normals}
+              setFaces={setFaces}
               setMapActive={setMapActive}
               setNormals={setNormals}
             />
@@ -1101,45 +1108,52 @@ export function DebugOverlay({
  *  render simple). */
 function MapScreen({
   actions,
+  faces,
   game,
   mapActive,
   normals,
+  setFaces,
   setMapActive,
   setNormals,
 }: {
   actions: DebugActions;
+  faces: boolean;
   game: Game;
   mapActive: boolean;
   normals: boolean;
+  setFaces: (value: boolean) => void;
   setMapActive: (update: (previous: boolean) => boolean) => void;
   setNormals: (value: boolean) => void;
 }): ReactElement {
   return (
     <div style={styles.group}>
+      <button onClick={() => setMapActive((previous) => !previous)} style={styles.actionButton} type="button">
+        {mapActive ? 'Deactivate Map Viewer' : 'Activate Map Viewer'}
+      </button>
       <button
         onClick={() => {
-          setMapActive((previous) => !previous);
-          setNormals(false);
-          actions.setShowNormals(false); // entering/leaving the map viewer resets normals
+          const next = !normals;
+          setNormals(next);
+          setFaces(false); // shares the override slot with Show Faces
+          actions.setShowNormals(next);
         }}
         style={styles.actionButton}
         type="button"
       >
-        {mapActive ? 'Deactivate Map Viewer' : 'Activate Map Viewer'}
+        {normals ? 'Hide Normals' : 'Show Normals'}
       </button>
-      {!mapActive && (
-        <button
-          onClick={() => {
-            const next = !normals;
-            setNormals(next);
-            actions.setShowNormals(next);
-          }}
-          style={styles.actionButton}
-          type="button"
-        >
-          {normals ? 'Hide Normals' : 'Show Normals'}
-        </button>
-      )}
+      <button
+        onClick={() => {
+          const next = !faces;
+          setFaces(next);
+          setNormals(false); // shares the override slot with Show Normals
+          actions.setShowFaces(next);
+        }}
+        style={styles.actionButton}
+        type="button"
+      >
+        {faces ? 'Hide Faces' : 'Show Faces'}
+      </button>
       {!mapActive && <DrawDistanceControls actions={actions} />}
       {mapActive && (
         <button onClick={() => actions.topDownView()} style={styles.actionButton} type="button">

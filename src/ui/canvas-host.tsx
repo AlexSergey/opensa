@@ -1005,6 +1005,7 @@ function bootstrap(
         }
       },
       setShadows: (patch) => game.setShadows(patch),
+      setShowFaces: (enabled) => game.setShowFaces(enabled),
       setShowNormals: (enabled) => game.setShowNormals(enabled),
       setSky: (patch) => game.setSky(patch),
       setSsao: (patch) => game.setSsao(patch),

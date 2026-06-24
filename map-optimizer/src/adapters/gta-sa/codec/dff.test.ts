@@ -48,6 +48,17 @@ describe('encodeDff', () => {
 
       expect(() => encodeDff(bytes, ir)).toThrow(/skinned/);
     });
+
+    it('routes a triangle reorder (counts unchanged, topology changed) to rebuild, not the attribute overlay', () => {
+      // The trap: equal vertex/triangle counts but different triangle indices. The attribute overlay would write
+      // stale indices and corrupt the mesh; the topology check must force rebuild (which here refuses skin).
+      const { arrayBuffer, bytes } = load(FIXTURES[0]);
+      const ir = clumpToIr(parseDff(arrayBuffer));
+      const mesh = ir.meshes.find((candidate) => candidate.triangles.length >= 2)!;
+      [mesh.triangles[0], mesh.triangles[1]] = [mesh.triangles[1], mesh.triangles[0]];
+
+      expect(() => encodeDff(bytes, ir)).toThrow(/skinned/);
+    });
   });
 
   describe('positive cases', () => {

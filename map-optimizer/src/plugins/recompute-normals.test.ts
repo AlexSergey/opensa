@@ -73,6 +73,18 @@ describe('recomputeNormals', () => {
       expectClose(normalAt(out, 4), [0, 0, 1]); // C' welds with C
     });
 
+    it('gives a vertex shared by opposite-winding faces a real normal, not zero (sliver guard)', () => {
+      // Coincident double-sided panel — the same triangle wound both ways → the angle-weighted reference
+      // cancels to zero. The vertex must still get the panel's ±Z face normal, never [0,0,0].
+      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+      const existing = new Float32Array(positions.length);
+
+      const normal = normalAt(recomputeNormals(positions, [tri(0, 1, 2), tri(0, 2, 1)], existing), 0);
+
+      expect(Math.hypot(...normal)).toBeCloseTo(1, 5); // unit length, not the old zero fallback
+      expect(Math.abs(normal[2])).toBeCloseTo(1, 5); // the panel's own face direction
+    });
+
     it('keeps a hard edge: 90° faces sharing a split edge keep their own-side normals', () => {
       // Face1 in XY (+Z): A,B,C. Face2 in XZ (-Y): A2,B2,C2 — A2==A, B2==B by position (split).
       const positions = new Float32Array([

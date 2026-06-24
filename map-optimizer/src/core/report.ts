@@ -45,12 +45,16 @@ export interface RunSummary {
 export function printReport(report: RunReport): void {
   const totals = summarizeReport(report);
   const saved = totals.bytesBefore - totals.bytesAfter;
-  const percent = totals.bytesBefore > 0 ? ((saved / totals.bytesBefore) * 100).toFixed(1) : '0.0';
+  const percent = totals.bytesBefore > 0 ? (Math.abs(saved / totals.bytesBefore) * 100).toFixed(1) : '0.0';
+  // A negative "removed" means the pass ADDED (split vertices, normal blocks, …); show it honestly.
+  const delta = (n: number): string => (n >= 0 ? `${n} removed` : `${-n} added`);
   console.log(`map-optimizer ${report.game}:`);
   console.log(`  models   — ${totals.models} processed, ${totals.changed} changed`);
-  console.log(`  vertices — ${totals.verticesRemoved} removed`);
-  console.log(`  faces    — ${totals.trianglesRemoved} removed`);
-  console.log(`  size     — ${kb(totals.bytesBefore)} → ${kb(totals.bytesAfter)} (${percent}% smaller)`);
+  console.log(`  vertices — ${delta(totals.verticesRemoved)}`);
+  console.log(`  faces    — ${delta(totals.trianglesRemoved)}`);
+  console.log(
+    `  size     — ${kb(totals.bytesBefore)} → ${kb(totals.bytesAfter)} (${percent}% ${saved >= 0 ? 'smaller' : 'larger'})`,
+  );
   console.log(`  failures — ${totals.failures}`);
   for (const failure of report.failures) {
     console.log(`    ✗ ${failure.name}: ${failure.error}`);

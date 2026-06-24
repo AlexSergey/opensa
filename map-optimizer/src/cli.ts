@@ -1,7 +1,8 @@
 /**
  * Map-optimizer CLI. Mirrors `scripts/build-game.ts`: takes `--game <name>`, reads `game-src/<name>/`, runs
  * the configured model pipeline (and, with `--textures`, the texture mip pass), and emits a full drop-in
- * build under `map-optimizer/out/<name>/`. Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures]`.
+ * build under `map-optimizer/out/<name>/`. `--refine` appends the experimental surface-smoothing pass (plan
+ * 014). Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures] [--refine] [--refine]`.
  */
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import { join } from 'node:path';
 import { createGtaSaAdapter } from './adapters/gta-sa';
 import { printReport, runPipeline, writeReport } from './core';
 import { config } from './optimizer.config';
+import { createRefineSurface } from './plugins/refine-surface';
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -19,7 +21,7 @@ function argValue(flag: string): string | undefined {
 async function main(): Promise<void> {
   const game = argValue('--game');
   if (!game) {
-    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <name> [--textures]');
+    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <name> [--textures] [--refine]');
   }
 
   const root = process.cwd();
@@ -36,7 +38,9 @@ async function main(): Promise<void> {
     optimizeTextures(adapter);
   }
 
-  const report = await runPipeline(adapter, config, outDir);
+  // `--refine` (opt-in, experimental — plan 014) appends surface smoothing as the last model stage.
+  const plugins = process.argv.includes('--refine') ? [...config.plugins, createRefineSurface()] : config.plugins;
+  const report = await runPipeline(adapter, { ...config, plugins }, outDir);
   printReport(report);
   writeReport(report);
 }

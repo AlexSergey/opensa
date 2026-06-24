@@ -19,8 +19,9 @@ normals, welding duplicate vertices, and removing degenerate / duplicate faces �
 # from the repo root — <game> is a folder under game-src/ (e.g. gostown)
 npx tsx map-optimizer/src/cli.ts --game gostown
 
-# opt-in texture pass:
+# opt-in passes:
 npx tsx map-optimizer/src/cli.ts --game gostown --textures   # generate mip chains (plan 010)
+npx tsx map-optimizer/src/cli.ts --game original --refine     # experimental surface smoothing (plan 014)
 ```
 
 - Reads `game-src/<game>/` (models `*.img` + `data/` IDE/IPL to resolve the map's models).
@@ -41,22 +42,35 @@ map-optimizer gostown:
   failures — 7
 ```
 
+## Analysis
+
+Read-only measurement tools (no output build), used to decide whether a transform is worth building:
+
+```bash
+# curvature scan (plan 014) — how much of a region is flat / gently-curved / crease
+npx tsx map-optimizer/src/analyze-curvature.ts --game original --center 2100,1490,15 --radius 200
+```
+
 ## Pipeline
 
 Edit `src/optimizer.config.ts` (the "gulpfile") to choose/reorder stages. The default pipeline, in order:
 
-1. **recompute-normals** — angle-weighted, crease-limited per-vertex normals (smooths surfaces, keeps hard
-   edges; welds seam splits). `addMissing` can also add normals to normal-less models.
-2. **weld-vertices** — merge vertices identical in _all_ attributes (position/normal/UV/prelit/night).
-3. **remove-degenerate-triangles** — drop zero-area faces (coincident/collinear/equal-index).
-4. **dedupe-faces** — remove exact duplicate triangles (keeps two-sided/reversed-winding faces and decals).
-5. **prune-vertices** — drop vertices no triangle references.
+1. **weld-vertices** — merge vertices identical in _all_ attributes (position/normal/UV/prelit/night).
+2. **remove-degenerate-triangles** — drop zero-area faces (coincident/collinear/equal-index).
+3. **dedupe-faces** — remove exact duplicate triangles (keeps two-sided/reversed-winding faces and decals).
+4. **prune-vertices** — drop vertices no triangle references.
+5. **smooth-normals** — rebuild normals from **smooth groups**, splitting at hard edges (plan 015). SA prelit
+   world models ship with broken/absent normals, so the engine smears them (gradients, double-face slivers) →
+   SSAO artifacts; this gives flat walls flat normals, sharp edges, correct double faces. Grows vertices at hard
+   edges (buildings split a lot, smooth terrain barely) — adds a normals block + splits (~+40% map-wide). The
+   topology-preserving `recompute-normals` plugin stays available for callers that can't change vertex count.
 6. **condition-prelit** — re-level pathologically dark/bright day-prelit toward a neutral target (RGB only,
-   alpha preserved); healthy models keep their baked AO. Visual heuristic — calibrate `targetLuma` in-game.
+   alpha preserved). Only _flat_ near-black / near-white prelit is touched; dark-but-structured models (real
+   baked shading) keep their AO. Visual heuristic — calibrate `targetLuma` in-game.
 7. **synthesize-night** — give night-less, opaque, bright-enough models a night vertex-colour set derived from
-   their day prelit, so they don't go dark at night (the engine darkens night-less models). Map-wide visual
-   heuristic — tune `minLuma`/`nightScale` (or restrict it) in-game; models that already have night colours
-   are untouched.
+   their day prelit (× `nightScale`, default `0.7`), so they don't go dark at night (the engine darkens
+   night-less models). Map-wide visual heuristic — tune `minLuma`/`nightScale` (or restrict it) in-game;
+   models that already have night colours are untouched.
 
 Every stage is a small, independently-tested pure transform wrapped in a `MapPlugin`.
 

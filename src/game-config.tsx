@@ -61,6 +61,7 @@ const SA_TELEPORTS: readonly Teleport[] = [
   { coords: [-1988.0, 138.0, 27.5], label: 'SF - City Center' },
   { coords: [-1420.0, -287.0, 14.1], label: 'SF - Airport' },
   { coords: [-1045.0, -1620.0, 76.4], label: "Country - Truth's Farm" },
+  { coords: [-1696.8, -748.0, 100.0], label: 'Country - Flint Hills' },
   { coords: [1139.0, -1490.0, 18.5], label: 'LS - Escalators' },
 ];
 

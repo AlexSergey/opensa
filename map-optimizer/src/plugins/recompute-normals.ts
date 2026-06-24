@@ -123,6 +123,18 @@ function cross(a: Vec3, b: Vec3): Vec3 {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
+/** The unit normal of the incident face with the largest corner angle (the vertex's dominant surface). */
+function dominantNormal(contributions: readonly Contribution[]): null | Vec3 {
+  let best: Contribution | null = null;
+  for (const contribution of contributions) {
+    if (!best || contribution.angle > best.angle) {
+      best = contribution;
+    }
+  }
+
+  return best ? best.normal : null;
+}
+
 function dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
@@ -159,15 +171,23 @@ function vertexNormal(
   existing: Float32Array,
   cosCrease: number,
 ): Vec3 {
+  const contributions = byPosition.get(positionKey(positions, v)) ?? [];
   const ref = normalize(reference);
-  const accumulator: Vec3 = [0, 0, 0];
   if (ref) {
-    for (const contribution of byPosition.get(positionKey(positions, v)) ?? []) {
+    const accumulator: Vec3 = [0, 0, 0];
+    for (const contribution of contributions) {
       if (dot(contribution.normal, ref) >= cosCrease) {
         addScaled(accumulator, contribution.normal, contribution.angle);
       }
     }
+    const crease = normalize(accumulator);
+    if (crease) {
+      return crease;
+    }
   }
 
-  return normalize(accumulator) ?? ref ?? [existing[v * 3], existing[v * 3 + 1], existing[v * 3 + 2]];
+  // Degenerate reference — e.g. a vertex shared by opposite-winding faces, where the angle-weighted sum
+  // cancels to zero. Fall back to the dominant incident face normal (a real surface direction) rather than a
+  // zero normal, which the renderer would repair into a stray sliver. See plan 002 / the addMissing path.
+  return dominantNormal(contributions) ?? [existing[v * 3], existing[v * 3 + 1], existing[v * 3 + 2]];
 }

@@ -3,7 +3,7 @@ import type { RwChunk } from './chunk';
 
 import { readRw, RW_CLUMP, RW_GEOMETRY, RW_GEOMETRY_LIST, RW_STRUCT, writeRw } from './chunk';
 import { addNightColorsIfMissing, rebuildGeometry } from './geometry-rebuild';
-import { applyMeshToStruct } from './geometry-struct';
+import { applyMeshToStruct, decodeGeometryStruct, type GeometryStruct } from './geometry-struct';
 
 /** Every Geometry chunk, in document order (matches the IR's `meshes` order). */
 export function collectGeometries(chunks: readonly RwChunk[]): RwChunk[] {
@@ -54,10 +54,12 @@ export function encodeDff(source: Uint8Array, ir: MeshIR): Uint8Array {
     if (!struct?.data) {
       throw new Error(`geometry ${index} has no Struct`);
     }
-    const view = new DataView(struct.data.buffer, struct.data.byteOffset, struct.data.byteLength);
-    const numTriangles = view.getUint32(4, true);
-    const numVertices = view.getUint32(8, true);
-    if (mesh.positions.length === numVertices * 3 && mesh.triangles.length === numTriangles) {
+    // Decide attribute-overlay vs full rebuild by the actual **topology**, not just counts. A plain count match
+    // is unsafe: topology-changing plugins (weld/prune + smooth-normals) can land the vertex/triangle counts
+    // back on the source's while the triangle indices differ — overlaying then writes stale indices and shatters
+    // the model. Only when the triangles are byte-for-byte identical is the overlay path (which preserves
+    // multi-UV/skin) correct.
+    if (sameTopology(decodeGeometryStruct(struct.data), mesh)) {
       struct.data = applyMeshToStruct(struct.data, mesh);
     } else {
       rebuildGeometry(geometry, mesh);
@@ -66,4 +68,20 @@ export function encodeDff(source: Uint8Array, ir: MeshIR): Uint8Array {
   });
 
   return writeRw(file);
+}
+
+/** True when the Struct's vertex count + triangle indices exactly match the mesh (an attribute-only edit). */
+function sameTopology(struct: GeometryStruct, mesh: MeshIR['meshes'][number]): boolean {
+  if (struct.numVertices !== mesh.positions.length / 3 || struct.triangles.length !== mesh.triangles.length) {
+    return false;
+  }
+  for (let i = 0; i < struct.triangles.length; i += 1) {
+    const a = struct.triangles[i];
+    const b = mesh.triangles[i];
+    if (a.a !== b.a || a.b !== b.b || a.c !== b.c) {
+      return false;
+    }
+  }
+
+  return true;
 }

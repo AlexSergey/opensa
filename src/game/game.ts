@@ -2,6 +2,7 @@ import {
   DoubleSide,
   Group,
   type Mesh,
+  MeshBasicMaterial,
   MeshNormalMaterial,
   type Object3D,
   type PerspectiveCamera,
@@ -91,6 +92,8 @@ export class Game {
   private currentCity: City = 'COUNTRYSIDE';
   private currentZone = ''; // district display name (GXT text); '' = no zone
   private readonly entityRoot = new Group();
+  /** Debug wireframe view (Map → Show Faces): scene-wide wireframe override to inspect the mesh. Lazy. */
+  private faceMaterial: MeshBasicMaterial | null = null;
   private readonly gameClock = new GameClock();
   private input!: CombinedInput;
   private lastRequest: null | RegionRequest = null;
@@ -104,6 +107,8 @@ export class Game {
   private readonly raycaster = new Raycaster();
   private renderer!: WebGLRenderer;
   private scene!: Scene;
+  /** Whether the debug wireframe override is active (shares the bypass-post-FX render path with normals). */
+  private showFacesMode = false;
   /** Whether the debug normals override is active (render path bypasses post-FX while on). */
   private showNormalsMode = false;
   private started = false;
@@ -446,9 +451,7 @@ export class Game {
   }
 
   setMapViewer(enabled: boolean): void {
-    if (enabled) {
-      this.setShowNormals(false); // the map viewer is a normal view — drop the debug normals override
-    }
+    // The debug normals / wireframe overrides stay available here, so the mesh can be inspected top-down.
     this.setConfig({ mapViewer: enabled });
     this.cameraController.setMode(enabled ? 'debug' : 'follow');
     this.events.emit('map-viewer', { enabled });
@@ -486,16 +489,37 @@ export class Game {
     void this.refreshCollision();
   }
 
+  /** Debug: render every object as a wireframe (scene-wide) so the mesh/topology is visible. Shares the
+   *  override slot with Show Normals, so enabling one disables the other. */
+  setShowFaces(enabled: boolean): void {
+    this.showFacesMode = enabled;
+    if (enabled) {
+      this.showNormalsMode = false; // single override slot — one debug view at a time
+      if (!this.faceMaterial) {
+        this.faceMaterial = new MeshBasicMaterial({
+          color: 0x00ff88,
+          side: DoubleSide,
+          toneMapped: false,
+          wireframe: true,
+        });
+      }
+    }
+    this.applyDebugOverride();
+  }
+
   /** Debug: render every object with a normals override (scene-wide), straight to the screen so the
    *  normals aren't reshaped by post-FX. Off restores the normal pipeline. */
   setShowNormals(enabled: boolean): void {
     this.showNormalsMode = enabled;
-    if (enabled && !this.normalMaterial) {
-      // DoubleSide so back-facing cutout/foliage triangles also show; raw colours (no tone mapping).
-      this.normalMaterial = new MeshNormalMaterial({ side: DoubleSide });
-      this.normalMaterial.toneMapped = false;
+    if (enabled) {
+      this.showFacesMode = false; // single override slot — one debug view at a time
+      if (!this.normalMaterial) {
+        // DoubleSide so back-facing cutout/foliage triangles also show; raw colours (no tone mapping).
+        this.normalMaterial = new MeshNormalMaterial({ side: DoubleSide });
+        this.normalMaterial.toneMapped = false;
+      }
     }
-    this.scene.overrideMaterial = enabled ? this.normalMaterial : null;
+    this.applyDebugOverride();
   }
 
   /** Tune the god-rays shader (density/exposure/weight) at runtime; merges into `graphics.sky`. */
@@ -587,6 +611,15 @@ export class Game {
     this.cameraController.topDownDebugView();
   }
 
+  /** Point the scene's override material at whichever debug view is active (faces / normals / none). */
+  private applyDebugOverride(): void {
+    this.scene.overrideMaterial = this.showNormalsMode
+      ? this.normalMaterial
+      : this.showFacesMode
+        ? this.faceMaterial
+        : null;
+  }
+
   /** Notify every plugin that config (or weather) changed, so they can refresh derived state. */
   private broadcastConfigChanged(): void {
     for (const plugin of this.plugins) {
@@ -647,8 +680,8 @@ export class Game {
           plugin.update?.(this.context);
         }
       }
-      if (this.showNormalsMode) {
-        // Debug normals: skip the post-FX pipeline and draw the (override-material) scene to screen.
+      if (this.showNormalsMode || this.showFacesMode) {
+        // Debug override (normals / wireframe): skip the post-FX pipeline and draw the scene straight to screen.
         this.renderer.setRenderTarget(null);
         this.renderer.render(this.scene, this.camera);
       } else {
