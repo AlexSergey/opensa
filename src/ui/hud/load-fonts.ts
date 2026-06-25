@@ -1,4 +1,4 @@
-import type { FontsConfig } from '../../game/interfaces/config.interface';
+import type { FontsConfig } from '@opensa/game/interfaces/config.interface';
 
 import sixCapsUrl from '../../assets/fonts/SixCaps-Regular.ttf';
 

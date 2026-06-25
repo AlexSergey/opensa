@@ -1,17 +1,13 @@
+import type { MapDefinitions } from '@opensa/renderware/parsers/text/types';
+
+import { buildCellColliders } from '@opensa/renderware/collision/build-cell-colliders';
+import { buildCollisionIndex } from '@opensa/renderware/collision/collision-index';
+import { groupRulesBySurface, PROC_OBJ_MAX_DENSITY, scatterProcObjects } from '@opensa/renderware/map/procobj-scatter';
+import { buildWorldGrid } from '@opensa/renderware/map/world-grid';
+import { parseProcObj } from '@opensa/renderware/parsers/text/procobj.parser';
+import { parseSurfaceNames } from '@opensa/renderware/parsers/text/surfinfo.parser';
 import { readFileSync } from 'node:fs';
 
-import type { MapDefinitions } from '../../src/renderware/parsers/text/types';
-
-import { buildCellColliders } from '../../src/renderware/collision/build-cell-colliders';
-import { buildCollisionIndex } from '../../src/renderware/collision/collision-index';
-import {
-  groupRulesBySurface,
-  PROC_OBJ_MAX_DENSITY,
-  scatterProcObjects,
-} from '../../src/renderware/map/procobj-scatter';
-import { buildWorldGrid } from '../../src/renderware/map/world-grid';
-import { parseProcObj } from '../../src/renderware/parsers/text/procobj.parser';
-import { parseSurfaceNames } from '../../src/renderware/parsers/text/surfinfo.parser';
 import { gameArg, gameDir, loadMapDefs, openGameArchive, positionalArgs } from '../lib/game';
 
 /**

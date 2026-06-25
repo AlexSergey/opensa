@@ -1,7 +1,8 @@
-import type { MapDefinitions } from '../../src/renderware/parsers/text/types';
+import type { MapDefinitions } from '@opensa/renderware/parsers/text/types';
 
-import { buildWorldGrid, cellKey } from '../../src/renderware/map/world-grid';
-import { parseDff } from '../../src/renderware/parsers/binary/dff';
+import { buildWorldGrid, cellKey } from '@opensa/renderware/map/world-grid';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+
 import { gameArg, loadMapDefs, openGameArchive, positionalArgs } from '../lib/game';
 
 /**

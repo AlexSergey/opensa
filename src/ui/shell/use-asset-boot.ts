@@ -1,12 +1,13 @@
+import type { AssetLoader, ProgressSnapshot } from '@opensa/loaders';
+import type { AssetFileSystem } from '@opensa/renderware';
+
+import { createAssetLoader } from '@opensa/loaders';
+import { Vfs } from '@opensa/vfs';
 import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import type { AssetLoader, ProgressSnapshot } from '../../loaders';
-import type { AssetFileSystem } from '../../renderware';
 import type { BootState } from './boot-machine';
 
 import { GAME_CONFIG, type GameId } from '../../game-config';
-import { createAssetLoader } from '../../loaders';
-import { Vfs } from '../../vfs';
 import { bootReducer, initialBootState } from './boot-machine';
 import { rotatingStatus, TEXTURE_STATUS, toPercent } from './boot-status';
 import { isDisclaimerAccepted, rememberDisclaimerAccepted } from './boot-storage';

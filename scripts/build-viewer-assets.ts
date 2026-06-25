@@ -1,3 +1,5 @@
+import { type ImgArchive, openArchive } from '@opensa/renderware/archive/img-archive';
+import { buildCollisionIndex, getCollision } from '@opensa/renderware/collision/collision-index';
 /**
  * Build the standalone viewers' fixtures into `static/viewer/` by extracting from a clean, UNMODIFIED GTA
  * San Andreas copy under `game-src/non-modified` (the same source `test-fixtures.ts` uses). These are
@@ -14,9 +16,6 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-
-import { type ImgArchive, openArchive } from '../src/renderware/archive/img-archive';
-import { buildCollisionIndex, getCollision } from '../src/renderware/collision/collision-index';
 
 const ROOT = join('game-src', 'non-modified');
 const ARCHIVES = ['models/gta3.img', 'models/gta_int.img'];

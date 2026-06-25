@@ -1,5 +1,3 @@
-import { type ReactElement, useCallback, useEffect, useState } from 'react';
-
 import type {
   BloomConfig,
   CameraConfig,
@@ -23,11 +21,14 @@ import type {
   VehicleReflectionConfig,
   WaterConfig,
   WorldLightConfig,
-} from '../../game';
+} from '@opensa/game';
+
+import { PRESETS } from '@opensa/game/plugins/vehicle-reflection/presets';
+import { GameClock } from '@opensa/game/time/game-clock';
+import { type ReactElement, useCallback, useEffect, useState } from 'react';
+
 import type { Teleport } from '../../game-config';
 
-import { PRESETS } from '../../game/plugins/vehicle-reflection/presets';
-import { GameClock } from '../../game/time/game-clock';
 import { styles } from './debug-styles';
 import { MapInspector } from './map-inspector';
 

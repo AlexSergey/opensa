@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/timecyc-builder",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Precompute the game's timecyc (time-of-day colour cycle) data. CLI tool.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

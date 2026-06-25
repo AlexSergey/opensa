@@ -2,7 +2,7 @@
  * Preloader status text + progress maths (pure, plan 051). The shell ticks an index on an interval and
  * shows `rotatingStatus(messages, tick)` so a long download never looks frozen.
  */
-import type { ProgressSnapshot } from '../../loaders';
+import type { ProgressSnapshot } from '@opensa/loaders';
 
 /** Rotating status lines for the core (data + others + models) phase. */
 export const CORE_STATUS: readonly string[] = ['Loading', 'Loading assets…', 'Preparing the world…', 'Almost there…'];

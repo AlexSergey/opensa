@@ -1,10 +1,10 @@
+import { parseFxp } from '@opensa/renderware/parsers/text/fxp.parser';
 /**
  * Dump one effects.fxp system: emitters, blend modes, textures and every keyframed track.
  * Usage: npx tsx scripts/debug/dump-fx-system.ts <system-name> [fxp-path] [--game original]
  */
 import { readFileSync } from 'node:fs';
 
-import { parseFxp } from '../../src/renderware/parsers/text/fxp.parser';
 import { gameArg, gameDir, positionalArgs } from '../lib/game';
 
 const [nameArg, pathArg] = positionalArgs();

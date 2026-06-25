@@ -1,9 +1,10 @@
+import type { AssetLoaderKind } from '@opensa/loaders';
+
 /**
  * Pure boot state machine (plans 051 / 056): from the game menu to playing, plus pause and error/retry.
  * No React, no IO — the hook drives it with events derived from the selected game's config + the loader.
  */
 import type { GameId } from '../../game-config';
-import type { AssetLoaderKind } from '../../loaders';
 
 export type BootEvent =
   | { accepted: boolean; assetLoader: AssetLoaderKind; game: GameId; type: 'SELECT' }

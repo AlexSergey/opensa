@@ -1,0 +1,14 @@
+{
+  "name": "@opensa/game-build",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build-side world partitioning: IDE/IPL refs → asset buckets (the GroupName vocabulary).",
+  "exports": {
+    "./*": "./*.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:engine"
+    ]
+  }
+}

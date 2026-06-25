@@ -1,3 +1,4 @@
+import type { BuiltDoor, BuiltPart, BuiltVehicle } from '@opensa/renderware/three/build-vehicle';
 /**
  * Standalone vehicle viewer — a dev tool to inspect a car in isolation: select a
  * body part, open/close its door (button or `E`), swap it to its damaged mesh,
@@ -10,6 +11,12 @@
  */
 import type { Texture } from 'three';
 
+import { parseDffCollision } from '@opensa/renderware/parsers/binary/col';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+import { buildCollisionWireframe } from '@opensa/renderware/three/build-col-wireframe';
+import { buildTextureMap } from '@opensa/renderware/three/build-texture';
+import { buildVehicle } from '@opensa/renderware/three/build-vehicle';
 import {
   AmbientLight,
   Box3,
@@ -27,15 +34,6 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-import type { BuiltDoor, BuiltPart, BuiltVehicle } from '../renderware/three/build-vehicle';
-
-import { parseDffCollision } from '../renderware/parsers/binary/col';
-import { parseDff } from '../renderware/parsers/binary/dff';
-import { parseTxd } from '../renderware/parsers/binary/txd';
-import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe';
-import { buildTextureMap } from '../renderware/three/build-texture';
-import { buildVehicle } from '../renderware/three/build-vehicle';
 
 /** Cars extracted into static/viewer/vehicles/ (model name → `<name>.dff` + `<name>.txd`). */
 const VEHICLES: readonly string[] = ['admiral', 'comet'];

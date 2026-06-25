@@ -1,9 +1,9 @@
+import type { RWTexture } from '@opensa/renderware/parsers/binary/types';
+
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-import type { RWTexture } from '../../src/renderware/parsers/binary/types';
-
-import { parseTxd } from '../../src/renderware/parsers/binary/txd';
 import { gameArg, openGameArchive, positionalArgs } from '../lib/game';
 
 /**

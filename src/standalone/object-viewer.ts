@@ -1,3 +1,5 @@
+import type { ColModel } from '@opensa/renderware/parsers/binary/col-types';
+import type { TextureDictionary } from '@opensa/renderware/three/build-texture';
 /**
  * Standalone object viewer (map models) — a dev tool, isolated from the map/streaming/
  * instancing layers. It reuses the real asset path (fetch -> parseTxd -> build-texture,
@@ -13,6 +15,11 @@
  */
 import type { BufferGeometry, Material } from 'three';
 
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+import { buildClump } from '@opensa/renderware/three/build-clump';
+import { buildCollisionWireframe } from '@opensa/renderware/three/build-col-wireframe';
+import { buildTextureMap } from '@opensa/renderware/three/build-texture';
 import {
   AmbientLight,
   Box3,
@@ -31,15 +38,6 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-import type { ColModel } from '../renderware/parsers/binary/col-types';
-import type { TextureDictionary } from '../renderware/three/build-texture';
-
-import { parseDff } from '../renderware/parsers/binary/dff';
-import { parseTxd } from '../renderware/parsers/binary/txd';
-import { buildClump } from '../renderware/three/build-clump';
-import { buildCollisionWireframe } from '../renderware/three/build-col-wireframe';
-import { buildTextureMap } from '../renderware/three/build-texture';
 
 /** Serialised COL (baked by scripts/build-viewer-assets.ts) — vertices as a plain array. */
 type ColJson = Omit<ColModel, 'vertices'> & { vertices: number[] };

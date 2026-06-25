@@ -74,16 +74,46 @@ sets across the repo; **update those links on each move** so the central docs st
    now lives in `game-build/partition.ts`, re-exported from `loaders/types.ts`; game-build no longer imports
    loaders (consumers untouched). 983 tests green.
 2. **Extract `rw-codec`** from map-optimizer → `tools/rw-codec`; repoint lod-generator + vehicle-optimizer.
-   (Already foreshadowed in `docs/ideas/monorepo-packages.md`.)
-3. **Stand up the Nx workspace** (`nx.json`, pnpm/npm workspaces, project tags + `enforce-module-boundaries`)
-   **without moving files yet** — wrap existing scripts via inferred targets; get graph + cache + boundaries.
-4. **Move directories** into `apps/`, `packages/`, `tools/` (incl. each module's `docs/`); add `package.json` +
-   `exports` per package; tags per project.
-5. **Codemod relative imports → `@opensa/*`**, leaf-first (`renderware` → `game-build` → `loaders` → `vfs` →
-   `game` → apps → tools).
-6. **Split Vite** into `apps/web` + `apps/viewer` (tabs); consolidate `tsconfig` (project references),
-   `vitest`/`eslint` (root configs globbing `apps/*`, `packages/*`, `tools/*`, or per-package).
-7. **Fix doc links** (`docs/plans/README.md` + cross-refs) after the moves; verify `tsc -b` + tests + lint + e2e
+   ✅ **Done** — pure codec (chunk, geometry-struct decode/encode, dff collectors, dxt±encode, texture-native,
+   mip) now lives in top-level `rw-codec/`; the `SubMesh`/`MeshIR` glue (`encodeDff`, `applyMeshToStruct`,
+   `rebuildGeometry`) stays in map-optimizer and imports it. lod-generator + vehicle-optimizer import rw-codec,
+   not map-optimizer. Tests split (pure → rw-codec, glue → map-optimizer); 983 green. (Folder is top-level for
+   now; physically lands under `tools/` in step 4.)
+
+   > **Reorder (agreed):** Nx is moved to **last**. Its wins (boundaries + per-project cache) need the workspace
+   > layout + **name-based imports** first — `@nx/enforce-module-boundaries` flags relative cross-project imports,
+   > and tools' legit `src/renderware` imports can't be told from app imports while the engine lives in `src`. So:
+   > workspaces + codemod → then Nx slots in cleanly.
+
+3. **npm workspaces, package by package** (codemod folded in per package, leaf-first). Each package gets a
+   `package.json` with subpath `exports` → `.ts` + a `workspaces` entry; importers move to `@opensa/<pkg>/<sub>`.
+   ✅ **Pilot done — `@opensa/rw-codec`.** Validated that `@opensa/*` → `.ts` resolves across **tsc + vite +
+   vitest + tsx** via the workspace symlink + `exports`, **no `tsconfig paths`, no build**. 983 green. Rollout
+   order: `rw-codec` ✅ → `tool-kit` ✅ → engine packages from `src/` (`renderware` ✅ → `game-build` ✅ →
+   `loaders` ✅ → `vfs` ✅ → `game` ✅) → CLI tools (`map-optimizer` ✅, `lod-generator` ✅,
+   `vehicle-optimizer` ✅, `timecyc-builder` ✅) — import-leaves, given a trivial `package.json` (no `exports`,
+   nothing to repoint). **All 11 `@opensa/*` packages now registered; `eslint .` + tsc + 983 tests green.**
+   - **Engine ✅ done** — all 5 made in place (`package.json` + `@opensa` name + `exports`), the whole app + tools
+     repointed to `@opensa/*`, intra-package imports left relative. Broad `exports` (`.` barrel where an index
+     exists, `./*` → `./*.ts`, explicit dir-barrels: `renderware/archive`, `game/input`). tsc-checked per package;
+     983 green, lint clean. Physical move to `packages/` is cosmetic + later.
+4. **Move to `apps/`, `packages/`, `tools/`** (incl. each module's `docs/`) — physical relocation once each is a
+   package (location is independent of the `@opensa` name, so imports don't change — only `workspaces` paths +
+   configs/scripts/globs). Sub-steps by risk: **A — tools → `tools/`** ✅ (workspaces, `timecyc` script,
+   vitest/eslint globs, `.gitignore`, doc links updated; symlinks repointed; 983 green). **B — engine → `packages/`**
+   ✅ (`src/{renderware,game-build,loaders,vfs,game}` → `packages/`; workspaces + vitest test-include/coverage +
+   eslint gameBoundary/check-file globs + scripts' relative engine imports updated; `src/` now app-only; 983
+   green). **C — app → `apps/web` + `apps/viewer`** (next; the risky one: vite/html/e2e wiring).
+5. **Apps**: split Vite into `apps/web` + `apps/viewer` (object/vehicle/character tabs in one html;
+   controls-harness stays in `apps/web`).
+6. **Stand up Nx** over the finished workspaces. ✅ **Done** — nx 23 + `@nx/eslint-plugin`; `nx.json`; 12 projects
+   (the app added as `@opensa/web` via `src/package.json`); tags `type:app|engine|tool`;
+   `@nx/enforce-module-boundaries` live (app→engine, engine→engine only, tool→engine+tool) — **proven to catch a
+   deliberate engine→tool violation**, deep subpath imports allowed (respects `exports`). `.nx/` cache ignored.
+   `nx show projects` graph works; 983 tests + tsc + eslint green. **Follow-up:** per-project cache/`affected`
+   targets (our root vitest/eslint/build scripts make Nx cache one big task for now — define per-project targets
+   to unlock granular cache/`affected`).
+7. **Fix doc links** (`docs/plans/README.md` + cross-refs) after the moves; verify `tsc` + tests + lint + e2e
    green across all projects.
 
 ## Risks

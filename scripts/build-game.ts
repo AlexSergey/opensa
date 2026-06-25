@@ -1,3 +1,19 @@
+import type { GroupName } from '@opensa/loaders/types';
+import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
+
+import {
+  type Entry,
+  ideRefs,
+  looseGroup,
+  type ModelRef,
+  partitionEntries,
+  placedModels,
+} from '@opensa/game-build/partition';
+import { openArchive } from '@opensa/renderware/archive/img-archive';
+import { parseBinaryIpl } from '@opensa/renderware/parsers/text/ipl-binary.parser';
+import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
+import { parsePedDefs } from '@opensa/renderware/parsers/text/ped-defs.parser';
+import { parseVehicleDefs } from '@opensa/renderware/parsers/text/vehicle-defs.parser';
 /**
  * Game build (plan 048). Packs `game-src/<game>/` into content-hashed fflate chunks under
  * `static/games/<version>/` (one `manifest.json` lists them; `static/games` is gitignored, `static/viewer`
@@ -16,23 +32,8 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync }
 import { join, relative, sep } from 'node:path';
 
 import type { GameConfig } from '../src/game-config';
-import type { GroupName } from '../src/loaders/types';
-import type { ImgArchive } from '../src/renderware/archive/img-archive';
 
-import {
-  type Entry,
-  ideRefs,
-  looseGroup,
-  type ModelRef,
-  partitionEntries,
-  placedModels,
-} from '../src/game-build/partition';
 import { GAME_CONFIG } from '../src/game-config';
-import { openArchive } from '../src/renderware/archive/img-archive';
-import { parseBinaryIpl } from '../src/renderware/parsers/text/ipl-binary.parser';
-import { parseIpl } from '../src/renderware/parsers/text/ipl.parser';
-import { parsePedDefs } from '../src/renderware/parsers/text/ped-defs.parser';
-import { parseVehicleDefs } from '../src/renderware/parsers/text/vehicle-defs.parser';
 import { chunkByHash } from './game-build/chunk';
 
 const ROOT = process.cwd();

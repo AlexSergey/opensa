@@ -1,6 +1,6 @@
-import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import type { CellCoord, Game, WorldObjectInfo } from '@opensa/game';
 
-import type { CellCoord, Game, WorldObjectInfo } from '../../game';
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
 
 import { CELL_PX, styles } from './debug-styles';
 

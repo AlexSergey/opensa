@@ -71,12 +71,15 @@ ideas
 blog-src
 
 # map-optimizer / lod-generator are tracked sub-projects; ignore only their generated output + local scratch.
-map-optimizer/out/
-map-optimizer/*.jpg
-lod-generator/out/
-vehicle-optimizer/out/
+tools/map-optimizer/out/
+tools/map-optimizer/*.jpg
+tools/lod-generator/out/
+tools/vehicle-optimizer/out/
 
 # Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
 # copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /
 # version-pinned test models) live in tests/custom/, which stays tracked.
 /tests/original/
+
+# Nx cache
+.nx/

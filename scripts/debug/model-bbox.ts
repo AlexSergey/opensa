@@ -1,5 +1,6 @@
-import { buildCollisionIndex, getCollision } from '../../src/renderware/collision/collision-index';
-import { parseDff } from '../../src/renderware/parsers/binary/dff';
+import { buildCollisionIndex, getCollision } from '@opensa/renderware/collision/collision-index';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+
 import { gameArg, openGameArchive, positionalArgs } from '../lib/game';
 
 /**

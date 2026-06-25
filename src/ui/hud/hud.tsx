@@ -1,8 +1,7 @@
+import type { Game } from '@opensa/game';
+
+import { GameClock } from '@opensa/game/time/game-clock';
 import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react';
-
-import type { Game } from '../../game';
-
-import { GameClock } from '../../game/time/game-clock';
 
 /** District label: full opacity for this long, then it fades over {@link ZONE_FADE_MS}. */
 const ZONE_HOLD_MS = 3000;

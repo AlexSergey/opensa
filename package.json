@@ -34,6 +34,20 @@
   },
   "license": "AGPL-3.0-only",
   "author": "Aleksandrov Sergey <gooddev.sergey@gmail.com>",
+  "workspaces": [
+    "src",
+    "tools/rw-codec",
+    "tools/tool-kit",
+    "packages/renderware",
+    "packages/game-build",
+    "packages/loaders",
+    "packages/vfs",
+    "packages/game",
+    "tools/map-optimizer",
+    "tools/lod-generator",
+    "tools/vehicle-optimizer",
+    "tools/timecyc-builder"
+  ],
   "scripts": {
     "build": "tsc -b && vite build",
     "build:game:anderius": "tsx scripts/build-game.ts --game anderius",
@@ -63,7 +77,7 @@
     "test:coverage": "vitest run --coverage",
     "test:fixtures": "tsx scripts/test-fixtures.ts",
     "test:watch": "vitest",
-    "timecyc": "tsx ./timecyc-builder/index.ts",
+    "timecyc": "tsx ./tools/timecyc-builder/index.ts",
     "viewer:assets": "tsx scripts/build-viewer-assets.ts"
   },
   "dependencies": {
@@ -83,6 +97,7 @@
     "@eslint/json": "1.2.0",
     "@inquirer/checkbox": "5.1.5",
     "@inquirer/prompts": "8.4.3",
+    "@nx/eslint-plugin": "23.0.1",
     "@playwright/test": "1.60.0",
     "@release-it/bumper": "7.0.5",
     "@release-it/conventional-changelog": "11.0.0",
@@ -118,6 +133,7 @@
     "jsdom": "29.1.1",
     "knip": "6.13.1",
     "lint-staged": "17.0.4",
+    "nx": "23.0.1",
     "playwright": "1.60.0",
     "prettier": "3.8.3",
     "react-doctor": "0.1.6",

@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenSA browser app: React UI + game-config + standalone viewers (the runtime that drives the engine).",
+  "nx": {
+    "tags": [
+      "type:app"
+    ]
+  }
+}

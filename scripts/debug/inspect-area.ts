@@ -1,6 +1,7 @@
-import { parseDff } from '../../src/renderware/parsers/binary/dff';
-import { parseTxd } from '../../src/renderware/parsers/binary/txd';
-import { isLodModel } from '../../src/renderware/parsers/text/lod';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+import { isLodModel } from '@opensa/renderware/parsers/text/lod';
+
 import { gameArg, loadMapDefs, openGameArchive, positionalArgs } from '../lib/game';
 
 /**

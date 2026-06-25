@@ -1,50 +1,36 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react';
-import {
-  CameraHelper,
-  Color,
-  type Mesh,
-  type Object3D,
-  Quaternion,
-  SRGBColorSpace,
-  type Texture,
-  Vector3,
-} from 'three';
+import type { CharacterPlacement } from '@opensa/game/character/orient-character';
+import type { Vec3 } from '@opensa/game/interfaces/world-adapter.interface';
+import type { SpawnedVehicle, VehiclePlacement } from '@opensa/game/vehicle/vehicle-lod.system';
 
-import type { CharacterPlacement } from '../game/character/orient-character';
-import type { Vec3 } from '../game/interfaces/world-adapter.interface';
-import type { SpawnedVehicle, VehiclePlacement } from '../game/vehicle/vehicle-lod.system';
-import type { DebugActions } from './debug/debug-overlay';
-
-import { Game } from '../game';
-import { GAME_CONFIG, type GameId, HUMAN_HALF_EXTENTS } from '../game-config';
-import { GtaSaWorldAdapter } from '../game/adapters/gta-sa-world.adapter';
-import { AnimationController } from '../game/character/animation-controller';
-import { CharacterAnimationSystem } from '../game/character/character-animation.system';
-import { orientCharacter } from '../game/character/orient-character';
-import { setupCharacter } from '../game/character/setup-character';
-import { Velocity } from '../game/ecs/components';
-import { TouchInputSource } from '../game/input';
-import { createWindMod } from '../game/mods/wind.mod';
-import { cloudProfile } from '../game/plugins/cloud-profile';
-import { FogPlugin } from '../game/plugins/fog.plugin';
-import { PostFxPlugin } from '../game/plugins/postfx.plugin';
-import { SkyPlugin, type SkySample } from '../game/plugins/sky.plugin';
-import { VehicleReflectionPlugin } from '../game/plugins/vehicle-reflection/vehicle-reflection.plugin';
-import { WaterPlugin, type WaterSample } from '../game/plugins/water.plugin';
-import { CollisionStreamingSystem } from '../game/streaming/collision-streaming.system';
-import { StreamingSystem } from '../game/streaming/streaming.system';
-import { clockNightFactor } from '../game/time/hour-window';
-import { TimedObjectSystem } from '../game/time/timed-object.system';
-import { EnterVehicleSystem } from '../game/vehicle/enter-vehicle.system';
-import { VehicleDamageSystem } from '../game/vehicle/vehicle-damage.system';
-import { VehicleHeadlightSystem } from '../game/vehicle/vehicle-headlight.system';
-import { VehicleLodSystem } from '../game/vehicle/vehicle-lod.system';
-import { vehicleModelsFromNames } from '../game/vehicle/vehicle-models';
-import { VehiclePhysicsSystem } from '../game/vehicle/vehicle-physics.system';
-import { weatherForCity } from '../game/weather/weather-zones';
-import { type CityBox, cityFromLevel, isDesertZone } from '../game/zones/city';
-import { CityZoneSystem } from '../game/zones/city-zone.system';
-import { type NamedZone, ZoneNameSystem } from '../game/zones/zone-name.system';
+import { Game } from '@opensa/game';
+import { GtaSaWorldAdapter } from '@opensa/game/adapters/gta-sa-world.adapter';
+import { AnimationController } from '@opensa/game/character/animation-controller';
+import { CharacterAnimationSystem } from '@opensa/game/character/character-animation.system';
+import { orientCharacter } from '@opensa/game/character/orient-character';
+import { setupCharacter } from '@opensa/game/character/setup-character';
+import { Velocity } from '@opensa/game/ecs/components';
+import { TouchInputSource } from '@opensa/game/input';
+import { createWindMod } from '@opensa/game/mods/wind.mod';
+import { cloudProfile } from '@opensa/game/plugins/cloud-profile';
+import { FogPlugin } from '@opensa/game/plugins/fog.plugin';
+import { PostFxPlugin } from '@opensa/game/plugins/postfx.plugin';
+import { SkyPlugin, type SkySample } from '@opensa/game/plugins/sky.plugin';
+import { VehicleReflectionPlugin } from '@opensa/game/plugins/vehicle-reflection/vehicle-reflection.plugin';
+import { WaterPlugin, type WaterSample } from '@opensa/game/plugins/water.plugin';
+import { CollisionStreamingSystem } from '@opensa/game/streaming/collision-streaming.system';
+import { StreamingSystem } from '@opensa/game/streaming/streaming.system';
+import { clockNightFactor } from '@opensa/game/time/hour-window';
+import { TimedObjectSystem } from '@opensa/game/time/timed-object.system';
+import { EnterVehicleSystem } from '@opensa/game/vehicle/enter-vehicle.system';
+import { VehicleDamageSystem } from '@opensa/game/vehicle/vehicle-damage.system';
+import { VehicleHeadlightSystem } from '@opensa/game/vehicle/vehicle-headlight.system';
+import { VehicleLodSystem } from '@opensa/game/vehicle/vehicle-lod.system';
+import { vehicleModelsFromNames } from '@opensa/game/vehicle/vehicle-models';
+import { VehiclePhysicsSystem } from '@opensa/game/vehicle/vehicle-physics.system';
+import { weatherForCity } from '@opensa/game/weather/weather-zones';
+import { type CityBox, cityFromLevel, isDesertZone } from '@opensa/game/zones/city';
+import { CityZoneSystem } from '@opensa/game/zones/city-zone.system';
+import { type NamedZone, ZoneNameSystem } from '@opensa/game/zones/zone-name.system';
 import {
   type AssetFileSystem,
   breakBreakable,
@@ -78,7 +64,22 @@ import {
   worldDayTintUniform,
   worldShadowUniforms,
   worldTintUniform,
-} from '../renderware';
+} from '@opensa/renderware';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
+import {
+  CameraHelper,
+  Color,
+  type Mesh,
+  type Object3D,
+  Quaternion,
+  SRGBColorSpace,
+  type Texture,
+  Vector3,
+} from 'three';
+
+import type { DebugActions } from './debug/debug-overlay';
+
+import { GAME_CONFIG, type GameId, HUMAN_HALF_EXTENTS } from '../game-config';
 import { isTouchDevice } from './controls/is-touch-device';
 import { TouchControls } from './controls/touch-controls';
 import { DebugOverlay } from './debug/debug-overlay';

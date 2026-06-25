@@ -1,6 +1,6 @@
-import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import type { TouchInputSource } from '@opensa/game/input';
 
-import type { TouchInputSource } from '../../game/input';
+import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
 import { ActionButton } from './action-button';
 import './controls.css';

@@ -1,13 +1,12 @@
+import type { Vec3 } from '@opensa/game';
+import type { VehiclePlacement } from '@opensa/game/vehicle/vehicle-lod.system';
+import type { AssetLoaderKind } from '@opensa/loaders';
 /**
  * Runtime game catalogue (plan 056). Each key is a game the menu can launch; the value is its full
  * configuration — replaces the old single-game `.env` setup. Data-only, except `disclaimer` which is JSX
  * (hence `.tsx`). The selected game drives the loader, the manifest URL, and the world/player setup.
  */
 import type { ReactNode } from 'react';
-
-import type { Vec3 } from './game';
-import type { VehiclePlacement } from './game/vehicle/vehicle-lod.system';
-import type { AssetLoaderKind } from './loaders';
 
 import { selectGameIds } from './game-config.select';
 

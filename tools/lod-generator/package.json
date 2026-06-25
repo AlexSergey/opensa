@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/lod-generator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Chunked LOD bake (merge → QEM decimate → per-cell TXD → drop-in build). CLI tool.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

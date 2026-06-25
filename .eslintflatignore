@@ -48,3 +48,4 @@ ecs/**
 ./game-src
 ./static
 ./static2
+.nx

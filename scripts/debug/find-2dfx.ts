@@ -1,4 +1,5 @@
-import { openArchive } from '../../src/renderware/archive/img-archive';
+import { openArchive } from '@opensa/renderware/archive/img-archive';
+
 import { gameArg, openGameArchive, readBytes } from '../lib/game';
 
 /**

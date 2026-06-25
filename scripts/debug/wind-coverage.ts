@@ -1,10 +1,10 @@
+import { WIND_MODELS } from '@opensa/game/mods/wind-mode';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { IdeFlag } from '@opensa/renderware/parsers/text/ide-flags';
+import { parseIde } from '@opensa/renderware/parsers/text/ide.parser';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { WIND_MODELS } from '../../src/game/mods/wind-mode';
-import { parseDff } from '../../src/renderware/parsers/binary/dff';
-import { IdeFlag } from '../../src/renderware/parsers/text/ide-flags';
-import { parseIde } from '../../src/renderware/parsers/text/ide.parser';
 import { gameArg, gameDir, openGameArchive } from '../lib/game';
 
 /**

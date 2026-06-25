@@ -1,0 +1,16 @@
+{
+  "name": "@opensa/renderware",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RenderWare format parsers + three.js builders (DFF/TXD/COL/IMG, IPL/IDE, timecyc) — the engine's read layer.",
+  "exports": {
+    ".": "./index.ts",
+    "./archive": "./archive/index.ts",
+    "./*": "./*.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:engine"
+    ]
+  }
+}

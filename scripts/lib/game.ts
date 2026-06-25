@@ -1,3 +1,12 @@
+import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
+import type { IdeObjectDef, IplInstance } from '@opensa/renderware/parsers/text/types';
+
+import { openArchive } from '@opensa/renderware/archive/img-archive';
+import { datChildUrl, iplBasename } from '@opensa/renderware/archive/resolve-paths';
+import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
+import { parseIde, parseTimedObjects } from '@opensa/renderware/parsers/text/ide.parser';
+import { parseBinaryIpl } from '@opensa/renderware/parsers/text/ipl-binary.parser';
+import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
 /**
  * Shared helpers for the dev scripts: resolve a game variant under `game-src/<game>/` and read its
  * real stock archives + data. `--game` defaults to `original`. Paths are relative to the cwd (repo root),
@@ -5,16 +14,6 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-
-import type { ImgArchive } from '../../src/renderware/archive/img-archive';
-import type { IdeObjectDef, IplInstance } from '../../src/renderware/parsers/text/types';
-
-import { openArchive } from '../../src/renderware/archive/img-archive';
-import { datChildUrl, iplBasename } from '../../src/renderware/archive/resolve-paths';
-import { parseGtaDat } from '../../src/renderware/parsers/text/gta-dat.parser';
-import { parseIde, parseTimedObjects } from '../../src/renderware/parsers/text/ide.parser';
-import { parseBinaryIpl } from '../../src/renderware/parsers/text/ipl-binary.parser';
-import { parseIpl } from '../../src/renderware/parsers/text/ipl.parser';
 
 const ROOT = process.cwd();
 

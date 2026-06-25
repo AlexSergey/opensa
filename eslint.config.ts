@@ -5,6 +5,7 @@ import type { Linter } from 'eslint';
 import reactPlugin from '@eslint-react/eslint-plugin';
 import js from '@eslint/js';
 import json from '@eslint/json';
+import nx from '@nx/eslint-plugin';
 import tseslintPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import gitignore from 'eslint-config-flat-gitignore';
@@ -60,7 +61,7 @@ const customTypescriptConfig = {
     '@check-file/filename-naming-convention': [
       'error',
       {
-        'src/**/*.{ts,tsx}': 'KEBAB_CASE',
+        '{src,packages}/**/*.{ts,tsx}': 'KEBAB_CASE',
       },
       {
         ignoreMiddleExtensions: true,
@@ -69,7 +70,7 @@ const customTypescriptConfig = {
     '@check-file/folder-naming-convention': [
       'error',
       {
-        'src/**/': 'KEBAB_CASE',
+        '{src,packages}/**/': 'KEBAB_CASE',
       },
     ],
 
@@ -215,10 +216,11 @@ const customJsConfig = {
 const scriptsConfig = {
   files: [
     'scripts/**/*.{js,mjs,cjs,ts}',
-    'map-optimizer/**/*.{js,mjs,cjs,ts}',
-    'lod-generator/**/*.{js,mjs,cjs,ts}',
-    'vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
-    'tool-kit/**/*.{js,mjs,cjs,ts}',
+    'tools/map-optimizer/**/*.{js,mjs,cjs,ts}',
+    'tools/lod-generator/**/*.{js,mjs,cjs,ts}',
+    'tools/vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
+    'tools/tool-kit/**/*.{js,mjs,cjs,ts}',
+    'tools/rw-codec/**/*.{js,mjs,cjs,ts}',
   ],
   languageOptions: {
     globals: {
@@ -234,8 +236,8 @@ const scriptsConfig = {
 // `game/adapters/**` and `game/mods/**` (plan 040: mods are GTA-specific by nature — they patch
 // world materials and read object defs). Keeps the engine core free of GTA-SA implementation.
 const gameBoundaryConfig = {
-  files: ['src/game/**/*.{ts,tsx}'],
-  ignores: ['src/game/adapters/**', 'src/game/mods/**'],
+  files: ['packages/game/**/*.{ts,tsx}'],
+  ignores: ['packages/game/adapters/**', 'packages/game/mods/**'],
   rules: {
     'no-restricted-imports': [
       'error',
@@ -259,6 +261,25 @@ const perfectionistConfig = {
 const regexpConfig = {
   files: sourceFiles,
   ...regexpPlugin.configs['flat/recommended'],
+};
+
+// Nx tag-based layer boundaries: apps → engine; engine → engine only (never tools/apps); tools → engine + tools.
+const moduleBoundariesConfig = {
+  files: ['**/*.{ts,tsx}'],
+  plugins: { '@nx': nx },
+  rules: {
+    '@nx/enforce-module-boundaries': [
+      'error',
+      {
+        allow: [],
+        depConstraints: [
+          { onlyDependOnLibsWithTags: ['type:app', 'type:engine'], sourceTag: 'type:app' },
+          { onlyDependOnLibsWithTags: ['type:engine'], sourceTag: 'type:engine' },
+          { onlyDependOnLibsWithTags: ['type:engine', 'type:tool'], sourceTag: 'type:tool' },
+        ],
+      },
+    ],
+  },
 };
 
 const dtsOverrides: Linter.Config = {
@@ -299,6 +320,7 @@ export default [
   customJsConfig,
   scriptsConfig,
   gameBoundaryConfig,
+  moduleBoundariesConfig,
   {
     settings: {
       react: {

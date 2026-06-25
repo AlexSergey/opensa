@@ -10,6 +10,14 @@
  */
 import type { AnimationClip, Object3D } from 'three';
 
+import { AnimationController } from '@opensa/game/character/animation-controller';
+import { orientCharacter } from '@opensa/game/character/orient-character';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { parseIfp } from '@opensa/renderware/parsers/binary/ifp';
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+import { buildAnimationClip } from '@opensa/renderware/three/build-anim-clip';
+import { buildSkinnedClump } from '@opensa/renderware/three/build-skinned-clump';
+import { buildTextureMap } from '@opensa/renderware/three/build-texture';
 import {
   AmbientLight,
   Box3,
@@ -26,15 +34,6 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-import { AnimationController } from '../game/character/animation-controller';
-import { orientCharacter } from '../game/character/orient-character';
-import { parseDff } from '../renderware/parsers/binary/dff';
-import { parseIfp } from '../renderware/parsers/binary/ifp';
-import { parseTxd } from '../renderware/parsers/binary/txd';
-import { buildAnimationClip } from '../renderware/three/build-anim-clip';
-import { buildSkinnedClump } from '../renderware/three/build-skinned-clump';
-import { buildTextureMap } from '../renderware/three/build-texture';
 
 /** Player ped (bmypol1) + the locomotion IFP (loaded directly, like the game). */
 const DFF = 'bmypol1.dff';

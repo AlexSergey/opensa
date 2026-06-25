@@ -1,3 +1,5 @@
+import { buildVer2Buffer, type ImgArchive, openArchive } from '@opensa/renderware/archive/img-archive';
+import { convertTo24h, parseTimecyc, stringifyTimecyc } from '@opensa/renderware/parsers/text/timecyc.parser';
 /**
  * Reconstruct the real-asset test fixtures (`tests/original/`) from a clean, UNMODIFIED GTA San Andreas
  * install under `game-src/non-modified` (default). These are Rockstar assets, so they are NOT committed
@@ -21,9 +23,6 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-
-import { buildVer2Buffer, type ImgArchive, openArchive } from '../src/renderware/archive/img-archive';
-import { convertTo24h, parseTimecyc, stringifyTimecyc } from '../src/renderware/parsers/text/timecyc.parser';
 
 type Fixture =
   | { readonly dest: string; readonly entry: string; readonly type: 'archive' }

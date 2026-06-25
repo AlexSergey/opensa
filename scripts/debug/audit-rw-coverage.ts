@@ -1,5 +1,6 @@
-import { parseDff } from '../../src/renderware/parsers/binary/dff';
-import { parseTxd } from '../../src/renderware/parsers/binary/txd';
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+
 import { gameArg, openGameArchive } from '../lib/game';
 
 /**

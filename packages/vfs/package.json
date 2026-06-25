@@ -1,0 +1,15 @@
+{
+  "name": "@opensa/vfs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Virtual File System: unzips + indexes loader chunks; the game reads assets through its interface.",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:engine"
+    ]
+  }
+}
