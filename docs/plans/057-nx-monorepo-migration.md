@@ -103,9 +103,19 @@ sets across the repo; **update those links on each move** so the central docs st
    vitest/eslint globs, `.gitignore`, doc links updated; symlinks repointed; 983 green). **B — engine → `packages/`**
    ✅ (`src/{renderware,game-build,loaders,vfs,game}` → `packages/`; workspaces + vitest test-include/coverage +
    eslint gameBoundary/check-file globs + scripts' relative engine imports updated; `src/` now app-only; 983
-   green). **C — app → `apps/web` + `apps/viewer`** (next; the risky one: vite/html/e2e wiring).
-5. **Apps**: split Vite into `apps/web` + `apps/viewer` (object/vehicle/character tabs in one html;
-   controls-harness stays in `apps/web`).
+   green). **C — app → `apps/web`** ✅ (`git mv src apps/web`; one move, `standalone/` intact so
+   `controls-harness`'s `../ui` stays valid). HTML entries **kept at repo root** (URLs unchanged → e2e specs,
+   which are URL-based, untouched) with `<script src>` repointed `/src/*` → `/apps/web/*`; one vite config
+   (root unchanged), favicon/og plugins repointed `src/assets` → `apps/web/assets`; workspaces + vitest +
+   eslint check-file + prettier/knip globs + `scripts/build-game.ts` game-config import updated. Verified: tsc +
+   983 tests + eslint (boundaries) green, **and `vite build` + `build:prod` both succeed** (all 5 entries bundle;
+   favicons/webmanifest/`og.jpg`/version-comment emitted; viewers correctly dropped in prod). **Deferred (own
+   step):** splitting the 3 viewers out into a separate `apps/viewer` project + merging their 3 HTML entries into
+   one tabbed shell — a UI feature on top of this relocation, see step 5.
+5. **Apps**: split the viewers into `apps/viewer` (object/vehicle/character tabs in one html; controls-harness
+   stays in `apps/web`). **Deferred** — the relocation (step 4C) landed the app under `apps/web` with viewers
+   still as `apps/web/standalone` multi-page entries; this step is the viewer-app split + tab shell (new UI,
+   needs a browser to verify) and is cleanly separable.
 6. **Stand up Nx** over the finished workspaces. ✅ **Done** — nx 23 + `@nx/eslint-plugin`; `nx.json`; 12 projects
    (the app added as `@opensa/web` via `src/package.json`); tags `type:app|engine|tool`;
    `@nx/enforce-module-boundaries` live (app→engine, engine→engine only, tool→engine+tool) — **proven to catch a

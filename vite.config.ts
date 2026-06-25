@@ -8,10 +8,10 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8'))
 /**
  * Emit the favicon set (icons + `site.webmanifest`) to the build ROOT with STABLE names, so index.html's
  * `<link rel="icon"/manifest>` and the manifest's own root-relative icon paths resolve. Source of truth:
- * `src/assets/favicon/`.
+ * `apps/web/assets/favicon/`.
  */
 function emitFavicons(): Plugin {
-  const dir = resolve(__dirname, 'src/assets/favicon');
+  const dir = resolve(__dirname, 'apps/web/assets/favicon');
 
   return {
     generateBundle(): void {
@@ -41,14 +41,14 @@ function emitHtaccess(): Plugin {
 /**
  * Emit the social-share preview to `dist/assets/og.jpg` with a STABLE name (no content hash), so the
  * `og:image` / `twitter:image` meta can point at a fixed URL (https://opensa.cc/assets/og.jpg).
- * Source of truth: `src/assets/og.jpg`.
+ * Source of truth: `apps/web/assets/og.jpg`.
  */
 function emitOgImage(): Plugin {
   return {
     generateBundle(): void {
       this.emitFile({
         fileName: 'assets/og.jpg',
-        source: readFileSync(resolve(__dirname, 'src/assets/og.jpg')),
+        source: readFileSync(resolve(__dirname, 'apps/web/assets/og.jpg')),
         type: 'asset',
       });
     },
@@ -98,7 +98,7 @@ export default defineConfig(({ command }) => ({
     },
   },
   define: {
-    // Build version usable in code as `__APP_VERSION__` (typed in src/vite-env.d.ts).
+    // Build version usable in code as `__APP_VERSION__` (typed in apps/web/vite-env.d.ts).
     __APP_VERSION__: JSON.stringify(pkg.version),
     // Hide dev-only debugger sections — true only in the deploy build (build:prod), false in `build`/`dev`.
     __DEBUGGER_HIDE__: JSON.stringify(hideDebugger),

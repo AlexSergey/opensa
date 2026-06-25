@@ -31,9 +31,9 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-import type { GameConfig } from '../src/game-config';
+import type { GameConfig } from '../apps/web/game-config';
 
-import { GAME_CONFIG } from '../src/game-config';
+import { GAME_CONFIG } from '../apps/web/game-config';
 import { chunkByHash } from './game-build/chunk';
 
 const ROOT = process.cwd();

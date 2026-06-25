@@ -6,14 +6,14 @@ export default defineConfig({
       // Project-wide logic coverage (.ts). The .tsx UI is R3F/DOM glue, integration-tested in-browser, not here.
       exclude: [
         // --- Not logic (never counted anywhere) ---
-        'src/**/*.test.ts',
-        'src/**/index.ts',
-        'src/**/*.interface.ts',
+        'apps/web/**/*.test.ts',
+        'apps/web/**/index.ts',
+        'apps/web/**/*.interface.ts',
         'packages/**/*.test.ts',
         'packages/**/index.ts',
         'packages/**/*.interface.ts',
         'packages/renderware/test-utils.ts',
-        'src/standalone/**', // dev-only viewer entry scripts
+        'apps/web/standalone/**', // dev-only viewer entry scripts
 
         // === COVERED BY THE PLAYWRIGHT E2E LANE (not by headless node units) ===
         // GL / DOM / app-loop glue: WebGL + browser only, so it's verified in `e2e/` (docs/development/e2e.md),
@@ -31,11 +31,11 @@ export default defineConfig({
         'packages/game/plugins/vehicle-reflection/vehicle-reflection.plugin.ts', // env-map/probe shader assembly (GL)
         'packages/game/vehicle/vehicle-headlight.system.ts', // canvas-texture lamps (logic unit-tested in build-vehicle)
         'packages/game/character/setup-character.ts', // async model load + scene wiring
-        'src/ui/**', // DOM/style helpers (locations, debug-styles, hud font loading)
-        'src/asset-loader/asset-loader.ts', // fetch streaming + Cache Storage orchestration (e2e: asset-loader.spec.ts)
-        'src/asset-loader/cache-store.ts', // Cache Storage API wrapper (e2e: asset-loader.spec.ts)
+        'apps/web/ui/**', // DOM/style helpers (locations, debug-styles, hud font loading)
+        'apps/web/asset-loader/asset-loader.ts', // fetch streaming + Cache Storage orchestration (e2e: asset-loader.spec.ts)
+        'apps/web/asset-loader/cache-store.ts', // Cache Storage API wrapper (e2e: asset-loader.spec.ts)
       ],
-      include: ['src/**/*.ts', 'packages/**/*.ts'],
+      include: ['apps/web/**/*.ts', 'packages/**/*.ts'],
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html'],
       // Floors (a small buffer below the achieved 88.8% stmt / 78.4% branch / 87.2% func / 88.8% lines) so an
@@ -45,7 +45,7 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: [
-      'src/**/*.test.ts',
+      'apps/web/**/*.test.ts',
       'packages/**/*.test.ts',
       'tools/timecyc-builder/**/*.test.ts',
       'scripts/**/*.test.ts',

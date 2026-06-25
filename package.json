@@ -35,7 +35,7 @@
   "license": "AGPL-3.0-only",
   "author": "Aleksandrov Sergey <gooddev.sergey@gmail.com>",
   "workspaces": [
-    "src",
+    "apps/web",
     "tools/rw-codec",
     "tools/tool-kit",
     "packages/renderware",

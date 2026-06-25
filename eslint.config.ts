@@ -61,7 +61,7 @@ const customTypescriptConfig = {
     '@check-file/filename-naming-convention': [
       'error',
       {
-        '{src,packages}/**/*.{ts,tsx}': 'KEBAB_CASE',
+        '{apps,packages}/**/*.{ts,tsx}': 'KEBAB_CASE',
       },
       {
         ignoreMiddleExtensions: true,
@@ -70,7 +70,7 @@ const customTypescriptConfig = {
     '@check-file/folder-naming-convention': [
       'error',
       {
-        '{src,packages}/**/': 'KEBAB_CASE',
+        '{apps,packages}/**/': 'KEBAB_CASE',
       },
     ],
 
