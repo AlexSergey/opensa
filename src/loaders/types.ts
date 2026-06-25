@@ -3,7 +3,10 @@
  * `AssetFetchLoader` downloads manifest-listed chunk zips, `AssetLocalLoader` reads a raw install folder.
  * Both expose the same {@link AssetLoader} contract and emit the same events, so boot stays loader-agnostic.
  */
+import type { GroupName } from '../game-build/partition';
 import type { Emitter } from './emitter';
+
+export type { GroupName }; // owned by game-build (the bucket vocabulary); re-exported so loaders/VFS import it here
 
 /** The contract the boot flow drives — implemented by every loader (fetch / local). */
 export interface AssetLoader {
@@ -74,9 +77,6 @@ export type ChunkStatus = 'cached' | 'done' | 'downloading' | 'error';
 export interface GroupChunk extends ChunkInfo {
   group: GroupName;
 }
-
-/** A build group — the four buckets the build emits (see scripts/build-game.ts). */
-export type GroupName = 'data' | 'models' | 'others' | 'textures';
 
 /** The build manifest at `static/games/<game>-<version>/manifest.json`. */
 export interface Manifest {

@@ -1,5 +1,3 @@
-import type { GroupName } from '../loaders/types';
-
 import { parseIde, parseTimedObjects } from '../renderware/parsers/text/ide.parser';
 
 /** One file to pack: its bare lowercased name (`cj.dff`) + which img to read it from. */
@@ -7,6 +5,9 @@ export interface Entry {
   name: string;
   source: Source;
 }
+
+/** The four build groups (asset buckets) the build emits — the runtime loaders/VFS fetch + store by these. */
+export type GroupName = 'data' | 'models' | 'others' | 'textures';
 
 /** A placed model's dff + txd base names (lowercased, no extension). */
 export interface ModelRef {
