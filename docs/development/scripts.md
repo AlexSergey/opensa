@@ -41,7 +41,7 @@ Packs a variant (`game-src/<game>/`) into `static/<version>/` in four groups —
   `true`) — the runtime caches only `cached` chunks and treats the always-fresh `data` group as a build-liveness
   probe (a 404 there wipes the client cache; see [asset-loader.md](../features/asset-loader.md)). See plan 048
   for the full breakdown. It also reads the game's **TEMP** `mainCharacter` (`peds.ide`) + `vehicles`
-  (`vehicles.ide`) from `GAME_CONFIG` (`src/game-config.tsx`, by `--game`) and packs them — dynamically-spawned
+  (`vehicles.ide`) from `GAME_CONFIG` (`apps/web/src/game-config.tsx`, by `--game`) and packs them — dynamically-spawned
   models the map-placement partition would otherwise miss. Rebuild after changing them.
 
 ```sh
@@ -51,7 +51,7 @@ tsx scripts/build-game.ts --game <name>   # any other variant
 
 ### gen-wind-list.ts
 
-Regenerates the `WIND_MODELS` constant in `src/game/mods/wind-mode.ts` from the ground-truth
+Regenerates the `WIND_MODELS` constant in `packages/game/src/mods/wind-mode.ts` from the ground-truth
 folder `game-src/wind/` (the set of models that must sway). Re-run after adding wind-adapted
 models.
 

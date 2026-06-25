@@ -56,7 +56,7 @@ Upload (FTP/SFTP/SSH) so the served layout is:
 <web root>/
   index.html
   .htaccess              # from dist/ (already configured: HTTPS, SPA fallback, caching, MIME)
-  favicon.ico            # favicon set + site.webmanifest emitted to the root (src/assets/favicon/)
+  favicon.ico            # favicon set + site.webmanifest emitted to the root (apps/web/src/assets/favicon/)
   favicon-16x16.png
   favicon-32x32.png
   apple-touch-icon.png

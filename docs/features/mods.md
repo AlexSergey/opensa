@@ -1,6 +1,6 @@
 # Game mods (WorldMod) + vegetation wind
 
-`src/game/mods/` (`mod.interface.ts`, `wind.mod.ts`, `wind-mode.ts`), plans 039/040.
+`packages/game/src/mods/` (`mod.interface.ts`, `wind.mod.ts`, `wind-mode.ts`), plans 039/040.
 
 ## Implemented
 

@@ -1,6 +1,6 @@
 # IMG archive + asset cache
 
-`src/renderware/archive/` — `img-archive.ts`, `asset-cache.ts`, `model-key.ts`,
+`packages/renderware/src/archive/` — `img-archive.ts`, `asset-cache.ts`, `model-key.ts`,
 `resolve-paths.ts`.
 
 ## Implemented

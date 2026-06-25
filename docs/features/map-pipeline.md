@@ -1,11 +1,12 @@
 # Map pipeline (DAT / IDE / IPL → streaming world)
 
-`src/renderware/parsers/text/`, `src/renderware/map/`, `src/game/streaming/`,
-`src/game/adapters/gta-sa-world.adapter.ts`.
+`packages/renderware/src/parsers/text/`, `packages/renderware/src/map/`, `packages/game/src/streaming/`,
+`packages/game/src/adapters/gta-sa-world.adapter.ts`.
 
 ## Implemented
 
 **Text parsers**
+
 - `gta.dat` (IDE/IPL/IMG directives).
 - IDE: `objs` (incl. the mesh-count multi-draw-distance variant — max wins), `anim` (IFP name
   kept on `def.anim`), `tobj` (time windows), `txdp` (TXD parents). Other sections ignored.
@@ -22,6 +23,7 @@
   procobj.dat, surfinfo.dat, GXT (CRC-32 without final inversion).
 
 **World assembly**
+
 - `resolveMap`: catalog + timed catalog + txdp + all instances (text + streams + extras).
 - `buildWorldGrid`: 250 m cells, HD vs LOD lists (`isLodModel` by name), exterior filter.
 - `buildCell` per cell: **InstancedMesh per single-material part** (shared geometry attributes),

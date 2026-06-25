@@ -1,6 +1,6 @@
 # Road-sign text (2dfx ROADSIGN, plan 042 item 5)
 
-`src/renderware/three/build-roadsign.ts`, dff parser type-7 entries,
+`packages/renderware/src/three/build-roadsign.ts`, dff parser type-7 entries,
 `map/build-region.ts` (buildRoadsignMeshes), canvas-host font install.
 
 ## Implemented

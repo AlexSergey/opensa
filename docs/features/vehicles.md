@@ -1,6 +1,6 @@
 # Vehicles
 
-`src/renderware/three/build-vehicle.ts`, `src/game/vehicle/`, vehicle-reflection plugin,
+`packages/renderware/src/three/build-vehicle.ts`, `packages/game/src/vehicle/`, vehicle-reflection plugin,
 plans 015–021/025/030/033.
 
 ## Implemented

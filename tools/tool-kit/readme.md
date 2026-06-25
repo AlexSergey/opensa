@@ -2,7 +2,7 @@
 
 Shared building blocks for the offline tools (`map-optimizer`, `lod-generator`, `vehicle-optimizer`), decoupled
 from any single tool so they don't reach into each other. Read-only over the engine's RenderWare primitives
-(`../src/renderware/...`); all mutation/convenience lives here.
+(`../packages/renderware/src/...`); all mutation/convenience lives here.
 
 Today a plain folder of relative-imported modules; on the eventual monorepo move it becomes a real package
 (`@opensa/tool-kit`) — see [docs/ideas/monorepo-packages.md](../docs/ideas/monorepo-packages.md).

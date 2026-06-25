@@ -1,6 +1,6 @@
 # UI shell (boot, menu, loading, pause)
 
-`src/ui/shell/` — the app entry (plans 051 / 056). A lightweight React shell that paints instantly (no
+`apps/web/src/ui/shell/` — the app entry (plans 051 / 056). A lightweight React shell that paints instantly (no
 three.js), shows a **menu of the games in `GAME_CONFIG`**, runs the picked game's disclaimer + load behind a
 branded loading screen, then lazy-loads and reveals the game. Theme: black bg, white text, orange-gradient
 accent (from `logo.svg`).

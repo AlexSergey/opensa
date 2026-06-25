@@ -1,7 +1,7 @@
 # Collision + physics
 
-`src/renderware/parsers/binary/col.ts`, `src/renderware/collision/`,
-`src/game/physics/`, `src/game/streaming/collision-streaming.system.ts`.
+`packages/renderware/src/parsers/binary/col.ts`, `packages/renderware/src/collision/`,
+`packages/game/src/physics/`, `packages/game/src/streaming/collision-streaming.system.ts`.
 
 ## Implemented
 

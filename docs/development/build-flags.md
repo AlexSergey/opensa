@@ -25,8 +25,8 @@ Both are plain `process.env` flags read in `vite.config.ts` (mac/linux inline sy
 ## Runtime config (`.env`, `VITE_`-prefixed)
 
 Client-visible config read from `.env` (copy `.env.example` → `.env`; `.env` is gitignored). Typed in
-`src/vite-env.d.ts`. Only two env vars remain — per-game settings (loader, character, vehicles, spawn,
-teleports, …) live in the runtime catalogue **`src/game-config.tsx`** (`GAME_CONFIG`), picked from the menu
+`apps/web/src/vite-env.d.ts`. Only two env vars remain — per-game settings (loader, character, vehicles, spawn,
+teleports, …) live in the runtime catalogue **`apps/web/src/game-config.tsx`** (`GAME_CONFIG`), picked from the menu
 (plan 056).
 
 | Env var           | Default                 | Effect                                                                               |
@@ -46,20 +46,20 @@ placed on the map, so the partition would otherwise miss them. Rebuild after cha
 | `__DEBUGGER_HIDE__`    | `boolean` | `true` only under `build:prod` (`OPENSA_DEBUGGER_HIDE`), else `false` | Gates the dev-only debugger sections.                     |
 | `process.env.NODE_ENV` | `string`  | `'production'` for any `vite build`, `'development'` for `vite dev`   | General prod/dev check. **Not** wired to debugger hiding. |
 
-Types are declared in `src/vite-env.d.ts` (`__APP_VERSION__`, `__DEBUGGER_HIDE__`); `process.env` is typed via
+Types are declared in `apps/web/src/vite-env.d.ts` (`__APP_VERSION__`, `__DEBUGGER_HIDE__`); `process.env` is typed via
 `@types/node`.
 
 ### Debugger sections gated by `__DEBUGGER_HIDE__`
 
-`src/ui/debug/debug-overlay.tsx` filters its `MENU` by `DEV_ONLY_SCREENS`: **Atmosphere, Camera, Graphics,
+`apps/web/src/ui/debug/debug-overlay.tsx` filters its `MENU` by `DEV_ONLY_SCREENS`: **Atmosphere, Camera, Graphics,
 ProcObj, Map**. They show in `dev` and the plain `build`, and are hidden only in `build:prod`. The always-on
 sections are Player, Vehicles, Time, Weather, Position.
 
 ### Dev-only games gated by `process.env.NODE_ENV`
 
-A game in `GAME_CONFIG` (`src/game-config.tsx`) flagged `devOnly: true` is dropped from the menu in **any**
+A game in `GAME_CONFIG` (`apps/web/src/game-config.tsx`) flagged `devOnly: true` is dropped from the menu in **any**
 production build (`vite build` / `build:prod`) and kept only under `npm run dev` (and the e2e dev server). The
-filter is the pure `selectGameIds(config, isDev)` (`src/game-config.select.ts`), with `isDev =
+filter is the pure `selectGameIds(config, isDev)` (`apps/web/src/game-config.select.ts`), with `isDev =
 process.env.NODE_ENV !== 'production'`. Today **gostown** (a `fetch` demo that would distribute mod content
 from the CDN) is `devOnly`, so a deployed site offers only **San Andreas** (local, bring-your-own-files) — see
 [Legal & takedowns](../../README.md#legal--takedowns). The dev-only game's config strings still sit inert in
@@ -68,9 +68,9 @@ importantly, **its built chunks (`static/games/gostown-*`) must not be uploaded*
 
 ## Other build-time injection (`vite.config.ts` plugins)
 
-- **`emit-og-image`** — copies `src/assets/og.jpg` → `dist/assets/og.jpg` with a **stable** name (no content
+- **`emit-og-image`** — copies `apps/web/src/assets/og.jpg` → `dist/assets/og.jpg` with a **stable** name (no content
   hash), so `og:image` / `twitter:image` in `index.html` can point at `https://opensa.cc/assets/og.jpg`.
-- **`emit-favicons`** — copies the favicon set + `site.webmanifest` from `src/assets/favicon/` to the build
+- **`emit-favicons`** — copies the favicon set + `site.webmanifest` from `apps/web/src/assets/favicon/` to the build
   **root** with stable names, matching the `<link rel="icon"/manifest>` tags in `index.html` and the
   manifest's root-relative icon paths.
 - **`inject-version-comment`** — stamps `<!-- OpenSA v<version> -->` at the top of `index.html`'s `<head>`

@@ -2,7 +2,7 @@
 
 A dev tool (`timecyc-builder/`) that builds a custom `timecyc_24h.dat` by **selectively merging** values from
 one or more donor timecyc files onto a base. Built on the canonical parser
-(`src/renderware/parsers/text/timecyc.parser.ts`) — see plan 047.
+(`packages/renderware/src/parsers/text/timecyc.parser.ts`) — see plan 047.
 
 ## Run
 
@@ -27,9 +27,11 @@ Input files (base **or** any donor) may be **vanilla 8-keyframe** (`timecyc.dat`
 const manager = new TimecycManager();
 await manager.setBase(resolve(__dirname, './base/timecyc_24h.dat'));
 await manager.setTimecycToMerge([
-  { path: resolve(__dirname, './merge/RealVision_Enhanced_24h.dat'),
+  {
+    path: resolve(__dirname, './merge/RealVision_Enhanced_24h.dat'),
     props: ['Sky top', 'Sky bot'],
-    times: ['20h', '21h', '22h', '23h', '0h', '1h', '2h', '3h', '4h', '5h'] },
+    times: ['20h', '21h', '22h', '23h', '0h', '1h', '2h', '3h', '4h', '5h'],
+  },
 ]);
 await writeFile(join(__dirname, 'merged', 'timecyc_24h.dat'), manager.merge(), 'utf8');
 ```

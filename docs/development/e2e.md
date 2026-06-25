@@ -19,7 +19,7 @@ npm run e2e:update     # regenerate screenshot baselines
 - `npm run dev -- --mode e2e --port 5174 --strictPort` — the Vite app on **:5174** (`baseURL`). The dedicated
   port (not the usual 5173) means the lane never reuses a hand-started dev server. `--mode e2e` loads the
   committed **`.env.e2e`** (just `VITE_STATIC_URL`); per-game loader/spawn/etc. come from `GAME_CONFIG`
-  (`src/game-config.tsx`), so the shell e2e picks a game (gostown = fetch, San Andreas = local) from the menu.
+  (`apps/web/src/game-config.tsx`), so the shell e2e picks a game (gostown = fetch, San Andreas = local) from the menu.
 
 Chromium is already installed under the repo's Playwright cache. If missing: `npx playwright install chromium`.
 

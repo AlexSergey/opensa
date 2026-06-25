@@ -1,7 +1,7 @@
 # Weather + environment (sky, water, fog)
 
-`src/game/plugins/sky.plugin.ts`, `water.plugin.ts`, `fog.plugin.ts`, `cloud-profile.ts`,
-`src/game/weather/`, `src/renderware/parsers/text/timecyc*`, `build-water.ts`, plans
+`packages/game/src/plugins/sky.plugin.ts`, `water.plugin.ts`, `fog.plugin.ts`, `cloud-profile.ts`,
+`packages/game/src/weather/`, `packages/renderware/src/parsers/text/timecyc*`, `build-water.ts`, plans
 014/024/028/029/031.
 
 ## Implemented

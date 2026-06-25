@@ -7,7 +7,7 @@ asphalt, curbs, walls), not just glow the lamps.
 
 ## Current state (MVP)
 
-`src/game/vehicle/vehicle-headlight.system.ts`: the occupied car's lamps get **emissive glass** + **corona
+`packages/game/src/vehicle/vehicle-headlight.system.ts`: the occupied car's lamps get **emissive glass** + **corona
 sprites** at night, gated on `seated && isNight()`; bloom makes the halo. **No light hits the world** — the
 map is unlit/prelit (plan 038), so there's no beam on the asphalt.
 

@@ -1,7 +1,7 @@
 # World lighting (SA prelit pipeline)
 
-`src/renderware/three/world-material.ts`, `build-clump.ts` (attributes),
-`src/game/plugins/postfx.plugin.ts`, canvas-host `coronas` system (uniform driver), plan 038.
+`packages/renderware/src/three/world-material.ts`, `build-clump.ts` (attributes),
+`packages/game/src/plugins/postfx.plugin.ts`, canvas-host `coronas` system (uniform driver), plan 038.
 
 ## Implemented
 

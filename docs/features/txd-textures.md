@@ -1,7 +1,7 @@
 # TXD parser + textures
 
-`src/renderware/parsers/binary/txd.ts`, `src/renderware/three/build-texture.ts`,
-`src/renderware/archive/asset-cache.ts` (txdp resolution).
+`packages/renderware/src/parsers/binary/txd.ts`, `packages/renderware/src/three/build-texture.ts`,
+`packages/renderware/src/archive/asset-cache.ts` (txdp resolution).
 
 ## Implemented
 

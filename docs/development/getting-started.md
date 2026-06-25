@@ -78,17 +78,17 @@ npm run dev                     # Vite dev server for the app
 ```
 
 The app reads `VITE_STATIC_URL` (default `http://localhost:3001`, see `.env`). The UI shell (plans 051 / 056,
-`src/ui/shell/`) shows a **menu of the games in `GAME_CONFIG`** (`src/game-config.tsx`); picking one runs its
+`apps/web/src/ui/shell/`) shows a **menu of the games in `GAME_CONFIG`** (`apps/web/src/game-config.tsx`); picking one runs its
 disclaimer → the **asset loader** (plan 049) loads `static/<game>-<version>/` into the **VFS** (plan 050,
 unzip + verify) → the lazily-loaded game runs entirely from the VFS.
 
-> **Per-game config (`src/game-config.tsx`):** each game sets its `assetLoader` (`fetch` = download chunks;
+> **Per-game config (`apps/web/src/game-config.tsx`):** each game sets its `assetLoader` (`fetch` = download chunks;
 > `local` = read a user-picked **raw GTA install**, Chromium only), `mainCharacter`, `vehicles`, `playerSpawn`,
 > teleports, and a `disclaimer`. `original` is `local` (bring-your-own-files → "Choose game folder", remembered
 > in IndexedDB); `gostown` is `fetch`. See [asset loaders](../features/asset-loader.md).
 
 > **Note:** the boot fetches `static/<game>-${__APP_VERSION__}/manifest.json` for the picked game (version from
-> `package.json`, wired in `src/ui/shell/use-asset-boot.ts`).
+> `package.json`, wired in `apps/web/src/ui/shell/use-asset-boot.ts`).
 
 > **Testing on a phone (LAN):** Cache Storage needs a **secure context** (https / localhost). Over plain
 > `http://<your-ip>:port` `caches` is undefined, so the loader skips caching and **re-downloads every visit**

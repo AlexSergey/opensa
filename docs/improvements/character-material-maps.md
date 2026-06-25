@@ -5,7 +5,7 @@ ships are simply ignored. Captured while fixing the **T800** ped (see below). No
 
 ## Idea
 
-`buildMaterial` (`src/renderware/three/build-clump.ts`) resolves **one** texture per material — the RW
+`buildMaterial` (`packages/renderware/src/three/build-clump.ts`) resolves **one** texture per material — the RW
 material's diffuse (`rw.texture`). Modern ped/vehicle mods ship a texture _set_ per material, conventionally
 suffixed: `_D` diffuse, `_N` normal, `_E` emissive (sometimes `_S` spec). We use `_D` and drop the rest, so
 those models render flat-lit — visually fine but without surface relief or self-illumination the author

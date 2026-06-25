@@ -1,11 +1,12 @@
 # Animated map objects (plan 041)
 
-`src/renderware/three/uv-anim.ts`, `build-animated-clump.ts`, `animated-objects.ts`,
+`packages/renderware/src/three/uv-anim.ts`, `build-animated-clump.ts`, `animated-objects.ts`,
 `map/build-region.ts` (buildAnimatedObjects), canvas-host `map-animations` system.
 
 ## Implemented
 
 **UV-animated textures** (signs, waterfalls — e.g. the LV skull sign `visagesign04`)
+
 - UVAnimDict parsed from the DFF; materials reference entries by name (UV Anim PLG).
 - Module registry: one shared `Vector4(offX, offY, sclX, sclY)` uniform per dict entry — the
   TXD texture cache is shared, so `texture.offset` is never mutated; all instances animate in
@@ -15,6 +16,7 @@
 - World-material shader variant `|uvAnim` (`mapUv = mapUv * scale + offset` after `uv_vertex`).
 
 **IFP-animated clump objects** (IDE `anim` section — oil pumps, windmills, fans)
+
 - `anim` defs are excluded from instancing; each instance builds a **frame hierarchy with
   transforms KEPT** (the one exception to the map's frames-ignored rule), one world-material
   mesh per atomic under its named frame node.

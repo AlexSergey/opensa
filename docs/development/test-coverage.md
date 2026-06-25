@@ -6,11 +6,11 @@
 > (hard readers) or skip (guarded readers). CI runs no tests for this reason. See
 > [scripts.md → test-fixtures.ts](./scripts.md#test-fixturests).
 
-Run: `npm run test:coverage` (Vitest + v8). Scope (from `vitest.config.ts`): `src/**/*.ts` logic; **excluded**
-`*.test.ts`, `index.ts`, `*.interface.ts`, `test-utils.ts`, `src/standalone/**`, all `.tsx` UI, and the
+Run: `npm run test:coverage` (Vitest + v8). Scope (from `vitest.config.ts`): `apps/web/**` + `packages/**` `.ts` logic; **excluded**
+`*.test.ts`, `index.ts`, `*.interface.ts`, `test-utils.ts`, `apps/viewer/src/**`, all `.tsx` UI, and the
 **GL / DOM / app-loop glue** (`game.ts`, `core/renderer`, `core/camera-controller`, `input/keyboard`, the
 sky/water/postfx/ambient/directional/vehicle-reflection GL plugins, `vehicle-headlight.system`,
-`setup-character`, `src/ui/**`) — WebGL/browser code verified on the Playwright e2e lane (`e2e.md`), not by
+`setup-character`, `apps/web/src/ui/**`) — WebGL/browser code verified on the Playwright e2e lane (`e2e.md`), not by
 headless node units (same rationale as the `.tsx` exclusion). See plan 046 for the roadmap.
 
 ## Current (2026-06-13, after It.1–7 + coverage hardening)

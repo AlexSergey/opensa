@@ -1,11 +1,12 @@
 # DFF parser
 
-`src/renderware/parsers/binary/dff.ts` (+ `binary-stream.ts`, `chunks.ts`, `constants.ts`,
+`packages/renderware/src/parsers/binary/dff.ts` (+ `binary-stream.ts`, `chunks.ts`, `constants.ts`,
 `types.ts`). Renderer-agnostic: outputs plain `RWClump` data, three.js never leaks in.
 
 ## Implemented
 
 **Clump structure**
+
 - Chunk-tree walking (`[type u32][size u32][version u32]` LE headers), tolerant of unknown
   chunks (skipped by size).
 - FrameList: name (NodeName plugin), parent index, 3×3 rotation + position.
@@ -20,6 +21,7 @@
   with `{time, (rot, sx, sy, skew, tx, ty)}` keyframes.
 
 **Material data**
+
 - Colour, texture refs (name + mask).
 - MatFX env-map (coefficient, texture, FB-alpha flag).
 - SA reflection plugin (`0x253F2FC`): env UV scale/offset, intensity.
@@ -27,6 +29,7 @@
 - UV Anim PLG (`0x135`): channel mask + per-channel dict-entry names.
 
 **2d Effect plugin (`0x253F2F8`, geometry extension)**
+
 - Type 0 **Light**: colour, corona far-clip/size, flags, corona texture → street-lamp coronas.
 - Type 1 **Particle**: char[24] FX-system name (effects.fxp) + geometry-local position →
   data-driven emitters (plan 044).
@@ -38,6 +41,7 @@
   size — counted in the survey but intentionally unused.
 
 **Breakable plugin (`0x253F2FD`, geometry extension; plan 045)**
+
 - `RWGeometry.breakable`: the secondary "shatter" mesh (positions/UVs/colours, triangles +
   per-triangle material, materials with texture/mask/ambient). Magic 0 = 4-byte marker, not
   breakable (1695 models carry the chunk, 238 have real data); non-zero magic is a raw runtime
@@ -45,6 +49,7 @@
   exactly — anything else is refused (data-tolerant undefined).
 
 **Data repair (mod re-exports)**
+
 - `sanitizeDegenerateNormals` (build side): zero-length/NaN stored OR computed normals replaced
   with face normals (PF casroyale black-faces case).
 - Frame transforms are deliberately ignored for map models (SA re-frames atomic model infos);

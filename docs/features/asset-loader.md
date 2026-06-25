@@ -1,6 +1,6 @@
 # Asset loaders
 
-`src/loaders/` — standalone, framework-agnostic (no React, no `game`). Resolves the game's assets into the
+`packages/loaders/src/` — standalone, framework-agnostic (no React, no `game`). Resolves the game's assets into the
 VFS behind one contract; the loader kind is chosen **per game** by its `assetLoader` in `GAME_CONFIG`
 (plan 056). Plans [049](../plans/049-asset-loader.md) (fetch) + [053](../plans/053-asset-local-loader.md)
 (local + restructure).
@@ -8,7 +8,7 @@ VFS behind one contract; the loader kind is chosen **per game** by its `assetLoa
 ## Layout
 
 ```
-src/loaders/
+packages/loaders/src/
   index.ts            # createAssetLoader(config) factory (per-game assetLoader) + public re-exports
   types.ts            # shared contract: AssetLoader + Manifest/GroupName/AssetSink/ProgressSnapshot/…
   manifest.ts         # manifest helpers (parseManifest, allChunks, chunkUrl, …) — pure
@@ -70,7 +70,7 @@ in-browser to the same VFS — so the downstream flow is identical. **Chromium-o
   entry's byte range from disk — never buffers the ~1 GB `gta3.img`. VER2 parsing shared from
   `renderware/archive`.
 - **Selection** (`build-vfs.ts`): the in-browser port of `scripts/build-game.ts`'s partition (shared
-  `src/game-build/partition.ts` — `partitionEntries` + `looseGroup`) — exterior-placed models/textures,
+  `packages/game-build/src/partition.ts` — `partitionEntries` + `looseGroup`) — exterior-placed models/textures,
   `.col`, the loose `data/`/anim/text files, and the `gta3.img` ipl/ifp/dat, **plus** the game's dynamic
   models (`GAME_CONFIG[game].mainCharacter` via `peds.ide`, `.vehicles` via `vehicles.ide`).
 - **`AssetLocalLoader`**: `restore()` (boot) → `prepare()` (folder gesture) → `init()` (scan+select →
@@ -84,7 +84,7 @@ Typed emitter (`emitter.ts`): `progress` (global `{ loadedBytes, loadedChunks, t
 `chunk` (per-chunk `cached`/`downloading`/`done`/`error`), `chunkReady`, `error`. Fetch aggregates bytes;
 local emits count-based progress per file.
 
-## Virtual File System — `src/vfs/` (plan 050)
+## Virtual File System — `packages/vfs/src/` (plan 050)
 
 The `AssetSink` consumer. `Vfs implements AssetSink, AssetFileSystem`:
 

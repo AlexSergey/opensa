@@ -1,6 +1,6 @@
 # Time of day, night content, light sources
 
-`src/game/time/`, `src/renderware/three/corona.ts`, `night-fill.ts`, canvas-host wiring,
+`packages/game/src/time/`, `packages/renderware/src/three/corona.ts`, `night-fill.ts`, canvas-host wiring,
 plans 026/032/034/038.
 
 ## Implemented

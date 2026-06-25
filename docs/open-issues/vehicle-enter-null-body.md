@@ -80,6 +80,6 @@ Recommended: trace to confirm (1 run) → structural fix + the defensive guard.
 Debug menu → teleport somewhere → spawn a car → walk to it → press Enter. Intermittent; the teleport step
 appears necessary (it supplies the freed-handle churn).
 
-Related: `src/game/vehicle/enter-vehicle.system.ts`, `src/game/physics/physics-world.ts`
-(`readBody`/`createDynamicVehicle`/`removeBodies`), `src/game/streaming/collision-streaming.system.ts`,
-`src/ui/canvas-host.tsx` (vehicle spawn/despawn + teleport).
+Related: `packages/game/src/vehicle/enter-vehicle.system.ts`, `packages/game/src/physics/physics-world.ts`
+(`readBody`/`createDynamicVehicle`/`removeBodies`), `packages/game/src/streaming/collision-streaming.system.ts`,
+`apps/web/src/ui/canvas-host.tsx` (vehicle spawn/despawn + teleport).

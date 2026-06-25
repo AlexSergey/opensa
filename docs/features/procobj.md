@@ -1,7 +1,7 @@
 # Procedural ground clutter (procobj, plan 042)
 
-`src/renderware/parsers/text/procobj.parser.ts`, `surfinfo.parser.ts`,
-`src/renderware/map/procobj-*.ts`, `build-procobj.ts`, adapter integration, debug ProcObj
+`packages/renderware/src/parsers/text/procobj.parser.ts`, `surfinfo.parser.ts`,
+`packages/renderware/src/map/procobj-*.ts`, `build-procobj.ts`, adapter integration, debug ProcObj
 screen.
 
 ## Implemented
