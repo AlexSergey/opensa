@@ -36,6 +36,7 @@
   "author": "Aleksandrov Sergey <gooddev.sergey@gmail.com>",
   "workspaces": [
     "apps/web",
+    "apps/viewer",
     "tools/rw-codec",
     "tools/tool-kit",
     "packages/renderware",
@@ -77,7 +78,7 @@
     "test:coverage": "vitest run --coverage",
     "test:fixtures": "tsx scripts/test-fixtures.ts",
     "test:watch": "vitest",
-    "timecyc": "tsx ./tools/timecyc-builder/index.ts",
+    "timecyc": "tsx ./tools/timecyc-builder/src/index.ts",
     "viewer:assets": "tsx scripts/build-viewer-assets.ts"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 import { TimecycManager } from './core/timecyc-manager';
 
-const gameDataFolder = join(__dirname, '..', 'game-src', 'original', 'data');
+const gameDataFolder = join(__dirname, '..', '..', '..', 'game-src', 'original', 'data');
 
 const init = async (): Promise<void> => {
   const manager = new TimecycManager();

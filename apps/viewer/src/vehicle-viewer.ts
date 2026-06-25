@@ -7,7 +7,7 @@ import type { BuiltDoor, BuiltPart, BuiltVehicle } from '@opensa/renderware/thre
  * It reuses the real build path (`parseDff` -> `buildVehicle`, `parseDffCollision`
  * -> `buildCollisionWireframe`), so what you see is what the game builds.
  *
- * Open at /vehicle-viewer.html (run `npm run dev` + `npm run serve:static`).
+ * Open at /viewer.html?tab=vehicle (run `npm run dev` + `npm run serve:static`).
  */
 import type { Texture } from 'three';
 

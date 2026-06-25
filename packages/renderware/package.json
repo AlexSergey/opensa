@@ -4,9 +4,9 @@
   "private": true,
   "description": "RenderWare format parsers + three.js builders (DFF/TXD/COL/IMG, IPL/IDE, timecyc) — the engine's read layer.",
   "exports": {
-    ".": "./index.ts",
-    "./archive": "./archive/index.ts",
-    "./*": "./*.ts"
+    ".": "./src/index.ts",
+    "./archive": "./src/archive/index.ts",
+    "./*": "./src/*.ts"
   },
   "nx": {
     "tags": [

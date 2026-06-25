@@ -12,7 +12,7 @@ const ORIGIN = 'http://localhost:3001';
 const DIR = `${ORIGIN}/loader-e2e`;
 const MANIFEST_URL = `${DIR}/manifest.json`;
 const CACHE_NAME = 'opensa-assets-e2e';
-const MODULE = '/src/loaders/index.ts';
+const MODULE = '/packages/loaders/src/index.ts';
 
 const manifest = {
   chunks: {

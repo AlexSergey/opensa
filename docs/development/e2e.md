@@ -25,7 +25,7 @@ Chromium is already installed under the repo's Playwright cache. If missing: `np
 
 ## Assets
 
-`e2e/object-viewer.spec.ts` targets **`object-viewer.html`**, whose models live in `static/viewer/` —
+`e2e/object-viewer.spec.ts` targets **`/viewer.html`**, whose models live in `static/viewer/` —
 generated locally (gitignored) from a GTA copy via `npm run viewer:assets`. Run that once after a fresh clone
 before the viewer e2e (CI doesn't have game-src, so the e2e lane runs locally).
 `e2e/asset-fetch-loader.spec.ts` mocks all network (`page.route`) — no assets needed.

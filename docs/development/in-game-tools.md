@@ -27,12 +27,12 @@ Standalone debug pages, isolated from the game/streaming layers — each reuses 
 what you see is what the game produces. Each is its own Vite HTML entry; run `npm run dev` +
 `npm run serve:static` and open the URL.
 
-- **`/object-viewer.html`** — map models. Toggles for prelit vertex colours, MODULATE2X, the lit/unlit
+- **`/viewer.html`** — map models. Toggles for prelit vertex colours, MODULATE2X, the lit/unlit
   material, and **collision** (pre-extracted COL, see below).
-- **`/vehicle-viewer.html`** — a car's parts. Pick a body part (highlighted, clamped to the COL bounds),
+- **`/viewer.html?tab=vehicle`** — a car's parts. Pick a body part (highlighted, clamped to the COL bounds),
   open/close its door (button or `E`), swap it to its damaged mesh, and toggle the collision wireframe and
   the low-detail `chassis_vlo` LOD.
-- **`/character-viewer.html`** — a skinned ped. Play any `ped.ifp` animation (looped), and toggle the
+- **`/viewer.html?tab=character`** — a skinned ped. Play any `ped.ifp` animation (looped), and toggle the
   skeleton and the collision capsule.
 
 Each viewer reads its fixtures from a subfolder of `static/viewer/` (all of `static/` is gitignored —

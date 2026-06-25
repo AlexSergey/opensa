@@ -16,7 +16,7 @@ windows) live as transparent groups **inside the same mesh**, sharing that mesh'
 ## Root cause
 
 - **Original RW/PC bug:** vehicle glass is drawn single-pass with **back-face culling** and only a
-  coarse, atomic-level alpha sort. At angles where you'd see the *inside* of the far glass it is culled,
+  coarse, atomic-level alpha sort. At angles where you'd see the _inside_ of the far glass it is culled,
   and overlapping panes mis-sort → windows blink out.
 - **Our three.js port:** three sorts transparency **per render-item by the object's centre distance**,
   not per triangle. All of a mesh's glass groups share that one distance, so they draw in fixed
@@ -37,13 +37,13 @@ relies on PC's single-pass culled draw.
   geometry/mesh; render it twice — a `BackSide` material then a `FrontSide` material (both transparent,
   `depthWrite = false`), with `renderOrder` so back draws before front (and both after opaque). This is
   the three.js equivalent of the SilentPatch/SkyGFX fix and resolves the dominant "far side culls /
-  vanishes" artifact. Residual: two *separate* panes at the same object-z can still tint-order oddly
+  vanishes" artifact. Residual: two _separate_ panes at the same object-z can still tint-order oddly
   (rare, not a disappearance).
 - **B — Per-surface objects (max correctness, heavier).** Put each glass surface in its own Object3D so
   three sorts them individually by distance. Most correct, but more meshes/draws and more build code;
   overkill for now.
 - **C — Alpha-test fallback (cheap, stable, less pretty).** Render glass as a cutout: `depthWrite =
-  true`, small `alphaTest`, not blended. Never disappears and needs no sorting, but the glass looks
+true`, small `alphaTest`, not blended. Never disappears and needs no sorting, but the glass looks
   solid-tinted (no smooth blend) — like SA-mobile. Good as a quick toggle / safety net.
 
 **Recommendation:** implement **A**. Keep **C** in reach as a config/material fallback if A still shows
@@ -63,14 +63,14 @@ other changes. `build-vehicle.test.ts` updated (16 tests, incl. the two-pass spl
 1. **Detect + isolate glass.** In `build-vehicle.ts`, partition an atomic's triangles into opaque vs
    **glass** (material colour alpha < 255, matching the current rule) and build two geometries: the
    opaque mesh as today + a separate glass geometry. (A small `splitGlassGeometry(rwGeometry,
-   materials)` helper, renderware-agnostic, unit-tested.)
+materials)` helper, renderware-agnostic, unit-tested.)
 2. **Two-pass glass mesh.** Build the glass as a tiny group of two meshes sharing the glass geometry —
    `BackSide` (lower `renderOrder`) then `FrontSide` (higher) — both transparent, `depthWrite = false`,
    `DoubleSide` removed (each pass is single-sided). Wrap opaque + glass-group in one Object3D so
    `vehicleMesh` still returns a single node (BuiltPart `ok`/`dam`, doors, `_vlo`, damage toggles, the
    vehicle viewer all keep working unchanged — they treat it as `Object3D`).
 3. **Verify + tune.** Check the admiral (and camper/admiral2) from all angles in-game and in
-   `/vehicle-viewer.html`; confirm damage `_ok`/`_dam` swap, doors, and LOD still render correctly.
+   `/viewer.html?tab=vehicle`; confirm damage `_ok`/`_dam` swap, doors, and LOD still render correctly.
    Update `build-vehicle.test.ts` for the split (glass now a separate mesh). Optionally expose the
    Option-C alpha-test fallback behind a flag.
 
@@ -87,4 +87,7 @@ other changes. `build-vehicle.test.ts` updated (16 tests, incl. the two-pass spl
 
 A real water/glass shader, environment reflections on glass (SkyGFX "neo" specular), per-pixel depth
 sorting, and fixing map-object transparency (fences/windows) — this plan is vehicle glass only.
+
+```
+
 ```

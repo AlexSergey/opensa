@@ -29,6 +29,16 @@ tools/      (tag type:tool)
 root: game-src/ · tests/ · e2e/ · scripts/ · deploy/ · static/ · nx.json · configs
 ```
 
+**Per-package `src/` convention (done):** every workspace keeps only `package.json` (+ `readme`/`docs`/`out`) at
+its root; all code lives in `<pkg>/src/`. Importers are unaffected — only `exports` _targets_ gain `/src/`
+(e.g. `renderware` `"./*": "./src/*.ts"`), and direct-path refs (root HTML `<script src>`, e2e in-browser
+`import('/packages/<p>/src/...')`, vite favicon/og asset dir, vitest GL/DOM exclude globs, eslint gameBoundary
+ignores, `scripts/build-game.ts` game-config import, knip entry, `timecyc` script + its `__dirname` depth) were
+repointed. Verified: tsc + 983 units + `eslint .` + `vite build`/`build:prod` + 25 e2e + coverage thresholds
+(func 85.14 / stmt 88.31 / branch 79.15 / lines 88.36). Also fixed a pre-existing stale exclude glob
+(`input/keyboard.ts` → `input/keyboard/keyboard.ts`, moved in an earlier inputs refactor — only surfaced under
+`--coverage`).
+
 ## Dependency DAG (derived from current imports)
 
 ```
@@ -113,9 +123,15 @@ sets across the repo; **update those links on each move** so the central docs st
    step):** splitting the 3 viewers out into a separate `apps/viewer` project + merging their 3 HTML entries into
    one tabbed shell — a UI feature on top of this relocation, see step 5.
 5. **Apps**: split the viewers into `apps/viewer` (object/vehicle/character tabs in one html; controls-harness
-   stays in `apps/web`). **Deferred** — the relocation (step 4C) landed the app under `apps/web` with viewers
-   still as `apps/web/standalone` multi-page entries; this step is the viewer-app split + tab shell (new UI,
-   needs a browser to verify) and is cleanly separable.
+   stays in `apps/web`). ✅ **Done** — `apps/web/standalone/{object,vehicle,character}-viewer.ts` → new
+   `@opensa/viewer` project (`type:app`); the 3 separate HTMLs collapse into **one `viewer.html`** + a tab nav
+   - `apps/viewer/shell.ts` that lazy-imports the active viewer by `?tab=` (object default). Each viewer still
+     owns `document.body` and auto-runs on import, so a tab switch is a plain reload — no viewer-internal refactor.
+     `controls-harness` stays in `apps/web` (uses `apps/web/ui` `TouchControls`). vite `viewerInputs` → `{ viewer,
+controlsHarness }`; workspaces + e2e gotos updated; old `/*-viewer.html` URLs renamed across docs/memory to
+     `/viewer.html?tab=`. Verified: tsc + 983 units + eslint (Nx boundaries: `@opensa/viewer`→engine only) + `vite
+build` (viewer entry + 3 lazy chunks) + **25 e2e** (21 prior, all repointed; the object-viewer visual baseline
+     unchanged since object is the default tab; + new `viewer-tabs.spec.ts` covering all 3 tabs).
 6. **Stand up Nx** over the finished workspaces. ✅ **Done** — nx 23 + `@nx/eslint-plugin`; `nx.json`; 12 projects
    (the app added as `@opensa/web` via `src/package.json`); tags `type:app|engine|tool`;
    `@nx/enforce-module-boundaries` live (app→engine, engine→engine only, tool→engine+tool) — **proven to catch a

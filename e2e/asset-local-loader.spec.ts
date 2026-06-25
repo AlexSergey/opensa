@@ -8,10 +8,10 @@ import { expect, test } from '@playwright/test';
  * VER2 reader) and the whole selection/ingest pipeline run for real. Runs on the Vite origin so `import('/src/
  * ...')` resolves. IndexedDB handle persistence is unit-tested separately (real handles aren't synthesisable).
  */
-const ALL = '/src/loaders/asset-local-loader/asset-local-loader.ts';
-const INSTALL = '/src/loaders/asset-local-loader/install-source.ts';
-const ARCHIVE = '/src/renderware/archive/img-archive.ts';
-const VFS = '/src/vfs/vfs.ts';
+const ALL = '/packages/loaders/src/asset-local-loader/asset-local-loader.ts';
+const INSTALL = '/packages/loaders/src/asset-local-loader/install-source.ts';
+const ARCHIVE = '/packages/renderware/src/archive/img-archive.ts';
+const VFS = '/packages/vfs/src/vfs.ts';
 
 const IDE = ['objs', '100, cj, cjtxd, 100, 0', '200, tree, treetxd, 80, 0', 'end'].join('\n');
 const IPL = ['inst', '100, cj, 0, 0, 0, 0, 0, 0, 0, 1, 0', 'end'].join('\n');

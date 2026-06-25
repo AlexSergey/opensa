@@ -12,28 +12,28 @@ export default defineConfig({
         'packages/**/*.test.ts',
         'packages/**/index.ts',
         'packages/**/*.interface.ts',
-        'packages/renderware/test-utils.ts',
-        'apps/web/standalone/**', // dev-only viewer entry scripts
+        'packages/renderware/src/test-utils.ts',
+        'apps/web/src/standalone/**', // dev-only viewer entry scripts
 
         // === COVERED BY THE PLAYWRIGHT E2E LANE (not by headless node units) ===
         // GL / DOM / app-loop glue: WebGL + browser only, so it's verified in `e2e/` (docs/development/e2e.md),
         // not here. RULE: anything excluded below MUST have e2e coverage on the Playwright lane — if you add a
         // file here, add/extend a spec in `e2e/` to exercise it. (See memory: gl-dom-coverage-exclusion.)
-        'packages/game/game.ts', // the whole frame loop (boots the renderer/canvas)
-        'packages/game/core/renderer.ts', // WebGLRenderer setup
-        'packages/game/core/camera-controller.ts', // pointer/keyboard DOM camera rig
-        'packages/game/input/keyboard.ts', // DOM keyboard listeners
-        'packages/game/plugins/sky.plugin.ts', // ShaderMaterial sky dome (GL)
-        'packages/game/plugins/water.plugin.ts', // GL water surface
-        'packages/game/plugins/postfx.plugin.ts', // EffectComposer / postprocessing (GL)
-        'packages/game/plugins/ambient-light.plugin.ts', // THREE light wiring
-        'packages/game/plugins/directional-light.plugin.ts', // THREE light + shadow wiring
-        'packages/game/plugins/vehicle-reflection/vehicle-reflection.plugin.ts', // env-map/probe shader assembly (GL)
-        'packages/game/vehicle/vehicle-headlight.system.ts', // canvas-texture lamps (logic unit-tested in build-vehicle)
-        'packages/game/character/setup-character.ts', // async model load + scene wiring
-        'apps/web/ui/**', // DOM/style helpers (locations, debug-styles, hud font loading)
-        'apps/web/asset-loader/asset-loader.ts', // fetch streaming + Cache Storage orchestration (e2e: asset-loader.spec.ts)
-        'apps/web/asset-loader/cache-store.ts', // Cache Storage API wrapper (e2e: asset-loader.spec.ts)
+        'packages/game/src/game.ts', // the whole frame loop (boots the renderer/canvas)
+        'packages/game/src/core/renderer.ts', // WebGLRenderer setup
+        'packages/game/src/core/camera-controller.ts', // pointer/keyboard DOM camera rig
+        'packages/game/src/input/keyboard/keyboard.ts', // DOM keyboard listeners
+        'packages/game/src/plugins/sky.plugin.ts', // ShaderMaterial sky dome (GL)
+        'packages/game/src/plugins/water.plugin.ts', // GL water surface
+        'packages/game/src/plugins/postfx.plugin.ts', // EffectComposer / postprocessing (GL)
+        'packages/game/src/plugins/ambient-light.plugin.ts', // THREE light wiring
+        'packages/game/src/plugins/directional-light.plugin.ts', // THREE light + shadow wiring
+        'packages/game/src/plugins/vehicle-reflection/vehicle-reflection.plugin.ts', // env-map/probe shader assembly (GL)
+        'packages/game/src/vehicle/vehicle-headlight.system.ts', // canvas-texture lamps (logic unit-tested in build-vehicle)
+        'packages/game/src/character/setup-character.ts', // async model load + scene wiring
+        'apps/web/src/ui/**', // DOM/style helpers (locations, debug-styles, hud font loading)
+        'apps/web/src/asset-loader/asset-loader.ts', // fetch streaming + Cache Storage orchestration (e2e: asset-loader.spec.ts)
+        'apps/web/src/asset-loader/cache-store.ts', // Cache Storage API wrapper (e2e: asset-loader.spec.ts)
       ],
       include: ['apps/web/**/*.ts', 'packages/**/*.ts'],
       provider: 'v8',

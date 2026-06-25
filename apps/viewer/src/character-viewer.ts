@@ -6,7 +6,7 @@
  * `parseIfp` -> `buildAnimationClip` -> `AnimationController`), so the rig and
  * animations behave exactly as in the game.
  *
- * Open at /character-viewer.html (run `npm run dev` + `npm run serve:static`).
+ * Open at /viewer.html?tab=character (run `npm run dev` + `npm run serve:static`).
  */
 import type { AnimationClip, Object3D } from 'three';
 

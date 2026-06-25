@@ -4,8 +4,8 @@
   "private": true,
   "description": "Virtual File System: unzips + indexes loader chunks; the game reads assets through its interface.",
   "exports": {
-    ".": "./index.ts",
-    "./*": "./*.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "nx": {
     "tags": [

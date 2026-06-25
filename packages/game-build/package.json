@@ -4,7 +4,7 @@
   "private": true,
   "description": "Build-side world partitioning: IDE/IPL refs → asset buckets (the GroupName vocabulary).",
   "exports": {
-    "./*": "./*.ts"
+    "./*": "./src/*.ts"
   },
   "nx": {
     "tags": [

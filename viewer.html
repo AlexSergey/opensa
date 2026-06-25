@@ -3,12 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vehicle Viewer</title>
+    <title>OpenSA Viewer</title>
     <style>
       body {
         margin: 0;
         overflow: hidden;
         font-family: monospace;
+      }
+      /* Tab nav — top-centre so it never overlaps the viewers' top-left .panel. */
+      .viewer-tabs {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 6px;
+        z-index: 10;
+      }
+      .viewer-tabs a {
+        padding: 4px 10px;
+        color: #ccc;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .viewer-tabs a.active {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
       }
       .panel {
         position: fixed;
@@ -43,9 +67,17 @@
         border-top: 1px solid rgba(255, 255, 255, 0.2);
         margin: 2px 0;
       }
+      .hint {
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
-    <script type="module" src="/apps/web/standalone/vehicle-viewer.ts"></script>
+    <nav class="viewer-tabs">
+      <a href="?tab=object" data-tab="object">Object</a>
+      <a href="?tab=vehicle" data-tab="vehicle">Vehicle</a>
+      <a href="?tab=character" data-tab="character">Character</a>
+    </nav>
+    <script type="module" src="/apps/viewer/src/shell.ts"></script>
   </body>
 </html>

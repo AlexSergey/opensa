@@ -4,8 +4,8 @@
   "private": true,
   "description": "Asset loaders (fetch manifest chunks / read a local install) that resolve game assets into the VFS.",
   "exports": {
-    ".": "./index.ts",
-    "./*": "./*.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "nx": {
     "tags": [

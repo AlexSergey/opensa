@@ -15,7 +15,7 @@ test.describe('object viewer', () => {
     });
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await page.goto('/object-viewer.html');
+    await page.goto('/viewer.html');
 
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible();
@@ -28,7 +28,7 @@ test.describe('object viewer', () => {
   });
 
   test('switches between the available models', async ({ page }) => {
-    await page.goto('/object-viewer.html');
+    await page.goto('/viewer.html');
     const select = page.locator('select').first();
     await expect(select).toBeVisible();
 
@@ -41,7 +41,7 @@ test.describe('object viewer', () => {
   });
 
   test('matches the rendered baseline (WebGL via SwiftShader)', async ({ page }) => {
-    await page.goto('/object-viewer.html');
+    await page.goto('/viewer.html');
     await expect(page.locator('canvas')).toBeVisible();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500); // let a few frames render the loaded clump

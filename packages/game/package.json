@@ -4,9 +4,9 @@
   "private": true,
   "description": "Game framework: ECS systems (streaming, vehicles, characters, zones, time, weather) + plugins.",
   "exports": {
-    ".": "./index.ts",
-    "./input": "./input/index.ts",
-    "./*": "./*.ts"
+    ".": "./src/index.ts",
+    "./input": "./src/input/index.ts",
+    "./*": "./src/*.ts"
   },
   "nx": {
     "tags": [

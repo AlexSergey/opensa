@@ -14,10 +14,10 @@ the **client constants** those flags resolve to (statically replaced at build ti
 
 ## Env flags (build-time, set by the scripts)
 
-| Env var                     | Set by       | Effect                                                                                                               |
-| --------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `OPENSA_NO_VIEWERS=true`    | `build:prod` | Rollup `input` keeps only `index.html`; the `character/object/vehicle-viewer.html` entries are excluded from `dist`. |
-| `OPENSA_DEBUGGER_HIDE=true` | `build:prod` | Hides the authoring/tuning debugger sections (see `__DEBUGGER_HIDE__`).                                              |
+| Env var                     | Set by       | Effect                                                                                                                                                  |
+| --------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENSA_NO_VIEWERS=true`    | `build:prod` | Rollup `input` keeps only `index.html`; the `viewer.html` (tabbed object/vehicle/character) + `controls-harness.html` entries are excluded from `dist`. |
+| `OPENSA_DEBUGGER_HIDE=true` | `build:prod` | Hides the authoring/tuning debugger sections (see `__DEBUGGER_HIDE__`).                                                                                 |
 
 Both are plain `process.env` flags read in `vite.config.ts` (mac/linux inline syntax). They are **not**
 `VITE_`-prefixed, so they never leak into `import.meta.env` / the client bundle.
@@ -79,7 +79,7 @@ importantly, **its built chunks (`static/games/gostown-*`) must not be uploaded*
 ## Verify
 
 ```bash
-npm run build      && npm run preview   # F2 → all debugger sections present; /object-viewer.html exists
+npm run build      && npm run preview   # F2 → all debugger sections present; /viewer.html exists
 npm run build:prod && npm run preview   # F2 → Atmosphere/Camera/Graphics/ProcObj/Map gone; viewers 404
 ```
 

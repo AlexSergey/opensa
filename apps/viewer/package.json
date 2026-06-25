@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/viewer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenSA standalone debug viewers (object/vehicle/character) as tabs in one app — the asset-light real-pipeline dev tool.",
+  "nx": {
+    "tags": [
+      "type:app"
+    ]
+  }
+}

@@ -8,10 +8,10 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8'))
 /**
  * Emit the favicon set (icons + `site.webmanifest`) to the build ROOT with STABLE names, so index.html's
  * `<link rel="icon"/manifest>` and the manifest's own root-relative icon paths resolve. Source of truth:
- * `apps/web/assets/favicon/`.
+ * `apps/web/src/assets/favicon/`.
  */
 function emitFavicons(): Plugin {
-  const dir = resolve(__dirname, 'apps/web/assets/favicon');
+  const dir = resolve(__dirname, 'apps/web/src/assets/favicon');
 
   return {
     generateBundle(): void {
@@ -41,14 +41,14 @@ function emitHtaccess(): Plugin {
 /**
  * Emit the social-share preview to `dist/assets/og.jpg` with a STABLE name (no content hash), so the
  * `og:image` / `twitter:image` meta can point at a fixed URL (https://opensa.cc/assets/og.jpg).
- * Source of truth: `apps/web/assets/og.jpg`.
+ * Source of truth: `apps/web/src/assets/og.jpg`.
  */
 function emitOgImage(): Plugin {
   return {
     generateBundle(): void {
       this.emitFile({
         fileName: 'assets/og.jpg',
-        source: readFileSync(resolve(__dirname, 'apps/web/assets/og.jpg')),
+        source: readFileSync(resolve(__dirname, 'apps/web/src/assets/og.jpg')),
         type: 'asset',
       });
     },
@@ -83,10 +83,8 @@ const hideDebugger = process.env.OPENSA_DEBUGGER_HIDE === 'true';
 const isProdDeploy = excludeViewers && hideDebugger;
 
 const viewerInputs = {
-  characterViewer: resolve(__dirname, 'character-viewer.html'),
   controlsHarness: resolve(__dirname, 'controls-harness.html'),
-  objectViewer: resolve(__dirname, 'object-viewer.html'),
-  vehicleViewer: resolve(__dirname, 'vehicle-viewer.html'),
+  viewer: resolve(__dirname, 'viewer.html'), // object/vehicle/character as ?tab= in one app
 };
 
 export default defineConfig(({ command }) => ({

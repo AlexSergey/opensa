@@ -11,7 +11,7 @@ import type { TextureDictionary } from '@opensa/renderware/three/build-texture';
  * main app). Toggles let you separate prelit vertex colours, MODULATE2X and the
  * lit/unlit shading model.
  *
- * Open at /object-viewer.html (run `npm run dev` + `npm run serve:static`).
+ * Open at /viewer.html (?tab=object) (run `npm run dev` + `npm run serve:static`).
  */
 import type { BufferGeometry, Material } from 'three';
 

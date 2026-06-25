@@ -237,7 +237,7 @@ const scriptsConfig = {
 // world materials and read object defs). Keeps the engine core free of GTA-SA implementation.
 const gameBoundaryConfig = {
   files: ['packages/game/**/*.{ts,tsx}'],
-  ignores: ['packages/game/adapters/**', 'packages/game/mods/**'],
+  ignores: ['packages/game/src/adapters/**', 'packages/game/src/mods/**'],
   rules: {
     'no-restricted-imports': [
       'error',
