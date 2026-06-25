@@ -27,7 +27,7 @@ physics straight into the browser, with no install.
 
 Dev notes and progress - in [`/blog`](./blog).
 
-- 2026-06-18 - [I built a RenderWare-compatible game engine in the browser that runs GTA San Andreas - solo, in three weeks, with Claude Code](./blog/2026-06-18-i-built-a-renderware-compatible-game-engine-in-the-browser-that-runs-gta-san-andreas.md)
+- 2026-06-18 - [I ran GTA San Andreas on my own engine in the browser - solo with Claude, in 3 weeks](./blog/2026-06-18-i-ran-gta-san-andreas-on-my-own-engine-in-the-browser-solo-with-claude-in-3-weeks.md)
 
 ## What's inside
 

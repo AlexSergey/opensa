@@ -7,4 +7,7 @@ import type { LodConfig } from './core/types';
  */
 export const config: LodConfig = {
   cellSize: 256,
+  decimateTargetTriangles: 4000,
+  lodDrawDistance: 1500,
+  lodTextureSize: 64,
 };

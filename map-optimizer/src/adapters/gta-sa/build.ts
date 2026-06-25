@@ -3,16 +3,18 @@ import { basename, dirname, join, relative } from 'node:path';
 
 import type { ImgArchive } from '../../../../src/renderware/archive/img-archive';
 
-import { buildVer2Buffer } from '../../../../src/renderware/archive/img-archive';
+import { editArchive } from '../../../../tool-kit/src/archive/img';
 
 /** Rebuild a VER2 archive: every entry kept, those present in `optimized` swapped for the optimized bytes. */
 export function rebuildArchive(archive: ImgArchive, optimized: Map<string, Uint8Array>): Uint8Array {
-  const entries = archive.names.map((name) => ({
-    data: optimized.get(name) ?? new Uint8Array(archive.get(name) ?? new ArrayBuffer(0)),
-    name,
-  }));
+  const img = editArchive(archive);
+  for (const [name, bytes] of optimized) {
+    if (img.has(name)) {
+      img.set(name, bytes); // swap an optimized entry in place; keep everything else
+    }
+  }
 
-  return buildVer2Buffer(entries);
+  return img.build();
 }
 
 /**

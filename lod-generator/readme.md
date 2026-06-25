@@ -12,8 +12,12 @@ It takes the same input as map-optimizer — a `game-src/<game>/` folder — pro
 
 ```bash
 # from the repo root — <game> is a folder under game-src/ (e.g. original)
-# Phase 0 (implemented): assemble the world into cells + print a sizing report.
+# assemble the world into cells + print a sizing report (Phase 0):
 npx tsx lod-generator/src/cli.ts --game original --cell 256
+
+# bake every cell (merge → QEM decimate → smooth normals → per-cell DFF/TXD) and emit a drop-in
+# build under lod-generator/out/<game>/ (models/lods.img + data/lods.ide/.ipl + gta.dat lines):
+npx tsx lod-generator/src/cli.ts --game original --build
 ```
 
 ```
@@ -23,8 +27,9 @@ lod-generator original:  cellSize=256
   per cell   — up to 422 instances
 ```
 
-Baking + emitting a drop-in build (cell DFFs / atlas TXDs / IPL, stripping the old LODs) lands across **plan
-002**; today the CLI runs only the read-only Phase-0 measurement.
+`--build` bakes the cells and emits a drop-in build (one `lods.img` of cell DFFs + per-cell TXDs, `lods.ide` /
+`lods.ipl`, registered in `gta.dat`). Stripping the old `lod*` models + DXT-compressing the cell TXDs are the
+remaining follow-ups (**plan 002**, 1d-iii).
 
 ## Layout
 

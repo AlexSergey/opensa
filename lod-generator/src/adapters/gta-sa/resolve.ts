@@ -2,28 +2,33 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { Cell, CellInstance } from '../../core/types';
+import type { Archive } from './io';
 
 import { ideRefs } from '../../../../src/game-build/partition';
-import { openArchive } from '../../../../src/renderware/archive/img-archive';
 import { parseBinaryIpl } from '../../../../src/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '../../../../src/renderware/parsers/text/ipl.parser';
 import { isLodModel } from '../../../../src/renderware/parsers/text/lod';
 import { cellKey, cellOf } from '../../core/grid';
 
-type Archive = ReturnType<typeof openArchive>;
+/** Highest object id across every IDE under the game's data folder — cell-LOD ids start at +1 (no collision). */
+export function maxObjectId(gameDir: string): number {
+  let max = 0;
+  for (const file of walk(join(gameDir, 'data')).filter((path) => path.toLowerCase().endsWith('.ide'))) {
+    for (const [id] of ideRefs(readFileSync(file, 'utf8'))) {
+      max = Math.max(max, id);
+    }
+  }
+
+  return max;
+}
 
 /**
  * Assemble the exterior **HD** map instances into the square cell grid (Phase 0). Read-only reuse of the
  * engine's IDE/IPL parsers — the same data the runtime grid is built from. Interiors and existing `lod*` models
  * are dropped (we regenerate LODs from HD), so each cell holds only the full-detail instances to bake.
  */
-export function resolveCells(gameDir: string, cellSize: number): Cell[] {
+export function resolveCells(gameDir: string, archives: readonly Archive[], cellSize: number): Cell[] {
   const dataDir = join(gameDir, 'data');
-  const modelsDir = join(gameDir, 'models');
-  const archives = readdirSync(modelsDir)
-    .filter((file) => file.toLowerCase().endsWith('.img'))
-    .map((file) => openArchive(new Uint8Array(readFileSync(join(modelsDir, file)))));
-
   const idToModel = buildIdMap(dataDir);
   const cells = new Map<string, Cell>();
   for (const instance of collectInstances(dataDir, archives, idToModel)) {
@@ -40,7 +45,7 @@ export function resolveCells(gameDir: string, cellSize: number): Cell[] {
   return [...cells.values()];
 }
 
-function binaryInstances(archives: Archive[]): ReturnType<typeof parseBinaryIpl> {
+function binaryInstances(archives: readonly Archive[]): ReturnType<typeof parseBinaryIpl> {
   const out: ReturnType<typeof parseBinaryIpl> = [];
   for (const archive of archives) {
     for (const name of archive.names.filter((entry) => entry.endsWith('.ipl'))) {
@@ -67,7 +72,11 @@ function buildIdMap(dataDir: string): Map<number, string> {
 }
 
 /** Every exterior, non-LOD HD instance with its model resolved by id. */
-function collectInstances(dataDir: string, archives: Archive[], idToModel: Map<number, string>): CellInstance[] {
+function collectInstances(
+  dataDir: string,
+  archives: readonly Archive[],
+  idToModel: Map<number, string>,
+): CellInstance[] {
   const out: CellInstance[] = [];
   for (const instance of [...textInstances(dataDir), ...binaryInstances(archives)]) {
     if (instance.interior > 0) {

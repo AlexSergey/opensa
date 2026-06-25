@@ -218,6 +218,7 @@ const scriptsConfig = {
     'map-optimizer/**/*.{js,mjs,cjs,ts}',
     'lod-generator/**/*.{js,mjs,cjs,ts}',
     'vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
+    'tool-kit/**/*.{js,mjs,cjs,ts}',
   ],
   languageOptions: {
     globals: {

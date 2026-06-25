@@ -48,6 +48,7 @@ export default defineConfig({
       'map-optimizer/**/*.test.ts',
       'lod-generator/**/*.test.ts',
       'vehicle-optimizer/**/*.test.ts',
+      'tool-kit/**/*.test.ts',
     ],
   },
 });

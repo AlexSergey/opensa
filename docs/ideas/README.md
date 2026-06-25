@@ -12,3 +12,5 @@ Not plans (those live in [../plans/](../plans/) and are committed work). These a
   duplicate faces, prelit) to clean up the map and enable map lighting.
 - [vehicle-headlights.md](./vehicle-headlights.md) — real headlight illumination on the road at night under
   the unlit (plan 038) world.
+- [monorepo-packages.md](./monorepo-packages.md) — move the offline tools' shared code (`tool-kit`: normals,
+  IMG, codec) into real workspace packages instead of deep relative imports.
