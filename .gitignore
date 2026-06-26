@@ -69,12 +69,14 @@ game-src
 issues
 ideas
 blog-src
+NO_COMMIT
 
 # map-optimizer / lod-generator are tracked sub-projects; ignore only their generated output + local scratch.
 tools/map-optimizer/out/
 tools/map-optimizer/*.jpg
 tools/lod-generator/out/
 tools/vehicle-optimizer/out/
+tools/lod-trees-generator/out/
 
 # Real GTA SA test fixtures (Rockstar assets — not redistributed): regenerated locally from a stock
 # copy at game-src/non-modified via `npm run test:fixtures`. Committed fixtures (mods + curated /

@@ -27,15 +27,15 @@ test.describe('object viewer', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
-  test('switches between the available models', async ({ page }) => {
+  test('overlays additional models via the checkbox lists', async ({ page }) => {
     await page.goto('/viewer.html');
-    const select = page.locator('select').first();
-    await expect(select).toBeVisible();
+    const checkboxes = page.locator('.model-list input[type="checkbox"]');
+    await expect(checkboxes.first()).toBeVisible();
 
-    const options = await select.locator('option').count();
-    expect(options).toBeGreaterThan(1);
+    const count = await checkboxes.count();
+    expect(count).toBeGreaterThan(1);
 
-    await select.selectOption({ index: 1 });
+    await checkboxes.nth(1).check(); // overlay a second model
     await page.waitForLoadState('networkidle');
     await expect(page.locator('canvas')).toBeVisible();
   });

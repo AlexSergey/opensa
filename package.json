@@ -47,7 +47,8 @@
     "tools/map-optimizer",
     "tools/lod-generator",
     "tools/vehicle-optimizer",
-    "tools/timecyc-builder"
+    "tools/timecyc-builder",
+    "tools/lod-trees-generator"
   ],
   "scripts": {
     "build": "tsc -b && vite build",

@@ -54,6 +54,7 @@ export default defineConfig({
       'tools/vehicle-optimizer/**/*.test.ts',
       'tools/tool-kit/**/*.test.ts',
       'tools/rw-codec/**/*.test.ts',
+      'tools/lod-trees-generator/**/*.test.ts',
     ],
   },
 });

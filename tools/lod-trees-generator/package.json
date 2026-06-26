@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/lod-trees-generator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generate GTA-SA-style tree LOD impostors (crossed-billboard cards + baked alpha atlas) from HD tree models. CLI tool.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

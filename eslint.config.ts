@@ -221,6 +221,7 @@ const scriptsConfig = {
     'tools/vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
     'tools/tool-kit/**/*.{js,mjs,cjs,ts}',
     'tools/rw-codec/**/*.{js,mjs,cjs,ts}',
+    'tools/lod-trees-generator/**/*.{js,mjs,cjs,ts}',
   ],
   languageOptions: {
     globals: {
