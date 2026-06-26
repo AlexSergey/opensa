@@ -5,7 +5,7 @@ import { encodeDff } from '@opensa/map-optimizer/codec';
 import type { Impostor } from '../../core';
 
 import { buildCardGeometry } from '../../core';
-import { setTextureName } from './dff-edit';
+import { clearTristripFlag, setTextureName, stripExtraVertColour } from './dff-edit';
 
 /**
  * Encode a LOD impostor to DFF bytes: build the card geometry, hand it to map-optimizer's geometry rebuilder
@@ -29,5 +29,5 @@ export function encodeLodDff(template: Uint8Array, impostor: Impostor): Uint8Arr
     ],
   };
 
-  return setTextureName(encodeDff(template, ir), impostor.name);
+  return clearTristripFlag(stripExtraVertColour(setTextureName(encodeDff(template, ir), impostor.name)));
 }

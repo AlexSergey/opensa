@@ -66,10 +66,21 @@ const MANIFEST: readonly Fixture[] = [
   extract('barriers.col', 'col/barriers.col'),
   extract('countn2_17.col', 'col/countn2_17.col'),
   extract('lae_stream0.ipl', 'ipl_binary/lae_stream0.ipl'),
+  // Map-strip fixtures (lod-trees-generator): a text IPL + its companion binary stream share one LOD-index space
+  // — a stream's `lod` indexes into its area's text IPL. `lae` is a coupled urban pair (the text has its own
+  // internal HD→LOD links AND `lae_stream0` HDs point into it); `countrye` is the canonical countryside case
+  // where the text holds tree LOD bigbuildings (`lod_vbg_fir_co`, all `lod -1`) referenced from `countrye_stream1`.
+  copy('data/maps/la/lae.ipl', 'ipl_text/lae.ipl'),
+  copy('data/maps/country/countrye.ipl', 'ipl_text/countrye.ipl'),
+  extract('countrye_stream1.ipl', 'ipl_binary/countrye_stream1.ipl'),
   extract('counxref.ifp', 'dff/anim-clump/counxref.ifp'),
   extract('nt_noddonkbase.dff', 'dff/anim-clump/nt_noddonkbase.dff'),
   extract('binnt08_la.dff', 'dff/breakable/binnt08_la.dff'),
   extract('washer.dff', 'dff/building/washer.dff'),
+  // A stock vegetation LOD DFF — the template the lod-trees-generator rebuilds card geometry over. Carries the
+  // tristrip flag + an extra-vertex-colour (0x253f2f9) extension, both of which the encoder must scrub (else SA
+  // renders the impostor as nothing).
+  extract('lodroadscoast02.dff', 'dff/lod-template/lodroadscoast02.dff'),
   extract('esc_step.dff', 'dff/escalator/esc_step.dff'),
   extract('escl_la.dff', 'dff/escalator/escl_la.dff'),
   extract('ws_floodbeams.dff', 'dff/floodbeams/ws_floodbeams.dff'),

@@ -67,6 +67,10 @@ export interface TreeLodConfig {
   cards: number;
   /** Emitted LOD draw distance (world units) — the visibility gate for the LOD def. */
   drawDistance: number;
+  /** Min impostor height (m) for a `--dff ∩ procobj` species to be converted to static IPL (excludes grass). */
+  procObjHeight: number;
+  /** Cap on statically converted procobj objects (0 disables the procobj → static conversion). */
+  procObjMax: number;
   /** Per-tree texture size (px) in the shared atlas — the N card views tile inside it. */
   textureSize: number;
 }

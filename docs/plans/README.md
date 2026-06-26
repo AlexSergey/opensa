@@ -26,7 +26,9 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
 - **lod-generator** — chunked LOD bake (merge → QEM decimate → per-cell TXD → drop-in build).
   [`lod-generator/docs/plans/`](../../tools/lod-generator/docs/plans/) (`001`–`002`).
 - **lod-trees-generator** — SA-style tree LOD impostors (crossed-billboard cards + baked alpha atlas) from HD
-  trees. [`lod-trees-generator/docs/plans/`](../../tools/lod-trees-generator/docs/plans/) (`001`).
+  trees, plus the map strip + place stages (text↔binary IPL LOD-index coupling), the SA asset-format checklist,
+  and procobj→static-IPL conversion.
+  [`lod-trees-generator/docs/plans/`](../../tools/lod-trees-generator/docs/plans/) (`001`–`006`).
 - **tool-kit** — shared building blocks (mesh smooth-normals + QEM simplify, editable IMG). No plans doc yet.
 - **rw-codec** — shared pure RW chunk/DFF/DXT/geometry-struct codec, extracted from map-optimizer (plan 057,
   step 2). Top-level `rw-codec/` now; moves under `tools/` in the migration. No plans doc.

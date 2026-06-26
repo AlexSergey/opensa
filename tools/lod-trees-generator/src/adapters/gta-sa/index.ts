@@ -9,19 +9,26 @@ import { encodeColLibrary } from './encode-col';
 import { encodeLodDff } from './encode-dff';
 import { encodeAtlasTxd } from './encode-txd';
 import { loadTemplate, loadTextures, loadTree, openTemplateArchive } from './io';
+import { impostorAlias } from './place/ide';
+import { placeMap } from './place/place-map';
+import { stripMap } from './strip/strip-map';
 
 /** GTA-SA generator inputs: the HD trees (`--dff`) + their textures (`--txd`), where to emit (`--out`), and the
- *  game data (`--game`) used only to source a structural LOD template. */
+ *  game data (`--game`) used for the LOD template + the map strip. */
 export interface GtaSaTreeLodOptions {
   config: TreeLodConfig;
   dffPath: string;
   gamePath: string;
+  /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking a full `gta3.img`. */
+  loose: boolean;
   outPath: string;
+  /** Verification mode: strip all source trees from the map (empty world) instead of placing impostor LODs. */
+  strip: boolean;
   txdPath: string;
 }
 
 export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLodAdapter {
-  const { dffPath, gamePath, outPath, txdPath } = options;
+  const { dffPath, gamePath, loose, outPath, strip, txdPath } = options;
   const isDir = statSync(dffPath).isDirectory();
   const textures = loadTextures(txdPath);
   const archive = openTemplateArchive(gamePath);
@@ -35,8 +42,39 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
         writeFileSync(join(outPath, `${impostor.name}.png`), encodePng(impostor.image, impostor.size, impostor.size));
       }
       writeFileSync(join(outPath, 'lodtrees.txd'), encodeAtlasTxd(impostors, version));
-      writeFileSync(join(outPath, 'lodtrees.col'), encodeColLibrary(impostors));
+      // Col models are bound by the same model name SA registers (the IDE/IMG alias), not the impostor's own name.
+      const aliases = impostors.map((impostor, i) => impostorAlias(impostor.name, i));
+      writeFileSync(join(outPath, 'lodtrees.col'), encodeColLibrary(impostors, aliases));
       console.log(`→ ${impostors.length} LOD DFF(s) + lodtrees.txd + lodtrees.col (+ debug PNGs) → ${outPath}`);
+
+      if (strip) {
+        // Verification mode: strip the source trees (HD + old LODs + procobj) from the map (empty world).
+        stripMap({
+          dffNames: impostors.map((i) => i.name.replace(/^lod/i, '')),
+          gamePath,
+          loose,
+          outPath,
+        });
+
+        return;
+      }
+
+      // Stage 2: attach an impostor LOD to every streamed tree HD + register/pack the impostor assets.
+      placeMap({
+        dffPath,
+        drawDistance: options.config.drawDistance,
+        gamePath,
+        impostors: impostors.map((i) => ({
+          height: i.bbox.max[2] - i.bbox.min[2],
+          name: i.name,
+          source: i.name.replace(/^lod/i, ''),
+        })),
+        loose,
+        outPath,
+        procObjHeight: options.config.procObjHeight,
+        procObjMax: options.config.procObjMax,
+        txdPath,
+      });
     },
 
     listInputs(): string[] {
