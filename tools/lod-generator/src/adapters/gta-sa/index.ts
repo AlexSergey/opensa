@@ -1,16 +1,16 @@
+import { decimateMesh } from '@opensa/sa-lod/decimate';
+import { createModelSource } from '@opensa/sa-lod/model-source';
+import { rebuildMeshNormals } from '@opensa/sa-lod/normals';
+import { createTextureSource } from '@opensa/sa-lod/texture-source';
 import { join } from 'node:path';
 
 import type { LodAdapter } from '../../core/adapter';
 import type { BakedCell, Cell, LodConfig } from '../../core/types';
 
-import { decimateMesh } from './decimate';
 import { writeBuild } from './finalize';
 import { openArchives } from './io';
 import { mergeCell } from './merge';
-import { createModelSource } from './model-source';
-import { rebuildMeshNormals } from './normals';
 import { maxObjectId, resolveCells } from './resolve';
-import { createTextureSource } from './texture-source';
 
 /**
  * GTA-SA (RenderWare) LOD adapter. Phase 0 (assemble HD instances → cell grid) + Phase 1's merge (HD geometry →

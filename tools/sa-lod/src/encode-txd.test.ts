@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { SourceTexture, TextureSource } from './texture-source';
 
-import { encodeCellTxd } from './cell-txd';
+import { encodeLodTxd } from './encode-txd';
 
 /** A solid-colour RGBA texture of the given size. */
 function solid(size: number, r: number, g: number, b: number): SourceTexture {
@@ -23,10 +23,10 @@ function source(textures: Record<string, SourceTexture>): TextureSource {
   return { get: (name) => textures[name.toLowerCase()] ?? null };
 }
 
-describe('encodeCellTxd', () => {
+describe('encodeLodTxd', () => {
   describe('negative cases', () => {
     it('skips names missing from the source, keeping the resolvable ones', () => {
-      const txd = encodeCellTxd(['absent', 'road'], source({ road: solid(64, 1, 2, 3) }), 64);
+      const txd = encodeLodTxd(['absent', 'road'], source({ road: solid(64, 1, 2, 3) }), 64);
       expect(parseTxd(toArrayBuffer(txd)).textures.map((t) => t.name)).toEqual(['road']);
     });
   });
@@ -34,7 +34,7 @@ describe('encodeCellTxd', () => {
   describe('positive cases', () => {
     it('round-trips the cell textures (downscaled, named) through the engine parser', () => {
       const textures = { grass: solid(128, 20, 180, 40), road: solid(256, 200, 100, 50) };
-      const txd = encodeCellTxd(['road', 'grass'], source(textures), 64);
+      const txd = encodeLodTxd(['road', 'grass'], source(textures), 64);
       const parsed = parseTxd(toArrayBuffer(txd)).textures;
 
       expect(parsed.map((t) => t.name).sort()).toEqual(['grass', 'road']);

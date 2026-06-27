@@ -1,8 +1,7 @@
+import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 import type { RWClump } from '@opensa/renderware/parsers/binary/types';
 
 import { parseDff } from '@opensa/renderware/parsers/binary/dff';
-
-import type { Archive } from './io';
 
 /** Resolves a model name to its parsed clump, loaded on demand from the archives and cached. */
 export interface ModelSource {
@@ -15,7 +14,7 @@ export interface ModelSource {
  * `parseDff` (read-only) and memoize. A missing or unparseable model caches as null (logged once) so the bake
  * skips it instead of retrying — the same model is instanced many times across cells.
  */
-export function createModelSource(archives: readonly Archive[]): ModelSource {
+export function createModelSource(archives: readonly ImgArchive[]): ModelSource {
   const cache = new Map<string, null | RWClump>();
 
   return {
@@ -45,7 +44,7 @@ function tryParse(buffer: ArrayBuffer, name: string): null | RWClump {
   try {
     return parseDff(buffer);
   } catch (error) {
-    console.warn(`lod-generator: skipping ${name} — ${(error as Error).message}`);
+    console.warn(`sa-lod: skipping ${name} — ${(error as Error).message}`);
 
     return null;
   }

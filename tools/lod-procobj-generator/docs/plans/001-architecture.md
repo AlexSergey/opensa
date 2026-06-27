@@ -171,24 +171,32 @@ Note: the **memory** `ipl-lod-index-coupling` and `sa-generated-asset-format` st
    `lodAlias` / `patchGtaDat`), `retxd.ts`, `procobj-strip.ts` (with `UNDERWATER_PROCOBJ`). `lod-trees-generator`
    imports them back, green. The IPL **append/strip** modules (`ipl-text-append`, `ipl-binary-link`,
    `strip/ipl-*`) stayed in `lod-trees-generator` — they're impostor/strip-specific, not shared.
-3. **Scaffold `@opensa/sa-lod`** — extract `model-source`/`decimate`/`normals`/`encode-dff`/`texture-source`/
-   `encode-txd`/`mesh` from `lod-generator`; repoint `lod-generator` to import them (keep it green).
-4. **Rebuild + generalise `procobj/convert` + `world`** from git history into `map-placement/procobj` —
-   `impostorId/impostorAlias` → `lodId/lodModel`; honour `UNDERWATER_PROCOBJ` (never convert).
-5. **Build `lod-procobj-generator`** — core/adapter scaffolding, CLI, wire P0–P7 from `map-placement` + `sa-lod`.
-6. **In-game verify** — convert a handful of species, check the simplified LODs render + fade, CPool budget.
+3. **Scaffold `@opensa/sa-lod`** ✅ **Done.** Created the package; moved `decimate`/`normals`/`encode-dff` (was
+   `dff`)/`encode-txd` (was `cell-txd`)/`model-source`/`texture-source` from `lod-generator` + a new `mesh.ts`
+   (the `MergedMesh`/`MergedGroup` **types** only). `lod-generator` repointed (core/types, core/index, merge,
+   adapter, finalize), green. `merge.ts`/`MeshBuilder` stayed in `lod-generator` (cell-specific) — the new tool
+   writes its own frame-aware single-model builder. Encoders renamed `encodeLodDff`/`encodeLodTxd`; model/texture
+   sources now take `ImgArchive[]`. Added both new packages to the eslint Node-globals override.
+4. **Rebuild + generalise `procobj/convert` + `world`** ✅ **Done.** Recovered both from git's dangling blobs into
+   `map-placement/src/procobj/`; `convert` generalised — `ProcObjSpecies` now `{ hdId, height, lodId, lodModel }`,
+   the IPL name is an `iplName` option (`lod_procobj`), and `UNDERWATER_PROCOBJ` species are never converted.
+   Exported as `@opensa/map-placement/procobj`. `world.ts` was already generic (moved as-is). Tests recovered.
+5. **Build `lod-procobj-generator`** ✅ **Done.** `src/cli.ts` + `config.ts` + `mesh-builder.ts` (frame-aware
+   single-model → `MergedMesh` + `meshBounds`) + `build.ts` (the P0–P7 orchestrator). Wires `map-placement`
+   (`convertProcObj`/`allocateLodIds`/`buildLodIde`/`lodAlias`/`patchGtaDat`/`retxdSwappedModels`) × `sa-lod`
+   (`decimateMesh`/`rebuildMeshNormals`/`encodeLodDff`/`encodeLodTxd`/`encodeColLibrary`/model+texture sources) ×
+   `tool-kit` (`editArchive`). One shared `lod_procobj.txd` (`--txd ∪ stock`, downscaled) + `lod_procobj.col`
+   (empty-collision per LOD). Mesh-builder unit-tested.
+6. **In-game verify** — _pending the user_: convert a handful of species, check the simplified LODs render + fade,
+   CPool budget.
 
-Each phase keeps `tsc`/`eslint`/tests green; extraction phases are move-then-reimport (no behaviour change).
+Each phase keeps `tsc`/`eslint`/tests green; extraction phases were move-then-reimport (no behaviour change).
 
 ## Decisions (resolved)
 
 1. **Shared package shape** — **two** packages: `@opensa/map-placement` + `@opensa/sa-lod` (`tool-kit` stays generic).
 2. **`--strip` procobj in `lod-trees-generator`** — **keep** the local clear, but **never touch** the
-   `UNDERWATER_PROCOBJ` species (a constant in `strip/procobj.ts`).
-3. **Cleanup timing** — **done now** (Phase 1), ahead of the package work.
-
-## Open (confirm before coding the new tool)
-
-1. **LOD TXD** — per-species TXD vs one shared `lod_procobj.txd` (like `lodtrees.txd`)? Lean shared with
-   name-prefixing (fewer IMG entries).
-2. **New tool name** — `lod-procobj-generator` (proposed) vs `procobj-lod-generator`.
+   `UNDERWATER_PROCOBJ` species.
+3. **Cleanup timing** — **done** (Phase 1), ahead of the package work.
+4. **LOD TXD** — **one shared `lod_procobj.txd`** (name-prefixed entries, fewer IMG entries).
+5. **New tool name** — **`lod-procobj-generator`**.

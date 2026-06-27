@@ -1,0 +1,21 @@
+{
+  "name": "@opensa/sa-lod",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Simplified-copy LOD mesh pipeline shared by the LOD tools: QEM decimation, smooth-normal rebuild, and RenderWare DFF/TXD encode from a merged mesh.",
+  "exports": {
+    "./mesh": "./src/mesh.ts",
+    "./decimate": "./src/decimate.ts",
+    "./normals": "./src/normals.ts",
+    "./encode-dff": "./src/encode-dff.ts",
+    "./encode-txd": "./src/encode-txd.ts",
+    "./encode-col": "./src/encode-col.ts",
+    "./model-source": "./src/model-source.ts",
+    "./texture-source": "./src/texture-source.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

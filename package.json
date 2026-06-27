@@ -49,7 +49,9 @@
     "tools/vehicle-optimizer",
     "tools/timecyc-builder",
     "tools/lod-trees-generator",
-    "tools/map-placement"
+    "tools/map-placement",
+    "tools/sa-lod",
+    "tools/lod-procobj-generator"
   ],
   "scripts": {
     "build": "tsc -b && vite build",

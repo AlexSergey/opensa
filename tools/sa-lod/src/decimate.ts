@@ -1,6 +1,6 @@
 import { simplify, type SimplifyMesh } from '@opensa/tool-kit/mesh/simplify';
 
-import type { MergedGroup, MergedMesh } from '../../core/types';
+import type { MergedGroup, MergedMesh } from './mesh';
 
 /**
  * QEM-decimate a merged cell mesh to a far-view triangle budget (plan 002, 1c) via the shared `tool-kit`

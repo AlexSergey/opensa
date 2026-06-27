@@ -1,9 +1,9 @@
 import type { RWClump, RWGeometry } from '@opensa/renderware/parsers/binary/types';
+import type { ModelSource } from '@opensa/sa-lod/model-source';
 
 import { describe, expect, it } from 'vitest';
 
 import type { Cell } from '../../core/types';
-import type { ModelSource } from './model-source';
 
 import { mergeCell } from './merge';
 

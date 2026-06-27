@@ -1,7 +1,7 @@
+import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
+
 import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { decodeDxt, type DxtFormat } from '@opensa/rw-codec/dxt';
-
-import type { Archive } from './io';
 
 /** A decoded source texture: top-mip RGBA8888 + dimensions. */
 export interface SourceTexture {
@@ -30,7 +30,7 @@ interface IndexedTexture {
   width: number;
 }
 
-export function createTextureSource(archives: readonly Archive[]): TextureSource {
+export function createTextureSource(archives: readonly ImgArchive[]): TextureSource {
   const index = new Map<string, IndexedTexture>();
   const cache = new Map<string, null | SourceTexture>();
   let indexed = false;

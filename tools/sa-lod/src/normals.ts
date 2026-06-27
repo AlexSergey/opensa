@@ -5,7 +5,7 @@ import {
   type SmoothNormalsOptions,
 } from '@opensa/tool-kit/mesh/smooth-normals';
 
-import type { MergedGroup, MergedMesh } from '../../core/types';
+import type { MergedGroup, MergedMesh } from './mesh';
 
 /**
  * Re-derive a merged cell mesh's normals from smooth groups (plan 015, shared `tool-kit` core) so flat ground

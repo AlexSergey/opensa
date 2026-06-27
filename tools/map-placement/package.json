@@ -6,7 +6,8 @@
   "exports": {
     "./ide": "./src/ide.ts",
     "./retxd": "./src/retxd.ts",
-    "./procobj-strip": "./src/procobj-strip.ts"
+    "./procobj-strip": "./src/procobj-strip.ts",
+    "./procobj": "./src/procobj/convert.ts"
   },
   "nx": {
     "tags": [

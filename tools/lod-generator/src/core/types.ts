@@ -1,8 +1,11 @@
 /**
  * Game-agnostic types for the LOD generator. The world is bucketed into square **cells** (matching the engine's
  * streaming grid); each cell's HD instances are baked into one merged LOD mesh + atlas (plan 002). Kept
- * game-neutral so a future game plugs in via a {@link LodAdapter} without touching the core.
+ * game-neutral so a future game plugs in via a {@link LodAdapter} without touching the core. The merged-mesh types
+ * live in the shared `@opensa/sa-lod` pipeline.
  */
+
+import type { MergedMesh } from '@opensa/sa-lod/mesh';
 
 /**
  * The baked output for one cell — a merged, decimated LOD mesh + its texture atlas + placement. The concrete
@@ -45,32 +48,6 @@ export interface LodConfig {
   lodTextureSize: number;
   /** Output directory; defaults to `lod-generator/out/<game>/`. */
   out?: string;
-}
-
-/** One texture's triangles within a {@link MergedMesh} — `indices` are triples into the vertex arrays. */
-export interface MergedGroup {
-  indices: Uint32Array;
-  /** Base texture name (lowercased), or '' for untextured materials. */
-  texture: string;
-}
-
-/**
- * A cell's HD instances merged into one mesh (Phase 1): cell-centre-relative, native Z-up world space, with
- * triangles bucketed into per-texture {@link MergedGroup}s (no atlas yet). Vertex attributes are parallel
- * arrays indexed by the group `indices`. Normals are carried from the source when present, else left zero for a
- * downstream normals pass; colours default to opaque white when a source vertex had no prelit.
- */
-export interface MergedMesh {
-  /** Prelit RGBA bytes, flattened (vertexCount × 4). */
-  colors: Uint8Array;
-  /** Per-texture triangle groups (vertex indices into the attribute arrays). */
-  groups: MergedGroup[];
-  /** Vertex normals, flattened (vertexCount × 3); zero where the source had none. */
-  normals: Float32Array;
-  /** Vertex positions, flattened (vertexCount × 3). */
-  positions: Float32Array;
-  /** UV layer 0, flattened (vertexCount × 2). */
-  uvs: Float32Array;
 }
 
 export type Quat = readonly [number, number, number, number];

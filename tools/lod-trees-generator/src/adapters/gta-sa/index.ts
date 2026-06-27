@@ -1,12 +1,12 @@
 import { lodAlias } from '@opensa/map-placement/ide';
 import { readRw } from '@opensa/rw-codec/chunk';
+import { encodeColLibrary } from '@opensa/sa-lod/encode-col';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 import type { HdTree, Impostor, TreeLodAdapter, TreeLodConfig } from '../../core';
 
 import { encodePng } from '../../core';
-import { encodeColLibrary } from './encode-col';
 import { encodeLodDff } from './encode-dff';
 import { encodeAtlasTxd } from './encode-txd';
 import { applyTrunkPrelight, loadTemplate, loadTextures, loadTree, openTemplateArchive } from './io';
@@ -52,7 +52,13 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
       writeFileSync(join(outPath, 'lodtrees.txd'), encodeAtlasTxd(impostors, version));
       // Col models are bound by the same model name SA registers (the IDE/IMG alias), not the impostor's own name.
       const aliases = impostors.map((impostor, i) => lodAlias(impostor.name, i));
-      writeFileSync(join(outPath, 'lodtrees.col'), encodeColLibrary(impostors, aliases));
+      writeFileSync(
+        join(outPath, 'lodtrees.col'),
+        encodeColLibrary(
+          impostors.map((impostor) => impostor.bbox),
+          aliases,
+        ),
+      );
       console.log(`→ ${impostors.length} LOD DFF(s) + lodtrees.txd + lodtrees.col (+ debug PNGs) → ${outPath}`);
 
       if (strip) {

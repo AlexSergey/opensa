@@ -13,7 +13,7 @@ import type { TextureSource } from './texture-source';
  * `parseTxd` (via the source) + map-optimizer's `encodeRgba8888Struct` + chunk codec; a true single-texture
  * atlas (fewer draws) is a later optimisation. Names missing from the source are skipped.
  */
-export function encodeCellTxd(textures: readonly string[], source: TextureSource, maxSize: number): Uint8Array {
+export function encodeLodTxd(textures: readonly string[], source: TextureSource, maxSize: number): Uint8Array {
   const natives: RwChunk[] = [];
   for (const name of textures) {
     const texture = source.get(name);

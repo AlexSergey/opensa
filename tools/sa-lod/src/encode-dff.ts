@@ -12,7 +12,7 @@ import {
 } from '@opensa/rw-codec/chunk';
 import { encodeGeometryStruct } from '@opensa/rw-codec/geometry-struct';
 
-import type { MergedMesh } from '../../core/types';
+import type { MergedMesh } from './mesh';
 
 /**
  * Serialize a merged + decimated cell {@link MergedMesh} into a standard SA RenderWare DFF (plan 002, 1d) — a
@@ -22,10 +22,10 @@ import type { MergedMesh } from '../../core/types';
  * cell-centre-relative space (the IPL inst places it back at the cell centre). u16 vertex indices cap a geometry
  * at 65 535 verts — far above a decimated cell, but asserted.
  */
-export function encodeCellDff(mesh: MergedMesh, name: string): Uint8Array {
+export function encodeLodDff(mesh: MergedMesh, name: string): Uint8Array {
   const vertexCount = mesh.positions.length / 3;
   if (vertexCount > 0xffff) {
-    throw new Error(`cell ${name}: ${vertexCount} vertices exceeds the 65535 u16 limit — lower the LOD budget`);
+    throw new Error(`LOD ${name}: ${vertexCount} vertices exceeds the 65535 u16 limit — lower the LOD budget`);
   }
 
   return writeRw({

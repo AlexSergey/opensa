@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/lod-procobj-generator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Convert GTA-SA procobj scatter species into static IPL instances with simplified-copy (decimated) LODs.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

@@ -1,12 +1,12 @@
+import type { TextureSource } from '@opensa/sa-lod/texture-source';
+
+import { encodeLodDff } from '@opensa/sa-lod/encode-dff';
+import { encodeLodTxd } from '@opensa/sa-lod/encode-txd';
 import { createImg } from '@opensa/tool-kit/archive/img';
 import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { BakedCell } from '../../core/types';
-import type { TextureSource } from './texture-source';
-
-import { encodeCellTxd } from './cell-txd';
-import { encodeCellDff } from './dff';
 
 export interface BuildOptions {
   baked: readonly BakedCell[];
@@ -55,8 +55,8 @@ export function writeBuild(options: BuildOptions): void {
   options.baked.forEach((cell, i) => {
     const id = options.firstId + i;
     const name = cellModelName(cell.cx, cell.cy);
-    img.set(`${name}.dff`, encodeCellDff(cell.mesh, name));
-    img.set(`${name}.txd`, encodeCellTxd(cellTextures(cell), options.textureSource, options.lodTextureSize));
+    img.set(`${name}.dff`, encodeLodDff(cell.mesh, name));
+    img.set(`${name}.txd`, encodeLodTxd(cellTextures(cell), options.textureSource, options.lodTextureSize));
     objs.push(ideObjsLine(id, name, options.drawDistance));
     insts.push(iplInstLine(id, name, cellCentre(cell, options.cellSize)));
   });

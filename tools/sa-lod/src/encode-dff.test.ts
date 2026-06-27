@@ -2,9 +2,9 @@ import { parseDff } from '@opensa/renderware/parsers/binary/dff';
 import { toArrayBuffer } from '@opensa/renderware/test-utils';
 import { describe, expect, it } from 'vitest';
 
-import type { MergedMesh } from '../../core/types';
+import type { MergedMesh } from './mesh';
 
-import { encodeCellDff } from './dff';
+import { encodeLodDff } from './encode-dff';
 
 /** A unit quad (4 verts, 2 tris) split across two texture groups. */
 function sampleMesh(): MergedMesh {
@@ -20,7 +20,7 @@ function sampleMesh(): MergedMesh {
   };
 }
 
-describe('encodeCellDff', () => {
+describe('encodeLodDff', () => {
   describe('negative cases', () => {
     it('throws when the mesh exceeds the u16 vertex limit', () => {
       const big: MergedMesh = {
@@ -30,13 +30,13 @@ describe('encodeCellDff', () => {
         positions: new Float32Array((0xffff + 1) * 3),
         uvs: new Float32Array((0xffff + 1) * 2),
       };
-      expect(() => encodeCellDff(big, 'lod_big')).toThrow(/65535/);
+      expect(() => encodeLodDff(big, 'lod_big')).toThrow(/65535/);
     });
   });
 
   describe('positive cases', () => {
     it('round-trips through the engine parser with geometry, materials and prelit intact', () => {
-      const clump = parseDff(toArrayBuffer(encodeCellDff(sampleMesh(), 'lod_3_-7')));
+      const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_3_-7')));
       expect(clump.atomics).toHaveLength(1);
       expect(clump.frames).toHaveLength(1);
       expect(clump.frames[0].name).toBe('lod_3_-7');
@@ -50,7 +50,7 @@ describe('encodeCellDff', () => {
     });
 
     it('assigns each triangle to its texture group via the BinMesh split', () => {
-      const clump = parseDff(toArrayBuffer(encodeCellDff(sampleMesh(), 'lod_cell')));
+      const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_cell')));
       const materials = clump.geometries[0].triangles.map((t) => t.materialIndex).sort();
       expect(materials).toEqual([0, 1]); // one triangle per group
     });

@@ -1,12 +1,16 @@
-import type { Impostor, Vec3 } from '../../core';
+import type { Vec3 } from './mesh';
 
 /**
- * Encode a COL3 collision library (one `.col`) — one **bounds-only** model per tree, matching what SA's LOD
+ * Encode a COL3 collision library (one `.col`) — one **bounds-only** model per LOD, matching what SA's LOD
  * vegetation ships (`lodCedar1_hi`: bounds set, zero spheres/boxes/faces/vertices). SA binds collision by model
- * **name**, so each col model is named with the impostor's registered model name (`names[i]` — the IDE/IMG
- * alias), and the library must be packed into the IMG (SA auto-discovers `.col` entries). Without it the game
- * faults with "model … does not have loaded collision". Layout mirrors `parsers/binary/col.ts`.
+ * **name**, so each col model is named with the LOD's registered model name (`names[i]` — the IDE/IMG alias).
+ * Without it the game faults with "model … does not have loaded collision". Layout mirrors `parsers/binary/col.ts`.
  */
+export interface Bounds {
+  max: Vec3;
+  min: Vec3;
+}
+
 const FOURCC = 'COL3';
 const NAME_BYTES = 22;
 // Stock empty-collision COL3 models are 112 bytes: name(22) + modelId(2) + bounds(40) + a 48-byte all-zero tail
@@ -14,8 +18,8 @@ const NAME_BYTES = 22;
 // library and corrupts collision globally (faults an unrelated model with "does not have loaded collision").
 const BODY_BYTES = 112;
 
-export function encodeColLibrary(impostors: Impostor[], names: readonly string[]): Uint8Array {
-  return concat(impostors.map((impostor, i) => encodeModel(impostor, names[i])));
+export function encodeColLibrary(bounds: readonly Bounds[], names: readonly string[]): Uint8Array {
+  return concat(bounds.map((b, i) => encodeModel(b, names[i])));
 }
 
 function concat(parts: Uint8Array[]): Uint8Array {
@@ -30,8 +34,7 @@ function concat(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-function encodeModel(impostor: Impostor, name: string): Uint8Array {
-  const { max, min } = impostor.bbox;
+function encodeModel({ max, min }: Bounds, name: string): Uint8Array {
   const center: Vec3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
   const radius = 0.5 * Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
 

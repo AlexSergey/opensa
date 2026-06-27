@@ -1,7 +1,8 @@
 import type { RWGeometry } from '@opensa/renderware/parsers/binary/types';
+import type { MergedMesh, Quat, Vec3 } from '@opensa/sa-lod/mesh';
+import type { ModelSource } from '@opensa/sa-lod/model-source';
 
-import type { Cell, MergedMesh, Quat, Vec3 } from '../../core/types';
-import type { ModelSource } from './model-source';
+import type { Cell } from '../../core/types';
 
 /** Accumulates transformed geometry into parallel attribute arrays + per-texture index groups. */
 class MeshBuilder {
