@@ -51,7 +51,8 @@
     "tools/lod-trees-generator",
     "tools/map-placement",
     "tools/sa-lod",
-    "tools/lod-procobj-generator"
+    "tools/lod-procobj-generator",
+    "tools/mod-installer"
   ],
   "scripts": {
     "build": "tsc -b && vite build",

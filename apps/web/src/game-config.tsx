@@ -70,6 +70,8 @@ export type GameId = 'gostown' | 'original' | 'original-extend';
 export const GAME_CONFIG: Record<GameId, GameConfig> = {
   gostown: {
     assetLoader: 'fetch',
+    disable: true,
+    disabledNote: 'Demo is temporarily unavailable',
     disclaimer: (
       <>
         <p>
@@ -120,6 +122,7 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
   },
   original: {
     assetLoader: 'local',
+    devOnly: true,
     disclaimer: (
       <>
         <p>

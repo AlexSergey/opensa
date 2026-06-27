@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/mod-installer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Layer GTA-SA mod folders onto a base game: copy files (overwrite) + merge gta3img/ loose entries into gta3.img, applied alphabetically.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

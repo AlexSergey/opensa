@@ -225,6 +225,7 @@ const scriptsConfig = {
     'tools/map-placement/**/*.{js,mjs,cjs,ts}',
     'tools/sa-lod/**/*.{js,mjs,cjs,ts}',
     'tools/lod-procobj-generator/**/*.{js,mjs,cjs,ts}',
+    'tools/mod-installer/**/*.{js,mjs,cjs,ts}',
   ],
   languageOptions: {
     globals: {
