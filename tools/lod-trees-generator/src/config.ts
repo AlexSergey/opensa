@@ -2,6 +2,9 @@ import type { TreeLodConfig } from './core';
 
 /** Default bake knobs (overridable via `--tex` / `--cards` / `--draw`). Tuned per the SA reference (`lodCedar1_hi`). */
 export const config: TreeLodConfig = {
+  // Trees taller than 2× their width bake into a portrait (width × 2*width) atlas so vertical detail isn't
+  // squashed into a square tile. Below this they stay square.
+  aspectThreshold: 2,
   cards: 4,
   drawDistance: 1500,
   // Convert every `--dff ∩ procobj` species to static IPL (capped at 20k objects). `procObjHeight` 0 = no height

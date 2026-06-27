@@ -74,7 +74,7 @@ function encodeDxt5Struct(
 }
 
 function textureNative(impostor: Impostor, version: number): RwChunk {
-  const levels = buildMipChain(impostor.image, impostor.size, impostor.size);
+  const levels = buildMipChain(impostor.image, impostor.width, impostor.height);
 
   return {
     children: [

@@ -13,17 +13,21 @@ tsx tools/lod-trees-generator/src/cli.ts --dff <path> --txd <path> --out <path> 
 - `--game` — path to the game data (`gta.dat` + `data/` + `models/gta3.img`)
 - `--tex` / `--cards` — per-tree atlas size (px) / cards per tree (defaults in `config.ts`)
 - `--draw` — impostor LOD draw distance in game units (default `1500`); how far the LOD stays visible
-- `--procobj-max` / `--procobj-height` — convert every `--dff ∩ procobj` species from runtime scatter to static
-  IPL + LOD: cap on objects (default `20000`, `0` disables) / optional min height in m to drop short clutter
-  (default `0` = off)
+- `--procobj` — touch `--dff ∩ procobj` species: convert their runtime scatter to static IPL + impostor LODs
+  **and** swap their HD DFF. Off (default) ⇒ procobj is left fully stock even if a species is in `--dff`
+- `--procobj-max` / `--procobj-height` — only with `--procobj`: cap on converted objects (default `20000`,
+  `0` disables) / optional min height in m to drop short clutter (default `0` = off)
+- `--prelight` — copy each swapped HD model's prelight (day vertex colours) from its stock DFF, so custom trees
+  with bad prelit don't render black/washed-out next to stock geometry
 - `--loose` — write the modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`
 - `--strip` — verification mode: strip all source trees from the map (empty world) instead of placing LODs
 
 With `--game` it also **places the impostors into the map** (stage 2): every streamed (binary IPL) placement of a
 `--dff` model gets its impostor attached as its far-LOD — a leaf instance appended to the area's companion text
 IPL (or an existing LOD row repointed), with the HD's `lod` linked to it. The impostors are registered
-(`lodtrees.ide` + a patched `gta.dat`) and packed — along with the swapped HD DFFs (LOD'd, non-procobj models) —
-into a drop-in repacked `gta3.img` (or loose `gta3img/`). `procobj.dat` is left untouched.
+(`lodtrees.ide` + a patched `gta.dat`) and packed — along with the swapped HD DFFs (LOD'd models; procobj species
+only with `--procobj`) — into a drop-in repacked `gta3.img` (or loose `gta3img/`). `procobj.dat` is left untouched
+unless `--procobj` is passed.
 
 See [`docs/plans/002-build-pipeline.md`](./docs/plans/002-build-pipeline.md) for the bake design (and the
 `cedar1_hi` → `lodCedar1_hi` reference breakdown), [`003-map-strip.md`](./docs/plans/003-map-strip.md) for the
@@ -32,3 +36,5 @@ its companion text IPL, so the two share one index space), and [`004-map-place.m
 for the stage-2 placement. [`005-sa-asset-format.md`](./docs/plans/005-sa-asset-format.md) is the **must-read**
 checklist of SA's strict DFF/TXD/COL/IDE requirements (tristrip flag, extra-vertex-colour, DXT5, 112-byte COL3,
 id ≤ 18630) — each was a real "renders in the viewer, invisible/crashes in-game" bug.
+[`007-impostor-improvements.md`](./docs/plans/007-impostor-improvements.md) covers the quality work: aspect-aware
+(portrait) impostor textures for tall trees + the `--prelight` stock→custom prelight transfer.

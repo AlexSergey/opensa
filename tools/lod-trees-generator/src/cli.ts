@@ -9,8 +9,10 @@
  *     --tex    per-tree atlas texture size in px (default from config)
  *     --cards  crossed billboard cards per tree (default from config)
  *     --draw   impostor LOD draw distance in game units (default from config)
+ *     --procobj         touch `--dff ∩ procobj` species (convert scatter → static LODs + swap HD); off = leave stock
  *     --procobj-max     cap on procobj objects converted to static IPL (0 disables; default from config)
  *     --procobj-height  optional min impostor height (m) gate, drops short clutter (0 = off; default from config)
+ *     --prelight        copy each swapped HD model's prelight (day vertex colours) from its stock DFF
  *   All paths are relative to the current working directory (absolute paths pass through).
  */
 import { existsSync, mkdirSync, statSync } from 'node:fs';
@@ -68,9 +70,14 @@ function main(): void {
   };
 
   const loose = process.argv.includes('--loose');
+  const prelight = process.argv.includes('--prelight');
+  const procobj = process.argv.includes('--procobj');
   const strip = process.argv.includes('--strip');
 
-  run(createGtaSaTreeLodAdapter({ config: merged, dffPath, gamePath, loose, outPath, strip, txdPath }), merged);
+  run(
+    createGtaSaTreeLodAdapter({ config: merged, dffPath, gamePath, loose, outPath, prelight, procobj, strip, txdPath }),
+    merged,
+  );
 }
 
 main();

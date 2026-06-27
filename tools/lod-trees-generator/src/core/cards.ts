@@ -16,7 +16,7 @@ export interface CardGeometry {
 export function buildCardGeometry(impostor: Impostor): CardGeometry {
   const cx = (impostor.bbox.min[0] + impostor.bbox.max[0]) / 2;
   const cy = (impostor.bbox.min[1] + impostor.bbox.max[1]) / 2;
-  const size = impostor.size;
+  const { height, width } = impostor;
   const positions: number[] = [];
   const uvs: number[] = [];
   const triangles: { a: number; b: number; c: number }[] = [];
@@ -27,10 +27,10 @@ export function buildCardGeometry(impostor: Impostor): CardGeometry {
     const ty = Math.cos(card.angle);
     const [uMin, uMax] = card.worldU;
     const [zMin, zMax] = card.worldZ;
-    const uL = card.uvRect.x / size;
-    const uR = (card.uvRect.x + card.uvRect.w) / size;
-    const vT = card.uvRect.y / size;
-    const vB = (card.uvRect.y + card.uvRect.h) / size;
+    const uL = card.uvRect.x / width;
+    const uR = (card.uvRect.x + card.uvRect.w) / width;
+    const vT = card.uvRect.y / height;
+    const vB = (card.uvRect.y + card.uvRect.h) / height;
 
     // Corners: 0 = (uMin,zMax) TL, 1 = (uMax,zMax) TR, 2 = (uMin,zMin) BL, 3 = (uMax,zMin) BR.
     positions.push(cx + tx * uMin, cy + ty * uMin, zMax);

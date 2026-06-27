@@ -14,6 +14,7 @@ import { convertProcObj, type ProcObjSpecies } from '../procobj/convert';
 import { allocateImpostorIds, buildLodTreesIde, impostorAlias, patchGtaDat } from './ide';
 import { linkBinaryLods } from './ipl-binary-link';
 import { type AppendInst, applyTextEdits, type Repoint } from './ipl-text-append';
+import { applyStockPrelight } from './prelight';
 import { retxdSwappedModels } from './retxd';
 
 /** One generated impostor: the `lod<source>` name (DFF file + texture) for source model `source`, and its
@@ -25,7 +26,7 @@ export interface ImpostorRef {
 }
 
 export interface PlaceOptions {
-  /** User HD trees (`--dff`) dir/file — HD DFFs swapped for the LOD'd, non-procobj models. */
+  /** User HD trees (`--dff`) dir/file — HD DFFs swapped for the LOD'd models (procobj only with `--procobj`). */
   dffPath: string;
   /** Impostor LOD draw distance written to `lodtrees.ide` (`--draw`). */
   drawDistance: number;
@@ -34,6 +35,11 @@ export interface PlaceOptions {
   /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`. */
   loose: boolean;
   outPath: string;
+  /** Copy each swapped model's prelight (day vertex colours) from its stock DFF (`--prelight`). */
+  prelight: boolean;
+  /** Touch `--dff ∩ procobj` species (`--procobj`): convert their scatter to static LODs **and** swap their HD.
+   *  Off ⇒ procobj species are left fully stock (no static conversion, no HD swap) even if in `--dff`. */
+  procobj: boolean;
   /** Min impostor height (m) to convert a `--dff ∩ procobj` species to static (excludes grass). */
   procObjHeight: number;
   /** Cap on statically converted procobj objects (0 = skip procobj conversion). */
@@ -58,10 +64,22 @@ const IDE_DAT = 'DATA\\MAPS\\lodtrees.IDE';
  * Stage 2 — attach an impostor LOD to every streamed tree HD. For each binary-stream instance of a source model
  * we ensure a text-IPL LOD = its impostor: append a leaf instance at the HD's transform (and point the HD's `lod`
  * at it), or repoint an existing LOD row. Then register the impostors (`lodtrees.ide` + `gta.dat`) and pack the
- * impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (LOD'd, non-procobj models) into the drop-in under `--out`.
+ * impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (procobj species only with `--procobj`) into `--out`.
  */
 export function placeMap(options: PlaceOptions): void {
-  const { dffPath, drawDistance, gamePath, impostors, loose, outPath, procObjHeight, procObjMax, txdPath } = options;
+  const {
+    dffPath,
+    drawDistance,
+    gamePath,
+    impostors,
+    loose,
+    outPath,
+    prelight,
+    procobj,
+    procObjHeight,
+    procObjMax,
+    txdPath,
+  } = options;
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const registry = buildRegistry(impostors, allObjectIds(gamePath, dat));
   const bySource = new Map(registry.map((r) => [r.source, r]));
@@ -72,9 +90,10 @@ export function placeMap(options: PlaceOptions): void {
   const archive = openArchive(readBytes(join(gamePath, 'models', 'gta3.img')));
   const result = editAreas(archive, gamePath, dat, idToImpostor);
 
-  // Swapped HD models (LOD'd, non-procobj) + their custom TXD: pack the TXD + retarget the models' IDE `txd`.
-  const swapModels = [...result.placedSources].filter((m) => !procModels.has(m));
-  const swap = swapEntries(dffPath, swapModels);
+  // Swapped HD models + their custom TXD: pack the TXD + retarget the models' IDE `txd`. procobj species are
+  // swapped only with `--procobj` (else kept stock so their runtime scatter stays unchanged).
+  const swapModels = procobj ? [...result.placedSources] : [...result.placedSources].filter((m) => !procModels.has(m));
+  const swap = swapEntries(dffPath, swapModels, prelight ? archive : null);
   const retxd = retxdSwappedModels(gamePath, dat.ide, dffPath, txdPath, swapModels);
 
   // Emit: text IPLs, retxd'd IDEs, lodtrees.ide, patched gta.dat.
@@ -88,8 +107,9 @@ export function placeMap(options: PlaceOptions): void {
   writeText(join(outPath, IDE_REL), buildLodTreesIde(ids, drawDistance));
 
   // procobj → static IPL: convert the tall `--dff ∩ procobj` species (writes lodtrees_procobj.ipl + procobj.dat).
+  // Only with `--procobj` — otherwise procobj is left untouched even when a species is in `--dff`.
   const procObj =
-    procObjMax > 0
+    procobj && procObjMax > 0
       ? convertProcObj({
           archive,
           gamePath,
@@ -348,8 +368,11 @@ function sourceObjectIds(
   return ids;
 }
 
-/** Read the user HD DFF bytes for each model to swap, keyed by its `<model>.dff` IMG entry. */
-function swapEntries(dffPath: string, models: readonly string[]): Map<string, Uint8Array> {
+/**
+ * Read the user HD DFF bytes for each model to swap, keyed by its `<model>.dff` IMG entry. When `archive` is
+ * given (`--prelight`), each swapped DFF inherits its stock model's prelight before being packed.
+ */
+function swapEntries(dffPath: string, models: readonly string[], archive: ImgArchive | null): Map<string, Uint8Array> {
   const isDir = statSync(dffPath).isDirectory();
   const files = isDir
     ? new Map(readdirSync(dffPath).map((f) => [f.replace(/\.dff$/i, '').toLowerCase(), join(dffPath, f)]))
@@ -366,9 +389,19 @@ function swapEntries(dffPath: string, models: readonly string[]): Map<string, Ui
   const swap = new Map<string, Uint8Array>();
   for (const model of models) {
     const file = files.get(model);
-    if (file) {
-      swap.set(`${model}.dff`, readBytes(file));
+    if (!file) {
+      continue;
     }
+    let bytes = readBytes(file);
+    if (archive) {
+      const stock = archive.get(`${model}.dff`);
+      if (stock) {
+        bytes = applyStockPrelight(bytes, new Uint8Array(stock));
+      } else {
+        console.warn(`  ! ${model}: no stock DFF in gta3.img → prelight not transferred`);
+      }
+    }
+    swap.set(`${model}.dff`, bytes);
   }
 
   return swap;

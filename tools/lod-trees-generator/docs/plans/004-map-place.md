@@ -53,9 +53,10 @@ needed — the inverse of the Stage-1 removal, and just as index-consistent.
 
 ## HD DFF + TXD swap
 
-Decision: **swap the HD DFF only for LOD'd models that are not procobj species** (keep procobj species' meshes
-stock so scatter is unchanged) — and **don't touch `procobj.dat`** at all (see [Stage 3](#stage-3-parked)). On the
-stock set this is 144 of the placed source models.
+Decision: **swap the HD DFF for every LOD'd model**, except procobj species are kept stock (so their runtime
+scatter is unchanged) **unless `--procobj`** is passed (which converts that scatter to static — see
+[Stage 3](#stage-3--procobj--static-ipl) and [`007 §C`](./007-impostor-improvements.md)). Without `--procobj` this
+is 144 of the placed source models on the stock set.
 
 The swapped DFFs reference textures in the user's `--txd`, not the stock TXD their IDE names, so `retxd.ts` also:
 pack the custom TXD(s) into `gta3.img`, and rewrite each swapped model's IDE `txd` column to the custom TXD that
@@ -66,7 +67,7 @@ render white.
 
 - repacked `gta3.img`: edited binary streams (HD `lod` set) + impostor DFFs + `lodtrees.txd` + swapped HD DFFs,
 - edited text IPLs under `data/maps/...` (appended LOD rows / repointed ids),
-- `data/maps/lodtrees.ide` + patched `data/gta.dat`. `procobj.dat` untouched.
+- `data/maps/lodtrees.ide` + patched `data/gta.dat`. `procobj.dat` untouched (unless `--procobj`).
 
 ## Caveats / to confirm in-game
 

@@ -15,7 +15,9 @@ set within ~60 m of the camera. So the renderer stays as-is; **the thinning live
 
 ## Scope (decided)
 
-**Every** `--dff ∩ procobj` species is converted — the user curates the set through `--dff` (no model-type
+Gated behind **`--procobj`** (off by default — procobj is left fully stock unless the flag is passed; see
+[`007-impostor-improvements.md` §C](./007-impostor-improvements.md)). When on, **every** `--dff ∩ procobj` species
+is converted — the user curates the set through `--dff` (no model-type
 heuristics in the tool). `--procobj-height` (default 0, off) is an optional gate to drop short clutter if wanted.
 On the stock set this is ~51 species (trees, rocks, bushes, rubble, flowers, …), thinned by MINDIST + the cap.
 

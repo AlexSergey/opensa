@@ -22,13 +22,17 @@ export interface GtaSaTreeLodOptions {
   /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking a full `gta3.img`. */
   loose: boolean;
   outPath: string;
+  /** Copy each swapped HD model's prelight from its stock DFF (`--prelight`). */
+  prelight: boolean;
+  /** Touch `--dff ∩ procobj` species (`--procobj`): convert their scatter to static LODs + swap their HD. */
+  procobj: boolean;
   /** Verification mode: strip all source trees from the map (empty world) instead of placing impostor LODs. */
   strip: boolean;
   txdPath: string;
 }
 
 export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLodAdapter {
-  const { dffPath, gamePath, loose, outPath, strip, txdPath } = options;
+  const { dffPath, gamePath, loose, outPath, prelight, procobj, strip, txdPath } = options;
   const isDir = statSync(dffPath).isDirectory();
   const textures = loadTextures(txdPath);
   const archive = openTemplateArchive(gamePath);
@@ -39,7 +43,10 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
       const version = readRw(template).chunks[0]?.version ?? 0;
       for (const impostor of impostors) {
         writeFileSync(join(outPath, `${impostor.name}.dff`), encodeLodDff(template, impostor));
-        writeFileSync(join(outPath, `${impostor.name}.png`), encodePng(impostor.image, impostor.size, impostor.size));
+        writeFileSync(
+          join(outPath, `${impostor.name}.png`),
+          encodePng(impostor.image, impostor.width, impostor.height),
+        );
       }
       writeFileSync(join(outPath, 'lodtrees.txd'), encodeAtlasTxd(impostors, version));
       // Col models are bound by the same model name SA registers (the IDE/IMG alias), not the impostor's own name.
@@ -71,6 +78,8 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
         })),
         loose,
         outPath,
+        prelight,
+        procobj,
         procObjHeight: options.config.procObjHeight,
         procObjMax: options.config.procObjMax,
         txdPath,

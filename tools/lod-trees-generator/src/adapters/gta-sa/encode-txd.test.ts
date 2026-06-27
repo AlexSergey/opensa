@@ -9,14 +9,15 @@ import { encodeAtlasTxd } from './encode-txd';
 const RW_VERSION = 0x1803ffff;
 const ab = (u: Uint8Array): ArrayBuffer => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
 
-/** A baked impostor with a `size`×`size` opaque RGBA image (alpha 255). */
-function impostor(name: string, size = 64): Impostor {
+/** A baked impostor with a `width`×`height` opaque RGBA image (alpha 255). */
+function impostor(name: string, width = 64, height = width): Impostor {
   return {
     bbox: { max: [1, 1, 1], min: [0, 0, 0] },
     cards: [],
-    image: new Uint8Array(size * size * 4).fill(255),
+    height,
+    image: new Uint8Array(width * height * 4).fill(255),
     name,
-    size,
+    width,
   };
 }
 
@@ -54,6 +55,13 @@ describe('encodeAtlasTxd', () => {
       const txd = parseTxd(ab(encodeAtlasTxd([impostor('loda'), impostor('lodb')], RW_VERSION)));
 
       expect(txd.textures.map((t) => t.name)).toEqual(['loda', 'lodb']);
+    });
+
+    it('packs a portrait (non-square) impostor with its own width/height', () => {
+      const txd = parseTxd(ab(encodeAtlasTxd([impostor('lodtall', 128, 256)], RW_VERSION)));
+
+      expect(txd.textures[0]).toMatchObject({ format: 'dxt5', height: 256, width: 128 });
+      expect(txd.textures[0].mipmaps.length).toBeGreaterThan(1);
     });
   });
 });

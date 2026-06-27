@@ -9,9 +9,10 @@ const ab = (u: Uint8Array): ArrayBuffer => u.buffer.slice(u.byteOffset, u.byteOf
 const impostor = (min: [number, number, number], max: [number, number, number]): Impostor => ({
   bbox: { max, min },
   cards: [],
+  height: 0,
   image: new Uint8Array(0),
   name: 'ignored',
-  size: 0,
+  width: 0,
 });
 
 describe('encodeColLibrary', () => {

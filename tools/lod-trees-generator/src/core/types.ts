@@ -29,14 +29,16 @@ export interface HdTriangle {
   uvs: [Vec2, Vec2, Vec2];
 }
 
-/** A baked tree impostor: the per-tree atlas image (RGBA, `size*size*4`) + the cards (placement + UV rect) the
- *  LOD DFF will reference. One {@link Impostor} → one named texture in the shared TXD. */
+/** A baked tree impostor: the per-tree atlas image (RGBA, `width*height*4`) + the cards (placement + UV rect) the
+ *  LOD DFF will reference. The atlas is square for ~square trees, portrait (`height = 2*width`) for tall ones, so
+ *  texels stay ~square in world space (no vertical under-sampling). One {@link Impostor} → one named TXD texture. */
 export interface Impostor {
   bbox: { max: Vec3; min: Vec3 };
   cards: ImpostorCard[];
+  height: number;
   image: Uint8Array;
   name: string;
-  size: number;
+  width: number;
 }
 
 /** One crossed-billboard card: angle around vertical Z, world extents (tangent `u` rel. to centre, absolute
@@ -63,6 +65,8 @@ export interface TreeLodAdapter {
 
 /** Bake knobs (the "how big / how many" of the impostor). */
 export interface TreeLodConfig {
+  /** `bboxHeight / bboxWidth` above which the atlas goes portrait (`width × 2*width`) instead of square. */
+  aspectThreshold: number;
   /** Number of crossed billboard cards in the impostor cage. */
   cards: number;
   /** Emitted LOD draw distance (world units) — the visibility gate for the LOD def. */

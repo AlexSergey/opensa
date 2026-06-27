@@ -43,9 +43,10 @@ function impostor(): Impostor {
   return {
     bbox: { max: [5, 5, 20], min: [-5, -5, 0] },
     cards: [card(0), card(Math.PI / 2)],
+    height: 64,
     image: new Uint8Array(0),
     name: 'lodtest',
-    size: 64,
+    width: 64,
   };
 }
 
