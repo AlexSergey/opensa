@@ -65,6 +65,9 @@ export interface VehicleOptions {
   primary: [number, number, number];
   /** 4th-colour paint RGB, replaces the `(255,60,0)` marker (falls back to secondary). */
   quaternary?: [number, number, number];
+  /** RNG `() => [0,1)` for per-spawn variation — currently picks which `extraN` component shows. Defaults to
+   *  `Math.random`; inject a fixed value in tests for determinism. */
+  rng?: () => number;
   /** Secondary paint RGB (0-255), replaces the `(255,0,175)` marker. */
   secondary: [number, number, number];
   /** 3rd-colour paint RGB, replaces the `(255,175,0)` marker (falls back to primary). */
@@ -97,6 +100,11 @@ const WHEEL_CONTAINER_RE = /^f_wheel/;
 
 /** Door body atomics — `door_{lf|rf|lr|rr}_ok` — wrapped in a hinge pivot so they swing. */
 const DOOR_RE = /^door_(lf|rf|lr|rr)_ok$/;
+
+/** SA "extra" component frames — `extra1`, `extra2`, … They are mutually-exclusive optional parts modelled at
+ *  the same spot (e.g. the Benson's swappable advertising boards): the game shows **at most one** per spawn, so
+ *  rendering them all overlaps into a jumble. */
+const EXTRA_RE = /^extra\d+$/;
 
 /** Wheels read a touch small from the vehicles.ide scale alone; nudge them up in-engine. */
 const WHEEL_SCALE_BOOST = 1.25;
@@ -168,6 +176,8 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
   // `f_wheel_*` wheel-mod container: its sub-atomics are the wheel sub-model, instanced at the dummies
   // (see addContainerWheels) rather than rendered as body. Empty unless that convention + real dummies.
   const container = collectContainerWheels(clump);
+  // SA shows at most one `extraN` component; the rest are hidden alternatives at the same spot.
+  const hiddenExtras = hiddenExtraFrames(clump, options.rng ?? Math.random);
 
   for (const atomic of clump.atomics) {
     if (container.frames.has(atomic.frameIndex)) {
@@ -195,6 +205,9 @@ export function buildVehicle(clump: RWClump, textures: Map<string, Texture>, opt
     }
     if (name.endsWith('_dam')) {
       continue; // paired with its `_ok` (see collectDamGeometry)
+    }
+    if (hiddenExtras.has(atomic.frameIndex)) {
+      continue; // an unchosen mutually-exclusive extra (e.g. a benson ad board) — only one shows
     }
     collectBuilt(addBodyAtomic(build, atomic, frame, name, geometry), doors, parts);
   }
@@ -767,6 +780,18 @@ function glassPass(
 /** True if the clump has any `wheel_*_dummy` frame (the shared-wheel instancing targets). */
 function hasWheelDummies(clump: RWClump): boolean {
   return clump.frames.some((frame) => wheelPlacement(frame.name.toLowerCase()) !== null);
+}
+
+/** Frame indices of the `extraN` atomics to HIDE — SA shows at most one of these mutually-exclusive components
+ *  per spawn (e.g. the Benson's swappable advertising boards), so all but a randomly-picked one are hidden. */
+function hiddenExtraFrames(clump: RWClump, rng: () => number): Set<number> {
+  const extras = clump.atomics.filter((a) => EXTRA_RE.test(clump.frames[a.frameIndex]?.name.toLowerCase() ?? ''));
+  if (extras.length === 0) {
+    return new Set();
+  }
+  const shown = extras[Math.floor(rng() * extras.length)];
+
+  return new Set(extras.filter((a) => a !== shown).map((a) => a.frameIndex));
 }
 
 /** Which light a lamp centroid belongs to: the nearer of the head/tail dummy within {@link LAMP_DUMMY_RADIUS},

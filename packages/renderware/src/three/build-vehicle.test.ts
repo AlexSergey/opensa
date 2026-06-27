@@ -71,6 +71,32 @@ function chassisOpaque(vehicle: ReturnType<typeof buildVehicle>): Mesh {
   return (ok.children[0] ?? ok) as Mesh;
 }
 
+/** A chassis + three `extraN` mutually-exclusive components (SA's optional parts, e.g. benson ad boards). */
+function extrasClump(): RWClump {
+  const id = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  return {
+    atomics: [
+      { frameIndex: 0, geometryIndex: 0 }, // chassis body
+      { frameIndex: 1, geometryIndex: 0 }, // extra1
+      { frameIndex: 2, geometryIndex: 0 }, // extra2
+      { frameIndex: 3, geometryIndex: 0 }, // extra3
+    ],
+    frames: [
+      { name: 'chassis', parentIndex: -1, position: [0, 0, 0], rotation: id },
+      { name: 'extra1', parentIndex: 0, position: [0, 0, 0], rotation: id },
+      { name: 'extra2', parentIndex: 0, position: [0, 0, 0], rotation: id },
+      { name: 'extra3', parentIndex: 0, position: [0, 0, 0], rotation: id },
+    ],
+    geometries: [triangleGeometry([material()])],
+  };
+}
+
+/** Whether a top-level body mesh with this name was rendered. */
+function hasBodyMesh(vehicle: ReturnType<typeof buildVehicle>, name: string): boolean {
+  return vehicle.root.children.some((child) => child.name === name);
+}
+
 function meshByName(vehicle: ReturnType<typeof buildVehicle>, name: string): Mesh {
   return vehicle.root.children.find((child) => child.name === name) as Mesh;
 }
@@ -131,6 +157,13 @@ describe('buildVehicle', () => {
       const { doors } = buildVehicle(vehicleClump(), new Map(), OPTIONS);
       expect(doors).toHaveLength(1);
       expect(doors[0].side).toBe('lf');
+    });
+
+    it('renders only one extraN component — the other mutually-exclusive extras are hidden', () => {
+      const vehicle = buildVehicle(extrasClump(), new Map(), { ...OPTIONS, rng: () => 0 });
+      expect(hasBodyMesh(vehicle, 'extra1')).toBe(true); // floor(0 * 3) → extra1
+      expect(hasBodyMesh(vehicle, 'extra2')).toBe(false);
+      expect(hasBodyMesh(vehicle, 'extra3')).toBe(false);
     });
   });
 
@@ -371,6 +404,13 @@ describe('buildVehicle', () => {
       clump.geometries[0].materials[2].texture = { maskName: '', name: 'carbody' };
       const materials = bodyMaterials(buildVehicle(clump, new Map([['carbody', tex]]), OPTIONS));
       expect(materials[2].map?.name).toBe('carbody');
+    });
+
+    it('lets the rng pick which extraN component shows', () => {
+      const vehicle = buildVehicle(extrasClump(), new Map(), { ...OPTIONS, rng: () => 0.9 });
+      expect(hasBodyMesh(vehicle, 'extra3')).toBe(true); // floor(0.9 * 3) → extra3
+      expect(hasBodyMesh(vehicle, 'extra1')).toBe(false);
+      expect(hasBodyMesh(vehicle, 'extra2')).toBe(false);
     });
   });
 });
@@ -667,11 +707,27 @@ describe.skipIf(!existsSync(PETRO_4))('buildVehicle (real per-corner petro-4whee
 
 describe.skipIf(!existsSync(PETRO_6))('buildVehicle (real 3-axle petro-6wheels.dff)', () => {
   const vehicle = buildVehicle(parseDff(toArrayBuffer(readFileSync(PETRO_6))), new Map(), OPTIONS);
+  // petro-6wheels ships six real `extra1`..`extra6` components — build with a fixed rng to assert which shows.
+  const withRng = (rng: () => number): string[] => {
+    const built = buildVehicle(parseDff(toArrayBuffer(readFileSync(PETRO_6))), new Map(), { ...OPTIONS, rng });
+    const shown: string[] = [];
+    built.root.traverse((o) => {
+      if (/^extra\d+$/.test(o.name)) {
+        shown.push(o.name);
+      }
+    });
+
+    return shown;
+  };
 
   describe('negative cases', () => {
     it('ignores the stray bare wheel atomic (exactly six wheels, none rendered as a body mesh)', () => {
       expect(vehicle.wheels).toHaveLength(6);
       expect(vehicle.root.children.map((c) => c.name)).not.toContain('wheel');
+    });
+
+    it('renders only one of the six extraN components — the other five are hidden', () => {
+      expect(withRng(() => 0)).toEqual(['extra1']); // floor(0 * 6) → extra1
     });
   });
 
@@ -679,6 +735,10 @@ describe.skipIf(!existsSync(PETRO_6))('buildVehicle (real 3-axle petro-6wheels.d
     it('builds all six per-corner wheels (only the front axle steers)', () => {
       expect(vehicle.wheels.filter((w) => w.front)).toHaveLength(2);
       expect(vehicle.wheels.every((w) => w.radius > 0)).toBe(true);
+    });
+
+    it('the rng selects which of the six extras shows', () => {
+      expect(withRng(() => 0.5)).toEqual(['extra4']); // floor(0.5 * 6) = 3 → extra4
     });
   });
 });

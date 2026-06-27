@@ -25,6 +25,10 @@ plans 015–021/025/030/033.
   MeshPhysicalMaterial), live intensity/preset switching, sky probe refresh on weather change.
 - **Glass** (plan 025): window materials detected and rendered transparent (double-sided,
   sorted).
+- **Extras** (`extraN` components): SA's mutually-exclusive optional parts modelled at the same spot (e.g. the
+  Benson's swappable advertising boards). The builder shows **at most one** per spawn — a random `extraN` (via
+  `VehicleOptions.rng`, default `Math.random`), hiding the rest. Without this, all `extraN` atomics render on top
+  of each other (overlapping jumble).
 - **Physics** (plans 017/018): Rapier dynamic chassis from the COL convex hull, raycast wheels
   (suspension), handling.cfg parsed (kept for tuning), enter/exit flow with seat alignment
   (plan 016) — the run-to-door is interruptible (movement input or a blocked path hands control back,
@@ -44,8 +48,13 @@ plans 015–021/025/030/033.
 - No NPC traffic (headlight gating already generalizes via `seated`).
 - Damage is collision-driven deformation state, not visual mesh swaps for every panel.
 - No vehicle audio.
+- **LEFTOVER — extras = "exactly one"**: the current `extraN` handling shows exactly one of the mutually-exclusive
+  components, which covers the Benson (ad boards) and similar variant sets. SA's real rule is more nuanced — **two
+  independent slots** chosen by the `carcols` component rules, each able to resolve to "nothing". If a vehicle ever
+  needs **two simultaneous** extras (or a chance of **none**), that's a follow-up built on top of the same
+  `hiddenExtraFrames` helper (it would need the carcols comp rules, which we don't parse yet).
 
 ## Test coverage anchors
 
-`build-vehicle.test.ts` (markers, modulate, parts), vehicle systems tests (physics/lod/damage),
-adapter vehicle data tests.
+`build-vehicle.test.ts` (markers, modulate, parts, extras — synthetic + real petro-6wheels.dff), vehicle systems
+tests (physics/lod/damage), adapter vehicle data tests.
