@@ -27,8 +27,6 @@ export interface AssetLocalLoaderConfig {
   peds?: readonly string[];
   /** Where resolved file bytes go — the VFS. Optional so the loader runs/tests standalone. */
   sink?: { addFiles(chunkId: string, entries: Iterable<readonly [string, Uint8Array]>): Promise<void> | void };
-  /** TEMPORARY: vehicle models (from `vehicles.ide`) to also pull into the selection. */
-  vehicles?: readonly string[];
   version: string;
 }
 
@@ -140,7 +138,7 @@ export class AssetLocalLoader implements AssetLoader {
       throw new Error('install folder not selected — call prepare() from a user gesture first');
     }
     this.source ??= await this.deps.openSource(this.dir);
-    this.plan ??= await selectInstallEntries(this.source, { peds: this.config.peds, vehicles: this.config.vehicles });
+    this.plan ??= await selectInstallEntries(this.source, { peds: this.config.peds });
 
     return { plan: this.plan, source: this.source };
   }

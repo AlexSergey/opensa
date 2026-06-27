@@ -2,7 +2,7 @@ import type { AssetFileSystem } from '@opensa/renderware/archive';
 
 import { describe, expect, it } from 'vitest';
 
-import { scanVehicles } from './scan';
+import { scanModloader } from './scan';
 
 /** A minimal in-memory AssetFileSystem from name → (string text | Uint8Array bytes). */
 function fakeFs(entries: Record<string, string | Uint8Array>): AssetFileSystem {
@@ -24,49 +24,55 @@ function fakeFs(entries: Record<string, string | Uint8Array>): AssetFileSystem {
   };
 }
 
-describe('scanVehicles', () => {
+describe('scanModloader', () => {
   describe('negative cases', () => {
-    it('returns nothing when there is no modloader/vehicles tree', () => {
-      expect(scanVehicles(fakeFs({ 'admiral.dff': Uint8Array.of(1) }))).toEqual([]);
+    it('returns an empty overlay when there is no modloader/ tree', () => {
+      const scan = scanModloader(fakeFs({ 'admiral.dff': Uint8Array.of(1) }));
+
+      expect(scan.overrides.size).toBe(0);
+      expect(scan.settings).toEqual([]);
     });
 
-    it('skips a subfolder with neither dff nor txd', () => {
-      expect(scanVehicles(fakeFs({ 'modloader/vehicles/empty/readme.md': 'x' }))).toEqual([]);
-    });
+    it('ignores non-dff/txd/txt files under modloader/', () => {
+      const scan = scanModloader(fakeFs({ 'modloader/a/preview.png': Uint8Array.of(1), 'modloader/readme.md': 'x' }));
 
-    it('skips a stray file directly under modloader/vehicles/ (no subfolder)', () => {
-      expect(scanVehicles(fakeFs({ 'modloader/vehicles/loose.dff': Uint8Array.of(1) }))).toEqual([]);
+      expect(scan.overrides.size).toBe(0);
+      expect(scan.settings).toEqual([]);
     });
   });
 
   describe('positive cases', () => {
-    it('takes the model from the file base name, ignoring the descriptive folder name', () => {
-      const mods = scanVehicles(
+    it('overrides every dff/txd by bare name — at the root or nested any depth, ignoring folder names', () => {
+      const scan = scanModloader(
         fakeFs({
-          'modloader/vehicles/Admiral - 1976 Mercedes-Benz 230 - k1real24/admiral.dff': Uint8Array.of(1, 2),
-          'modloader/vehicles/Admiral - 1976 Mercedes-Benz 230 - k1real24/admiral.txd': Uint8Array.of(3),
+          'modloader/a/b/c/d/alpha.txd': Uint8Array.of(3), // deeply nested
+          'modloader/Admiral - 1976 Mercedes-Benz 230 - k1real24/admiral.dff': Uint8Array.of(2), // one level
+          'modloader/root.dff': Uint8Array.of(1), // at the root of modloader/
         }),
       );
 
-      expect(mods).toHaveLength(1);
-      expect(mods[0].model).toBe('admiral');
-      expect([...new Uint8Array(mods[0].dff!)]).toEqual([1, 2]);
-      expect([...new Uint8Array(mods[0].txd!)]).toEqual([3]);
-      expect(mods[0].settings).toBeUndefined();
+      expect([...scan.overrides.keys()].sort()).toEqual(['admiral.dff', 'alpha.txd', 'root.dff']);
+      expect([...new Uint8Array(scan.overrides.get('admiral.dff')!)]).toEqual([2]);
+      expect([...new Uint8Array(scan.overrides.get('alpha.txd')!)]).toEqual([3]);
     });
 
-    it('handles a txd-only subfolder (model from the txd) and parses settings when present', () => {
-      const mods = scanVehicles(
+    it('keeps every txd of a multi-txd mod, each under its own bare name', () => {
+      const scan = scanModloader(
         fakeFs({
-          'modloader/vehicles/blade/blade.settings.txt': 'blade, 1,3',
-          'modloader/vehicles/blade/blade.txd': Uint8Array.of(7),
+          'modloader/alpha/alpha1.txd': Uint8Array.of(3),
+          'modloader/alpha/alpha2.txd': Uint8Array.of(4),
+          'modloader/alpha/alpha.dff': Uint8Array.of(1),
+          'modloader/alpha/alpha.txd': Uint8Array.of(2),
         }),
       );
 
-      expect(mods).toHaveLength(1);
-      expect(mods[0].model).toBe('blade');
-      expect(mods[0].dff).toBeUndefined();
-      expect(mods[0].settings).toEqual({ carcolsLine: 'blade, 1,3' });
+      expect([...scan.overrides.keys()].sort()).toEqual(['alpha.dff', 'alpha.txd', 'alpha1.txd', 'alpha2.txd']);
+    });
+
+    it('parses each *.settings.txt it finds', () => {
+      const scan = scanModloader(fakeFs({ 'modloader/blade/blade.settings.txt': 'blade, 1,3' }));
+
+      expect(scan.settings).toEqual([{ carcolsLine: 'blade, 1,3' }]);
     });
   });
 });

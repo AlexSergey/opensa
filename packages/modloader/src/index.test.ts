@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { withModloader } from './index';
 
-const SUB = 'modloader/vehicles/admiral - 1976 Mercedes-Benz 230 - k1real24';
+const SUB = 'modloader/admiral - 1976 Mercedes-Benz 230 - k1real24';
 const IDE = '400, landstal, landstal, car\n445, admiral, admiral, car, OLDADMIRAL\n';
 const HANDLING = 'LANDSTAL 1700\nADMIRAL 2000 stock\n';
 const CARCOLS = 'car\nlandstal, 1,1\nadmiral, 9,9\nend\n';
@@ -46,19 +46,19 @@ describe('withModloader', () => {
   });
 
   describe('positive cases', () => {
-    it('overrides the vehicle dff/txd under vehicles/<model>.* (the loader tries that first)', () => {
+    it('shadows the stock dff/txd under the bare <model>.* key (what the loader reads)', () => {
       const fs = fakeFs({
         [`${SUB}/admiral.dff`]: Uint8Array.from([1, 2, 3]),
         [`${SUB}/admiral.txd`]: Uint8Array.from([4, 5]),
-        'admiral.dff': Uint8Array.from([9]), // stock
+        'admiral.dff': Uint8Array.from([9]), // stock gta3.img model — must be overridden
+        'admiral.txd': Uint8Array.from([8]), // stock txd — must be overridden
       });
       const mod = withModloader(fs);
 
-      expect([...new Uint8Array(mod.get('vehicles/admiral.dff')!)]).toEqual([1, 2, 3]);
-      expect([...new Uint8Array(mod.get('vehicles/admiral.txd')!)]).toEqual([4, 5]);
-      expect(mod.has('vehicles/admiral.dff')).toBe(true);
-      expect(mod.names).toContain('vehicles/admiral.dff');
-      expect([...new Uint8Array(mod.get('admiral.dff')!)]).toEqual([9]); // stock passthrough untouched
+      expect([...new Uint8Array(mod.get('admiral.dff')!)]).toEqual([1, 2, 3]);
+      expect([...new Uint8Array(mod.get('admiral.txd')!)]).toEqual([4, 5]);
+      expect(mod.has('admiral.dff')).toBe(true);
+      expect(mod.names).toContain('admiral.dff');
     });
 
     it('merges the settings into vehicles.ide / handling.cfg / carcols.dat', () => {

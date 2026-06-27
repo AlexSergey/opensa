@@ -41,12 +41,10 @@ export interface InstallSource {
   readLooseText(path: string): Promise<string>;
 }
 
-/** Options for {@link selectInstallEntries} — the dynamically-spawned models named in `.env`. */
+/** Options for {@link selectInstallEntries} — the dynamically-spawned models. */
 export interface SelectOptions {
   /** Ped model names (from `peds.ide`) to pull in — e.g. `[VITE_MAIN_CHARACTER]`. */
   peds?: readonly string[];
-  /** Vehicle model names (from `vehicles.ide`) to pull in — e.g. `VITE_VEHICLES`. */
-  vehicles?: readonly string[];
 }
 
 /** Read one partition entry's bytes from the archive it resolves to (gta3, or gta_int override). */
@@ -67,7 +65,7 @@ export async function readEntry(source: InstallSource, entry: Entry): Promise<Ui
  */
 export async function selectInstallEntries(source: InstallSource, options: SelectOptions = {}): Promise<InstallPlan> {
   const placed = placedModels(await placedInstanceIds(source), await ideById(source));
-  const extra = await dynamicModelRefs(source, options.peds ?? [], options.vehicles ?? []);
+  const extra = await dynamicModelRefs(source, options.peds ?? []);
   const refs = { models: [...placed.models, ...extra.models], txds: [...placed.txds, ...extra.txds] };
   const { models, others, textures } = partitionEntries(
     refs,
@@ -78,11 +76,11 @@ export async function selectInstallEntries(source: InstallSource, options: Selec
   return { loose: await source.looseFiles(), models, others, textures };
 }
 
-/** Model + txd base names for the named dynamically-spawned set: the requested peds + vehicles. */
+/** Model + txd base names for the dynamically-spawned set: the requested **peds** + **every** vehicle in
+ *  `vehicles.ide` (cars are spawned dynamically, not placed on the map, so the partition would otherwise miss them). */
 async function dynamicModelRefs(
   source: InstallSource,
   peds: readonly string[],
-  vehicles: readonly string[],
 ): Promise<{ models: string[]; txds: string[] }> {
   const models: string[] = [];
   const txds: string[] = [];
@@ -100,15 +98,11 @@ async function dynamicModelRefs(
     }
   }
 
-  const vehiclesPath = vehicles.length > 0 ? loose.find((path) => path.endsWith('vehicles.ide')) : undefined;
+  const vehiclesPath = loose.find((path) => path.endsWith('vehicles.ide'));
   if (vehiclesPath) {
-    const defs = parseVehicleDefs(await source.readLooseText(vehiclesPath));
-    for (const name of vehicles) {
-      const def = defs.get(name.toLowerCase());
-      if (def) {
-        models.push(def.model.toLowerCase());
-        txds.push(def.txd.toLowerCase());
-      }
+    for (const def of parseVehicleDefs(await source.readLooseText(vehiclesPath)).values()) {
+      models.push(def.model.toLowerCase());
+      txds.push(def.txd.toLowerCase());
     }
   }
 

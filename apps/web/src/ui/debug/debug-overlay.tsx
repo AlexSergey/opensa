@@ -155,7 +155,7 @@ export interface DebugActions {
   toneMapping(): boolean;
   /** Snap the map-inspector camera back to top-down (undo a right-drag orbit). */
   topDownView(): void;
-  /** Spawnable car model names of the loaded game (from its `vehicles/` folder) — for the spawn list. */
+  /** Spawnable car model names of the loaded game (from `vehicles.ide`) — for the spawn list. */
   vehicleModels(): readonly string[];
   /** Current vehicle-reflection tuning (preset + intensity). */
   vehicleReflection(): VehicleReflectionConfig;
@@ -244,6 +244,7 @@ export function DebugOverlay({
   const menu = menuFor();
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState<Screen>('root');
+  const [vehicleFilter, setVehicleFilter] = useState('');
   const [showCoords, setShowCoords] = useState(false);
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
   const [city, setCity] = useState<City>(() => actions.city());
@@ -384,16 +385,26 @@ export function DebugOverlay({
 
           {screen === 'vehicles' && (
             <div style={styles.group}>
-              {actions.vehicleModels().map((model) => (
-                <button
-                  key={model}
-                  onClick={() => void actions.spawnVehicle(model)}
-                  style={styles.actionButton}
-                  type="button"
-                >
-                  {model.charAt(0).toUpperCase() + model.slice(1)} Spawn
-                </button>
-              ))}
+              <input
+                onChange={(e) => setVehicleFilter(e.target.value)}
+                placeholder="Filter…"
+                style={styles.filterInput}
+                type="text"
+                value={vehicleFilter}
+              />
+              {actions
+                .vehicleModels()
+                .filter((model) => model.includes(vehicleFilter.trim().toLowerCase()))
+                .map((model) => (
+                  <button
+                    key={model}
+                    onClick={() => void actions.spawnVehicle(model)}
+                    style={styles.actionButton}
+                    type="button"
+                  >
+                    {model.charAt(0).toUpperCase() + model.slice(1)} Spawn
+                  </button>
+                ))}
               <button onClick={() => actions.flipVehicle()} style={styles.actionButton} type="button">
                 Flip vehicle
               </button>

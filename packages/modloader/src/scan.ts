@@ -2,57 +2,47 @@ import type { AssetFileSystem } from '@opensa/renderware/archive';
 
 import { parseVehicleSettings, type VehicleSettings } from './settings';
 
-/** One scanned vehicle mod: its model name + replacement bytes + parsed settings (any field may be absent). */
-export interface VehicleMod {
-  dff?: ArrayBuffer;
-  model: string;
-  settings?: VehicleSettings;
-  txd?: ArrayBuffer;
+/** The overlay a `modloader/` tree contributes: bare-name asset overrides + parsed settings lines. */
+export interface ModloaderScan {
+  /** Asset overrides keyed by bare lowercased file name (e.g. `admiral.dff`) — shadows the same-named game asset. */
+  overrides: Map<string, ArrayBuffer>;
+  /** One parsed `*.settings.txt` per file found (its lines merge into vehicles.ide/handling.cfg/carcols.dat). */
+  settings: VehicleSettings[];
 }
 
-const PREFIX = 'modloader/vehicles/';
+const PREFIX = 'modloader/';
 
 /**
- * Scan the VFS for `modloader/vehicles/<subfolder>/` mods: each subfolder ships a `<model>.dff` / `<model>.txd`
- * (the model name is the file's base name) and an optional `*.settings.txt`. Groups files by subfolder so the
- * descriptive folder name (e.g. `admiral - 1976 …`) is irrelevant.
+ * Scan the VFS for a `modloader/` overlay. The folder structure is irrelevant — like the real Modloader, a file may
+ * sit at the root of `modloader/` or nested any number of levels deep. Every `.dff`/`.txd` becomes an override keyed
+ * by its bare file name (the in-game asset it replaces, so a mod's `<file>.txd` wins by name regardless of folder),
+ * and every `.txt` is parsed for vehicles.ide / handling.cfg / carcols.dat lines.
  */
-export function scanVehicles(fs: AssetFileSystem): VehicleMod[] {
-  const bySubfolder = new Map<string, string[]>();
+export function scanModloader(fs: AssetFileSystem): ModloaderScan {
+  const overrides = new Map<string, ArrayBuffer>();
+  const settings: VehicleSettings[] = [];
   for (const name of fs.names) {
-    if (!name.toLowerCase().startsWith(PREFIX)) {
+    const lower = name.toLowerCase();
+    if (!lower.startsWith(PREFIX)) {
       continue;
     }
-    const rest = name.slice(PREFIX.length);
-    const slash = rest.indexOf('/');
-    if (slash < 0) {
-      continue; // a stray file directly under modloader/vehicles/ — no subfolder
+    if (lower.endsWith('.dff') || lower.endsWith('.txd')) {
+      const bytes = fs.get(name);
+      if (bytes) {
+        overrides.set(baseName(lower), bytes);
+      }
+    } else if (lower.endsWith('.txt')) {
+      const text = fs.getText(name);
+      if (text) {
+        settings.push(parseVehicleSettings(text));
+      }
     }
-    const subfolder = rest.slice(0, slash);
-    (bySubfolder.get(subfolder) ?? bySubfolder.set(subfolder, []).get(subfolder)!).push(name);
   }
 
-  const mods: VehicleMod[] = [];
-  for (const files of bySubfolder.values()) {
-    const dff = files.find((f) => f.toLowerCase().endsWith('.dff'));
-    const txd = files.find((f) => f.toLowerCase().endsWith('.txd'));
-    const settingsFile = files.find((f) => f.toLowerCase().endsWith('.txt'));
-    const modelFile = dff ?? txd;
-    if (!modelFile) {
-      continue; // no model asset — skip
-    }
-    mods.push({
-      dff: dff ? (fs.get(dff) ?? undefined) : undefined,
-      model: baseName(modelFile),
-      settings: settingsFile ? parseVehicleSettings(fs.getText(settingsFile) ?? '') : undefined,
-      txd: txd ? (fs.get(txd) ?? undefined) : undefined,
-    });
-  }
-
-  return mods;
+  return { overrides, settings };
 }
 
-/** Lowercased file base name without the `.dff`/`.txd` extension. */
+/** Last path segment (the bare file name) — `path` is already lowercased by the caller. */
 function baseName(path: string): string {
-  return (path.split('/').pop() ?? path).replace(/\.(?:dff|txd)$/i, '').toLowerCase();
+  return path.slice(path.lastIndexOf('/') + 1);
 }

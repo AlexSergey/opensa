@@ -18,7 +18,8 @@
 
 **Debugger (F2)** — multi-level menu; opening it never touches the simulation:
 
-- Player (respawn, coords), Vehicles (spawn admiral/camper), Time (presets + speed),
+- Player (respawn, coords), Vehicles (spawn any car from `vehicles.ide` — sorted, with a name filter),
+  Time (presets + speed),
   Atmosphere (night/world-light calibration sliders), Camera (follow rig), Graphics (bloom,
   SSAO, tonemapping, reflections, water, sun/god-rays, clouds, stars, fog), **ProcObj**
   (per-category clutter knobs), Weather selector, Position (live coords + teleports incl.

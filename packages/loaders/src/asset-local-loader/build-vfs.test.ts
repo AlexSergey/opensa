@@ -59,16 +59,23 @@ describe('selectInstallEntries', () => {
       expect(plan.loose).toEqual(['data/gta.dat', 'data/maps/test.ide', 'data/maps/test.ipl']);
     });
 
-    it('pulls in the named peds (peds.ide) and the named vehicles (vehicles.ide); ignores unknown names', async () => {
+    it('pulls in the named peds (peds.ide) + EVERY vehicle in vehicles.ide; ignores unnamed peds', async () => {
       const loose: Record<string, string> = {
         'data/peds.ide': 'peds\n66, bmypol1, bmypol1, CIVMALE\n9, cesar, cesar, CIVMALE\nend',
-        'data/vehicles.ide':
-          'cars\n400, admiral, admiral, car, ADMIRAL, gm, null, normal, 10, 7, 0, 100, 1.0, 1.0, 0\nend',
+        'data/vehicles.ide': [
+          'cars',
+          '400, admiral, admtxd, car, ADMIRAL, gm, null, normal, 10, 7, 0, 100, 1.0, 1.0, 0',
+          '402, buffalo, buftxd, car, BUFFALO, gm, null, normal, 10, 7, 0, 100, 1.0, 1.0, 0',
+          'end',
+        ].join('\n'),
       };
       const gta3 = fakeArchive({
         'admiral.dff': new Uint8Array([1]),
+        'admtxd.txd': new Uint8Array([1]),
         'bmypol1.dff': new Uint8Array([1]),
         'bmypol1.txd': new Uint8Array([1]),
+        'buffalo.dff': new Uint8Array([1]),
+        'buftxd.txd': new Uint8Array([1]),
         'cesar.dff': new Uint8Array([1]),
       });
       const plan = await selectInstallEntries(
@@ -77,12 +84,12 @@ describe('selectInstallEntries', () => {
           looseFiles: () => Promise.resolve(Object.keys(loose)),
           readLooseText: (p) => Promise.resolve(loose[p] ?? ''),
         }),
-        { peds: ['bmypol1', 'unknownped'], vehicles: ['admiral', 'missing'] },
+        { peds: ['bmypol1', 'unknownped'] },
       );
 
-      // Only the named bmypol1 (not cesar) + admiral; unknown names are dropped.
-      expect(plan.models.map((e) => e.name).sort()).toEqual(['admiral.dff', 'bmypol1.dff']);
-      expect(plan.textures.map((e) => e.name)).toContain('bmypol1.txd');
+      // Every vehicle (admiral + buffalo) + the named bmypol1 (cesar is not requested).
+      expect(plan.models.map((e) => e.name).sort()).toEqual(['admiral.dff', 'bmypol1.dff', 'buffalo.dff']);
+      expect(plan.textures.map((e) => e.name).sort()).toEqual(['admtxd.txd', 'bmypol1.txd', 'buftxd.txd']);
     });
   });
 });

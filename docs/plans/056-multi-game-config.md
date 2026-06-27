@@ -55,7 +55,7 @@ interface GameConfig {
 
   // World + player
   mainCharacter: string; // peds.ide ped name (was VITE_MAIN_CHARACTER)
-  vehicles: string[]; // vehicles.ide names available in-game (was VITE_VEHICLES)
+  // (no `vehicles` field — every car is pulled from vehicles.ide at build + listed in the debugger; see 053)
   playerSpawn: Vec3; // single source: capsule + collision-zone centre
   loadGame: { radius: number; startMinutes: number; weather: string }; // collision radius / clock / weather
   vehiclesSpawn?: VehiclePlacement[]; // parked cars (colour inline)

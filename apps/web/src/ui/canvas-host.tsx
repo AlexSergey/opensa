@@ -25,7 +25,6 @@ import { EnterVehicleSystem } from '@opensa/game/vehicle/enter-vehicle.system';
 import { VehicleDamageSystem } from '@opensa/game/vehicle/vehicle-damage.system';
 import { VehicleHeadlightSystem } from '@opensa/game/vehicle/vehicle-headlight.system';
 import { VehicleLodSystem } from '@opensa/game/vehicle/vehicle-lod.system';
-import { vehicleModelsFromNames } from '@opensa/game/vehicle/vehicle-models';
 import { VehiclePhysicsSystem } from '@opensa/game/vehicle/vehicle-physics.system';
 import { weatherForCity } from '@opensa/game/weather/weather-zones';
 import { type CityBox, cityFromLevel, isDesertZone } from '@opensa/game/zones/city';
@@ -80,6 +79,7 @@ import {
 import type { DebugActions } from './debug/debug-overlay';
 
 import { GAME_CONFIG, type GameId, HUMAN_HALF_EXTENTS } from '../game-config';
+import { vehicleModelsFromIde } from '../vehicle-models';
 import { isTouchDevice } from './controls/is-touch-device';
 import { TouchControls } from './controls/touch-controls';
 import { DebugOverlay } from './debug/debug-overlay';
@@ -946,9 +946,8 @@ function bootstrap(
       );
     };
 
-    // Cars available in-game → drives the debug spawn list. TEMP: `VITE_VEHICLES` (resolved via vehicles.ide,
-    // for bring-your-own-files) takes precedence; otherwise the loose `vehicles/*.dff` packed in the archive.
-    const vehicleModels = config.vehicles.length > 0 ? config.vehicles : vehicleModelsFromNames(fs.names);
+    // Cars available in-game → drives the debug spawn list: every car defined in `vehicles.ide` (sorted).
+    const vehicleModels = vehicleModelsFromIde(fs);
 
     // Cycle each car's OWN carcols combos on repeated debug spawns (so re-spawning gives a different
     // colour); undefined when the car has no carcols entry → loadVehicle picks its default.

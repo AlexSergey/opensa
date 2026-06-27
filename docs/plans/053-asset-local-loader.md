@@ -167,20 +167,20 @@ The partition only selects models **placed on the map** (IPL/IDE). Peds and vehi
 so a raw install yields a VFS with no player/car models → the game can't start. Stop-gap until a proper
 ped/vehicle registry exists:
 
-- **Selection — only what's named in `.env`** (not all peds): `selectInstallEntries(source, { peds, vehicles })`
-  resolves the named peds (`peds.ide` → `parsePedDefs`) and vehicles (`vehicles.ide` → `parseVehicleDefs`),
-  adding their `model.dff`/`txd.txd` to the models/textures buckets. `peds = [VITE_MAIN_CHARACTER]` and
-  `vehicles = VITE_VEHICLES` flow via `createAssetLoader` → `AssetLocalLoader`.
-- **Offline build parity**: `scripts/build-game.ts` does the same — `loadEnv` reads the local `.env`,
-  `dynamicRefs(dataDir, VITE_MAIN_CHARACTER, VITE_VEHICLES)` merges those into the partition refs before
-  packing, so the fetch archives also contain the chosen character + cars. The env-list parsing is shared
-  (`src/game-build/env-list.ts` `parseModelList`, used by both `game-config.ts` and the builder).
-- **Runtime** (`game-config.ts` exposes `MAIN_CHARACTER`, `VEHICLES`): the player loads via
-  `adapter.loadCharacterByModel(VITE_MAIN_CHARACTER)` (resolve `peds.ide` → bare `model.dff`/`txd.txd`), else
-  the loose `player/*` fallback. `loadVehicle` now tries loose `vehicles/<name>` then the bare archive name
-  (`requireFirstBuffer`), so cars load in both fetch (loose) and local (raw) modes. The debug spawn list uses
-  `VITE_VEHICLES` when set.
-- Env: `VITE_MAIN_CHARACTER=BMYPOL1`, `VITE_VEHICLES=['admiral','comet']` (or `admiral,comet`).
+- **Selection — named ped + every car**: `selectInstallEntries(source, { peds })` resolves the named peds
+  (`peds.ide` → `parsePedDefs`) and **all** vehicles (`vehicles.ide` → `parseVehicleDefs`, every `cars` entry),
+  adding their `model.dff`/`txd.txd` to the models/textures buckets. `peds = [mainCharacter]` flows via
+  `createAssetLoader` → `AssetLocalLoader`. Vehicles are no longer a curated list — `vehicles.ide` is the single
+  source of truth, so a raw install ships its full roster (the DFFs sit bare in `gta3.img`, not a loose folder).
+- **Offline build parity**: `scripts/build-game.ts` does the same — `dynamicRefs(dataDir, mainCharacter)` merges
+  the named character + every vehicle from `vehicles.ide` into the partition refs before packing, so the fetch
+  archives contain the same roster.
+- **Runtime**: the player loads via `adapter.loadCharacterByModel(mainCharacter)` (resolve `peds.ide` → bare
+  `model.dff`/`txd.txd`), else the loose `player/*` fallback. `loadVehicle` reads the **bare** archive name
+  (`requireBuffer(fs, '<model>.dff')`) — straight from gta3.img (or a modloader override), no loose `vehicles/`
+  folder, so cars load identically in fetch and local (raw) modes. The
+  debug spawn list is built from `vehicles.ide` (`vehicleModelsFromIde` in apps/web — sorted, filterable in the
+  overlay); there is no `GAME_CONFIG.vehicles` field.
 
 ## Out of scope (v1)
 

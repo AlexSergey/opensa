@@ -86,11 +86,7 @@ function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
  * TEMP: model + txd base names for the env-named main character (`peds.ide`) and vehicles (`vehicles.ide`).
  * Those are spawned dynamically (not placed on the map), so the partition misses them — pack them explicitly.
  */
-function dynamicRefs(
-  dataDir: string,
-  mainCharacter: string | undefined,
-  vehicles: readonly string[],
-): { models: string[]; txds: string[] } {
+function dynamicRefs(dataDir: string, mainCharacter: string | undefined): { models: string[]; txds: string[] } {
   const models: string[] = [];
   const txds: string[] = [];
 
@@ -103,15 +99,10 @@ function dynamicRefs(
     }
   }
 
-  if (vehicles.length > 0) {
-    const defs = parseVehicleDefs(readIde(dataDir, 'vehicles.ide'));
-    for (const name of vehicles) {
-      const def = defs.get(name);
-      if (def) {
-        models.push(def.model.toLowerCase());
-        txds.push(def.txd.toLowerCase());
-      }
-    }
+  // Every vehicle in `vehicles.ide` — cars are spawned dynamically, not placed on the map.
+  for (const def of parseVehicleDefs(readIde(dataDir, 'vehicles.ide')).values()) {
+    models.push(def.model.toLowerCase());
+    txds.push(def.txd.toLowerCase());
   }
 
   return { models, txds };
@@ -164,11 +155,10 @@ function main(): void {
 
   const dataDir = join(src, 'data');
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
-  // TEMP (bring-your-own-files): also pack the game's main character (peds.ide) + vehicles (vehicles.ide),
-  // since peds/cars are spawned dynamically, not placed on the map. Source of truth is GAME_CONFIG (the same
-  // the app reads); games not in the catalogue just pack no dynamic models.
+  // Also pack the dynamically-spawned models (not placed on the map): the game's main character (from peds.ide,
+  // per GAME_CONFIG) + **every** vehicle defined in vehicles.ide.
   const cfg: GameConfig | undefined = (GAME_CONFIG as Record<string, GameConfig>)[game];
-  const dynamic = dynamicRefs(dataDir, cfg?.mainCharacter, cfg?.vehicles ?? []);
+  const dynamic = dynamicRefs(dataDir, cfg?.mainCharacter);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
   const { models: modelEntries, others, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
   // `partitionEntries` only pulls world files from gta3.img; pull a mod's from the override archives too
@@ -190,11 +180,12 @@ function main(): void {
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
   // keyed by their lowercased relative path and bucketed by `looseGroup` (data folder → data, dff → models,
   // txd → textures, the rest → others). ALL `models/*.img` are read above, so skip them here. Files under
-  // loose `player/` and `vehicles/` also get a **bare-name** alias that OVERRIDES the same-named entry from
-  // the img archives (so a modder's loose `vehicles/admiral.dff` wins over gta3.img's).
+  // loose `player/` also get a **bare-name** alias that OVERRIDES the same-named entry from the img archives
+  // (the main-character override). Vehicles aren't loose — the roster comes from vehicles.ide → gta3.img, and
+  // per-car overrides go through the runtime modloader.
   const excluded = new Set([join('anim', 'anim.img')]);
   const isModelImg = new RegExp(`^models\\${sep}.+\\.img$`, 'i');
-  const overrideBare = new Set<string>(); // bare names provided by loose player/ + vehicles/
+  const overrideBare = new Set<string>(); // bare names provided by loose player/
   const loose: Record<GroupName, LoadedEntry[]> = { data: [], models: [], others: [], textures: [] };
   for (const path of walk(src)) {
     const rel = relative(src, path);
@@ -204,7 +195,7 @@ function main(): void {
     const bytes = new Uint8Array(readFileSync(path));
     const name = rel.split(sep).join('/').toLowerCase();
     loose[looseGroup(name)].push({ bytes, name, size: bytes.length });
-    if (name.startsWith('player/') || name.startsWith('vehicles/')) {
+    if (name.startsWith('player/')) {
       const bare = name.slice(name.lastIndexOf('/') + 1);
       if (!overrideBare.has(bare)) {
         overrideBare.add(bare);
@@ -212,7 +203,7 @@ function main(): void {
       }
     }
   }
-  // Drop img model/texture entries the loose player/vehicles files override (their bytes are packed above).
+  // Drop img model/texture entries the loose player/ files override (their bytes are packed above).
   const models = modelEntries.filter((entry) => !overrideBare.has(entry.name));
   const textures = textureEntries.filter((entry) => !overrideBare.has(entry.name));
 

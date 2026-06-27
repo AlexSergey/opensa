@@ -71,7 +71,6 @@ export function useAssetBoot(): AssetBoot {
       manifestUrl: `${BASE}/games/${state.game}-${__APP_VERSION__}/manifest.json`,
       peds: [config.mainCharacter],
       sink: vfs,
-      vehicles: config.vehicles,
       version: __APP_VERSION__,
     });
 

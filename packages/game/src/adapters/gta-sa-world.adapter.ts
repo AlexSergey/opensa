@@ -373,9 +373,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     }
 
     const genericTextures = await this.loadGenericVehicleTextures();
-    // Loose `vehicles/<name>` (fetch build) or the bare archive name (raw install, e.g. local loader).
-    const dffBuffer = requireFirstBuffer(this.fs, [`vehicles/${def.model}.dff`, `${def.model}.dff`]);
-    const carTxdBuffer = requireFirstBuffer(this.fs, [`vehicles/${def.txd}.txd`, `${def.txd}.txd`]);
+    // Bare archive names — straight from gta3.img (or shadowed by a modloader override). No loose `vehicles/`
+    // folder: the roster comes from vehicles.ide, so models live under their plain `<model>.dff`/`<txd>.txd` key.
+    const dffBuffer = requireBuffer(this.fs, `${def.model.toLowerCase()}.dff`);
+    const carTxdBuffer = requireBuffer(this.fs, `${def.txd.toLowerCase()}.txd`);
     const textures = new Map<string, Texture>([...genericTextures, ...buildTextureMap(parseTxd(carTxdBuffer))]);
     const indices = colour
       ? colour
@@ -593,17 +594,6 @@ function requireBuffer(fs: AssetFileSystem, name: string): ArrayBuffer {
   }
 
   return buffer;
-}
-
-/** First present buffer among `names` (case-insensitive keys), throwing if none exist. */
-function requireFirstBuffer(fs: AssetFileSystem, names: readonly string[]): ArrayBuffer {
-  for (const name of names) {
-    const buffer = fs.get(name.toLowerCase());
-    if (buffer) {
-      return buffer;
-    }
-  }
-  throw new Error(`asset not found: ${names.join(' | ')}`);
 }
 
 /** Read a required text asset from the file system (throws if absent). */

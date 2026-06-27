@@ -12,17 +12,17 @@ object types / settings, and duplicate-file conflict resolution, are **out of sc
 
 `GtaSaWorldAdapter` (`packages/game/src/adapters/gta-sa-world.adapter.ts`):
 
-- **DFF/TXD** — `loadVehicle(model)` does
-  `requireFirstBuffer(fs, ['vehicles/<model>.dff', '<model>.dff'])` (and the same for `.txd`). The **loose path is
-  tried first**, the bare gta3.img name second — so serving `vehicles/<model>.dff` overrides the stock model with
-  zero ambiguity.
+- **DFF/TXD** — `loadVehicle(model)` does `requireBuffer(fs, '<model>.dff')` (and the same for `.txd`). It reads
+  the **bare** archive name (the key gta3.img / the raw install populate). There is no loose `vehicles/` folder —
+  the roster comes from `vehicles.ide`. So serving a `<model>.dff` override under that **same bare key** shadows
+  the stock model with zero ambiguity.
 - **Settings** — `ensureVehicleData()` (lazy, on the first `loadVehicle`, then cached) reads three **text** files
   via the VFS and parses them:
   - `requireText(fs, 'data/vehicles.ide')` → `parseVehicleDefs` (keyed by **model name**, the `cars` section).
   - `requireText(fs, 'data/carcols.dat')` → `parseCarcols` (keyed by **model name**).
   - `requireText(fs, 'data/handling.cfg')` → `parseHandling` (keyed by **handling id**, uppercase).
 
-So overriding a vehicle = (a) serve its `dff`/`txd` under `vehicles/<model>.*`, and (b) make those three text
+So overriding a vehicle = (a) serve its `dff`/`txd` under the bare `<model>.*` key, and (b) make those three text
 files, **as the VFS returns them**, contain the mod's line for that vehicle. The VFS is a flat, synchronous,
 last-write-wins key→bytes store (`@opensa/vfs`) and `AssetFileSystem extends ImgArchive` — i.e. the thing the
 engine reads through is just an interface we can **decorate**.
@@ -30,13 +30,15 @@ engine reads through is just an interface we can **decorate**.
 ## The example (`./1`)
 
 ```
-modloader/vehicles/
+modloader/
   admiral - 1976 Mercedes-Benz 230 - k1real24/
     admiral.dff   admiral.txd   admiral.settings.txt
-  ambulan - …/   ambulan.dff  ambulan.txd  ambulan.settings.txt
+  alpha - …/   alpha.dff  alpha.txd  alpha1.txd … alpha4.txd  alpha.settings.txt
 ```
 
-`<name>.dff`/`.txd` match the stock gta3.img names. `*.settings.txt` bundles **three lines** (blank-line
+The folder layout is **irrelevant** — like the real Modloader, files may sit at the root of `modloader/` or be
+nested any number of levels deep. `<name>.dff`/`.txd` match the stock gta3.img names (a mod may ship several
+txds — each overrides by its own name). `*.settings.txt` bundles **three lines** (blank-line
 separated), each from a different stock file:
 
 ```
@@ -60,9 +62,10 @@ single line where the app hands the fs to the engine (`new Game({ fs: withModloa
 
 At construction (eager, synchronous — the VFS is sync):
 
-1. **Scan** `vfs.names` for `modloader/vehicles/*/` subfolders. Per subfolder, find `<model>.dff` / `<model>.txd`
-   (model = file basename) and the `*.settings.txt`.
-2. **Override map** — `vehicles/<model>.dff` / `.txd` → the modloader file's bytes (served first by `loadVehicle`).
+1. **Scan** `vfs.names` for any file under `modloader/` (at any depth — folders are ignored): every `.dff`/`.txd`
+   and every `*.settings.txt`.
+2. **Override map** — each `.dff`/`.txd` → its bytes, keyed by its **bare file name** (shadows gta3.img for
+   `loadVehicle`, which reads the bare `<model>.dff` / `<txd>.txd`).
 3. **Settings** — parse each `*.settings.txt`, split into blocks, **classify** each block by feeding it to the
    existing parsers (`parseVehicleDefs('cars\n…\nend')`, `parseHandling(…)`, `parseCarcols('car\n…\nend')`) — the
    one that parses cleanly tags the block. Collect per-vehicle `{ ideLine?, handlingLine?, carcolsLine? }`.
@@ -86,7 +89,7 @@ Everything is precomputed once, so reads stay O(1) and synchronous (the engine's
 ```
 packages/modloader/src/
   index.ts          withModloader(vfs)
-  scan.ts           find modloader/vehicles/* → { model, dff?, txd?, settingsText? }
+  scan.ts           scanModloader: walk modloader/** → { overrides: bare-name→bytes, settings: parsed[] }
   settings.ts       parse a .settings.txt → { ideLine?, handlingLine?, carcolsLine? } (classify via the parsers)
   merge-ide.ts      replace a cars-section line by model in vehicles.ide
   merge-handling.ts replace a line by handling-id in handling.cfg
@@ -111,15 +114,15 @@ So the only change outside the package is the **one-line app wiring**.
 
 ## Complexity estimate — **Medium, low-risk**
 
-| Part                                                 | Effort      | Notes                                                                                |
-| ---------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ |
-| `withModloader` decorator + override map (dff/txd)   | **Low**     | sync wrap; `loadVehicle` already tries `vehicles/<name>` first                       |
-| Scan `modloader/vehicles/*` from the VFS             | **Low**     | string ops over `vfs.names`                                                          |
-| Parse + classify `.settings.txt` blocks              | **Low–Med** | reuse the 3 existing parsers to validate/classify; handle partial/absent             |
-| Merge into vehicles.ide / handling.cfg / carcols.dat | **Med**     | 3 section-aware line-replace editors (same pattern as the lod-trees IDE/IPL editors) |
-| Ingest `modloader/**` into the VFS                   | **Low–Med** | small additions to `build-vfs.ts` + `build-game.ts` (loader/build, not engine)       |
-| Wiring (`withModloader(vfs)` at the fs boundary)     | **Trivial** | one line in `apps/web`                                                               |
-| Tests                                                | **Med**     | settings classify, the 3 merges, the decorator override + passthrough                |
+| Part                                                 | Effort      | Notes                                                                                 |
+| ---------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------- |
+| `withModloader` decorator + override map (dff/txd)   | **Low**     | sync wrap; `loadVehicle` reads the bare `<model>.dff`/`<txd>.txd` the overlay shadows |
+| Scan `modloader/**` from the VFS                     | **Low**     | string ops over `vfs.names`                                                           |
+| Parse + classify `.settings.txt` blocks              | **Low–Med** | reuse the 3 existing parsers to validate/classify; handle partial/absent              |
+| Merge into vehicles.ide / handling.cfg / carcols.dat | **Med**     | 3 section-aware line-replace editors (same pattern as the lod-trees IDE/IPL editors)  |
+| Ingest `modloader/**` into the VFS                   | **Low–Med** | small additions to `build-vfs.ts` + `build-game.ts` (loader/build, not engine)        |
+| Wiring (`withModloader(vfs)` at the fs boundary)     | **Trivial** | one line in `apps/web`                                                                |
+| Tests                                                | **Med**     | settings classify, the 3 merges, the decorator override + passthrough                 |
 
 **No engine changes.** The only friction is the 3 text-merges (small, well-trodden) and the loader/build ingestion
 of `modloader/`. Roughly a focused day or two.
@@ -133,8 +136,8 @@ of `modloader/`. Roughly a focused day or two.
 3. **Three merges** ✅ — `merge.ts`: `mergeIde` (cars section, model col 1) · `mergeCarcols` (car section, col 0) ·
    `mergeHandling` (flat car table, first token; comments/`!`/`$` sub-tables left alone). Replace-in-place, append
    new before `end`. Tested (replace, leave others, append).
-4. **Decorator** ✅ — `index.ts` `withModloader(fs)` (+ `scan.ts`): scan `modloader/vehicles/*`, build the
-   `vehicles/<model>.dff|txd` override map + merged `vehicles.ide`/`handling.cfg`/`carcols.dat`; `get`/`getText`/
+4. **Decorator** ✅ — `index.ts` `withModloader(fs)` (+ `scan.ts` `scanModloader`): scan `modloader/**` (any depth),
+   build the bare `<file>.dff|txd` override map + merged `vehicles.ide`/`handling.cfg`/`carcols.dat`; `get`/`getText`/
    `has`/`names` overlay, everything else passes through. Returns the same fs when there's no overlay. Tested.
 5. **Ingestion + wiring** ✅ — ingestion was already free (both loaders pull `modloader/**` in as loose files).
    Wired `withModloader(vfs)` in `apps/web/.../use-asset-boot.ts`: once the VFS is loaded (`phase === 'warmup'`+),

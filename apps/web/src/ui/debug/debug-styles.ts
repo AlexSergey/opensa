@@ -66,6 +66,18 @@ export const styles: Record<string, CSSProperties> = {
     borderTop: `1px solid ${BORDER}`,
     margin: '8px 0',
   },
+  filterInput: {
+    background: 'transparent',
+    border: `1px solid ${BORDER}`,
+    borderRadius: 3,
+    color: FG,
+    fontFamily: '"Courier New", monospace',
+    fontSize: 12,
+    letterSpacing: 1,
+    marginBottom: 4,
+    padding: '6px 8px',
+    width: '100%',
+  },
   grid: {
     display: 'grid',
     gap: 2,

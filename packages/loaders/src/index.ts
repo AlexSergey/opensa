@@ -37,8 +37,6 @@ export interface CreateAssetLoaderConfig {
   peds?: readonly string[];
   /** Where resolved bytes go — the VFS. */
   sink?: AssetSink;
-  /** TEMPORARY: vehicle models to pull into the local loader's selection (from `vehicles.ide`). */
-  vehicles?: readonly string[];
   /** Build version string. */
   version: string;
 }
@@ -50,7 +48,6 @@ export function createAssetLoader(config: CreateAssetLoaderConfig): AssetLoader 
       game: config.game,
       peds: config.peds,
       sink: config.sink,
-      vehicles: config.vehicles,
       version: config.version,
     });
   }
