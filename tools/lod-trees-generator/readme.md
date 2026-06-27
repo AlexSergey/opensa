@@ -17,8 +17,9 @@ tsx tools/lod-trees-generator/src/cli.ts --dff <path> --txd <path> --out <path> 
   **and** swap their HD DFF. Off (default) ⇒ procobj is left fully stock even if a species is in `--dff`
 - `--procobj-max` / `--procobj-height` — only with `--procobj`: cap on converted objects (default `20000`,
   `0` disables) / optional min height in m to drop short clutter (default `0` = off)
-- `--prelight` — copy each swapped HD model's prelight (day vertex colours) from its stock DFF, so custom trees
-  with bad prelit don't render black/washed-out next to stock geometry
+- `--prelight` — copy the stock model's prelight (day ambient) onto each swapped custom tree so it isn't
+  black/washed-out next to stock geometry. Applied **trunk-only** (opaque surfaces; foliage keeps its own prelit)
+  and to **both** the HD and the baked LOD atlas, so the impostor isn't over-bright vs the corrected HD
 - `--loose` — write the modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`
 - `--strip` — verification mode: strip all source trees from the map (empty world) instead of placing LODs
 

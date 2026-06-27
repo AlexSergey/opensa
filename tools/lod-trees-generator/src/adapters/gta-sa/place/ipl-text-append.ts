@@ -23,6 +23,8 @@ export interface TextEdits {
   appends: readonly AppendInst[];
   /** data-row index → impostor it should now resolve to. */
   repoints: ReadonlyMap<number, Repoint>;
+  /** data-row index → new `lod` column value (point a text-IPL HD row at its appended impostor). */
+  setLods: ReadonlyMap<number, number>;
 }
 
 /** Apply edits; returns the new text + the data-row count seen (the base index appends were numbered from). */
@@ -30,7 +32,7 @@ export function applyTextEdits(text: string, edits: TextEdits): { instCount: num
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const lines = text.split(/\r?\n/);
   const section = findInst(lines);
-  if (!section || (edits.appends.length === 0 && edits.repoints.size === 0)) {
+  if (!section || (edits.appends.length === 0 && edits.repoints.size === 0 && edits.setLods.size === 0)) {
     return { instCount: section ? countRows(lines, section) : 0, text };
   }
 
@@ -43,7 +45,7 @@ export function applyTextEdits(text: string, edits: TextEdits): { instCount: num
       }
     }
     if (i > section.start && i < section.end && isRow(lines[i])) {
-      out.push(repoint(lines[i], edits.repoints.get(r)));
+      out.push(setLod(repoint(lines[i], edits.repoints.get(r)), edits.setLods.get(r)));
       r += 1;
     } else {
       out.push(lines[i]);
@@ -102,6 +104,21 @@ function repoint(line: string, to: Repoint | undefined): string {
   const lead = /^\s*/.exec(cells[1])?.[0] ?? '';
   const trail = /\s*$/.exec(cells[1])?.[0] ?? '';
   cells[1] = `${lead}${to.model}${trail}`;
+
+  return cells.join(',');
+}
+
+/** Set the `lod` column (col 10) of an `inst` row, keeping its leading spacing. */
+function setLod(line: string, lod: number | undefined): string {
+  if (lod === undefined) {
+    return line;
+  }
+  const cells = line.split(',');
+  if (cells.length < 11) {
+    return line;
+  }
+  const lead = /^\s*/.exec(cells[10])?.[0] ?? ' ';
+  cells[10] = `${lead}${lod}`;
 
   return cells.join(',');
 }

@@ -10,7 +10,7 @@ function ipl(rows: readonly (readonly [number, string, number])[]): string {
   return lines.join('\r\n') + '\r\n';
 }
 
-const noEdits = { appends: [], repoints: new Map() };
+const noEdits = { appends: [], repoints: new Map(), setLods: new Map() };
 const impostor = (id: number, model: string): AppendInst => ({
   id,
   interior: 0,
@@ -44,6 +44,7 @@ describe('applyTextEdits', () => {
       const result = applyTextEdits(ipl([[1, 'a', -1]]), {
         appends: [impostor(9, 'lodx')],
         repoints: new Map(),
+        setLods: new Map(),
       });
       const out = parseIpl(result.text);
 
@@ -58,7 +59,7 @@ describe('applyTextEdits', () => {
           [1, 'stocklod', -1],
           [2, 'b', -1],
         ]),
-        { appends: [], repoints: new Map([[0, { id: 9, model: 'lodx' }]]) },
+        { appends: [], repoints: new Map([[0, { id: 9, model: 'lodx' }]]), setLods: new Map() },
       );
       const out = parseIpl(result.text);
 
@@ -66,10 +67,23 @@ describe('applyTextEdits', () => {
       expect(out[1].modelName).toBe('b');
     });
 
+    it('sets a text HD row’s lod column to its appended impostor index', () => {
+      const result = applyTextEdits(ipl([[1, 'tree', -1]]), {
+        appends: [impostor(9, 'lodx')],
+        repoints: new Map(),
+        setLods: new Map([[0, 1]]), // row 0 (the HD) → appended row index 1
+      });
+      const out = parseIpl(result.text);
+
+      expect(out[0]).toMatchObject({ id: 1, lod: 1, modelName: 'tree' }); // HD now points at its LOD
+      expect(out[1]).toMatchObject({ id: 9, lod: -1, modelName: 'lodx' }); // the appended LOD leaf
+    });
+
     it('numbers appends after the existing rows (the index the caller links to)', () => {
       const result = applyTextEdits(ipl([[1, 'a', -1]]), {
         appends: [impostor(9, 'lodx'), impostor(10, 'lody')],
         repoints: new Map(),
+        setLods: new Map(),
       });
 
       // base instCount 1 → appends land at indices 1 and 2
@@ -77,7 +91,11 @@ describe('applyTextEdits', () => {
     });
 
     it('preserves CRLF endings', () => {
-      const result = applyTextEdits(ipl([[1, 'a', -1]]), { appends: [impostor(9, 'lodx')], repoints: new Map() });
+      const result = applyTextEdits(ipl([[1, 'a', -1]]), {
+        appends: [impostor(9, 'lodx')],
+        repoints: new Map(),
+        setLods: new Map(),
+      });
 
       expect(result.text).toContain('\r\n');
       expect(result.text).not.toMatch(/[^\r]\n/);

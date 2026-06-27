@@ -12,7 +12,9 @@
  *     --procobj         touch `--dff ∩ procobj` species (convert scatter → static LODs + swap HD); off = leave stock
  *     --procobj-max     cap on procobj objects converted to static IPL (0 disables; default from config)
  *     --procobj-height  optional min impostor height (m) gate, drops short clutter (0 = off; default from config)
- *     --prelight        copy each swapped HD model's prelight (day vertex colours) from its stock DFF
+ *     --prelight        copy the stock model's trunk prelight onto each swapped tree (HD + baked LOD; foliage kept)
+ *     --loose           write changed IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`
+ *     --strip           verification mode: strip all source trees from the map (empty world) instead of placing
  *   All paths are relative to the current working directory (absolute paths pass through).
  */
 import { existsSync, mkdirSync, statSync } from 'node:fs';

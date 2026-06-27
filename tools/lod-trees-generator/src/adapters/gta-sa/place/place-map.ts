@@ -30,6 +30,8 @@ export interface PlaceOptions {
   dffPath: string;
   /** Impostor LOD draw distance written to `lodtrees.ide` (`--draw`). */
   drawDistance: number;
+  /** Lowercased names of the alpha-cutout (foliage) textures — the trunk-only `--prelight` split. */
+  foliageTextures: ReadonlySet<string>;
   gamePath: string;
   impostors: readonly ImpostorRef[];
   /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`. */
@@ -60,16 +62,35 @@ interface Impostor {
 const IDE_REL = 'data/maps/lodtrees.ide';
 const IDE_DAT = 'DATA\\MAPS\\lodtrees.IDE';
 
+/** Per-area accumulator over the text IPL's shared instance-index space (binary streams + text rows alike). */
+interface AreaEdit {
+  appends: AppendInst[];
+  baseCount: number;
+  claimed: Map<number, number>;
+  nextIdx: number;
+  repoints: Map<number, Repoint>;
+}
+
+/** A placed HD instance (binary or text) — the transform the impostor LOD inherits. */
+interface PlacedInst {
+  interior: number;
+  lod: number;
+  position: readonly [number, number, number];
+  rotation: readonly [number, number, number, number];
+}
+
 /**
- * Stage 2 — attach an impostor LOD to every streamed tree HD. For each binary-stream instance of a source model
- * we ensure a text-IPL LOD = its impostor: append a leaf instance at the HD's transform (and point the HD's `lod`
- * at it), or repoint an existing LOD row. Then register the impostors (`lodtrees.ide` + `gta.dat`) and pack the
- * impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (procobj species only with `--procobj`) into `--out`.
+ * Stage 2 — attach an impostor LOD to every placed tree HD (binary-stream **and** text-IPL instances). For each
+ * we ensure a LOD = its impostor: append a leaf instance at the HD's transform and link the HD's `lod` (binary
+ * stream field / text `lod` column) to it, or repoint an existing LOD row. Then register the impostors
+ * (`lodtrees.ide` + `gta.dat`) and pack the impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (procobj species
+ * only with `--procobj`) into `--out`.
  */
 export function placeMap(options: PlaceOptions): void {
   const {
     dffPath,
     drawDistance,
+    foliageTextures,
     gamePath,
     impostors,
     loose,
@@ -93,7 +114,7 @@ export function placeMap(options: PlaceOptions): void {
   // Swapped HD models + their custom TXD: pack the TXD + retarget the models' IDE `txd`. procobj species are
   // swapped only with `--procobj` (else kept stock so their runtime scatter stays unchanged).
   const swapModels = procobj ? [...result.placedSources] : [...result.placedSources].filter((m) => !procModels.has(m));
-  const swap = swapEntries(dffPath, swapModels, prelight ? archive : null);
+  const swap = swapEntries(dffPath, swapModels, prelight ? archive : null, foliageTextures);
   const retxd = retxdSwappedModels(gamePath, dat.ide, dffPath, txdPath, swapModels);
 
   // Emit: text IPLs, retxd'd IDEs, lodtrees.ide, patched gta.dat.
@@ -167,6 +188,31 @@ function areaKey(name: string): string {
     .toLowerCase();
 }
 
+/**
+ * Attach an impostor LOD to one placed HD: repoint the HD's existing stock-LOD text row onto the impostor (when
+ * free), else append a leaf impostor row at the HD's transform. Returns the appended row index the caller must
+ * link the HD's `lod` to (binary stream field or text `lod` column), or `null` when repointed in place.
+ */
+function attachImpostor(
+  edit: AreaEdit,
+  imp: Impostor,
+  inst: PlacedInst,
+  out: { appended: number; repointed: number },
+): null | number {
+  if (inst.lod >= 0 && inst.lod < edit.baseCount && claim(edit.claimed, inst.lod, imp.id)) {
+    edit.repoints.set(inst.lod, { id: imp.id, model: imp.alias });
+    out.repointed += 1;
+
+    return null;
+  }
+  edit.appends.push({ id: imp.id, interior: inst.interior, model: imp.alias, pos: inst.position, rot: inst.rotation });
+  const idx = edit.nextIdx;
+  edit.nextIdx += 1;
+  out.appended += 1;
+
+  return idx;
+}
+
 /** Impostor records: short IMG/IDE alias + a free object id each. */
 function buildRegistry(impostors: readonly ImpostorRef[], usedIds: ReadonlySet<number>): Impostor[] {
   const aliases = impostors.map((imp, i) => impostorAlias(imp.name, i));
@@ -192,7 +238,12 @@ function claim(claimed: Map<number, number>, index: number, id: number): boolean
   return owner === id;
 }
 
-/** Per-area: append/repoint impostor LODs in the text IPL + link the binary `lod` fields. */
+/**
+ * Per-area: attach an impostor LOD to every placed tree HD — binary-stream HDs (link the binary `lod` field) and
+ * text-IPL HDs (set the text row's `lod` column) alike — appending leaf LOD rows / repointing existing ones into
+ * the area's companion text IPL. Areas iterated = every text IPL ∪ every binary-stream area (so text-only
+ * placements are no longer skipped); binary streams without a companion text IPL can't host LODs and are skipped.
+ */
 function editAreas(
   archive: ImgArchive,
   gamePath: string,
@@ -212,18 +263,17 @@ function editAreas(
   const streams = new Map<string, Uint8Array>();
   const texts = new Map<string, string>();
 
-  for (const [area, streamNames] of streamsByArea) {
+  for (const area of new Set([...textByArea.keys(), ...streamsByArea.keys()])) {
     const textRef = textByArea.get(area);
     if (!textRef) {
-      continue; // streams without a companion text IPL can't host LOD instances — skip
+      continue; // binary streams without a companion text IPL can't host LOD instances — skip
     }
     const textRaw = readFileSync(datChildUrl(gamePath, textRef), 'utf8');
-    const appends: AppendInst[] = [];
-    const repoints = new Map<number, Repoint>();
-    const claimed = new Map<number, number>();
-    let nextIdx = parseIpl(textRaw).length;
+    const baseCount = parseIpl(textRaw).length;
+    const edit: AreaEdit = { appends: [], baseCount, claimed: new Map(), nextIdx: baseCount, repoints: new Map() };
 
-    for (const name of streamNames) {
+    // Binary-stream HDs: link the stream instance's `lod` to its appended/repointed impostor row.
+    for (const name of streamsByArea.get(area) ?? []) {
       const bytes = new Uint8Array(archive.get(name) ?? new ArrayBuffer(0));
       const links = new Map<number, number>();
       parseBinaryIpl(toArrayBuffer(bytes)).forEach((inst, i) => {
@@ -233,29 +283,32 @@ function editAreas(
         }
         out.attached += 1;
         out.placedSources.add(imp.source);
-        if (inst.lod >= 0 && inst.lod < nextIdx && claim(claimed, inst.lod, imp.id)) {
-          // The HD already has a stock LOD slot — repoint that text instance onto the impostor (no append).
-          repoints.set(inst.lod, { id: imp.id, model: imp.alias });
-          out.repointed += 1;
-        } else {
-          // Append the impostor as a leaf instance at the HD's transform and point the HD's binary `lod` at it.
-          appends.push({
-            id: imp.id,
-            interior: inst.interior,
-            model: imp.alias,
-            pos: inst.position,
-            rot: inst.rotation,
-          });
-          links.set(i, nextIdx);
-          nextIdx += 1;
-          out.appended += 1;
+        const idx = attachImpostor(edit, imp, inst, out);
+        if (idx !== null) {
+          links.set(i, idx);
         }
       });
       if (links.size > 0) {
         streams.set(name, linkBinaryLods(bytes, links));
       }
     }
-    texts.set(textRef, applyTextEdits(textRaw, { appends, repoints }).text);
+
+    // Text-IPL HDs (always-loaded placements): set the row's `lod` column to its appended impostor.
+    const setLods = new Map<number, number>();
+    parseIpl(textRaw).forEach((inst, row) => {
+      const imp = idToImpostor.get(inst.id);
+      if (!imp) {
+        return;
+      }
+      out.attached += 1;
+      out.placedSources.add(imp.source);
+      const idx = attachImpostor(edit, imp, inst, out);
+      if (idx !== null) {
+        setLods.set(row, idx);
+      }
+    });
+
+    texts.set(textRef, applyTextEdits(textRaw, { appends: edit.appends, repoints: edit.repoints, setLods }).text);
   }
 
   return { ...out, streams, texts };
@@ -372,7 +425,12 @@ function sourceObjectIds(
  * Read the user HD DFF bytes for each model to swap, keyed by its `<model>.dff` IMG entry. When `archive` is
  * given (`--prelight`), each swapped DFF inherits its stock model's prelight before being packed.
  */
-function swapEntries(dffPath: string, models: readonly string[], archive: ImgArchive | null): Map<string, Uint8Array> {
+function swapEntries(
+  dffPath: string,
+  models: readonly string[],
+  archive: ImgArchive | null,
+  foliageTextures: ReadonlySet<string>,
+): Map<string, Uint8Array> {
   const isDir = statSync(dffPath).isDirectory();
   const files = isDir
     ? new Map(readdirSync(dffPath).map((f) => [f.replace(/\.dff$/i, '').toLowerCase(), join(dffPath, f)]))
@@ -396,7 +454,7 @@ function swapEntries(dffPath: string, models: readonly string[], archive: ImgArc
     if (archive) {
       const stock = archive.get(`${model}.dff`);
       if (stock) {
-        bytes = applyStockPrelight(bytes, new Uint8Array(stock));
+        bytes = applyStockPrelight(bytes, new Uint8Array(stock), (name) => foliageTextures.has(name));
       } else {
         console.warn(`  ! ${model}: no stock DFF in gta3.img → prelight not transferred`);
       }

@@ -1,31 +1,39 @@
 import type { GeometryStruct } from '@opensa/rw-codec/geometry-struct';
 
+import { parseDff } from '@opensa/renderware/parsers/binary/dff';
 import { readRw, writeRw } from '@opensa/rw-codec/chunk';
 import { collectGeometries } from '@opensa/rw-codec/dff';
 import { decodeGeometryStruct, encodeGeometryStruct } from '@opensa/rw-codec/geometry-struct';
 
 const RW_STRUCT = 0x01;
 const PRELIT_FLAG = 0x0008; // rpGEOMETRYPRELIT — geometry Struct carries one RGBA per vertex
+const WHITE: Rgba = [255, 255, 255, 255];
+
+/** Classifies a (lowercased) texture name as foliage — alpha-cutout leaves — vs an opaque trunk/bark surface. */
+export type FoliagePredicate = (textureName: string) => boolean;
 
 type Rgba = readonly [number, number, number, number];
 
 /**
- * Transfer the **stock** model's prelight (day vertex colours) onto a **custom** swapped HD DFF. Custom trees
- * often ship with badly-set prelit (black / washed-out) versus the stock model SA lit for that spot, and SA draws
- * foliage as `prelit × material`, so the custom looks wrong in-world.
+ * Transfer the **stock** model's prelight onto a **custom** swapped HD DFF, but **only on the trunk** (opaque
+ * surfaces) — foliage (alpha-cutout) keeps its own prelit so the leaves stay natural. Custom trees often ship with
+ * badly-set prelit (black / washed-out) versus the stock model SA lit for that spot, and SA draws `prelit ×
+ * material`, so the trunk looks wrong in-world; the stock model's representative ambient fixes it.
  *
- * Topology differs between stock and custom, so a per-vertex copy isn't generally possible — SA tree prelit is a
- * near-uniform ambient tint anyway. So we take a representative colour from the stock prelit and **fill the custom
- * uniformly** (setting the PRELIT flag + allocating the array if absent). A same-`numVertices` geometry keeps full
- * fidelity via a verbatim copy (the custom is a stock re-export). No-ops when the stock carries no prelit.
+ * Topology differs between stock and custom, so we take one representative colour from the stock prelit and fill
+ * the custom's **trunk** vertices with it (setting the PRELIT flag + allocating the array if absent). Foliage
+ * vertices keep the custom's existing prelit (or white when it had none). No-ops when the stock carries no prelit.
  */
-export function applyStockPrelight(customDff: Uint8Array, stockDff: Uint8Array): Uint8Array {
-  const stockStructs = geometryStructs(stockDff);
-  const withPrelit = stockStructs.filter((s) => hasPrelit(s));
-  if (withPrelit.length === 0) {
+export function applyStockPrelight(
+  customDff: Uint8Array,
+  stockDff: Uint8Array,
+  isFoliage: FoliagePredicate,
+): Uint8Array {
+  const average = stockPrelightColor(stockDff);
+  if (!average) {
     return customDff; // nothing to transfer — leave the custom untouched
   }
-  const average = averageColour(withPrelit);
+  const masks = foliageVertexMasks(customDff, isFoliage);
 
   const file = readRw(customDff);
   collectGeometries(file.chunks).forEach((geometry, i) => {
@@ -37,16 +45,38 @@ export function applyStockPrelight(customDff: Uint8Array, stockDff: Uint8Array):
     if (struct.native !== 0) {
       return; // native (pre-instanced) geometry — the non-native Struct codec can't express it; leave as-is
     }
-    const stock = stockStructs[i];
-    struct.prelit =
-      stock && hasPrelit(stock) && stock.numVertices === struct.numVertices
-        ? stock.prelit!.slice()
-        : fill(struct.numVertices, average);
+    struct.prelit = trunkOnlyPrelit(struct.numVertices, struct.prelit, average, masks[i] ?? []);
     struct.flags |= PRELIT_FLAG;
     child.data = encodeGeometryStruct(struct);
   });
 
   return writeRw(file);
+}
+
+/** The stock model's representative prelit colour (mean RGBA over its prelit vertices), or `null` if it has none. */
+export function stockPrelightColor(stockDff: Uint8Array): null | Rgba {
+  const withPrelit = geometryStructs(stockDff).filter(hasPrelit);
+
+  return withPrelit.length === 0 ? null : averageColour(withPrelit);
+}
+
+/** A prelit array where trunk vertices take the stock `average` and foliage vertices keep `existing` (or white). */
+export function trunkOnlyPrelit(
+  numVertices: number,
+  existing: null | Uint8Array,
+  average: Rgba,
+  foliageMask: readonly boolean[],
+): Uint8Array {
+  const out = new Uint8Array(numVertices * 4);
+  for (let v = 0; v < numVertices; v += 1) {
+    if (foliageMask[v]) {
+      out.set(existing ? existing.subarray(v * 4, v * 4 + 4) : WHITE, v * 4); // foliage — keep custom / white
+    } else {
+      out.set(average, v * 4); // trunk — stock ambient
+    }
+  }
+
+  return out;
 }
 
 /** Mean RGBA across every prelit vertex of the given (prelit-bearing) geometries. */
@@ -70,17 +100,28 @@ function averageColour(structs: readonly GeometryStruct[]): Rgba {
   return n === 0 ? [255, 255, 255, 255] : [Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)];
 }
 
-/** A `numVertices × 4` prelit array filled with one colour. */
-function fill(numVertices: number, [r, g, b, a]: Rgba): Uint8Array {
-  const out = new Uint8Array(numVertices * 4);
-  for (let i = 0; i < out.length; i += 4) {
-    out[i] = r;
-    out[i + 1] = g;
-    out[i + 2] = b;
-    out[i + 3] = a;
-  }
+/**
+ * Per geometry, a per-vertex mask: `true` where the vertex is touched by a foliage (alpha-textured) triangle.
+ * Falls back to all-trunk (`[]`) if the DFF can't be parsed for materials — prelight then applies everywhere.
+ */
+function foliageVertexMasks(customDff: Uint8Array, isFoliage: FoliagePredicate): boolean[][] {
+  try {
+    return parseDff(toArrayBuffer(customDff)).geometries.map((geo) => {
+      const mask = new Array<boolean>(geo.positions.length / 3).fill(false);
+      for (const tri of geo.triangles) {
+        const name = geo.materials[tri.materialIndex]?.texture?.name?.toLowerCase();
+        if (name && isFoliage(name)) {
+          mask[tri.a] = true;
+          mask[tri.b] = true;
+          mask[tri.c] = true;
+        }
+      }
 
-  return out;
+      return mask;
+    });
+  } catch {
+    return [];
+  }
 }
 
 /** Decode each geometry's Struct (in geometry order; `null` for a geometry without one). */
@@ -94,4 +135,11 @@ function geometryStructs(dff: Uint8Array): (GeometryStruct | null)[] {
 
 function hasPrelit(struct: GeometryStruct | null): struct is GeometryStruct {
   return struct !== null && struct.native === 0 && (struct.flags & PRELIT_FLAG) !== 0 && struct.prelit !== null;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+
+  return copy.buffer;
 }

@@ -24,6 +24,7 @@ describe('place attach (lae text + lae_stream0 binary)', () => {
       const text = applyTextEdits(textRaw, {
         appends: [{ id: impostorId, interior: hd.interior, model: 'lodtest', pos: hd.position, rot: hd.rotation }],
         repoints: new Map(),
+        setLods: new Map(),
       }).text;
       const linked = parseBinaryIpl(ab(linkBinaryLods(stream, new Map([[0, newIndex]]))));
       const out = parseIpl(text);

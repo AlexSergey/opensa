@@ -3,23 +3,25 @@ import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
+export interface CustomTxd {
+  bytes: Uint8Array;
+  name: string;
+  textures: Set<string>;
+}
+
 /**
  * Point the swapped HD models at the user's custom TXD: each swapped DFF references textures that live in the
  * `--txd`, not the stock TXD its IDE names — so the model renders untextured (white) until we (a) pack the custom
- * TXD into the IMG and (b) rewrite the model's IDE `txd` column to it. Each model is matched to the custom TXD
- * that contains its textures (the common case is a single combined TXD → every model maps to it).
+ * TXD into the IMG and (b) rewrite the model's IDE `txd` column to it. A model is repointed **only** to a custom
+ * TXD that actually contains its textures; a model whose textures aren't in any custom TXD (e.g. a swapped procobj
+ * desert plant that still uses stock `gta_procdesert` textures) keeps its stock `txd` — repointing it would strip
+ * its textures.
  */
 export interface RetxdResult {
   /** gta.dat-relative IDE path → rewritten text. */
   ides: Map<string, string>;
   /** IMG entry name (`<txd>.txd`) → TXD bytes to pack. */
   txds: Map<string, Uint8Array>;
-}
-
-interface CustomTxd {
-  bytes: Uint8Array;
-  name: string;
-  textures: Set<string>;
 }
 
 /** Rewrite the `txd` column (cell 2) of every `objs`/`tobj`/`anim` row whose model is in `modelToTxd`. */
@@ -87,6 +89,30 @@ export function retxdSwappedModels(
   return { ides, txds };
 }
 
+/**
+ * The custom TXD covering the **most** of the model's referenced textures, requiring at least one hit — so a model
+ * whose textures aren't in any custom TXD returns `undefined` and keeps its stock `txd` (rather than being
+ * repointed to a TXD that doesn't contain them, which strips its textures in-game).
+ */
+export function selectTxd(refs: ReadonlySet<string>, custom: readonly CustomTxd[]): CustomTxd | undefined {
+  let best: CustomTxd | undefined;
+  let bestHits = 0;
+  for (const txd of custom) {
+    let hits = 0;
+    for (const t of refs) {
+      if (txd.textures.has(t)) {
+        hits += 1;
+      }
+    }
+    if (hits > bestHits) {
+      best = txd;
+      bestHits = hits;
+    }
+  }
+
+  return best;
+}
+
 function base(path: string): string {
   return basename(path)
     .replace(/\.(?:dff|txd)$/i, '')
@@ -139,21 +165,14 @@ function loadCustomTxds(txdPath: string): CustomTxd[] {
   });
 }
 
-/** The custom TXD that covers the model's referenced textures (or the only one when there is a single TXD). */
+/** The custom TXD that covers the model's referenced textures, or `undefined` (→ keep its stock `txd`). */
 function pickTxd(custom: readonly CustomTxd[], dffFile: string | undefined): CustomTxd | undefined {
-  if (custom.length <= 1 || !dffFile) {
-    return custom[0];
+  if (!dffFile) {
+    return undefined; // can't inspect the DFF → don't risk repointing to a TXD that lacks its textures
   }
-  const refs = dffTextures(dffFile);
-  let best = custom[0];
-  let bestHits = -1;
-  for (const txd of custom) {
-    const hits = [...refs].filter((t) => txd.textures.has(t)).length;
-    if (hits > bestHits) {
-      best = txd;
-      bestHits = hits;
-    }
+  try {
+    return selectTxd(dffTextures(dffFile), custom);
+  } catch {
+    return undefined; // unparseable DFF → leave its stock txd
   }
-
-  return best;
 }

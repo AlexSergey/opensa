@@ -76,44 +76,53 @@ that's black or washed-out next to stock geometry).
 With `--prelight`, before packing each swapped custom DFF, read the **stock** model's DFF (the same
 `<model>.dff` already present in the opened `gta3.img` archive), extract its prelit, and write it into the custom.
 
-### The topology problem & the chosen transfer
+### The transfer — trunk-only, on both HD and LOD
 
-Stock and custom meshes have **different vertex counts / topology**, so a 1:1 per-vertex copy is impossible in
-general. In practice SA tree prelit is a **near-uniform ambient tint** (foliage uses flat prelight, not baked
-per-vertex AO). So the transfer is:
+Stock and custom meshes have **different vertex counts / topology**, so a 1:1 per-vertex copy is impossible. SA
+tree prelit is a **near-uniform ambient tint** anyway, so we take **one representative colour** from the stock
+prelit (mean RGBA over its prelit vertices — `stockPrelightColor`).
 
-> Compute a **representative prelit colour** from the stock geometry (average RGBA over its prelit array) and
-> **fill the custom geometry's prelit uniformly** with it — setting the `PRELIT` flag (`0x0008`) and allocating a
-> `numVertices × 4` array if the custom lacks one.
+It is applied **only to the trunk**, not the foliage: a flat ambient over alpha-cutout leaves muddies them, and
+the foliage texture already reads well. Trunk vs foliage is classified by **texture alpha** — opaque = trunk/bark,
+alpha-cutout = foliage (`DecodedTexture.hasAlpha`, the `--txd` set). So:
 
-This is robust to topology and is exactly "take the original's setting, apply it to the custom." A
-**same-`numVertices` fast path** copies the stock prelit array verbatim (zero-cost fidelity when the custom is a
-stock re-export and topology happens to match). Both live behind `--prelight`.
+- **trunk** vertices/pixels → the stock ambient colour.
+- **foliage** vertices/pixels → keep the custom's own prelit (white when it had none).
 
-Per-geometry, multi-atomic DFFs handled by `collectGeometries` (same access pattern as `clearTristripFlag` /
-`stripExtraVertColour`), using `decodeGeometryStruct` / `encodeGeometryStruct` from `@opensa/rw-codec/geometry-struct`
-on each geometry's Struct child.
+Crucially this runs on **both surfaces so they stay consistent**:
 
-### Code touch (for the implementation)
+- **HD DFF** (`applyStockPrelight`, `place/prelight.ts`) — per geometry, decode the Struct, and fill `prelit` via
+  `trunkOnlyPrelit(numVertices, existing, average, foliageMask)`; set the `PRELIT` flag. The foliage mask comes
+  from `parseDff` materials (texture name → `isFoliage`), defaulting to all-trunk if the DFF won't parse.
+- **LOD atlas** (`applyTrunkPrelight`, `io.ts`) — the bake multiplies texture × vertex prelit, so the impostor
+  inherits whatever prelit the source carries. Without this it baked from the custom's **uncorrected** (often
+  bright) prelit → LOD much brighter than the now-darkened HD. So when `--prelight`, the adapter recolours trunk
+  triangles to the same stock ambient before baking; foliage triangles keep their source colours.
 
-- new `adapters/gta-sa/place/prelight.ts` — `applyStockPrelight(customDff, stockDff): Uint8Array`: for each custom
-  geometry, find the matching stock geometry (by index), compute its representative colour (or copy if counts
-  match), write into the custom Struct, set the `PRELIT` flag.
+### Code touch
+
+- `place/prelight.ts` — `applyStockPrelight(customDff, stockDff, isFoliage)`, plus exported `stockPrelightColor`
+  and `trunkOnlyPrelit`.
+- `io.ts` — `applyTrunkPrelight(tree, colour)` (LOD-bake trunk recolour).
+- `adapters/gta-sa/index.ts` — build the `foliageTextures` set (`hasAlpha`); in the adapter's `loadTree`, when
+  `--prelight`, compute the stock trunk colour and `applyTrunkPrelight` the baked tree; pass `foliageTextures` to
+  `placeMap`.
 - `place/place-map.ts` `swapEntries` — when `prelight`, fetch stock bytes via `archive.get('<model>.dff')` and run
-  `applyStockPrelight` before `swap.set`.
-- `cli.ts` — `--prelight` boolean → `PlaceOptions.prelight`.
+  `applyStockPrelight(..., (n) => foliageTextures.has(n))` before `swap.set`.
+- `cli.ts` — `--prelight` boolean.
 
 ### Edge cases
 
 - Stock model absent from the archive → skip + warn (leave custom as-is).
-- Stock has no `PRELIT` flag → nothing to transfer; leave the custom untouched (don't invent white).
-- Custom multi-geometry vs stock single → match by index; fall back to the stock's global average.
+- Stock has no `PRELIT` → `stockPrelightColor` is null; nothing transferred, LOD bake unchanged (HD and LOD both
+  use the source prelit → still consistent).
+- Custom DFF unparseable for materials → foliage mask falls back to all-trunk (prelight applies everywhere).
 
 ### Scope note
 
-Only touches the **swapped HD DFFs**. Impostors already bake HD lighting into the atlas and use flat-white prelit
-(`buildCardGeometry`), so they're unaffected. procobj species are swapped (and so prelit-transferred) only when
-`--procobj` is passed — see [§C](#c---procobj-gate--implemented); otherwise they keep stock HDs and are unaffected.
+Only touches the **swapped HD DFFs** and their **LOD atlas**. Non-`--prelight` runs are unchanged. procobj species
+are swapped (and so prelit-transferred) only when `--procobj` is passed — see
+[§C](#c---procobj-gate--implemented); otherwise they keep stock HDs and are unaffected.
 
 ---
 

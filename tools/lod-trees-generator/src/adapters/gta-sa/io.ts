@@ -55,8 +55,42 @@ export function loadTextures(txdPath: string): Textures {
   return textures;
 }
 
-/** Parse one HD tree into a triangle soup + bbox (native Z-up), sharing the combined `textures` map. Warns about
- *  any referenced texture name that the `--txd` source doesn't provide (those faces render untextured). */
+// Identity frame for atomics without a frame (and the fallback when a DFF has no atomics).
+const IDENTITY_ROTATION = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const ZERO_POSITION: Vec3 = [0, 0, 0];
+
+/**
+ * Override the **trunk** triangles' prelit colour in a baked tree so the LOD atlas matches a `--prelight`-corrected
+ * HD: trunk (opaque-textured) triangles take the stock ambient `trunk` colour; foliage (alpha-textured) triangles
+ * keep their source prelit, staying natural. Mutates the tree's triangles in place.
+ */
+export function applyTrunkPrelight(tree: HdTree, trunk: readonly [number, number, number, number]): void {
+  const colour: Rgba = [trunk[0], trunk[1], trunk[2], trunk[3]];
+  for (const triangle of tree.triangles) {
+    const foliage = triangle.texture ? (tree.textures.get(triangle.texture)?.hasAlpha ?? false) : false;
+    if (!foliage) {
+      triangle.colors = [colour, colour, colour];
+    }
+  }
+}
+
+/**
+ * Transform a vertex by a RenderWare frame: the flattened 3×3 `rotation` holds the right/up/at basis vectors and
+ * `position` the translation (mirrors `build-clump.ts` `frameMatrix` — the proven viewer path). Column-vector
+ * convention: `out = right·x + up·y + at·z + position`.
+ */
+export function frameTransformPoint(rotation: readonly number[], position: Vec3, [x, y, z]: Vec3): Vec3 {
+  return [
+    rotation[0] * x + rotation[3] * y + rotation[6] * z + position[0],
+    rotation[1] * x + rotation[4] * y + rotation[7] * z + position[1],
+    rotation[2] * x + rotation[5] * y + rotation[8] * z + position[2],
+  ];
+}
+
+/** Parse one HD tree into a triangle soup + bbox (native Z-up), sharing the combined `textures` map. Iterates the
+ *  clump's **atomics** so each geometry is placed by its **frame transform** (a multi-atomic / frame-offset model
+ *  was being baked from a mis-assembled mesh — the "LOD as if from the wrong model" bug). Warns about any
+ *  referenced texture name that the `--txd` source doesn't provide (those faces render untextured). */
 export function loadTree(dffPath: string, model: string, textures: Textures): HdTree {
   const dff = parseDff(toArrayBuffer(readBytes(dffPath)));
   const triangles: HdTriangle[] = [];
@@ -64,21 +98,42 @@ export function loadTree(dffPath: string, model: string, textures: Textures): Hd
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
   const missing = new Set<string>();
 
-  for (const geometry of dff.geometries) {
+  // Bake the atomic instances (geometry + its frame transform); fall back to raw geometries for DFFs with none.
+  const atomics =
+    dff.atomics.length > 0
+      ? dff.atomics
+      : dff.geometries.map((_, geometryIndex) => ({ frameIndex: -1, geometryIndex }));
+
+  for (const atomic of atomics) {
+    const geometry = dff.geometries[atomic.geometryIndex];
+    if (!geometry) {
+      continue;
+    }
+    const frame = dff.frames[atomic.frameIndex];
+    const rot = frame?.rotation ?? IDENTITY_ROTATION;
+    const fpos = frame?.position ?? ZERO_POSITION;
     const pos = geometry.positions;
     const uv: Float32Array | undefined = geometry.uvLayers[0];
     const col = geometry.prelitColors;
-    const at = (i: number): Vec3 => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+
+    // Frame-transform every vertex once into world space.
+    const world = new Float32Array(pos.length);
+    for (let i = 0; i < pos.length; i += 3) {
+      const p = frameTransformPoint(rot, fpos, [pos[i], pos[i + 1], pos[i + 2]]);
+      world[i] = p[0];
+      world[i + 1] = p[1];
+      world[i + 2] = p[2];
+      for (let axis = 0; axis < 3; axis += 1) {
+        min[axis] = Math.min(min[axis], p[axis]);
+        max[axis] = Math.max(max[axis], p[axis]);
+      }
+    }
+
+    const at = (i: number): Vec3 => [world[i * 3], world[i * 3 + 1], world[i * 3 + 2]];
     const uvAt = (i: number): Vec2 => (uv ? [uv[i * 2], uv[i * 2 + 1]] : [0, 0]);
     const colAt = (i: number): null | Rgba =>
       col ? [col[i * 4], col[i * 4 + 1], col[i * 4 + 2], col[i * 4 + 3]] : null;
 
-    for (let i = 0; i < pos.length; i += 3) {
-      for (let axis = 0; axis < 3; axis += 1) {
-        min[axis] = Math.min(min[axis], pos[i + axis]);
-        max[axis] = Math.max(max[axis], pos[i + axis]);
-      }
-    }
     for (const triangle of geometry.triangles) {
       const texture = geometry.materials[triangle.materialIndex]?.texture?.name?.toLowerCase() ?? null;
       if (texture && !textures.has(texture)) {

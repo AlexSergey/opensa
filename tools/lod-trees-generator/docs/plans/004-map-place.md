@@ -22,27 +22,25 @@ instances. For each binary-stream instance of a source model, ensure it has a te
 | `lod = -1` (9860) | **append** a `lod<name>` instance to the area's companion text IPL at the HD's pos/rot (interior copied, `lod -1`); set the binary HD's `lod` to the appended index |
 | `lod ≥ 0` (351)   | **repoint in place**: overwrite the existing stock-LOD text instance's id → the impostor id (same index, no append, HD `lod` unchanged)                             |
 
-Text-IPL source instances are already always-loaded bigbuildings (no distance cull) — left untouched.
+Text-IPL source instances (always-loaded bigbuildings) are handled the same way **within their own file**: append
+the impostor as a leaf row and set the HD row's `lod` column to it (or repoint an existing LOD row) — a
+text-internal link, no binary coupling. Areas are iterated as _every text IPL ∪ every binary-stream area_, so a
+model placed only in text is no longer skipped (it was the "in `--dff`, not procobj, yet no LOD and not swapped"
+bug). These HDs also enter `placedSources`, so their DFF is swapped like any other.
 
 ### Why appends are safe
 
 Appends go at the **end** of the text `inst` section, so every existing text/binary `lod` index is unchanged;
-the only edits are (a) the new rows, (b) the targeted binary `lod` fields, (c) the 351 repointed ids. No
-re-index needed — the inverse of the Stage-1 removal, and just as index-consistent.
-
-Text-IPL source instances are already always-loaded bigbuildings (no distance cull) — left untouched.
-
-### Why appends are safe
-
-Appends go at the **end** of the text `inst` section, so every existing text/binary `lod` index is unchanged;
-the only edits are (a) the new rows, (b) the targeted binary `lod` fields, (c) the repointed ids. No re-index
-needed — the inverse of the Stage-1 removal, and just as index-consistent.
+the only edits are (a) the new rows, (b) the targeted binary `lod` fields / text `lod` columns, (c) the repointed
+ids. No re-index needed — the inverse of the Stage-1 removal, and just as index-consistent.
 
 ## Asset registration
 
-- Allocate 286 object ids from the **lowest free gap inside the stock id space** (scan all IDE ids; the stock set
-  leaves gaps like `6526..6862`, `11682..12799`). Ids **must stay ≤ 18630** (the stock max) — ids above it
-  silently fail to load on stock SA without a limit adjuster, which is exactly the "no LODs, no crash" symptom.
+- Allocate 286 object ids from the **lowest free ids inside the stock id space** (scan all IDE ids; assign the
+  lowest unused ids ascending — **not** necessarily contiguous, since a heavily-modded game rarely leaves a
+  286-wide consecutive gap below the ceiling). Ids **must stay ≤ 18630** (the stock max) — ids above it silently
+  fail to load on stock SA without a limit adjuster, which is exactly the "HD swapped but no LOD" symptom (so the
+  allocator throws if it can't fit every model ≤ 18630 rather than spilling past it).
 - Emit a dedicated **`lodtrees.ide`** (`objs`: `id, <model>, lodtrees, 600, 2130048` — stock tree-LOD draw
   distance + flags) and splice an `IDE` line into `gta.dat` after the stock IDEs.
 - **Model name** is `lod<source>`, except names that would overflow the IMG entry limit (≤ 23 bytes incl `.dff`,
@@ -60,8 +58,11 @@ is 144 of the placed source models on the stock set.
 
 The swapped DFFs reference textures in the user's `--txd`, not the stock TXD their IDE names, so `retxd.ts` also:
 pack the custom TXD(s) into `gta3.img`, and rewrite each swapped model's IDE `txd` column to the custom TXD that
-covers its textures (a single combined TXD → every swapped model points at it). Without this the swapped HDs
-render white.
+covers its textures. A model is repointed **only** when a custom TXD actually contains its textures (≥1 hit) — a
+swapped model whose textures aren't in any custom TXD (e.g. a procobj desert plant still using stock
+`gta_procdesert` textures, pulled in via `--procobj`) **keeps its stock `txd`**, since repointing it to a TXD that
+lacks its textures would strip them (renders untextured). Without the repoint for genuinely custom-textured HDs
+they render white.
 
 ## Output (under `--out`)
 

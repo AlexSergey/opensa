@@ -3,10 +3,11 @@
  * (`objs` section), and splice an `IDE` line into `gta.dat` (IDEs load before IPLs).
  */
 
-/** Search window for free object ids: above the low special-model ranges, below the stock model ceiling, so the
- *  new models load on **stock** SA (ids above the max stock id of 18630 silently fail to load without an adjuster). */
+/** Search window for free object ids: above the low special-model ranges, **at or below the stock model ceiling
+ *  of 18630** — ids above it silently fail to load on stock SA (no adjuster), which is the "HD swapped, no LOD"
+ *  symptom. The window must stay ≤ 18630; do not widen it. */
 const ID_MIN = 4000;
-const ID_MAX = 19999;
+const ID_MAX = 18630;
 /** Object flags for the LOD billboards — the value the Proper-Fixes LOD-vegetation mod uses for its tree LODs.
  *  (0x200084: alpha + draw-last + LOD-friendly.) The draw distance is `--draw`. */
 const FLAGS = 2097284;
@@ -16,14 +17,15 @@ const TXD = 'lodtrees';
 const MAX_MODEL = 19;
 
 /**
- * Assign each impostor model a free object id from the lowest contiguous gap in the stock id space that fits them
- * all (deterministic, sorted). Staying inside the stock range means the models load without a limit adjuster.
+ * Assign each impostor model a free object id — the lowest unused ids in the stock space (**not** necessarily
+ * contiguous; ids needn't be consecutive, and a heavily-modded game rarely has a 286-wide contiguous gap left
+ * below 18630). Deterministic (models sorted, ids ascending). Staying ≤ 18630 means they load without an adjuster.
  */
 export function allocateImpostorIds(models: readonly string[], used: ReadonlySet<number>): Map<string, number> {
   const sorted = [...new Set(models.map((m) => m.toLowerCase()))].sort();
-  const start = findFreeBlock(used, sorted.length);
+  const free = freeIds(used, sorted.length);
   const ids = new Map<string, number>();
-  sorted.forEach((model, i) => ids.set(model, start + i));
+  sorted.forEach((model, i) => ids.set(model, free[i]));
 
   return ids;
 }
@@ -68,21 +70,17 @@ export function patchGtaDat(dat: string, idePath: string): string {
   return lines.join(eol);
 }
 
-/** The lowest id starting a run of `count` consecutive unused ids within `[ID_MIN, ID_MAX]`. */
-function findFreeBlock(used: ReadonlySet<number>, count: number): number {
-  let runStart = -1;
-  for (let id = ID_MIN; id <= ID_MAX; id += 1) {
-    if (used.has(id)) {
-      runStart = -1;
-      continue;
-    }
-    if (runStart < 0) {
-      runStart = id;
-    }
-    if (id - runStart + 1 >= count) {
-      return runStart;
+/** The lowest `count` unused ids within `[ID_MIN, ID_MAX]` (ascending; gaps allowed). */
+function freeIds(used: ReadonlySet<number>, count: number): number[] {
+  const ids: number[] = [];
+  for (let id = ID_MIN; id <= ID_MAX && ids.length < count; id += 1) {
+    if (!used.has(id)) {
+      ids.push(id);
     }
   }
+  if (ids.length < count) {
+    throw new Error(`only ${ids.length} free object ids in [${ID_MIN}, ${ID_MAX}], need ${count}`);
+  }
 
-  throw new Error(`no free block of ${count} object ids in [${ID_MIN}, ${ID_MAX}]`);
+  return ids;
 }

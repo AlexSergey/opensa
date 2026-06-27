@@ -8,9 +8,10 @@ import { encodePng } from '../../core';
 import { encodeColLibrary } from './encode-col';
 import { encodeLodDff } from './encode-dff';
 import { encodeAtlasTxd } from './encode-txd';
-import { loadTemplate, loadTextures, loadTree, openTemplateArchive } from './io';
+import { applyTrunkPrelight, loadTemplate, loadTextures, loadTree, openTemplateArchive } from './io';
 import { impostorAlias } from './place/ide';
 import { placeMap } from './place/place-map';
+import { stockPrelightColor } from './place/prelight';
 import { stripMap } from './strip/strip-map';
 
 /** GTA-SA generator inputs: the HD trees (`--dff`) + their textures (`--txd`), where to emit (`--out`), and the
@@ -35,6 +36,8 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
   const { dffPath, gamePath, loose, outPath, prelight, procobj, strip, txdPath } = options;
   const isDir = statSync(dffPath).isDirectory();
   const textures = loadTextures(txdPath);
+  // Alpha-cutout textures are foliage; opaque ones are trunk/bark — drives the trunk-only `--prelight` split.
+  const foliageTextures = new Set([...textures].filter(([, tex]) => tex.hasAlpha).map(([name]) => name));
   const archive = openTemplateArchive(gamePath);
 
   return {
@@ -70,6 +73,7 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
       placeMap({
         dffPath,
         drawDistance: options.config.drawDistance,
+        foliageTextures,
         gamePath,
         impostors: impostors.map((i) => ({
           height: i.bbox.max[2] - i.bbox.min[2],
@@ -92,8 +96,18 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
 
     loadTree(name: string): HdTree {
       const file = isDir ? join(dffPath, name) : dffPath;
+      const model = name.replace(/\.dff$/i, '');
+      const tree = loadTree(file, model, textures);
+      if (prelight) {
+        // Bake the LOD with the same stock trunk ambient the HD gets, so the impostor matches (not over-bright).
+        const stock = archive.get(`${model.toLowerCase()}.dff`);
+        const trunk = stock ? stockPrelightColor(new Uint8Array(stock)) : null;
+        if (trunk) {
+          applyTrunkPrelight(tree, trunk);
+        }
+      }
 
-      return loadTree(file, name.replace(/\.dff$/i, ''), textures);
+      return tree;
     },
   };
 }

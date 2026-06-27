@@ -10,8 +10,8 @@ describe('allocateImpostorIds', () => {
   });
 
   describe('positive cases', () => {
-    it('assigns ids from the lowest free gap, deduped and sorted', () => {
-      // 4000 is taken → the first run of two free ids starts at 4001
+    it('assigns the lowest free ids, deduped and sorted', () => {
+      // 4000 is taken → the first two free ids are 4001, 4002
       const ids = allocateImpostorIds(['lodb', 'loda', 'loda'], new Set([4000]));
 
       expect([...ids]).toEqual([
@@ -20,11 +20,22 @@ describe('allocateImpostorIds', () => {
       ]);
     });
 
-    it('skips an occupied run to find a gap that fits', () => {
+    it('fills non-contiguous free ids (a lone gap is usable — ids need not be consecutive)', () => {
       const ids = allocateImpostorIds(['a', 'b'], new Set([4000, 4001, 4002, 4004]));
 
-      // 4000..4002 taken, 4003 alone is too small, 4004 taken → fits at 4005..4006
-      expect([...ids.values()]).toEqual([4005, 4006]);
+      // 4000..4002 taken, 4003 free (used), 4004 taken, 4005 free → 4003, 4005
+      expect([...ids.values()]).toEqual([4003, 4005]);
+    });
+
+    it('throws when the stock id window cannot fit every impostor (≤ 18630)', () => {
+      const used = new Set<number>();
+      for (let id = 4000; id <= 18630; id += 1) {
+        if (id !== 18630) {
+          used.add(id); // leave a single free id, ask for two
+        }
+      }
+
+      expect(() => allocateImpostorIds(['a', 'b'], used)).toThrow(/free object ids/);
     });
   });
 });
