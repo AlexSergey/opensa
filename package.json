@@ -43,6 +43,7 @@
     "packages/game-build",
     "packages/loaders",
     "packages/vfs",
+    "packages/modloader",
     "packages/game",
     "tools/map-optimizer",
     "tools/lod-generator",

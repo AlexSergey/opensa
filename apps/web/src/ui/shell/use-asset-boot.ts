@@ -2,6 +2,7 @@ import type { AssetLoader, ProgressSnapshot } from '@opensa/loaders';
 import type { AssetFileSystem } from '@opensa/renderware';
 
 import { createAssetLoader } from '@opensa/loaders';
+import { withModloader } from '@opensa/modloader';
 import { Vfs } from '@opensa/vfs';
 import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
@@ -76,6 +77,15 @@ export function useAssetBoot(): AssetBoot {
 
     return { loader, vfs };
   }, [state.game]);
+
+  // Wrap the VFS with the modloader overlay once it's fully loaded (phase `warmup`+) — the game canvas only
+  // mounts then, and the scan needs the complete `modloader/` tree. Computed once per loaded session (stable ref).
+  const loaded = state.phase === 'warmup' || state.phase === 'playing' || state.phase === 'paused';
+  const fs = useMemo<AssetFileSystem>(() => {
+    const vfs = session?.vfs ?? fallbackVfs;
+
+    return loaded ? withModloader(vfs) : vfs;
+  }, [session, fallbackVfs, loaded]);
 
   // Stream active-load progress into state.
   useEffect(() => session?.loader.events.on('progress', setSnapshot), [session]);
@@ -170,7 +180,7 @@ export function useAssetBoot(): AssetBoot {
     detail,
     disclaimer: state.game ? GAME_CONFIG[state.game].disclaimer : null,
     disclaimerAccepted: state.game ? isDisclaimerAccepted(state.game) : false,
-    fs: session?.vfs ?? fallbackVfs,
+    fs,
     pause: useCallback((): void => dispatch({ type: 'PAUSE' }), []),
     percent: toPercent(snapshot),
     play: useCallback((game: GameId): void => {

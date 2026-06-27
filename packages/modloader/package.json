@@ -1,0 +1,15 @@
+{
+  "name": "@opensa/modloader",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A modloader/ overlay decorator over AssetFileSystem: override vehicle dff/txd by name + merge their settings into vehicles.ide/handling.cfg/carcols.dat — no engine changes.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:engine"
+    ]
+  }
+}
