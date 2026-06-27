@@ -33,8 +33,6 @@ export interface CreateAssetLoaderConfig {
   game: string;
   /** Full URL to `manifest.json` — used by the fetch loader. */
   manifestUrl: string;
-  /** TEMPORARY: ped models to pull into the local loader's selection (from `peds.ide`). */
-  peds?: readonly string[];
   /** Where resolved bytes go — the VFS. */
   sink?: AssetSink;
   /** Build version string. */
@@ -46,7 +44,6 @@ export function createAssetLoader(config: CreateAssetLoaderConfig): AssetLoader 
   if (config.assetLoader === 'local') {
     return new AssetLocalLoader({
       game: config.game,
-      peds: config.peds,
       sink: config.sink,
       version: config.version,
     });

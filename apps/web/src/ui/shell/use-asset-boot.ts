@@ -69,7 +69,6 @@ export function useAssetBoot(): AssetBoot {
       assetLoader: config.assetLoader,
       game: state.game,
       manifestUrl: `${BASE}/games/${state.game}-${__APP_VERSION__}/manifest.json`,
-      peds: [config.mainCharacter],
       sink: vfs,
       version: __APP_VERSION__,
     });

@@ -41,6 +41,7 @@ function baseFiles(): Map<string, ArrayBuffer | string> {
     ['bmypol1.txd', buffer('tests/original/character/bmypol1.txd')],
     ['data/carcols.dat', readFileSync('game-src/original/data/carcols.dat', 'utf8')],
     ['data/handling.cfg', readFileSync('game-src/original/data/handling.cfg', 'utf8')],
+    ['data/peds.ide', readFileSync('game-src/original/data/peds.ide', 'utf8')],
     ['data/timecyc.dat', readFileSync('tests/original/data/timecyc.dat', 'utf8')],
     ['data/vehicles.ide', readFileSync('game-src/original/data/vehicles.ide', 'utf8')],
     ['junk.txd', buffer('tests/original/txd/junk.txd')],
@@ -123,6 +124,13 @@ describe('GtaSaWorldAdapter integration', () => {
       const character = await new GtaSaWorldAdapter(cfg()).loadCharacter('bmypol1.dff', 'bmypol1.txd');
       expect(character.skeleton?.bones).toHaveLength(32);
       expect(character.bonesByName.has('Root')).toBe(true);
+      expect(character.object).toBeDefined();
+    });
+
+    it('resolves a character by peds.ide model name to its bare dff/txd (loadCharacterByModel)', async () => {
+      // BMYPOL1 → peds.ide → bare `bmypol1.dff`/`bmypol1.txd` (the roster lives in the img, no loose `player/`).
+      const character = await new GtaSaWorldAdapter(cfg()).loadCharacterByModel('BMYPOL1');
+      expect(character.skeleton?.bones).toHaveLength(32);
       expect(character.object).toBeDefined();
     });
 

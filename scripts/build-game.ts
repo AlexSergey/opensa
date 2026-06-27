@@ -31,9 +31,6 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-import type { GameConfig } from '../apps/web/src/game-config';
-
-import { GAME_CONFIG } from '../apps/web/src/game-config';
 import { chunkByHash } from './game-build/chunk';
 
 const ROOT = process.cwd();
@@ -83,23 +80,18 @@ function buildZip(entries: readonly LoadedEntry[]): Uint8Array {
 }
 
 /**
- * TEMP: model + txd base names for the env-named main character (`peds.ide`) and vehicles (`vehicles.ide`).
- * Those are spawned dynamically (not placed on the map), so the partition misses them — pack them explicitly.
+ * Model + txd base names for the dynamically-spawned set: **every** ped in `peds.ide` and **every** vehicle in
+ * `vehicles.ide`. Those are spawned dynamically (not placed on the map), so the partition misses them — pack them
+ * explicitly. The roster is the IDE, not a curated list or a loose `player/`/`vehicles/` folder.
  */
-function dynamicRefs(dataDir: string, mainCharacter: string | undefined): { models: string[]; txds: string[] } {
+function dynamicRefs(dataDir: string): { models: string[]; txds: string[] } {
   const models: string[] = [];
   const txds: string[] = [];
 
-  const char = mainCharacter?.trim().toLowerCase();
-  if (char) {
-    const def = parsePedDefs(readIde(dataDir, 'peds.ide')).get(char);
-    if (def) {
-      models.push(def.model.toLowerCase());
-      txds.push(def.txd.toLowerCase());
-    }
+  for (const def of parsePedDefs(readIde(dataDir, 'peds.ide')).values()) {
+    models.push(def.model.toLowerCase());
+    txds.push(def.txd.toLowerCase());
   }
-
-  // Every vehicle in `vehicles.ide` — cars are spawned dynamically, not placed on the map.
   for (const def of parseVehicleDefs(readIde(dataDir, 'vehicles.ide')).values()) {
     models.push(def.model.toLowerCase());
     txds.push(def.txd.toLowerCase());
@@ -155,10 +147,9 @@ function main(): void {
 
   const dataDir = join(src, 'data');
   const placed = placedModels(placedInstanceIds(dataDir, gta3), ideIdMap(dataDir));
-  // Also pack the dynamically-spawned models (not placed on the map): the game's main character (from peds.ide,
-  // per GAME_CONFIG) + **every** vehicle defined in vehicles.ide.
-  const cfg: GameConfig | undefined = (GAME_CONFIG as Record<string, GameConfig>)[game];
-  const dynamic = dynamicRefs(dataDir, cfg?.mainCharacter);
+  // Also pack the dynamically-spawned models (not placed on the map): **every** ped in peds.ide + **every**
+  // vehicle in vehicles.ide.
+  const dynamic = dynamicRefs(dataDir);
   const refs = { models: [...placed.models, ...dynamic.models], txds: [...placed.txds, ...dynamic.txds] };
   const { models: modelEntries, others, textures: textureEntries } = partitionEntries(refs, gta3Names, gtaIntNames);
   // `partitionEntries` only pulls world files from gta3.img; pull a mod's from the override archives too
@@ -179,13 +170,11 @@ function main(): void {
 
   // Loose files (everything except the model archives + the stock anim.img — ped.ifp is used directly),
   // keyed by their lowercased relative path and bucketed by `looseGroup` (data folder → data, dff → models,
-  // txd → textures, the rest → others). ALL `models/*.img` are read above, so skip them here. Files under
-  // loose `player/` also get a **bare-name** alias that OVERRIDES the same-named entry from the img archives
-  // (the main-character override). Vehicles aren't loose — the roster comes from vehicles.ide → gta3.img, and
-  // per-car overrides go through the runtime modloader.
+  // txd → textures, the rest → others). ALL `models/*.img` are read above, so skip them here. There is no loose
+  // `player/` or `vehicles/` folder — the ped/car rosters come from peds.ide/vehicles.ide → the img archives,
+  // and per-asset overrides go through the runtime modloader.
   const excluded = new Set([join('anim', 'anim.img')]);
   const isModelImg = new RegExp(`^models\\${sep}.+\\.img$`, 'i');
-  const overrideBare = new Set<string>(); // bare names provided by loose player/
   const loose: Record<GroupName, LoadedEntry[]> = { data: [], models: [], others: [], textures: [] };
   for (const path of walk(src)) {
     const rel = relative(src, path);
@@ -195,17 +184,7 @@ function main(): void {
     const bytes = new Uint8Array(readFileSync(path));
     const name = rel.split(sep).join('/').toLowerCase();
     loose[looseGroup(name)].push({ bytes, name, size: bytes.length });
-    if (name.startsWith('player/')) {
-      const bare = name.slice(name.lastIndexOf('/') + 1);
-      if (!overrideBare.has(bare)) {
-        overrideBare.add(bare);
-        loose[looseGroup(bare)].push({ bytes, name: bare, size: bytes.length }); // bare alias → overrides img
-      }
-    }
   }
-  // Drop img model/texture entries the loose player/ files override (their bytes are packed above).
-  const models = modelEntries.filter((entry) => !overrideBare.has(entry.name));
-  const textures = textureEntries.filter((entry) => !overrideBare.has(entry.name));
 
   // Pack each group into ~50MB content-hashed chunks (sequential so peak memory ≈ the largest group).
   const dataChunks = packChunks('data', loose.data, outDir);
@@ -216,10 +195,10 @@ function main(): void {
   );
   const modelChunks = packChunks(
     'models',
-    [...loose.models, ...models.map(loadImg), ...overrideCol.map(loadImg)],
+    [...loose.models, ...modelEntries.map(loadImg), ...overrideCol.map(loadImg)],
     outDir,
   );
-  const textureChunks = packChunks('textures', [...loose.textures, ...textures.map(loadImg)], outDir);
+  const textureChunks = packChunks('textures', [...loose.textures, ...textureEntries.map(loadImg)], outDir);
 
   const manifest = {
     chunks: { data: dataChunks, models: modelChunks, others: othersChunks, textures: textureChunks },
@@ -228,19 +207,19 @@ function main(): void {
   };
   writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
-  const fromInt = [...others, ...overrideOthers, ...models, ...overrideCol, ...textures].filter(
+  const fromInt = [...others, ...overrideOthers, ...modelEntries, ...overrideCol, ...textureEntries].filter(
     (e) => e.source === 'gta_int',
   ).length;
   const mb = (chunks: ChunkInfo[]): string =>
     `${(chunks.reduce((sum, c) => sum + c.bytes, 0) / 1024 / 1024).toFixed(1)} MB`;
   const othersCount = loose.others.length + others.length + overrideOthers.length;
-  const modelsCount = loose.models.length + models.length + overrideCol.length;
+  const modelsCount = loose.models.length + modelEntries.length + overrideCol.length;
   console.log(`build ${version}:`);
   console.log(`  data     — ${dataChunks.length} chunk(s), ${loose.data.length} files, ${mb(dataChunks)}`);
   console.log(`  others   — ${othersChunks.length} chunk(s), ${othersCount} files, ${mb(othersChunks)}`);
   console.log(`  models   — ${modelChunks.length} chunk(s), ${modelsCount} dff/col, ${mb(modelChunks)}`);
   console.log(
-    `  textures — ${textureChunks.length} chunk(s), ${loose.textures.length + textures.length} txd, ${mb(textureChunks)}`,
+    `  textures — ${textureChunks.length} chunk(s), ${loose.textures.length + textureEntries.length} txd, ${mb(textureChunks)}`,
   );
   console.log(`  from override img(s) (gta_int/mods): ${fromInt} files`);
   console.log(`  → static/games/${version}/`);

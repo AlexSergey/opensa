@@ -41,12 +41,6 @@ export interface InstallSource {
   readLooseText(path: string): Promise<string>;
 }
 
-/** Options for {@link selectInstallEntries} — the dynamically-spawned models. */
-export interface SelectOptions {
-  /** Ped model names (from `peds.ide`) to pull in — e.g. `[VITE_MAIN_CHARACTER]`. */
-  peds?: readonly string[];
-}
-
 /** Read one partition entry's bytes from the archive it resolves to (gta3, or gta_int override). */
 export async function readEntry(source: InstallSource, entry: Entry): Promise<Uint8Array> {
   const archive = entry.source === 'gta3' ? source.gta3 : source.gtaInt;
@@ -60,12 +54,12 @@ export async function readEntry(source: InstallSource, entry: Entry): Promise<Ui
 
 /**
  * Compute the install's selection (exterior-placed models/textures + loose + world) — the build's port. Also
- * pulls in the named **peds** (from `peds.ide`) and **vehicles** (from `vehicles.ide`), since those are
- * spawned dynamically, not placed on the map, so the partition would otherwise miss them (plan 053 stop-gap).
+ * pulls in **every** ped (from `peds.ide`) and **every** vehicle (from `vehicles.ide`), since those are spawned
+ * dynamically, not placed on the map, so the partition would otherwise miss them.
  */
-export async function selectInstallEntries(source: InstallSource, options: SelectOptions = {}): Promise<InstallPlan> {
+export async function selectInstallEntries(source: InstallSource): Promise<InstallPlan> {
   const placed = placedModels(await placedInstanceIds(source), await ideById(source));
-  const extra = await dynamicModelRefs(source, options.peds ?? []);
+  const extra = await dynamicModelRefs(source);
   const refs = { models: [...placed.models, ...extra.models], txds: [...placed.txds, ...extra.txds] };
   const { models, others, textures } = partitionEntries(
     refs,
@@ -76,25 +70,18 @@ export async function selectInstallEntries(source: InstallSource, options: Selec
   return { loose: await source.looseFiles(), models, others, textures };
 }
 
-/** Model + txd base names for the dynamically-spawned set: the requested **peds** + **every** vehicle in
- *  `vehicles.ide` (cars are spawned dynamically, not placed on the map, so the partition would otherwise miss them). */
-async function dynamicModelRefs(
-  source: InstallSource,
-  peds: readonly string[],
-): Promise<{ models: string[]; txds: string[] }> {
+/** Model + txd base names for the dynamically-spawned set: **every** ped in `peds.ide` + **every** vehicle in
+ *  `vehicles.ide` (both are spawned dynamically, not placed on the map, so the partition would otherwise miss them). */
+async function dynamicModelRefs(source: InstallSource): Promise<{ models: string[]; txds: string[] }> {
   const models: string[] = [];
   const txds: string[] = [];
   const loose = await source.looseFiles();
 
-  const pedsPath = peds.length > 0 ? loose.find((path) => path.endsWith('peds.ide')) : undefined;
+  const pedsPath = loose.find((path) => path.endsWith('peds.ide'));
   if (pedsPath) {
-    const defs = parsePedDefs(await source.readLooseText(pedsPath));
-    for (const name of peds) {
-      const def = defs.get(name.toLowerCase());
-      if (def) {
-        models.push(def.model.toLowerCase());
-        txds.push(def.txd.toLowerCase());
-      }
+    for (const def of parsePedDefs(await source.readLooseText(pedsPath)).values()) {
+      models.push(def.model.toLowerCase());
+      txds.push(def.txd.toLowerCase());
     }
   }
 

@@ -233,7 +233,7 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   async loadCharacter(dffName: string, txdName: string): Promise<CharacterModel> {
     await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     // The build lowercases all packed asset keys (case-insensitive like GTA), so normalise the lookup —
-    // e.g. a `player/Shrek.dff` request resolves to the packed `player/shrek.dff`.
+    // e.g. a `BMYPOL1.dff` request resolves to the packed `bmypol1.dff`.
     const dffBuffer = requireBuffer(this.fs, dffName.toLowerCase());
     const textures = buildTextureMap(parseTxd(requireBuffer(this.fs, txdName.toLowerCase())));
     const clump = parseDff(dffBuffer);
@@ -247,8 +247,9 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   }
 
   /**
-   * TEMP (bring-your-own-files): load a character by its `peds.ide` model name (e.g. `BMYPOL1`), resolving to
-   * the archive's bare `model.dff` / `txd.txd` — for raw installs that have no loose `player/*` files.
+   * TEMP (main-character stub): load a character by its `peds.ide` model name (e.g. `BMYPOL1`), resolving to the
+   * archive's bare `model.dff` / `txd.txd`. The whole ped roster comes from peds.ide → the img archives; there is
+   * no loose `player/` folder. (`GAME_CONFIG.mainCharacter` still picks which ped stands in for the player.)
    */
   async loadCharacterByModel(modelName: string): Promise<CharacterModel> {
     this.peds ??= parsePedDefs(requireText(this.fs, 'data/peds.ide'));

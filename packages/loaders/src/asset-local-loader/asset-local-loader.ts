@@ -23,8 +23,6 @@ import { browserInstallSource } from './install-source';
 export interface AssetLocalLoaderConfig {
   /** The build variant + version, used to label the synthesised manifest. */
   game: string;
-  /** TEMPORARY: ped models (from `peds.ide`) to pull into the selection — e.g. `[VITE_MAIN_CHARACTER]`. */
-  peds?: readonly string[];
   /** Where resolved file bytes go — the VFS. Optional so the loader runs/tests standalone. */
   sink?: { addFiles(chunkId: string, entries: Iterable<readonly [string, Uint8Array]>): Promise<void> | void };
   version: string;
@@ -138,7 +136,7 @@ export class AssetLocalLoader implements AssetLoader {
       throw new Error('install folder not selected — call prepare() from a user gesture first');
     }
     this.source ??= await this.deps.openSource(this.dir);
-    this.plan ??= await selectInstallEntries(this.source, { peds: this.config.peds });
+    this.plan ??= await selectInstallEntries(this.source);
 
     return { plan: this.plan, source: this.source };
   }

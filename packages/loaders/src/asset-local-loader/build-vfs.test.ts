@@ -59,7 +59,7 @@ describe('selectInstallEntries', () => {
       expect(plan.loose).toEqual(['data/gta.dat', 'data/maps/test.ide', 'data/maps/test.ipl']);
     });
 
-    it('pulls in the named peds (peds.ide) + EVERY vehicle in vehicles.ide; ignores unnamed peds', async () => {
+    it('pulls in EVERY ped (peds.ide) + EVERY vehicle (vehicles.ide), even when none are map-placed', async () => {
       const loose: Record<string, string> = {
         'data/peds.ide': 'peds\n66, bmypol1, bmypol1, CIVMALE\n9, cesar, cesar, CIVMALE\nend',
         'data/vehicles.ide': [
@@ -77,6 +77,7 @@ describe('selectInstallEntries', () => {
         'buffalo.dff': new Uint8Array([1]),
         'buftxd.txd': new Uint8Array([1]),
         'cesar.dff': new Uint8Array([1]),
+        'cesar.txd': new Uint8Array([1]),
       });
       const plan = await selectInstallEntries(
         source({
@@ -84,12 +85,11 @@ describe('selectInstallEntries', () => {
           looseFiles: () => Promise.resolve(Object.keys(loose)),
           readLooseText: (p) => Promise.resolve(loose[p] ?? ''),
         }),
-        { peds: ['bmypol1', 'unknownped'] },
       );
 
-      // Every vehicle (admiral + buffalo) + the named bmypol1 (cesar is not requested).
-      expect(plan.models.map((e) => e.name).sort()).toEqual(['admiral.dff', 'bmypol1.dff', 'buffalo.dff']);
-      expect(plan.textures.map((e) => e.name).sort()).toEqual(['admtxd.txd', 'bmypol1.txd', 'buftxd.txd']);
+      // Every ped (bmypol1 + cesar) + every vehicle (admiral + buffalo) — the whole roster, from the IDEs.
+      expect(plan.models.map((e) => e.name).sort()).toEqual(['admiral.dff', 'bmypol1.dff', 'buffalo.dff', 'cesar.dff']);
+      expect(plan.textures.map((e) => e.name).sort()).toEqual(['admtxd.txd', 'bmypol1.txd', 'buftxd.txd', 'cesar.txd']);
     });
   });
 });

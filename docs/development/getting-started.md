@@ -23,11 +23,9 @@ preserving the layout:
 
 ```
 game-src/original/
-  data/        # gta.dat, *.dat, *.ide, data/maps/**, surfinfo.dat, object.dat, timecyc.dat, …
+  data/        # gta.dat, *.dat, *.ide (incl. peds.ide, vehicles.ide), data/maps/**, timecyc.dat, …
   models/      # gta3.img, gta_int.img, effects.fxp, effectsPC.txd, particle.txd, generic/
   anim/        # ped.ifp and friends
-  player/
-  vehicles/
 ```
 
 `original` is the base build for the current game version — **treat it as read-only** once populated
@@ -35,6 +33,9 @@ game-src/original/
 
 - `models/gta3.img` is the primary archive; `models/gta_int.img` is overlaid as a fallback for the
   few interior props `gta3.img` lacks (the same override the build and dev scripts use).
+- There is **no `player/` or `vehicles/` folder** — the full ped/car roster comes from `data/peds.ide` /
+  `data/vehicles.ide`, with the model/txd bytes read straight from the `.img` archives (per-asset overrides go
+  through the runtime `modloader/`).
 - The build reads model/texture bytes **straight from the `.img` archives** — you do not extract them.
 - Optional `data/timecyc_24h.dat` is used as-is when present; otherwise the vanilla `data/timecyc.dat`
   is converted to 24h at runtime.

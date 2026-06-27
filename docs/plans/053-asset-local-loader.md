@@ -9,7 +9,7 @@ VFS sink (`Vfs.addChunk` → `unzipSync` → name→bytes map), and the game rea
 selects the exterior-placed models from IPL/IDE, packs loose files + model/texture entries into ~50 MB zips).
 
 We want a **second** loader that reads a **raw GTA San Andreas install folder** the user picks at runtime
-(`models/gta3.img`, `data/`, `anim/ped.ifp`, `player/…`), converts it in-browser to the same in-memory VFS,
+(`models/gta3.img`, `data/`, `anim/ped.ifp`), converts it in-browser to the same in-memory VFS,
 and then the **downstream flow is identical** (same `AssetFileSystem`, same renderer). Loader chosen by an env
 var. The pick must be remembered (no re-prompt) unless it becomes invalid (folder deleted / permission lost).
 
@@ -167,20 +167,20 @@ The partition only selects models **placed on the map** (IPL/IDE). Peds and vehi
 so a raw install yields a VFS with no player/car models → the game can't start. Stop-gap until a proper
 ped/vehicle registry exists:
 
-- **Selection — named ped + every car**: `selectInstallEntries(source, { peds })` resolves the named peds
-  (`peds.ide` → `parsePedDefs`) and **all** vehicles (`vehicles.ide` → `parseVehicleDefs`, every `cars` entry),
-  adding their `model.dff`/`txd.txd` to the models/textures buckets. `peds = [mainCharacter]` flows via
-  `createAssetLoader` → `AssetLocalLoader`. Vehicles are no longer a curated list — `vehicles.ide` is the single
-  source of truth, so a raw install ships its full roster (the DFFs sit bare in `gta3.img`, not a loose folder).
-- **Offline build parity**: `scripts/build-game.ts` does the same — `dynamicRefs(dataDir, mainCharacter)` merges
-  the named character + every vehicle from `vehicles.ide` into the partition refs before packing, so the fetch
-  archives contain the same roster.
+- **Selection — every ped + every car**: `selectInstallEntries(source)` resolves **all** peds (`peds.ide` →
+  `parsePedDefs`) and **all** vehicles (`vehicles.ide` → `parseVehicleDefs`), adding their `model.dff`/`txd.txd`
+  to the models/textures buckets. Neither is a curated list — the IDEs are the single source of truth, so a raw
+  install ships the full roster (the DFFs sit bare in `gta3.img`, no loose `player/`/`vehicles/` folder). There is
+  no `peds` option anymore.
+- **Offline build parity**: `scripts/build-game.ts` does the same — `dynamicRefs(dataDir)` merges every ped from
+  `peds.ide` + every vehicle from `vehicles.ide` into the partition refs before packing, so the fetch archives
+  contain the same roster.
 - **Runtime**: the player loads via `adapter.loadCharacterByModel(mainCharacter)` (resolve `peds.ide` → bare
-  `model.dff`/`txd.txd`), else the loose `player/*` fallback. `loadVehicle` reads the **bare** archive name
-  (`requireBuffer(fs, '<model>.dff')`) — straight from gta3.img (or a modloader override), no loose `vehicles/`
-  folder, so cars load identically in fetch and local (raw) modes. The
-  debug spawn list is built from `vehicles.ide` (`vehicleModelsFromIde` in apps/web — sorted, filterable in the
-  overlay); there is no `GAME_CONFIG.vehicles` field.
+  `model.dff`/`txd.txd`). `loadVehicle` reads the **bare** archive name (`requireBuffer(fs, '<model>.dff')`) —
+  straight from gta3.img (or a modloader override). No loose `player/`/`vehicles/` folder, so peds and cars load
+  identically in fetch and local (raw) modes. The debug spawn list is built from `vehicles.ide`
+  (`vehicleModelsFromIde` in apps/web — sorted, filterable in the overlay); there is no `GAME_CONFIG.vehicles`
+  field. `GAME_CONFIG.mainCharacter` remains (a TEMP stub picking which ped stands in for the player).
 
 ## Out of scope (v1)
 
