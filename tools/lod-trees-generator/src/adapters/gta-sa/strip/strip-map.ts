@@ -1,5 +1,6 @@
 import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 
+import { stripProcObj } from '@opensa/map-placement/procobj-strip';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
 import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
@@ -10,7 +11,6 @@ import { dirname, join } from 'node:path';
 
 import { stripBinaryIpl } from './ipl-binary';
 import { stripTextIpl } from './ipl-text';
-import { stripProcObj } from './procobj';
 
 export interface StripOptions {
   /** Tree model names (dff base, no extension) whose placements to remove. */

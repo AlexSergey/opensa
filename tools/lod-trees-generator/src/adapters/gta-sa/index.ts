@@ -1,3 +1,4 @@
+import { lodAlias } from '@opensa/map-placement/ide';
 import { readRw } from '@opensa/rw-codec/chunk';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -9,7 +10,6 @@ import { encodeColLibrary } from './encode-col';
 import { encodeLodDff } from './encode-dff';
 import { encodeAtlasTxd } from './encode-txd';
 import { applyTrunkPrelight, loadTemplate, loadTextures, loadTree, openTemplateArchive } from './io';
-import { impostorAlias } from './place/ide';
 import { placeMap } from './place/place-map';
 import { stockPrelightColor } from './place/prelight';
 import { stripMap } from './strip/strip-map';
@@ -25,15 +25,13 @@ export interface GtaSaTreeLodOptions {
   outPath: string;
   /** Copy each swapped HD model's prelight from its stock DFF (`--prelight`). */
   prelight: boolean;
-  /** Touch `--dff ∩ procobj` species (`--procobj`): convert their scatter to static LODs + swap their HD. */
-  procobj: boolean;
   /** Verification mode: strip all source trees from the map (empty world) instead of placing impostor LODs. */
   strip: boolean;
   txdPath: string;
 }
 
 export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLodAdapter {
-  const { dffPath, gamePath, loose, outPath, prelight, procobj, strip, txdPath } = options;
+  const { dffPath, gamePath, loose, outPath, prelight, strip, txdPath } = options;
   const isDir = statSync(dffPath).isDirectory();
   const textures = loadTextures(txdPath);
   // Alpha-cutout textures are foliage; opaque ones are trunk/bark — drives the trunk-only `--prelight` split.
@@ -53,7 +51,7 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
       }
       writeFileSync(join(outPath, 'lodtrees.txd'), encodeAtlasTxd(impostors, version));
       // Col models are bound by the same model name SA registers (the IDE/IMG alias), not the impostor's own name.
-      const aliases = impostors.map((impostor, i) => impostorAlias(impostor.name, i));
+      const aliases = impostors.map((impostor, i) => lodAlias(impostor.name, i));
       writeFileSync(join(outPath, 'lodtrees.col'), encodeColLibrary(impostors, aliases));
       console.log(`→ ${impostors.length} LOD DFF(s) + lodtrees.txd + lodtrees.col (+ debug PNGs) → ${outPath}`);
 
@@ -76,16 +74,12 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
         foliageTextures,
         gamePath,
         impostors: impostors.map((i) => ({
-          height: i.bbox.max[2] - i.bbox.min[2],
           name: i.name,
           source: i.name.replace(/^lod/i, ''),
         })),
         loose,
         outPath,
         prelight,
-        procobj,
-        procObjHeight: options.config.procObjHeight,
-        procObjMax: options.config.procObjMax,
         txdPath,
       });
     },

@@ -15,7 +15,9 @@ A map area (e.g. `countrye`) is split across three places:
 | **procobj**            | `data/procobj.dat`                              | `CPlantMgr` procedural scatter rules (grass, cacti, small plants)  |
 
 `procobj.dat` is independent (tab-separated rows, no count header) — drop the rows whose model is a tree, done.
-The IPLs are the hard part.
+Underwater species (`UNDERWATER_PROCOBJ`: seaweed/starfish/searock) are **never** stripped — a hard never-touch
+list in `@opensa/map-placement/procobj-strip` (seabed scatter is harmless to leave and doesn't replace well). The
+IPLs are the hard part.
 
 ## The LOD link is an index — and it is **shared** across text + binary
 
@@ -51,7 +53,7 @@ Both were real failure modes during bring-up.
    text map — no within-stream re-index ([`stripBinaryIpl`](../../src/adapters/gta-sa/strip/ipl-binary.ts)).
    Streams pair to text by area key: `countrye_stream3.ipl` & `countrye.ipl` → `countrye`. A stream with no
    companion text leaves its `lod` untouched.
-4. **procobj** — drop the tree scatter rows ([`stripProcObj`](../../src/adapters/gta-sa/strip/procobj.ts)).
+4. **procobj** — drop the tree scatter rows (`stripProcObj` from `@opensa/map-placement/procobj-strip`).
 
 Text and binary are coupled: they must be stripped **together** and applied together. Replacing only the data
 files (original `gta3.img`) or only `gta3.img` (original data) reintroduces the index mismatch and crashes.

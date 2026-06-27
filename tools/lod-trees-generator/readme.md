@@ -13,10 +13,6 @@ tsx tools/lod-trees-generator/src/cli.ts --dff <path> --txd <path> --out <path> 
 - `--game` — path to the game data (`gta.dat` + `data/` + `models/gta3.img`)
 - `--tex` / `--cards` — per-tree atlas size (px) / cards per tree (defaults in `config.ts`)
 - `--draw` — impostor LOD draw distance in game units (default `1500`); how far the LOD stays visible
-- `--procobj` — touch `--dff ∩ procobj` species: convert their runtime scatter to static IPL + impostor LODs
-  **and** swap their HD DFF. Off (default) ⇒ procobj is left fully stock even if a species is in `--dff`
-- `--procobj-max` / `--procobj-height` — only with `--procobj`: cap on converted objects (default `20000`,
-  `0` disables) / optional min height in m to drop short clutter (default `0` = off)
 - `--prelight` — copy the stock model's prelight (day ambient) onto each swapped custom tree so it isn't
   black/washed-out next to stock geometry. Applied **trunk-only** (opaque surfaces; foliage keeps its own prelit)
   and to **both** the HD and the baked LOD atlas, so the impostor isn't over-bright vs the corrected HD
@@ -26,9 +22,9 @@ tsx tools/lod-trees-generator/src/cli.ts --dff <path> --txd <path> --out <path> 
 With `--game` it also **places the impostors into the map** (stage 2): every streamed (binary IPL) placement of a
 `--dff` model gets its impostor attached as its far-LOD — a leaf instance appended to the area's companion text
 IPL (or an existing LOD row repointed), with the HD's `lod` linked to it. The impostors are registered
-(`lodtrees.ide` + a patched `gta.dat`) and packed — along with the swapped HD DFFs (LOD'd models; procobj species
-only with `--procobj`) — into a drop-in repacked `gta3.img` (or loose `gta3img/`). `procobj.dat` is left untouched
-unless `--procobj` is passed.
+(`lodtrees.ide` + a patched `gta.dat`) and packed — along with the swapped HD DFFs (LOD'd, non-procobj models) —
+into a drop-in repacked `gta3.img` (or loose `gta3img/`). `procobj.dat` is left untouched; procobj species get
+their LODs from a separate tool (`lod-procobj-generator`) whose LODs are simplified-copy meshes, not impostors.
 
 See [`docs/plans/002-build-pipeline.md`](./docs/plans/002-build-pipeline.md) for the bake design (and the
 `cedar1_hi` → `lodCedar1_hi` reference breakdown), [`003-map-strip.md`](./docs/plans/003-map-strip.md) for the

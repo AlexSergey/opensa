@@ -1,5 +1,7 @@
 import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 
+import { allocateLodIds, buildLodIde, lodAlias, patchGtaDat } from '@opensa/map-placement/ide';
+import { retxdSwappedModels } from '@opensa/map-placement/retxd';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
 import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
@@ -10,23 +12,18 @@ import { editArchive } from '@opensa/tool-kit/archive/img';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { convertProcObj, type ProcObjSpecies } from '../procobj/convert';
-import { allocateImpostorIds, buildLodTreesIde, impostorAlias, patchGtaDat } from './ide';
 import { linkBinaryLods } from './ipl-binary-link';
 import { type AppendInst, applyTextEdits, type Repoint } from './ipl-text-append';
 import { applyStockPrelight } from './prelight';
-import { retxdSwappedModels } from './retxd';
 
-/** One generated impostor: the `lod<source>` name (DFF file + texture) for source model `source`, and its
- *  bbox height (the procobj tree-vs-grass gate). */
+/** One generated impostor: the `lod<source>` name (DFF file + texture) for source model `source`. */
 export interface ImpostorRef {
-  height: number;
   name: string;
   source: string;
 }
 
 export interface PlaceOptions {
-  /** User HD trees (`--dff`) dir/file — HD DFFs swapped for the LOD'd models (procobj only with `--procobj`). */
+  /** User HD trees (`--dff`) dir/file — HD DFFs swapped for the LOD'd, non-procobj models. */
   dffPath: string;
   /** Impostor LOD draw distance written to `lodtrees.ide` (`--draw`). */
   drawDistance: number;
@@ -39,13 +36,6 @@ export interface PlaceOptions {
   outPath: string;
   /** Copy each swapped model's prelight (day vertex colours) from its stock DFF (`--prelight`). */
   prelight: boolean;
-  /** Touch `--dff ∩ procobj` species (`--procobj`): convert their scatter to static LODs **and** swap their HD.
-   *  Off ⇒ procobj species are left fully stock (no static conversion, no HD swap) even if in `--dff`. */
-  procobj: boolean;
-  /** Min impostor height (m) to convert a `--dff ∩ procobj` species to static (excludes grass). */
-  procObjHeight: number;
-  /** Cap on statically converted procobj objects (0 = skip procobj conversion). */
-  procObjMax: number;
   /** User HD textures (`--txd`) — packed + wired into the swapped models' IDE `txd` column. */
   txdPath: string;
 }
@@ -83,37 +73,24 @@ interface PlacedInst {
  * Stage 2 — attach an impostor LOD to every placed tree HD (binary-stream **and** text-IPL instances). For each
  * we ensure a LOD = its impostor: append a leaf instance at the HD's transform and link the HD's `lod` (binary
  * stream field / text `lod` column) to it, or repoint an existing LOD row. Then register the impostors
- * (`lodtrees.ide` + `gta.dat`) and pack the impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (procobj species
- * only with `--procobj`) into `--out`.
+ * (`lodtrees.ide` + `gta.dat`) and pack the impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (LOD'd,
+ * non-procobj models) into `--out`. procobj species keep their stock HD + runtime scatter (procobj LODs are a
+ * separate tool — see `lod-procobj-generator`).
  */
 export function placeMap(options: PlaceOptions): void {
-  const {
-    dffPath,
-    drawDistance,
-    foliageTextures,
-    gamePath,
-    impostors,
-    loose,
-    outPath,
-    prelight,
-    procobj,
-    procObjHeight,
-    procObjMax,
-    txdPath,
-  } = options;
+  const { dffPath, drawDistance, foliageTextures, gamePath, impostors, loose, outPath, prelight, txdPath } = options;
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const registry = buildRegistry(impostors, allObjectIds(gamePath, dat));
   const bySource = new Map(registry.map((r) => [r.source, r]));
-  const heightOf = new Map(impostors.map((i) => [i.source.toLowerCase(), i.height]));
   const idToImpostor = sourceObjectIds(gamePath, dat, bySource);
   const procModels = procObjModels(gamePath);
 
   const archive = openArchive(readBytes(join(gamePath, 'models', 'gta3.img')));
   const result = editAreas(archive, gamePath, dat, idToImpostor);
 
-  // Swapped HD models + their custom TXD: pack the TXD + retarget the models' IDE `txd`. procobj species are
-  // swapped only with `--procobj` (else kept stock so their runtime scatter stays unchanged).
-  const swapModels = procobj ? [...result.placedSources] : [...result.placedSources].filter((m) => !procModels.has(m));
+  // Swapped HD models (LOD'd, non-procobj) + their custom TXD: pack the TXD + retarget the models' IDE `txd`.
+  // procobj species keep their stock mesh so their runtime scatter is unchanged.
+  const swapModels = [...result.placedSources].filter((m) => !procModels.has(m));
   const swap = swapEntries(dffPath, swapModels, prelight ? archive : null, foliageTextures);
   const retxd = retxdSwappedModels(gamePath, dat.ide, dffPath, txdPath, swapModels);
 
@@ -125,28 +102,11 @@ export function placeMap(options: PlaceOptions): void {
     writeText(join(outPath, idePath.replace(/\\/g, '/')), text);
   }
   const ids = new Map(registry.map((r) => [r.alias, r.id]));
-  writeText(join(outPath, IDE_REL), buildLodTreesIde(ids, drawDistance));
-
-  // procobj → static IPL: convert the tall `--dff ∩ procobj` species (writes lodtrees_procobj.ipl + procobj.dat).
-  // Only with `--procobj` — otherwise procobj is left untouched even when a species is in `--dff`.
-  const procObj =
-    procobj && procObjMax > 0
-      ? convertProcObj({
-          archive,
-          gamePath,
-          heightThreshold: procObjHeight,
-          outPath,
-          procObjMax,
-          species: procObjSpecies(idToImpostor, heightOf),
-        })
-      : null;
-
-  let gtaDat = patchGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'), IDE_DAT);
-  if (procObj) {
-    const eol = gtaDat.includes('\r\n') ? '\r\n' : '\n';
-    gtaDat = `${gtaDat.replace(/\s*$/, '')}${eol}${procObj.datLine}${eol}`;
-  }
-  writeText(join(outPath, 'data', 'gta.dat'), gtaDat);
+  writeText(join(outPath, IDE_REL), buildLodIde(ids, 'lodtrees', drawDistance));
+  writeText(
+    join(outPath, 'data', 'gta.dat'),
+    patchGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'), IDE_DAT),
+  );
 
   // Emit: gta3.img (edited streams + impostor DFFs + lodtrees.txd + swapped HD DFFs + custom TXDs).
   const extras = new Map([...swap, ...retxd.txds]);
@@ -156,7 +116,6 @@ export function placeMap(options: PlaceOptions): void {
     `place: ${result.attached} tree instances → impostor LODs ` +
       `(${result.appended} appended, ${result.repointed} repointed) · ${swap.size} HD DFFs swapped ` +
       `(${retxd.txds.size} custom TXD, ${retxd.ides.size} IDEs retxd'd) · ${registry.length} impostors ` +
-      `${procObj ? `· procobj→static ${procObj.objects} ` : ''}` +
       `· LOD draw ${drawDistance} → ${loose ? `${outPath}/gta3img/` : `${outPath}/gta3.img`}`,
   );
 }
@@ -215,8 +174,8 @@ function attachImpostor(
 
 /** Impostor records: short IMG/IDE alias + a free object id each. */
 function buildRegistry(impostors: readonly ImpostorRef[], usedIds: ReadonlySet<number>): Impostor[] {
-  const aliases = impostors.map((imp, i) => impostorAlias(imp.name, i));
-  const ids = allocateImpostorIds(aliases, usedIds);
+  const aliases = impostors.map((imp, i) => lodAlias(imp.name, i));
+  const ids = allocateLodIds(aliases, usedIds);
 
   return impostors.map((imp, i) => ({
     alias: aliases[i],
@@ -371,24 +330,6 @@ function procObjModels(gamePath: string): Set<string> {
   }
 
   return models;
-}
-
-/** Map each source model that has an impostor → its procobj registration (stock HD id + impostor + height). */
-function procObjSpecies(
-  idToImpostor: ReadonlyMap<number, Impostor>,
-  heightOf: ReadonlyMap<string, number>,
-): Map<string, ProcObjSpecies> {
-  const species = new Map<string, ProcObjSpecies>();
-  for (const [hdId, imp] of idToImpostor) {
-    species.set(imp.source, {
-      hdId,
-      height: heightOf.get(imp.source) ?? 0,
-      impostorAlias: imp.alias,
-      impostorId: imp.id,
-    });
-  }
-
-  return species;
 }
 
 function readBytes(path: string): Uint8Array {

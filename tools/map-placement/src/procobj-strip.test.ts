@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { stripProcObj } from './procobj';
+import { stripProcObj } from './procobj-strip';
+
+const keepNone = (): boolean => false;
 
 const keepAll = (): boolean => true;
 const modelsOf = (text: string): string[] =>
@@ -26,6 +28,14 @@ describe('stripProcObj', () => {
 
       expect(result.text).toContain('# header');
       expect(result.text.split('\r\n').filter((l) => l === '')).not.toHaveLength(0);
+    });
+
+    it('never strips underwater species (seaweed/starfish/searock), even when keep rejects everything', () => {
+      const text = 'P_UNDERWATERBARREN\tseaweed\t21.0\r\nP_UNDERWATERBARREN\tsearock03\t81.0\r\nP_SAND\ttree\t16.0\r\n';
+      const result = stripProcObj(text, keepNone);
+
+      expect(result.removed).toBe(1); // only `tree`
+      expect(modelsOf(result.text)).toEqual(['seaweed', 'searock03']);
     });
   });
 

@@ -13,8 +13,8 @@ export interface CustomTxd {
  * Point the swapped HD models at the user's custom TXD: each swapped DFF references textures that live in the
  * `--txd`, not the stock TXD its IDE names — so the model renders untextured (white) until we (a) pack the custom
  * TXD into the IMG and (b) rewrite the model's IDE `txd` column to it. A model is repointed **only** to a custom
- * TXD that actually contains its textures; a model whose textures aren't in any custom TXD (e.g. a swapped procobj
- * desert plant that still uses stock `gta_procdesert` textures) keeps its stock `txd` — repointing it would strip
+ * TXD that actually contains its textures; a model whose textures aren't in any custom TXD (the user's `--txd`
+ * doesn't cover it — its `--dff` still names stock textures) keeps its stock `txd` — repointing it would strip
  * its textures.
  */
 export interface RetxdResult {

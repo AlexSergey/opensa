@@ -51,16 +51,14 @@ ids. No re-index needed — the inverse of the Stage-1 removal, and just as inde
 
 ## HD DFF + TXD swap
 
-Decision: **swap the HD DFF for every LOD'd model**, except procobj species are kept stock (so their runtime
-scatter is unchanged) **unless `--procobj`** is passed (which converts that scatter to static — see
-[Stage 3](#stage-3--procobj--static-ipl) and [`007 §C`](./007-impostor-improvements.md)). Without `--procobj` this
-is 144 of the placed source models on the stock set.
+Decision: **swap the HD DFF for every LOD'd model that is not a procobj species** (keep procobj species' meshes
+stock so their runtime scatter is unchanged). On the stock set this is 144 of the placed source models. procobj
+species are handled by a separate tool (`lod-procobj-generator`) — this tool never touches `procobj.dat`.
 
 The swapped DFFs reference textures in the user's `--txd`, not the stock TXD their IDE names, so `retxd.ts` also:
 pack the custom TXD(s) into `gta3.img`, and rewrite each swapped model's IDE `txd` column to the custom TXD that
 covers its textures. A model is repointed **only** when a custom TXD actually contains its textures (≥1 hit) — a
-swapped model whose textures aren't in any custom TXD (e.g. a procobj desert plant still using stock
-`gta_procdesert` textures, pulled in via `--procobj`) **keeps its stock `txd`**, since repointing it to a TXD that
+swapped model whose textures aren't in any custom TXD **keeps its stock `txd`**, since repointing it to a TXD that
 lacks its textures would strip them (renders untextured). Without the repoint for genuinely custom-textured HDs
 they render white.
 
@@ -68,7 +66,7 @@ they render white.
 
 - repacked `gta3.img`: edited binary streams (HD `lod` set) + impostor DFFs + `lodtrees.txd` + swapped HD DFFs,
 - edited text IPLs under `data/maps/...` (appended LOD rows / repointed ids),
-- `data/maps/lodtrees.ide` + patched `data/gta.dat`. `procobj.dat` untouched (unless `--procobj`).
+- `data/maps/lodtrees.ide` + patched `data/gta.dat`. `procobj.dat` untouched.
 
 ## Caveats / to confirm in-game
 
@@ -77,11 +75,11 @@ they render white.
 - The impostor is baked from the `--dff` mesh; if `--dff` differs from the stock HD of a _non-swapped_ (procobj)
   model, the LOD↔HD transition can mismatch slightly.
 
-## Stage 3 — procobj → static IPL
+## procobj (out of scope)
 
-Converting `--dff ∩ procobj` species from runtime scatter to static IPL + impostor LODs (`area / spacing` is
-~2 M at full density, so it is thinned by MINDIST min-spacing + a cap). Implemented in
-[`006-procobj-place.md`](./006-procobj-place.md).
+procobj scatter species are **not** touched here — `procobj.dat` stays as-is. Converting procobj to static LODs is
+a separate tool (`lod-procobj-generator`), whose LODs are simplified-copy meshes (not impostors). See its
+`docs/plans/001-architecture.md`.
 
 ## Module shape
 

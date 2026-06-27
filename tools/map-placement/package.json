@@ -1,0 +1,16 @@
+{
+  "name": "@opensa/map-placement",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SA map placement workflows shared by the LOD tools: object-id allocation, IDE/gta.dat editing, swapped-HD retexture, and procobj scatter conversion/stripping.",
+  "exports": {
+    "./ide": "./src/ide.ts",
+    "./retxd": "./src/retxd.ts",
+    "./procobj-strip": "./src/procobj-strip.ts"
+  },
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

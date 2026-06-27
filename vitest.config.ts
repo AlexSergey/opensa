@@ -55,6 +55,7 @@ export default defineConfig({
       'tools/tool-kit/**/*.test.ts',
       'tools/rw-codec/**/*.test.ts',
       'tools/lod-trees-generator/**/*.test.ts',
+      'tools/map-placement/**/*.test.ts',
     ],
   },
 });

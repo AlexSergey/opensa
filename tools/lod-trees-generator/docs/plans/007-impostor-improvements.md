@@ -1,6 +1,6 @@
 # 007 — impostor improvements (aspect-aware atlas + stock prelight transfer)
 
-Two quality fixes for the placed assets. Independent, can land separately. **Plan only — no code yet.**
+Two quality fixes for the placed assets. Independent. Both **implemented** (§A, §B).
 
 ---
 
@@ -121,34 +121,8 @@ Crucially this runs on **both surfaces so they stay consistent**:
 ### Scope note
 
 Only touches the **swapped HD DFFs** and their **LOD atlas**. Non-`--prelight` runs are unchanged. procobj species
-are swapped (and so prelit-transferred) only when `--procobj` is passed — see
-[§C](#c---procobj-gate--implemented); otherwise they keep stock HDs and are unaffected.
-
----
-
-## C. `--procobj` gate — **implemented**
-
-### Problem
-
-procobj handling was always on (gated only by `procObjMax > 0`, default 20 000): every `--dff ∩ procobj` species
-got its scatter converted to static **and** the HD-swap deliberately _skipped_ procobj species. That mixed two
-policies and gave no way to leave procobj entirely stock while still LOD-ing the regular placements.
-
-### Fix — one explicit flag
-
-`--procobj` is the single switch for **touching procobj species at all** — covering **both** the LOD side
-(scatter → static IPL + impostor LODs) and the HD side (swap their HD DFF for the `--dff` mesh):
-
-- **off** (default) — procobj species are left fully stock: no static conversion, no HD swap, `procobj.dat`
-  untouched. Their regular streamed placements still get impostor LODs like any other `--dff` model.
-- **on** — convert their scatter to static (capped by `--procobj-max`, gated by `--procobj-height`) **and** include
-  them in the HD swap (safe now that the runtime scatter is gone).
-
-### Code touch
-
-- `place/place-map.ts` — swap list `procobj ? allPlaced : allPlaced.filter(notProcobj)`; convert gate
-  `procobj && procObjMax > 0`.
-- `cli.ts` `--procobj` boolean → `GtaSaTreeLodOptions.procobj` → `PlaceOptions.procobj`.
+are never swapped here (they keep their stock HD + runtime scatter), so they're unaffected — their LODs are a
+separate tool (`lod-procobj-generator`).
 
 ---
 
