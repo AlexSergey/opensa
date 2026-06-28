@@ -53,6 +53,13 @@ plans 015–021/025/030/033.
   independent slots** chosen by the `carcols` component rules, each able to resolve to "nothing". If a vehicle ever
   needs **two simultaneous** extras (or a chance of **none**), that's a follow-up built on top of the same
   `hiddenExtraFrames` helper (it would need the carcols comp rules, which we don't parse yet).
+- **LEFTOVER (engine) — carmods / vehicle upgrades**: `carmods.dat` is now **parsed** (`parseCarmods` in
+  `@opensa/renderware`, added for the `vehicle-installer` tool's settings merge), but it is **not wired into the
+  engine** yet — the in-game vehicle **component/upgrade** system (mod-shop parts, the `link`/`wheel` rules) is a
+  future iteration. No adapter/runtime usage.
+- **LEFTOVER (engine) — cargrp / population vehicles**: `cargrp.dat` (the per-ped-type vehicle distribution) is now
+  **parsed** (`parseCarGroups` in `@opensa/renderware`, added for `vehicle-installer`'s `--strip`), but it is **not
+  wired into the engine** — the in-game **population/traffic** car selection is a future iteration. No runtime usage.
 
 ## Test coverage anchors
 

@@ -36,6 +36,10 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
 - **mod-installer** — layer mod folders onto a base game (files overwrite, `gta3img/` merges into `gta3.img`, a
   PNG folder merges into a sibling loose `.txd`), alphabetical.
   [`mod-installer/docs/plans/`](../../tools/mod-installer/docs/plans/) (`001` design · `002` as-built · `003` txd).
+- **vehicle-installer** — install vehicle mod folders: dff/txd → `gta3.img`; settings → `handling.cfg`/
+  `vehicles.ide`/`carcols.dat` (car/car4, alpha-sorted, custom `col` palettes)/`carmods.dat`; `--strip` to keep
+  only the installed cars. [`vehicle-installer/docs/plans/`](../../tools/vehicle-installer/docs/plans/) (`001`
+  architecture · `002` install · `003` palette · `004` strip).
 - **tool-kit** — shared building blocks (mesh smooth-normals + QEM simplify, editable IMG). No plans doc yet.
 - **map-placement** — shared SA map-edit workflows (id allocation, IDE/gta.dat edits, swapped-HD retexture,
   procobj convert/strip), used by lod-trees-generator + lod-procobj-generator. No plans doc.

@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/vehicle-installer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Install GTA-SA vehicle mod folders onto a base game: dff/txd into gta3.img + merge settings into handling.cfg / vehicles.ide / carcols.dat / carmods.dat.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

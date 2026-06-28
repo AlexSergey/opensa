@@ -59,6 +59,7 @@ export default defineConfig({
       'tools/sa-lod/**/*.test.ts',
       'tools/lod-procobj-generator/**/*.test.ts',
       'tools/mod-installer/**/*.test.ts',
+      'tools/vehicle-installer/**/*.test.ts',
     ],
   },
 });

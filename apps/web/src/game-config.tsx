@@ -63,7 +63,7 @@ const SA_TELEPORTS: readonly Teleport[] = [
 ];
 
 /** A launchable game id. */
-export type GameId = 'gostown' | 'original' | 'original-extend';
+export type GameId = 'gostown' | 'original';
 
 export const GAME_CONFIG: Record<GameId, GameConfig> = {
   gostown: {
@@ -130,20 +130,6 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
       </>
     ),
     label: 'Run San Andreas [local only]',
-    loadGame: { radius: 400, startMinutes: 360, weather: 'EXTRASUNNY_SMOG_LA' },
-    mainCharacter: 'BMYPOL1',
-    playerSpawn: [2495, -1675, 16],
-    teleports: [...SA_TELEPORTS],
-    vehiclesSpawn: [
-      { colour: '57,57', heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
-      { colour: '6,3', heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
-    ],
-  },
-  'original-extend': {
-    assetLoader: 'fetch',
-    devOnly: true,
-    disclaimer: <div />,
-    label: 'Run Extended SA [local only]',
     loadGame: { radius: 400, startMinutes: 360, weather: 'EXTRASUNNY_SMOG_LA' },
     mainCharacter: 'BMYPOL1',
     playerSpawn: [2495, -1675, 16],

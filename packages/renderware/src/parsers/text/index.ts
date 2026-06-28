@@ -1,5 +1,7 @@
 // Public API for the GTA San Andreas text map parsers (DAT / IDE / IPL).
 export { parseCarcols, type VehicleColours } from './carcols.parser';
+export { type CarGroup, parseCarGroups } from './cargrp.parser';
+export { type Carmods, parseCarmods } from './carmods.parser';
 export { type FxEmitter, type FxKeyframe, type FxSystem, parseFxp, sampleFxTrack } from './fxp.parser';
 export { parseGtaDat } from './gta-dat.parser';
 export { type HandlingEntry, parseHandling } from './handling.parser';
