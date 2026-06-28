@@ -1,4 +1,7 @@
+import type { DxtFormat } from './dxt';
 import type { MipLevel } from './mip';
+
+import { encodeDxt } from './dxt-encode';
 
 /**
  * Write a `TextureNative` Struct as uncompressed **A8R8G8B8** with a full mip chain (plan 010, Phase 1 — no
@@ -72,6 +75,52 @@ export function encodeSameFormatStruct(original: Uint8Array, levels: readonly { 
   return out;
 }
 
+// From-scratch DXT struct header (mirrors the in-game-verified `LODvegetation.txd` writer). For DXT the engine's
+// parser keys the format off `d3dFormat`, so `rasterFormat`/`depth` are decorative; `flags` carries the alpha bit.
+const PLATFORM_D3D9 = 9;
+const FILTER_LINEAR_MIP = 0x1106; // trilinear + wrap/wrap
+const RASTER_TYPE_TEXTURE = 4;
+const RASTER_MIP = 0x8300; // mipmap flag + a raster format (informational for DXT)
+const DXT_DEPTH = 16;
+const FLAG_DXT = 0x08; // "compressed" bit
+const FLAG_ALPHA = 0x01;
+const D3DFMT: Record<DxtFormat, number> = { dxt1: 0x31545844, dxt3: 0x33545844, dxt5: 0x35545844 };
+
+/**
+ * Build a complete TextureNative Struct **from scratch** (no original to copy): DXT-compress each RGBA mip level
+ * and write the 88-byte header. `dxt1` for opaque, `dxt5` for alpha (alpha bit set in `flags`). Pairs with the
+ * `RW_TEXTURE_NATIVE` wrapper to add a brand-new texture to a dictionary.
+ */
+export function encodeDxtStruct(name: string, format: DxtFormat, levels: readonly MipLevel[]): Uint8Array {
+  const blocks = levels.map((level) => encodeDxt(format, level.data, level.width, level.height));
+  const dataSize = blocks.reduce((sum, block) => sum + 4 + block.length, 0);
+  const out = new Uint8Array(HEADER_SIZE + dataSize);
+  const view = new DataView(out.buffer);
+
+  view.setUint32(0, PLATFORM_D3D9, true);
+  view.setUint32(4, FILTER_LINEAR_MIP, true);
+  writeName(out, 8, name); // name[32]
+  writeName(out, 40, name); // maskName[32]
+  view.setUint32(72, RASTER_MIP, true);
+  view.setUint32(76, D3DFMT[format], true);
+  view.setUint16(80, levels[0].width, true);
+  view.setUint16(82, levels[0].height, true);
+  out[84] = DXT_DEPTH;
+  out[85] = levels.length;
+  out[86] = RASTER_TYPE_TEXTURE;
+  out[87] = format === 'dxt1' ? FLAG_DXT : FLAG_DXT | FLAG_ALPHA;
+
+  let offset = HEADER_SIZE;
+  for (const block of blocks) {
+    view.setUint32(offset, block.length, true);
+    offset += 4;
+    out.set(block, offset);
+    offset += block.length;
+  }
+
+  return out;
+}
+
 /** A TextureNative Struct's texture name (offset 8, 32-byte NUL-terminated). */
 export function readTextureName(struct: Uint8Array): string {
   let end = 8;
@@ -80,4 +129,10 @@ export function readTextureName(struct: Uint8Array): string {
   }
 
   return new TextDecoder().decode(struct.subarray(8, end));
+}
+
+function writeName(out: Uint8Array, offset: number, name: string): void {
+  for (let i = 0; i < Math.min(name.length, 31); i += 1) {
+    out[offset + i] = name.charCodeAt(i);
+  }
 }

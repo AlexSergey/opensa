@@ -3,6 +3,9 @@
 **Plan only — no code yet.** A drop-in mod layering tool: copy a base game to `--out`, then apply each mod folder
 under `--in` on top, in alphabetical order — plain files overwrite, `gta3img/` entries merge into `gta3.img`.
 
+> Shipped. For the **as-built** behaviour (exact functions, guard rules, edge cases, test anchors) see
+> [002 — how it works (as-built)](./002-as-built.md).
+
 ## Idea
 
 ```

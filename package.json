@@ -56,6 +56,7 @@
     "tools/mod-installer"
   ],
   "scripts": {
+    "arch": "tsx scripts/arch-graph.ts",
     "build": "tsc -b && vite build",
     "build:game:anderius": "tsx scripts/build-game.ts --game anderius",
     "build:game:carcer": "tsx scripts/build-game.ts --game carcer",

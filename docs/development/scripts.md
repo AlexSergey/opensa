@@ -5,6 +5,8 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
 
 ## Contents
 
+- [Project overview](#project-overview)
+  - [arch-graph.ts](#arch-graphts)
 - [Build / asset pipeline](#build--asset-pipeline)
   - [build-game.ts](#build-gamets)
   - [gen-wind-list.ts](#gen-wind-listts)
@@ -26,6 +28,25 @@ All TypeScript scripts run via `npx tsx`, `.mjs` ones via `node`.
   - [wind-coverage.ts](#wind-coveragets)
   - [ide-flag-histogram.ts](#ide-flag-histogramts)
 - [In-game debug URL params](#in-game-debug-url-params)
+
+---
+
+## Project overview
+
+### arch-graph.ts
+
+Visualise the package architecture as a **Mermaid flowchart**, derived from the actual workspace packages and
+their `@opensa/*` (plus `three` / Rapier) imports — so the picture can't drift from the code. Nodes are coloured
+by layer (app · engine · tool · external); edges are the import dependencies.
+
+```bash
+npm run arch                                  # print the Mermaid graph to stdout
+tsx scripts/arch-graph.ts --out docs/architecture.generated.md   # write a fenced .md
+tsx scripts/arch-graph.ts --no-externals      # internal packages only (drop three.js / Rapier)
+tsx scripts/arch-graph.ts --include-tests     # also follow imports in *.test.ts
+```
+
+Paste the output into a ` ```mermaid ` block (GitHub renders it) or <https://mermaid.live>.
 
 ---
 

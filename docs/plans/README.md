@@ -33,8 +33,9 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
   [`lod-trees-generator/docs/plans/`](../../tools/lod-trees-generator/docs/plans/) (`001`–`005`, `007`).
 - **lod-procobj-generator** — procobj scatter → static IPL with **simplified-copy** (decimated) LODs; reuses
   `sa-lod` + `map-placement`. [`lod-procobj-generator/docs/plans/`](../../tools/lod-procobj-generator/docs/plans/) (`001`).
-- **mod-installer** — layer mod folders onto a base game (files overwrite, `gta3img/` merges into `gta3.img`),
-  alphabetical. [`mod-installer/docs/plans/`](../../tools/mod-installer/docs/plans/) (`001`).
+- **mod-installer** — layer mod folders onto a base game (files overwrite, `gta3img/` merges into `gta3.img`, a
+  PNG folder merges into a sibling loose `.txd`), alphabetical.
+  [`mod-installer/docs/plans/`](../../tools/mod-installer/docs/plans/) (`001` design · `002` as-built · `003` txd).
 - **tool-kit** — shared building blocks (mesh smooth-normals + QEM simplify, editable IMG). No plans doc yet.
 - **map-placement** — shared SA map-edit workflows (id allocation, IDE/gta.dat edits, swapped-HD retexture,
   procobj convert/strip), used by lod-trees-generator + lod-procobj-generator. No plans doc.

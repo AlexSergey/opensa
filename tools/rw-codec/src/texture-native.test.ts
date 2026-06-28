@@ -2,7 +2,8 @@ import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { describe, expect, it } from 'vitest';
 
 import { RW_STRUCT, RW_TEXTURE_DICTIONARY, RW_TEXTURE_NATIVE, type RwChunk, writeRw } from './chunk';
-import { encodeRgba8888Struct, readTextureName } from './texture-native';
+import { buildMipChain } from './mip';
+import { encodeDxtStruct, encodeRgba8888Struct, readTextureName } from './texture-native';
 
 const RW_VERSION = 0x1803ffff; // a real SA RenderWare stream version
 
@@ -10,6 +11,19 @@ const RW_VERSION = 0x1803ffff; // a real SA RenderWare stream version
 function originalHeader(name: string): Uint8Array {
   const out = new Uint8Array(88);
   new TextEncoder().encodeInto(name, out.subarray(8, 40));
+
+  return out;
+}
+
+/** A flat `size × size` RGBA buffer of one colour. */
+function solid(size: number, [r, g, b, a]: [number, number, number, number]): Uint8Array {
+  const out = new Uint8Array(size * size * 4);
+  for (let i = 0; i < out.length; i += 4) {
+    out[i] = r;
+    out[i + 1] = g;
+    out[i + 2] = b;
+    out[i + 3] = a;
+  }
 
   return out;
 }
@@ -68,6 +82,34 @@ describe('encodeRgba8888Struct', () => {
       ]);
       // base level pixels survive the BGRA store → RGBA read.
       expect([...texture.mipmaps[0].data]).toEqual([...levels[0].data]);
+    });
+  });
+});
+
+describe('encodeDxtStruct', () => {
+  describe('positive cases', () => {
+    it('round-trips an opaque image through parseTxd as DXT1 with its mip chain', () => {
+      const struct = encodeDxtStruct('body', 'dxt1', buildMipChain(solid(4, [200, 50, 25, 255]), 4, 4));
+
+      expect(readTextureName(struct)).toBe('body');
+
+      const { textures } = parseTxd(wrapTxd(struct).buffer as ArrayBuffer);
+      expect(textures).toHaveLength(1);
+      expect(textures[0].name).toBe('body');
+      expect(textures[0].format).toBe('dxt1');
+      expect(textures[0].mipmaps.map((m) => [m.width, m.height])).toEqual([
+        [4, 4],
+        [2, 2],
+        [1, 1],
+      ]);
+    });
+
+    it('encodes an image with alpha as DXT5', () => {
+      const struct = encodeDxtStruct('glass', 'dxt5', buildMipChain(solid(4, [200, 50, 25, 128]), 4, 4));
+
+      const { textures } = parseTxd(wrapTxd(struct).buffer as ArrayBuffer);
+      expect(textures[0].format).toBe('dxt5');
+      expect(textures[0].hasAlpha).toBe(true);
     });
   });
 });

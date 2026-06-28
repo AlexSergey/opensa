@@ -28,3 +28,21 @@ tsx tools/mod-installer/src/cli.ts --game ./game-src/non-modified --in ./mods --
 It's the inverse of the LOD tools' `--loose` output (a `gta3img/` drop) — mod-installer **applies** such drops.
 
 A guard refuses to wipe a dangerous `--out` (the filesystem root, or a path that is/contains `--game` / `--in`).
+
+## Texture folders → loose `.txd`
+
+A mod can patch a **loose** `.txd` (a `.txd` file on disk, e.g. `models/particle.txd`, `models/generic/vehicle.txd`
+— **not** textures inside `gta3.img`) by shipping a **folder of PNGs** in its place. If a mod directory's sibling
+`<dir>.txd` already exists in `--out`, the folder is **not copied** — instead each `<name>.png` inside becomes a
+texture named `<name>`, **replacing** the same-named texture or **adding** a new one (every other texture is left
+untouched). Works at any depth.
+
+```
+mod/models/generic/vehicle/   → merges into  out/models/generic/vehicle.txd
+  stock.png    (replaces the existing `stock` texture)
+  decal.png    (adds a new `decal` texture)
+```
+
+Encoding follows the SA texture conventions: **DXT5** when a PNG has real alpha, else **DXT1**, with a full mip
+chain — so alpha, mipmaps and compression are all handled. PNGs must be 8-bit RGB/RGBA. (The `.txd` must already
+exist; mod-installer patches it, it doesn't create new dictionaries.)
