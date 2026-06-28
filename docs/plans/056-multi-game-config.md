@@ -58,7 +58,7 @@ interface GameConfig {
   // (no `vehicles` field — every car is pulled from vehicles.ide at build + listed in the debugger; see 053)
   playerSpawn: Vec3; // single source: capsule + collision-zone centre
   loadGame: { radius: number; startMinutes: number; weather: string }; // collision radius / clock / weather
-  vehiclesSpawn?: VehiclePlacement[]; // parked cars (colour inline)
+  // (no `vehiclesSpawn` field — parked cars come from the game's `parked.json` in the VFS; absent → none)
   teleports?: { coords: Vec3; label: string }[]; // debug Position tab
 
   // — discretionary additions (see below) —

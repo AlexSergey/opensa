@@ -1,5 +1,4 @@
 import type { Vec3 } from '@opensa/game';
-import type { VehiclePlacement } from '@opensa/game/vehicle/vehicle-lod.system';
 import type { AssetLoaderKind } from '@opensa/loaders';
 /**
  * Runtime game catalogue (plan 056). Each key is a game the menu can launch; the value is its full
@@ -35,8 +34,6 @@ export interface GameConfig {
   playerSpawn: Vec3;
   /** Debug "Position" teleport list ([] / omitted → no Position tab). */
   teleports?: Teleport[];
-  /** Parked cars placed on load (colour = carcols.dat palette indices). */
-  vehiclesSpawn?: VehiclePlacement[];
 }
 
 /** A debug "Position" teleport target (native GTA Z-up world coords). */
@@ -112,10 +109,6 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
     mainCharacter: 'BMYPOL1',
     playerSpawn: [1531.15, -1271.89, 581.74],
     teleports: [{ coords: [1531.15, -1271.89, 581.74], label: 'Downtown' }],
-    vehiclesSpawn: [
-      { colour: '57,57', heading: 0, model: 'admiral', position: [1528.91, -1279.5, 581.36] },
-      { colour: '6,3', heading: 0, model: 'comet', position: [1534.33, -1279.93, 581.38] },
-    ],
   },
   original: {
     assetLoader: 'local',
@@ -134,10 +127,6 @@ export const GAME_CONFIG: Record<GameId, GameConfig> = {
     mainCharacter: 'BMYPOL1',
     playerSpawn: [2495, -1675, 16],
     teleports: [...SA_TELEPORTS],
-    vehiclesSpawn: [
-      { colour: '57,57', heading: 0, model: 'admiral', position: [2502, -1678, 13.4] },
-      { colour: '6,3', heading: 0, model: 'comet', position: [2493, -1678, 13.4] },
-    ],
   },
 };
 

@@ -79,6 +79,7 @@ import {
 import type { DebugActions } from './debug/debug-overlay';
 
 import { GAME_CONFIG, type GameId, HUMAN_HALF_EXTENTS } from '../game-config';
+import { parseParkedVehicles } from '../parked-vehicles';
 import { vehicleModelsFromIde } from '../vehicle-models';
 import { isTouchDevice } from './controls/is-touch-device';
 import { TouchControls } from './controls/touch-controls';
@@ -924,7 +925,8 @@ function bootstrap(
 
     const vehicleLod = new VehicleLodSystem(character.viewOf, game.getConfig(), spawnVehicle);
     game.addSystem(vehicleLod);
-    for (const placement of config.vehiclesSpawn ?? []) {
+    // Parked cars come from the game's `parked.json` in the VFS (shipped per game); absent → none.
+    for (const placement of parseParkedVehicles(fs.getText('parked.json'))) {
       vehicleLod.add(placement, await spawnVehicle(placement));
     }
 
