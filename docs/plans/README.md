@@ -40,6 +40,10 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
   `vehicles.ide`/`carcols.dat` (car/car4, alpha-sorted, custom `col` palettes)/`carmods.dat`; `--strip` to keep
   only the installed cars. [`vehicle-installer/docs/plans/`](../../tools/vehicle-installer/docs/plans/) (`001`
   architecture · `002` install · `003` palette · `004` strip).
+- **ped-installer** — install ped mod folders: dff/txd → `gta3.img`; a new ped's line → `peds.ide` (replace by
+  model, append if new); `--strip` to keep only the installed peds + the player ped (`--player`, default
+  `BMYPOL1`). [`ped-installer/docs/plans/`](../../tools/ped-installer/docs/plans/) (`001` architecture · `002`
+  add/replace · `003` strip).
 - **tool-kit** — shared building blocks (mesh smooth-normals + QEM simplify, editable IMG). No plans doc yet.
 - **map-placement** — shared SA map-edit workflows (id allocation, IDE/gta.dat edits, swapped-HD retexture,
   procobj convert/strip), used by lod-trees-generator + lod-procobj-generator. No plans doc.

@@ -50,6 +50,30 @@ describe('PhysicsWorld', () => {
   });
 });
 
+describe('PhysicsWorld.groundBelow', () => {
+  describe('negative cases', () => {
+    it('returns null when nothing is below within maxDrop', async () => {
+      const physics = await makeWorld();
+      physics.createStaticBox([0, 0, 0], [10, 10, 0.5]); // top at z = 0.5
+      physics.step(STEP); // build the query pipeline so the ray sees the ground
+
+      expect(physics.groundBelow([0, 0, 5], 2)).toBeNull(); // ground is 4.5 below, beyond maxDrop 2
+      physics.dispose();
+    });
+  });
+
+  describe('positive cases', () => {
+    it('finds the Z of the ground directly below the position', async () => {
+      const physics = await makeWorld();
+      physics.createStaticBox([0, 0, 0], [10, 10, 0.5]); // top surface at z = 0.5
+      physics.step(STEP);
+
+      expect(physics.groundBelow([0, 0, 10], 100)).toBeCloseTo(0.5, 3);
+      physics.dispose();
+    });
+  });
+});
+
 describe('PhysicsWorld.createDynamicVehicle', () => {
   const HALF: [number, number, number] = [1.2, 2.5, 0.7];
 

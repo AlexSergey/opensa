@@ -54,7 +54,8 @@
     "tools/sa-lod",
     "tools/lod-procobj-generator",
     "tools/mod-installer",
-    "tools/vehicle-installer"
+    "tools/vehicle-installer",
+    "tools/ped-installer"
   ],
   "scripts": {
     "arch": "tsx scripts/arch-graph.ts",

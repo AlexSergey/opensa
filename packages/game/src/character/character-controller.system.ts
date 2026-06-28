@@ -13,6 +13,12 @@ import { PlayerControlled, RigidBody, Transform, Velocity } from '../ecs/compone
 /** Gravity integrated into the kinematic body's vertical velocity (Z-up). */
 const GRAVITY = -9.81;
 
+/** Debug fly mode moves at this multiple of the run speed (horizontal + vertical). */
+const FLY_SPEED_MULTIPLIER = 2;
+
+/** Metres the player lifts off the moment fly mode is turned on (so they're immediately airborne). */
+const FLY_INITIAL_LIFT = 4;
+
 /** Planar distance (m) at which a scripted {@link CharacterControllerSystem.runTo} target is reached. */
 const ARRIVE_DISTANCE = 0.6;
 
@@ -39,6 +45,7 @@ export class CharacterControllerSystem implements System {
   private readonly config: Readonly<Config>;
   private readonly controller: CharacterController;
   private enabled = true;
+  private flyMode = false;
   private readonly forward = new Vector3();
   private readonly input: InputState;
   private readonly physics: PhysicsWorld;
@@ -63,7 +70,15 @@ export class CharacterControllerSystem implements System {
   }
 
   fixedUpdate(step: number): void {
-    if (!this.enabled || this.config.gameState !== 'play') {
+    if (this.config.gameState !== 'play') {
+      return;
+    }
+    if (this.flyMode) {
+      this.flyUpdate(step);
+
+      return;
+    }
+    if (!this.enabled) {
       return; // gated (e.g. while the player is scripted into a car)
     }
     const { movement } = this.config;
@@ -91,6 +106,11 @@ export class CharacterControllerSystem implements System {
     }
   }
 
+  /** Whether the debug fly mode is on. */
+  isFlying(): boolean {
+    return this.flyMode;
+  }
+
   /**
    * Drive the player along a world-space path (Z-up), ignoring the keyboard until
    * the last point is reached. Pass `[]` to restore manual control.
@@ -106,11 +126,20 @@ export class CharacterControllerSystem implements System {
     this.enabled = enabled;
     if (!enabled) {
       this.autoPath = [];
-      // Stop the body so stale velocity doesn't drive facing/locomotion when control returns.
-      for (const eid of query(this.world, [PlayerControlled, Velocity])) {
-        Velocity.x[eid] = 0;
-        Velocity.y[eid] = 0;
-        Velocity.z[eid] = 0;
+      this.zeroVelocity(); // stop the body so stale velocity doesn't drive facing/locomotion when control returns
+    }
+  }
+
+  /** Toggle the debug fly mode: the player floats (no gravity/collision), moving at 2× run speed — horizontal
+   *  from the camera-relative move keys, vertical from jump (up) / descend (down), hovering when neither is held.
+   *  Turning it on lifts the player off the ground so they are immediately airborne. */
+  setFlying(on: boolean): void {
+    this.flyMode = on;
+    this.zeroVelocity();
+    if (on) {
+      for (const eid of query(this.world, [PlayerControlled, RigidBody, Velocity])) {
+        const [px, py, pz] = this.physics.readBody(RigidBody.handle[eid]).position;
+        this.placeFlying(eid, [px, py, pz + FLY_INITIAL_LIFT], 0, 0, 0);
       }
     }
   }
@@ -155,6 +184,22 @@ export class CharacterControllerSystem implements System {
     return { jump: this.input.isActive('jump'), target };
   }
 
+  /** Float the player by directly teleporting the kinematic body (no gravity, no collision): horizontal from the
+   *  move keys, vertical from jump (up) / descend (down), all at 2× run speed; hovers when neither is held.
+   *  `grounded` stays set so the animation shows run/idle (never the fall clip) while flying. */
+  private flyUpdate(step: number): void {
+    const speed = this.config.movement.runSpeed * FLY_SPEED_MULTIPLIER;
+    const move = this.input.move();
+    const { x, y } = this.cameraRelativeMove(move.y, move.x, speed);
+    const vz = (this.input.isActive('jump') ? speed : 0) - (this.input.isActive('descend') ? speed : 0);
+    for (const eid of query(this.world, [PlayerControlled, RigidBody, Velocity])) {
+      // Base the next position on the **body** (what the PhysicsSystem syncs Transform from) — not Transform —
+      // so releasing the keys (vz = 0) leaves the player hovering instead of the two desyncing.
+      const [px, py, pz] = this.physics.readBody(RigidBody.handle[eid]).position;
+      this.placeFlying(eid, [px + x * step, py + y * step, pz + vz * step], x, y, vz);
+    }
+  }
+
   /** Planar velocity toward the current path waypoint; advances/flags arrival as points are reached. */
   private moveToward(eid: number, speed: number): { x: number; y: number } {
     const target = this.autoPath[this.autoIndex];
@@ -174,6 +219,27 @@ export class CharacterControllerSystem implements System {
     }
 
     return { x: (dx / distance) * speed, y: (dy / distance) * speed };
+  }
+
+  /** Teleport the kinematic body to `next` and write the matching Transform + Velocity (grounded, for the run
+   *  animation) — the one place fly mode moves the player, so the body and Transform never diverge. */
+  private placeFlying(eid: number, next: Vec3, vx: number, vy: number, vz: number): void {
+    this.physics.teleport(RigidBody.handle[eid], next);
+    Transform.x[eid] = next[0];
+    Transform.y[eid] = next[1];
+    Transform.z[eid] = next[2];
+    Velocity.x[eid] = vx;
+    Velocity.y[eid] = vy;
+    Velocity.z[eid] = vz;
+    Velocity.grounded[eid] = 1;
+  }
+
+  private zeroVelocity(): void {
+    for (const eid of query(this.world, [PlayerControlled, Velocity])) {
+      Velocity.x[eid] = 0;
+      Velocity.y[eid] = 0;
+      Velocity.z[eid] = 0;
+    }
   }
 }
 

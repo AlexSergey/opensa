@@ -69,6 +69,8 @@ export interface DebugActions {
   godraysSize(): number;
   /** Current vehicle-headlight config (lamp corona size + brightness). */
   headlights(): HeadlightConfig;
+  /** Whether the debug fly mode is currently on. */
+  isFlying(): boolean;
   /** Current night-lights (street-lamp coronas) config. */
   lights(): LightsConfig;
   /** Current night-moon config (size/glow/elevation). */
@@ -89,6 +91,8 @@ export interface DebugActions {
   setClouds(patch: Partial<CloudsConfig>): void;
   /** Tune world 2dfx particle effects (enabled/drawDistance; plan 044). */
   setEffects(patch: Partial<EffectsConfig>): void;
+  /** Toggle the debug fly mode (off → drop the player to the ground beneath them). */
+  setFlyMode(on: boolean): void;
   /** Set the fog distance (world units to full fog). */
   setFogDistance(distance: number): void;
   /** Set the in-game time (minutes since midnight). */
@@ -245,6 +249,7 @@ export function DebugOverlay({
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState<Screen>('root');
   const [vehicleFilter, setVehicleFilter] = useState('');
+  const [flying, setFlying] = useState(() => actions.isFlying());
   const [showCoords, setShowCoords] = useState(false);
   const [coords, setCoords] = useState<Vec3>([0, 0, 0]);
   const [city, setCity] = useState<City>(() => actions.city());
@@ -288,21 +293,39 @@ export function DebugOverlay({
     [actions],
   );
 
-  // F2 toggles the panel; closing resets navigation (so the map viewer is left and we reopen at root).
+  // Close the panel: reset navigation (leave the map viewer, reopen at root) and end fly mode (drops the player
+  // to the ground beneath them) — so the debugger never leaves the player floating.
+  const close = useCallback((): void => {
+    resetTo('root');
+    setVisible(false);
+    if (actions.isFlying()) {
+      actions.setFlyMode(false);
+      setFlying(false);
+    }
+  }, [actions, resetTo]);
+
+  const toggleFly = useCallback((): void => {
+    const next = !actions.isFlying();
+    actions.setFlyMode(next);
+    setFlying(next);
+  }, [actions]);
+
+  // F2 toggles the panel.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === 'F2') {
         e.preventDefault();
         if (visible) {
-          resetTo('root');
+          close();
+        } else {
+          setVisible(true);
         }
-        setVisible((previous) => !previous);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
 
     return (): void => window.removeEventListener('keydown', handleKeyDown);
-  }, [visible, resetTo]);
+  }, [visible, close]);
 
   // Keep the shown coords live while the Position screen displays them.
   useEffect(() => {
@@ -343,14 +366,7 @@ export function DebugOverlay({
 
   return (
     <div style={styles.panel}>
-      <button
-        onClick={() => {
-          resetTo('root');
-          setVisible(false);
-        }}
-        style={styles.close}
-        type="button"
-      >
+      <button onClick={close} style={styles.close} type="button">
         ×
       </button>
       <div style={styles.title}>DEBUG</div>
@@ -371,6 +387,10 @@ export function DebugOverlay({
 
           {screen === 'player' && (
             <div style={styles.group}>
+              <button onClick={toggleFly} style={styles.actionButton} type="button">
+                Fly Mode {flying ? 'Off' : 'On'}
+              </button>
+              <div style={styles.divider} />
               <button onClick={() => actions.respawnPlayer()} style={styles.actionButton} type="button">
                 Respawn
               </button>

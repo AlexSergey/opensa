@@ -5,8 +5,9 @@
  * camera moves onto it.
  */
 
-/** Semantic player actions, mapped from a device by a source (e.g. {@link KeyboardSource}). */
-export type Action = 'enterExit' | 'jump' | 'run';
+/** Semantic player actions, mapped from a device by a source (e.g. {@link KeyboardSource}). `descend` (Ctrl) is
+ *  the inverse of `jump`/up — used by the debug fly mode for vertical control. */
+export type Action = 'descend' | 'enterExit' | 'jump' | 'run';
 
 /** What the game reads: planar movement, held actions, and per-frame look/zoom deltas. */
 export interface InputState {

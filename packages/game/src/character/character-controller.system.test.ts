@@ -6,7 +6,7 @@ import type { KeyboardInput } from '../input';
 import type { Config } from '../interfaces/config.interface';
 import type { CharacterController } from '../physics/physics-world';
 
-import { PlayerControlled, RigidBody, Velocity } from '../ecs/components';
+import { PlayerControlled, RigidBody, Transform, Velocity } from '../ecs/components';
 import { createEcsWorld } from '../ecs/world';
 import { KeyboardSource } from '../input';
 import { PhysicsWorld } from '../physics/physics-world';
@@ -200,5 +200,72 @@ describe('CharacterControllerSystem', () => {
       expect(Velocity.z[player.eid]).toBeGreaterThan(0);
       player.physics.dispose();
     });
+
+    it('fly mode lifts off on activation, then climbs on jump at 2x run speed (run animation, never falling)', async () => {
+      const player = await groundedPlayer();
+      addComponent(player.world, player.eid, Transform);
+      const handle = RigidBody.handle[player.eid];
+      const z = (): number => player.physics.readBody(handle).position[2];
+      const grounded = z();
+      const system = flySystem(player, keys('Space')); // Space = jump = up
+
+      system.setFlying(true);
+      player.physics.step(STEP); // apply the lift teleport
+      expect(system.isFlying()).toBe(true);
+      expect(z()).toBeCloseTo(grounded + 4, 1); // immediate lift-off (FLY_INITIAL_LIFT)
+
+      const lifted = z();
+      system.fixedUpdate(STEP);
+      player.physics.step(STEP);
+      expect(z()).toBeCloseTo(lifted + 26 * 2 * STEP, 1); // climbs at runSpeed 26 × 2
+      expect(Velocity.grounded[player.eid]).toBe(1); // never the fall clip while flying
+      player.physics.dispose();
+    });
+
+    it('fly mode hovers (holds its height) when no vertical key is held', async () => {
+      const player = await groundedPlayer();
+      addComponent(player.world, player.eid, Transform);
+      const handle = RigidBody.handle[player.eid];
+      const system = flySystem(player, keys()); // nothing held
+
+      system.setFlying(true);
+      player.physics.step(STEP);
+      const lifted = player.physics.readBody(handle).position[2];
+      system.fixedUpdate(STEP);
+      player.physics.step(STEP);
+
+      expect(player.physics.readBody(handle).position[2]).toBeCloseTo(lifted, 2); // unchanged → hovering
+      player.physics.dispose();
+    });
+
+    it('fly mode descends on Control (descend)', async () => {
+      const player = await groundedPlayer();
+      addComponent(player.world, player.eid, Transform);
+      const handle = RigidBody.handle[player.eid];
+      const system = flySystem(player, keys('ControlLeft'));
+
+      system.setFlying(true);
+      player.physics.step(STEP);
+      const lifted = player.physics.readBody(handle).position[2];
+      system.fixedUpdate(STEP);
+      player.physics.step(STEP);
+
+      expect(player.physics.readBody(handle).position[2]).toBeCloseTo(lifted - 26 * 2 * STEP, 1);
+      player.physics.dispose();
+    });
   });
 });
+
+/** A controller bound to a fixed keyboard, for the persistent-instance fly-mode tests. */
+function flySystem(player: Player, keyboard: KeyboardInput): CharacterControllerSystem {
+  const cfg = config('play');
+
+  return new CharacterControllerSystem(
+    player.world,
+    player.physics,
+    new KeyboardSource(keyboard, cfg.controls),
+    cfg,
+    player.controller,
+    CAMERA,
+  );
+}

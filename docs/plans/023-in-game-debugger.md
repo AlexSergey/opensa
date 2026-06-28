@@ -30,13 +30,25 @@ inspector it contains is reused by `debug2`'s Map screen (see iteration 4).
 
 ```ts
 interface DebugActions {
-  flipVehicle(): void;                              // flips the occupied car (no-op if on foot)
-  playerCoords(): Vec3;                             // live player position
-  respawnPlayer(): void;                            // re-drop Tommy at his current spot (unstick)
-  spawnVehicle(model: 'admiral' | 'camper'): Promise<void>; // in front of Tommy
+  flipVehicle(): void; // flips the occupied car (no-op if on foot)
+  isFlying(): boolean; // is the player fly mode on
+  playerCoords(): Vec3; // live player position
+  respawnPlayer(): void; // re-drop Tommy at his current spot (unstick)
+  setFlyMode(on: boolean): void; // toggle player fly mode (off → drop to ground below)
+  spawnVehicle(model: string): Promise<void>; // in front of Tommy
   teleportToGanton(): void;
 }
 ```
+
+### Player Fly Mode (later addition)
+
+The Player screen's **first** entry (separated by a divider): **Fly Mode**. On → the player floats (no gravity / no
+collision), the kinematic body teleported each `fixedUpdate` by `CharacterControllerSystem.setFlying(true)` at **2×
+run speed** — horizontal from the camera-relative move keys, **Space** up, **Ctrl** down (a new `descend` input
+`Action`, mapped to Control in `KeyboardSource`). The animation stays `grounded` so it shows run/idle, never the
+fall clip. Off — or **closing the debugger** — calls `PhysicsWorld.groundBelow` (a downward raycast) + `placePlayer`
+to drop the player onto the ground directly beneath them. Distinct from the K+M **camera** fly (which moves only
+the screenshot camera).
 
 ## Status
 
@@ -69,11 +81,13 @@ Play/Pause — not in the new spec.)
 Introduce the `DebugActions` prop + wiring in `canvas-host` (bootstrap returns it).
 
 **Player** screen:
+
 - **Respawn** → `actions.respawnPlayer()`: `placePlayer(viewOf(), true)` (re-teleports the kinematic
   capsule at the current spot, +small z lift) to unstick. `placePlayer` already teleports the body.
 - **To Ganton** → `actions.teleportToGanton()`: `placePlayer(PLAYER_SPAWN, true)`.
 
 **Vehicles** screen:
+
 - **Admiral Spawn / Camper Spawn** → `actions.spawnVehicle('admiral' | 'camper')`: reuse the existing
   `spawnVehicle(placement)` factory **and** register the result with `vehicleLod` (so LOD/unload still
   apply). Placement: position = player position + the player's **facing** forward (expose
@@ -98,10 +112,12 @@ event listener that gates click-pick), `debug-overlay.tsx` (old overlay's call),
 test fixtures (`character-controller`, `collision-streaming`, `streaming`, `physics`).
 
 **Game** screen:
+
 - **Show coords** → reveals the live player coords (`actions.playerCoords()`, refreshed while shown).
 - Once shown, a **Copy Coords** button appears → `navigator.clipboard.writeText(...)` of the coords.
 
 **Map** screen:
+
 - **Activate Map Viewer** (toggle) → turns on `mapViewer`: this is exactly today's overlay behaviour
   (manual cell selection/render, Show LODs, collision overlay, free look, click-to-pick + Selected
   info). The section inspector is reused: extract the inspector body from `DebugOverlay` into a shared
@@ -125,6 +141,5 @@ The Map screen gained two extras (rendered while the map viewer is OFF; `MapScre
 - **Show Normals** — a scene-wide `MeshNormalMaterial` override (`game.setShowNormals`), drawn
   **straight to the screen, bypassing the post-FX pipeline** (in `Game`'s render loop) so the normals
   read clean. Auto-resets via `resetTo` (Back / × / F2) and when entering the map viewer.
-- **Draw Distance / HD Distance / Fog** sliders — `game.setStreaming` (live `config.streaming`, plan
-  009) + `game.setFogDistance` (plan 024). Fog moved here from Atmosphere; the Draw Distance slider
+- **Draw Distance / HD Distance / Fog** sliders — `game.setStreaming` (live `config.streaming`, plan 009) + `game.setFogDistance` (plan 024). Fog moved here from Atmosphere; the Draw Distance slider
   couples fog to the LOD cull edge (`fog ≈ lod × 0.8`).

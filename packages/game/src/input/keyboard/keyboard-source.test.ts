@@ -29,6 +29,7 @@ describe('KeyboardSource', () => {
       expect(source.isActive('jump')).toBe(false);
       expect(source.isActive('run')).toBe(false);
       expect(source.isActive('enterExit')).toBe(false);
+      expect(source.isActive('descend')).toBe(false);
     });
 
     it('cancels opposite keys to a zero axis', () => {
@@ -54,6 +55,11 @@ describe('KeyboardSource', () => {
       expect(new KeyboardSource(keys('Space'), CONTROLS).isActive('jump')).toBe(true);
       expect(new KeyboardSource(keys('ShiftLeft'), CONTROLS).isActive('run')).toBe(true);
       expect(new KeyboardSource(keys('Enter'), CONTROLS).isActive('enterExit')).toBe(true);
+    });
+
+    it('maps either Control to descend (fly-mode down)', () => {
+      expect(new KeyboardSource(keys('ControlLeft'), CONTROLS).isActive('descend')).toBe(true);
+      expect(new KeyboardSource(keys('ControlRight'), CONTROLS).isActive('descend')).toBe(true);
     });
   });
 });

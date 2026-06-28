@@ -92,6 +92,7 @@ const BASE = import.meta.env.VITE_STATIC_URL;
 
 const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
 const WORLD_READY_TIMEOUT_MS = 12000; // reveal the game even if grounding is delayed
+const FLY_GROUND_MAX_DROP = 2000; // max downward ray (m) to find the ground when leaving fly mode
 
 // The animation (idle/walk) stands the skeleton up in GTA Z-up, so the model needs
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
@@ -979,6 +980,7 @@ function bootstrap(
       godrays: () => game.getConfig().graphics.sun.godrays,
       godraysSize: () => game.getConfig().graphics.sun.godraysSize,
       headlights: () => game.getConfig().graphics.headlights,
+      isFlying: () => character.controllerSystem.isFlying(),
       lights: () => game.getConfig().graphics.lights,
       moon: () => game.getConfig().graphics.moon,
       night: () => game.getConfig().graphics.night,
@@ -992,6 +994,17 @@ function bootstrap(
       setCamera: (patch) => game.setCamera(patch),
       setClouds: (patch) => game.setClouds(patch),
       setEffects: (patch) => game.setEffects(patch),
+      setFlyMode: (on) => {
+        character.controllerSystem.setFlying(on);
+        if (!on) {
+          // Drop the player onto the ground directly beneath them (or leave them put if none is found).
+          const [x, y, z] = character.viewOf();
+          const ground = character.physics.groundBelow([x, y, z], FLY_GROUND_MAX_DROP);
+          if (ground !== null) {
+            character.placePlayer([x, y, ground + character.halfExtents[2]], true);
+          }
+        }
+      },
       setFogDistance: (distance) => game.setFogDistance(distance),
       setGameTime: (minutes) => game.setTime(minutes),
       setGodrays: (enabled) => game.setGodrays(enabled),

@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/ped-installer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Install GTA-SA ped mod folders onto a base game: dff/txd into gta3.img + merge a new ped's line into peds.ide.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

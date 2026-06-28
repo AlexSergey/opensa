@@ -293,6 +293,15 @@ export class PhysicsWorld {
     return [v.x, v.y, v.z];
   }
 
+  /** Z of the nearest collision directly below `position` (within `maxDrop`), or null if none — for dropping the
+   *  fly-mode player back onto the ground beneath them. */
+  groundBelow(position: Vec3, maxDrop: number): null | number {
+    const ray = new this.rapier.Ray({ x: position[0], y: position[1], z: position[2] }, { x: 0, y: 0, z: -1 });
+    const hit = this.world.castRay(ray, maxDrop, true);
+
+    return hit ? position[2] - hit.timeOfImpact : null;
+  }
+
   /**
    * Pin a (dynamic) body at a fixed transform with zero velocity — used to hold a parked
    * car perfectly still while the player slides in/out, so the kinematic rider can't shove it.

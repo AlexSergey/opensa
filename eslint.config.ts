@@ -227,6 +227,7 @@ const scriptsConfig = {
     'tools/lod-procobj-generator/**/*.{js,mjs,cjs,ts}',
     'tools/mod-installer/**/*.{js,mjs,cjs,ts}',
     'tools/vehicle-installer/**/*.{js,mjs,cjs,ts}',
+    'tools/ped-installer/**/*.{js,mjs,cjs,ts}',
   ],
   languageOptions: {
     globals: {

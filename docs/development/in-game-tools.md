@@ -7,7 +7,11 @@ Developer tooling that ships with the build but stays out of the normal play pat
 Press **F2** in the game for the debug menu. Opening it alone changes nothing in the world — it's a
 multi-level menu:
 
-- **Player** — Respawn (unstick on the spot), To Ganton.
+- **Player** — **Fly Mode** (first, separated): toggle on and the player floats and flies at **2× speed** —
+  **WASD** horizontal (camera-relative), **Space** up, **Ctrl** down (run animation, no gravity/collision).
+  Turning it **off** — or closing the debugger — drops the player onto the ground directly beneath them. (This
+  moves the **player**, unlike the K+M screenshot camera below, which moves only the camera.) Then Respawn
+  (unstick on the spot), To Ganton.
 - **Vehicles** — spawn Admiral/Camper in front of you; Flip the car you're in (wheels ↔ roof).
 - **Game** — Show / Copy current coords.
 - **Map** — Activate **Map Viewer**: free-fly camera, click to pick objects, and render chosen map

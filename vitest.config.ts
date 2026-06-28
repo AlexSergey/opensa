@@ -60,6 +60,7 @@ export default defineConfig({
       'tools/lod-procobj-generator/**/*.test.ts',
       'tools/mod-installer/**/*.test.ts',
       'tools/vehicle-installer/**/*.test.ts',
+      'tools/ped-installer/**/*.test.ts',
     ],
   },
 });
