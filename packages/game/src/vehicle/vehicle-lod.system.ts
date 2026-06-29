@@ -19,6 +19,9 @@ export interface SpawnedVehicle {
 export interface VehiclePlacement {
   /** Optional carcols palette indices for the paint (e.g. `'34,34'`); omit for the car's default. */
   colour?: string;
+  /** Snap the spawn down onto the ground (raycast) so the body doesn't penetrate terrain and get ejected — set
+   *  for map car generators whose IPL positions sit in tight/clipping spots. */
+  groundSnap?: boolean;
   heading: number;
   model: string;
   position: Vec3;
@@ -65,6 +68,15 @@ export class VehicleLodSystem implements System {
   /** Register an already-spawned car against the placement it can be respawned from. */
   add(placement: VehiclePlacement, current: SpawnedVehicle): void {
     this.entries.push({ current, home: [...current.position], loading: false, placement });
+  }
+
+  /**
+   * Register a placement to be spawned **lazily** by distance — no upfront spawn. The stream loop materialises
+   * it once the view comes within `lodDistance` and unloads it again past `unloadDistance`. Used for the many
+   * map car generators (binary IPL CARS), where pre-spawning every one across the map would spike load.
+   */
+  register(placement: VehiclePlacement): void {
+    this.entries.push({ current: null, home: [...placement.position], loading: false, placement });
   }
 
   update(): void {

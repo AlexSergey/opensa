@@ -48,6 +48,7 @@ const MANIFEST: readonly Fixture[] = [
   copy('data/carcols.dat', 'data/carcols.dat'),
   copy('data/carmods.dat', 'data/carmods.dat'),
   copy('data/cargrp.dat', 'data/cargrp.dat'),
+  copy('data/popcycle.dat', 'data/popcycle.dat'),
   copy('parked.json', 'parked.json'),
   copy('data/water.dat', 'data/water.dat'),
   copy('data/vehicles.ide', 'data/vehicles.ide'),

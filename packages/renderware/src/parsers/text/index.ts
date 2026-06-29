@@ -8,11 +8,19 @@ export { type HandlingEntry, parseHandling } from './handling.parser';
 export { hasIdeFlag, IdeFlag } from './ide-flags';
 export { parseIde, parseTimedObjects, parseTxdParents } from './ide.parser';
 export { interiorId, isInterior } from './interior';
-export { parseBinaryIpl } from './ipl-binary.parser';
+export { parseBinaryCarGenerators, parseBinaryIpl } from './ipl-binary.parser';
 export { parseIpl } from './ipl.parser';
 export { isLodModel } from './lod';
 export { ColDamageEffect, type ObjectDatEntry, parseObjectDat } from './object-dat.parser';
 export { parsePedDefs, type PedDef } from './ped-defs.parser';
+export {
+  parsePopcycle,
+  POPCYCLE_GROUPS,
+  POPCYCLE_SLOTS,
+  type PopcycleSlot,
+  popcycleSlotForHour,
+  type PopcycleZone,
+} from './popcycle.parser';
 export { parseProcObj, type ProcObjRule } from './procobj.parser';
 export { parseSurfaceNames } from './surfinfo.parser';
 export {

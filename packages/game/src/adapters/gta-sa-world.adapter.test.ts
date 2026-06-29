@@ -12,6 +12,28 @@ vi.mock('@opensa/renderware', async (importActual) => {
   return {
     ...actual,
     resolveMap: (): Renderware.MapDefinitions => ({
+      carGenerators: [
+        {
+          alarm: 0,
+          angle: 1,
+          doorLock: 0,
+          forceSpawn: 0,
+          id: 400,
+          position: [10, 20, 3],
+          primaryColor: -1,
+          secondaryColor: -1,
+        },
+        {
+          alarm: 0,
+          angle: 2,
+          doorLock: 0,
+          forceSpawn: 0,
+          id: -1,
+          position: [-50, -50, 5],
+          primaryColor: -1,
+          secondaryColor: -1,
+        },
+      ],
       catalog: new Map([[1, { drawDistance: 300, flags: 0, id: 1, modelName: 'house', txdName: 'txd' }]]),
       imgDirs: [],
       instances: [{ id: 1, interior: 0, lod: -1, modelName: '', position: [10, 10, 0], rotation: [0, 0, 0, 1] }],
@@ -168,6 +190,89 @@ describe('GtaSaWorldAdapter cell streaming', () => {
       const second = await adapter.loadCellColliders(0, 0);
 
       expect(second).toBe(first);
+    });
+  });
+});
+
+const VEHICLES_IDE = [
+  'cars',
+  '400, landstal, landstal, car, LANDSTAL, LANDSTAL, null, normal, 10, 0, 0, 169, 0.82, 0.82, -1',
+  '489, rancher, rancher, car, RANCHER, RANCHER, null, normal, 7, 0, 0, 191, 0.85, 0.85, -1',
+  'end',
+].join('\n');
+
+/** cargrp with the 18 `POPCYCLE_GROUP_*` lines; the Workers group (index 0) holds `rancher`. */
+function cargrpText(): string {
+  const names = [
+    'WORKERS',
+    'BUSINESS',
+    'CLUBBERS',
+    'FARMERS',
+    'BEACHFOLK',
+    'PARKFOLK',
+    'CASUAL_RICH',
+    'CASUAL_AVERAGE',
+    'CASUAL_POOR',
+    'PROSTITUTES',
+    'CRIMINALS',
+    'GOLFERS',
+    'SERVANTS',
+    'AIRCREW',
+    'ENTERTAINERS',
+    'OUT_OF_TOWN_FACTORY',
+    'DESERT_FOLK',
+    'AIRCREW_RUNWAY',
+  ];
+
+  return names.map((name, i) => `${i === 0 ? 'rancher' : `car${i}`}  # POPCYCLE_GROUP_${name}`).join('\n');
+}
+
+/** A file system serving vehicles.ide/carcols/handling, plus any extra data files (popcycle/cargrp). */
+function dataFs(extra: Record<string, string> = {}): Renderware.AssetFileSystem {
+  const files: Record<string, string> = {
+    'data/carcols.dat': '',
+    'data/handling.cfg': '',
+    'data/vehicles.ide': VEHICLES_IDE,
+    ...extra,
+  };
+
+  return { get: () => null, getText: (name) => files[name] ?? null, has: (name) => name in files, names: [] };
+}
+
+/** popcycle with a COUNTRYSIDE block whose weekday slot 0 weights only the Workers group (index 0). */
+function popcycleText(): string {
+  const weights = Array.from({ length: 18 }, (_, i) => (i === 0 ? 100 : 0)).join(' ');
+
+  return ['//////', '// COUNTRYSIDE', '//////', '// Weekday', `  2 6 100 100 100 100  ${weights}  // Midnight`].join(
+    '\n',
+  );
+}
+
+describe('GtaSaWorldAdapter.mapCarGenerators', () => {
+  describe('negative cases', () => {
+    it('returns only the specific-model generators when popcycle/cargrp are absent', async () => {
+      const adapter = new GtaSaWorldAdapter({ cellSize: 250, fs: dataFs() });
+      await adapter.prepare();
+
+      const out = await adapter.mapCarGenerators({ cityAt: () => 'COUNTRYSIDE', hour: 0 });
+
+      expect(out.map((placement) => placement.model)).toEqual(['landstal']); // id 400 → landstal; id=-1 dropped
+      expect(out[0].heading).toBe(1); // heading from the IPL angle
+    });
+  });
+
+  describe('positive cases', () => {
+    it('resolves specific + random (popcycle → cargrp) generators', async () => {
+      const adapter = new GtaSaWorldAdapter({
+        cellSize: 250,
+        fs: dataFs({ 'data/cargrp.dat': cargrpText(), 'data/popcycle.dat': popcycleText() }),
+      });
+      await adapter.prepare();
+
+      const out = await adapter.mapCarGenerators({ cityAt: () => 'COUNTRYSIDE', hour: 0 });
+
+      // id 400 → landstal (specific); id -1 in COUNTRYSIDE → Workers group → rancher (random).
+      expect(out.map((placement) => placement.model).sort()).toEqual(['landstal', 'rancher']);
     });
   });
 });

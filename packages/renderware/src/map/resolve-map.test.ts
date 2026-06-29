@@ -14,19 +14,35 @@ const FILES: Record<string, ArrayBuffer | string> = {
     'end',
   ].join('\n'),
   'data/maps/test/test.ipl': ['inst', '100, house, 0, 10, 20, 5, 0, 0, 0, 1, -1', 'end'].join('\n'),
+  // The binary stream matching the text IPL's basename — no INST, two CARS (one specific model, one random).
+  'test_stream0.ipl': binaryIpl(
+    [],
+    [
+      { id: 452, position: [10, 20, 3] },
+      { id: -1, position: [-5, 7, 1] },
+    ],
+  ),
   // Standalone binary group, packed bare (from gta3.img) — keyed by name without a path.
   'truthsfarm.ipl': binaryIpl([{ id: 3261, position: [-1023.1, -1632.5, 75.5] }]),
 };
 
-/** Build a synthetic "bnry" IPL (the real header/record layout, see ipl-binary.parser). */
-function binaryIpl(instances: { id: number; position: [number, number, number] }[]): ArrayBuffer {
-  const buffer = new ArrayBuffer(76 + instances.length * 40);
+/** Build a synthetic "bnry" IPL (the real header/record layout, see ipl-binary.parser) with INST + CARS. */
+function binaryIpl(
+  instances: { id: number; position: [number, number, number] }[],
+  cars: { id: number; position: [number, number, number] }[] = [],
+): ArrayBuffer {
+  const carsOffset = 76 + instances.length * 40;
+  const buffer = new ArrayBuffer(carsOffset + cars.length * 48);
   const view = new DataView(buffer);
   for (const [index, char] of [...'bnry'].entries()) {
     view.setUint8(index, char.charCodeAt(0));
   }
   view.setUint32(0x04, instances.length, true);
   view.setUint32(0x1c, 76, true);
+  if (cars.length > 0) {
+    view.setUint32(0x14, cars.length, true);
+    view.setUint32(0x3c, carsOffset, true);
+  }
   instances.forEach((instance, index) => {
     const offset = 76 + index * 40;
     view.setFloat32(offset, instance.position[0], true);
@@ -35,6 +51,15 @@ function binaryIpl(instances: { id: number; position: [number, number, number] }
     view.setFloat32(offset + 24, 1, true); // unit quaternion (w)
     view.setUint32(offset + 28, instance.id, true);
     view.setInt32(offset + 36, -1, true); // no LOD
+  });
+  cars.forEach((car, index) => {
+    const offset = carsOffset + index * 48;
+    view.setFloat32(offset, car.position[0], true);
+    view.setFloat32(offset + 4, car.position[1], true);
+    view.setFloat32(offset + 8, car.position[2], true);
+    view.setInt32(offset + 16, car.id, true);
+    view.setInt32(offset + 20, -1, true); // random primary colour
+    view.setInt32(offset + 24, -1, true); // random secondary colour
   });
 
   return buffer;
@@ -84,6 +109,19 @@ describe('resolveMap extraIpl (standalone binary IPL groups, plan 042)', () => {
       expect(farm?.position[0]).toBeCloseTo(-1023.1, 3);
       expect(farm?.lod).toBe(-1);
       expect(defs.catalog.get(3261)?.modelName).toBe('grasshouse'); // resolvable via the IDE catalog
+    });
+  });
+});
+
+describe('resolveMap car generators (binary IPL CARS sections)', () => {
+  describe('positive cases', () => {
+    it('collects the stream CARS records into carGenerators (specific + random)', () => {
+      const defs = resolveMap(fakeFs(FILES));
+
+      expect(defs.carGenerators).toHaveLength(2);
+      expect(defs.carGenerators?.map((car) => car.id)).toEqual([452, -1]);
+      expect(defs.carGenerators?.[0].position[0]).toBeCloseTo(10, 3);
+      expect(defs.carGenerators?.[1].primaryColor).toBe(-1); // random colour
     });
   });
 });

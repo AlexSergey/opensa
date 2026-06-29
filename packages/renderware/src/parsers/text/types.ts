@@ -27,6 +27,29 @@ export interface IdeObjectDef {
   txdName: string;
 }
 
+/**
+ * A car generator from a binary IPL `CARS` section — SA's map-baked parked/spawned cars (the same
+ * concept as the CLEO `0x014B` generators). Model and colour fields use `-1` for "pick at runtime".
+ */
+export interface IplCarGenerator {
+  /** Alarm probability as stored (0–100). */
+  alarm: number;
+  /** Raw IPL heading field (Z-up). Stored in radians in stock streams; convert at the spawn site. */
+  angle: number;
+  /** Door-lock probability as stored (0–100). */
+  doorLock: number;
+  /** Force-spawn flag. */
+  forceSpawn: number;
+  /** Vehicle model id, or -1 for a random area-appropriate car (resolve via cargrp/popcycle). */
+  id: number;
+  /** World position in GTA Z-up space. */
+  position: [number, number, number];
+  /** Primary colour id, or -1 for random. */
+  primaryColor: number;
+  /** Secondary colour id, or -1 for random. */
+  secondaryColor: number;
+}
+
 /** One placed instance from an IPL `inst` section. */
 export interface IplInstance {
   id: number;
@@ -42,6 +65,11 @@ export interface IplInstance {
 
 /** Resolved map: object catalog keyed by id + the instances to place. */
 export interface MapDefinitions {
+  /**
+   * Car generators from the binary IPL `CARS` sections (SA's map-baked parked/spawned cars). Absent/empty
+   * when no stream carried a CARS section. `id = -1` entries are random area cars (resolved at the spawn site).
+   */
+  carGenerators?: IplCarGenerator[];
   catalog: Map<number, IdeObjectDef>;
   /** IMG asset folder paths from the DAT, normalized. */
   imgDirs: string[];

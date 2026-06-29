@@ -1,8 +1,16 @@
 import type { AssetFileSystem } from '../archive';
-import type { IdeObjectDef, IplInstance, MapDefinitions } from '../parsers/text';
+import type { IdeObjectDef, IplCarGenerator, IplInstance, MapDefinitions } from '../parsers/text';
 
 import { iplBasename, normalizeDatPath } from '../archive';
-import { parseBinaryIpl, parseGtaDat, parseIde, parseIpl, parseTimedObjects, parseTxdParents } from '../parsers/text';
+import {
+  parseBinaryCarGenerators,
+  parseBinaryIpl,
+  parseGtaDat,
+  parseIde,
+  parseIpl,
+  parseTimedObjects,
+  parseTxdParents,
+} from '../parsers/text';
 
 /** Path of `gta.dat` within the asset file system (loose, packed by relative path). */
 const GTA_DAT = 'data/gta.dat';
@@ -49,6 +57,7 @@ export function resolveMap(fs: AssetFileSystem, options: ResolveMapOptions = {})
   }
 
   const instances: IplInstance[] = [];
+  const carGenerators: IplCarGenerator[] = [];
   for (const iplPath of dat.ipl) {
     if (iplPath.toLowerCase().endsWith('.zon')) {
       continue; // .ZON = zone definitions, not object placement (no inst, no streams)
@@ -58,7 +67,7 @@ export function resolveMap(fs: AssetFileSystem, options: ResolveMapOptions = {})
       instances.push(...parseIpl(text));
     }
     // Full-detail placement lives in the matching binary stream IPLs (bare `<base>_streamN.ipl`).
-    instances.push(...loadBinaryStreams(fs, iplBasename(iplPath)));
+    loadBinaryStreams(fs, iplBasename(iplPath), instances, carGenerators);
   }
 
   // Standalone script-gated groups (plan 042) — the configured "world state" extras (bare `<name>.ipl`).
@@ -66,22 +75,26 @@ export function resolveMap(fs: AssetFileSystem, options: ResolveMapOptions = {})
     const buffer = fs.get(`${name.toLowerCase()}.ipl`);
     if (buffer !== null) {
       instances.push(...parseBinaryIpl(buffer));
+      carGenerators.push(...parseBinaryCarGenerators(buffer));
     }
   }
 
-  return { catalog, imgDirs: dat.img.map(normalizeDatPath), instances, timedCatalog, txdParents };
+  return { carGenerators, catalog, imgDirs: dat.img.map(normalizeDatPath), instances, timedCatalog, txdParents };
 }
 
-/** Load the contiguous `<base>_stream{0,1,…}.ipl` binary streams that exist in the file system. */
-function loadBinaryStreams(fs: AssetFileSystem, basename: string): IplInstance[] {
-  const instances: IplInstance[] = [];
+/** Load the contiguous `<base>_stream{0,1,…}.ipl` binary streams that exist, collecting INST + CARS records. */
+function loadBinaryStreams(
+  fs: AssetFileSystem,
+  basename: string,
+  instances: IplInstance[],
+  carGenerators: IplCarGenerator[],
+): void {
   let index = 0;
   let buffer = fs.get(`${basename}_stream${index}.ipl`);
   while (buffer !== null) {
     instances.push(...parseBinaryIpl(buffer));
+    carGenerators.push(...parseBinaryCarGenerators(buffer));
     index += 1;
     buffer = fs.get(`${basename}_stream${index}.ipl`);
   }
-
-  return instances;
 }

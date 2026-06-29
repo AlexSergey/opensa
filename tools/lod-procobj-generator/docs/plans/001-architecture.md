@@ -1,6 +1,8 @@
 # 001 — lod-procobj-generator: architecture, extraction & task plan
 
-**Plan only — no code yet.** Split procobj LOD generation out of `lod-trees-generator` into a dedicated tool whose
+**Implemented** (phases 1–5; in-game verify pending — see the task plan). The build pipeline is detailed in
+[002](./002-build-pipeline.md); the strict-SA format requirements in [003](./003-sa-asset-format.md). Split procobj
+LOD generation out of `lod-trees-generator` into a dedicated tool whose
 LODs are **simplified copies of the HD model** (decimated geometry, like `lod-generator`) — not crossed-billboard
 impostors. Extract the shared bits into a reusable package, and strip procobj entirely from `lod-trees-generator`.
 

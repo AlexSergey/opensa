@@ -32,7 +32,8 @@ converted.
 
 ## Architecture
 
-A thin orchestrator over two shared packages (see [`docs/plans/001-architecture.md`](./docs/plans/001-architecture.md)):
+A thin orchestrator over two shared packages. Plans: [`001` architecture](./docs/plans/001-architecture.md) ·
+[`002` build pipeline](./docs/plans/002-build-pipeline.md) · [`003` SA asset format](./docs/plans/003-sa-asset-format.md).
 
 - **[`@opensa/sa-lod`](../sa-lod/)** — the simplified-copy LOD pipeline (decimate → normals → encode DFF/TXD/COL),
   shared with [`lod-generator`](../lod-generator/).

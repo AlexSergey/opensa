@@ -45,6 +45,14 @@ describe('VehicleLodSystem', () => {
       system.update();
       expect(spawn).not.toHaveBeenCalled();
     });
+
+    it('does not spawn a lazily-registered car while the view is out of range', () => {
+      const spawn = vi.fn();
+      const system = new VehicleLodSystem(() => [0, 0, 0], CONFIG, spawn);
+      system.register({ heading: 0, model: 'admiral', position: [300, 0, 0] }); // beyond lodDistance
+      system.update();
+      expect(spawn).not.toHaveBeenCalled();
+    });
   });
 
   describe('positive cases', () => {
@@ -76,6 +84,24 @@ describe('VehicleLodSystem', () => {
       expect(despawn).toHaveBeenCalledOnce();
       system.update(); // already unloaded → no second despawn
       expect(despawn).toHaveBeenCalledOnce();
+    });
+
+    it('spawns a lazily-registered car once the view comes within lodDistance', async () => {
+      let view: Vec3 = [600, 0, 0];
+      const spawned = makeCar([0, 0, 0]);
+      const spawn = vi.fn(async () => Promise.resolve(spawned.spawned));
+      const system = new VehicleLodSystem(() => view, CONFIG, spawn);
+      system.register({ heading: 0, model: 'admiral', position: [0, 0, 0] });
+
+      system.update(); // out of range → not spawned yet
+      expect(spawn).not.toHaveBeenCalled();
+
+      view = [10, 0, 0];
+      system.update(); // in range → lazily spawned
+      expect(spawn).toHaveBeenCalledOnce();
+      await flush();
+      system.update();
+      expect(spawned.spawned.object.visible).toBe(true);
     });
 
     it('respawns an unloaded car once the view returns within lodDistance', async () => {

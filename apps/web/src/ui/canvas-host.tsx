@@ -27,7 +27,7 @@ import { VehicleHeadlightSystem } from '@opensa/game/vehicle/vehicle-headlight.s
 import { VehicleLodSystem } from '@opensa/game/vehicle/vehicle-lod.system';
 import { VehiclePhysicsSystem } from '@opensa/game/vehicle/vehicle-physics.system';
 import { weatherForCity } from '@opensa/game/weather/weather-zones';
-import { type CityBox, cityFromLevel, isDesertZone } from '@opensa/game/zones/city';
+import { cityAt, type CityBox, cityFromLevel, isDesertZone } from '@opensa/game/zones/city';
 import { CityZoneSystem } from '@opensa/game/zones/city-zone.system';
 import { type NamedZone, ZoneNameSystem } from '@opensa/game/zones/zone-name.system';
 import {
@@ -93,6 +93,8 @@ const BASE = import.meta.env.VITE_STATIC_URL;
 const CELL_SIZE = 250; // streaming grid cell edge — shared by Config.streaming + the adapter
 const WORLD_READY_TIMEOUT_MS = 12000; // reveal the game even if grounding is delayed
 const FLY_GROUND_MAX_DROP = 2000; // max downward ray (m) to find the ground when leaving fly mode
+const GROUND_SNAP_LIFT = 1.5; // start the map-car ground ray this far above the generator (clears a floor it sits in)
+const GROUND_SNAP_DROP = 5; // max downward distance (m) to find the ground beneath a map-car generator
 
 // The animation (idle/walk) stands the skeleton up in GTA Z-up, so the model needs
 // NO rotation; offset nudges the feet onto the box base. (Tune offset/scale here.)
@@ -610,8 +612,9 @@ function bootstrap(
     const desertBoxes: CityBox[] = infoZones.flatMap((zone) =>
       isDesertZone(zone.name) ? [{ city: 'DESERT' as const, max: zone.max, min: zone.min }] : [],
     );
+    const orderedCityBoxes = [...desertBoxes, ...cityBoxes]; // desert first (wins over the coarse LV box)
     game.addSystem(
-      new CityZoneSystem([...desertBoxes, ...cityBoxes], character.viewOf, (city) => {
+      new CityZoneSystem(orderedCityBoxes, character.viewOf, (city) => {
         game.setCity(city);
         game.setWeather(weatherForCity(WEATHER_NAMES, game.getWeather(), city));
       }),
@@ -864,13 +867,24 @@ function bootstrap(
       const { colliders, doors, halfExtents, handling, lod, object, parts, reflectiveMaterials, rig, seats, wheels } =
         await adapter.loadVehicle(model, placement.colour);
       const gap = halfExtents[1] + 2; // car half-length (COL bounds) + clearance, so it clears the player
-      const position: Vec3 = anchor
+      let position: Vec3 = anchor
         ? [
             anchor.from[0] - Math.sin(anchor.facing) * gap,
             anchor.from[1] + Math.cos(anchor.facing) * gap,
             anchor.from[2] + 0.5,
           ]
         : placement.position;
+      // Map car generators (plan 059): seat the body on the ground beneath the IPL spot so it doesn't penetrate
+      // terrain/props and get launched. Raycast from just above the generator; keep the original z if none found.
+      if (!anchor && placement.groundSnap) {
+        const ground = character.physics.groundBelow(
+          [position[0], position[1], position[2] + GROUND_SNAP_LIFT],
+          GROUND_SNAP_DROP,
+        );
+        if (ground !== null) {
+          position = [position[0], position[1], ground + halfExtents[2] + 0.1];
+        }
+      }
       object.position.set(position[0], position[1], position[2]);
       object.rotation.z = heading;
       game.getStreamingRoot().add(object);
@@ -929,6 +943,14 @@ function bootstrap(
     // Parked cars come from the game's `parked.json` in the VFS (shipped per game); absent → none.
     for (const placement of parseParkedVehicles(fs.getText('parked.json'))) {
       vehicleLod.add(placement, await spawnVehicle(placement));
+    }
+    // Map-baked car generators (binary IPL CARS in gta3.img) — specific-model + random (resolved via the zone-type
+    // popcycle, plan 059 B1). Registered lazily so the LOD stream spawns each only when the view nears it.
+    for (const placement of await adapter.mapCarGenerators({
+      cityAt: (x, y) => cityAt(x, y, orderedCityBoxes),
+      hour: Math.floor(game.getHours()),
+    })) {
+      vehicleLod.register(placement);
     }
 
     // Flip the occupied car: a 180° roll about its forward axis (wheels ↔ roof), lifted clear of

@@ -16,6 +16,7 @@ import {
   buildVehicle,
   buildWater,
   buildWorldGrid,
+  type CarGroup,
   ColDamageEffect,
   convertTo24h,
   getBreakable,
@@ -26,18 +27,21 @@ import {
   type ObjectDatEntry,
   oceanFrame,
   parseCarcols,
+  parseCarGroups,
   parseDff,
   parseDffCollision,
   parseHandling,
   parseIfp,
   parseObjectDat,
   parsePedDefs,
+  parsePopcycle,
   parseProcObj,
   parseSurfaceNames,
   parseTimecyc,
   parseTxd,
   parseVehicleDefs,
   parseWater,
+  type PopcycleZone,
   type ProcObjBatch,
   type ProcObjCategoryName,
   procObjColliders,
@@ -68,12 +72,26 @@ import type {
 } from '../interfaces/world-adapter.interface';
 import type { WorldMod } from '../mods/mod.interface';
 import type { CellCoord } from '../streaming/grid';
+import type { VehiclePlacement } from '../vehicle/vehicle-lod.system';
+import type { City } from '../zones/city';
 
 import { VehicleRig } from '../vehicle/vehicle-rig';
+import { carGeneratorPlacements } from './car-generators';
+import { randomCarPlacements } from './popcycle-cars';
 
 /** Sea level (Z) + a large background plane half-size so the ocean reaches the horizon. */
 const SEA_LEVEL = 0;
 const SEA_HALF = 16000;
+
+/** B1 (plan 059) — a representative `popcycle.dat` zone-type per map.zon city, for resolving random map cars.
+ *  Countryside/desert map 1:1; the three cities use a generic residential mix (coarse but data-driven). */
+const CITY_POPCYCLE_ZONE: Record<City, string> = {
+  COUNTRYSIDE: 'COUNTRYSIDE',
+  DESERT: 'DESERT',
+  LA: 'RESIDENTIAL_AVERAGE',
+  SF: 'RESIDENTIAL_AVERAGE',
+  VEGAS: 'RESIDENTIAL_AVERAGE',
+};
 
 /** object.dat collision-damage effects that smash a prop on impact (plan 045). Props with one of
  *  these but no RW Breakable atomic shatter their render geometry; props WITH an atomic break
@@ -124,6 +142,8 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   /** Lowercased model names that "smash" per object.dat but carry no RW Breakable atomic (plan 045) —
    *  their shatter mesh is synthesized from the render geometry. Built in {@link prepare}. */
   private readonly breakableModels = new Set<string>();
+  /** `cargrp.dat` groups for random map-car resolution (plan 059); null when absent. */
+  private carGroups: CarGroup[] | null = null;
   private readonly cellCache = new Map<string, Object3D[]>();
   private readonly colliderCache = new Map<string, ModelColliders[]>();
   private readonly config: GtaSaWorldConfig;
@@ -141,6 +161,10 @@ export class GtaSaWorldAdapter implements WorldAdapter {
   private objectDat: Map<string, ObjectDatEntry> | null = null;
   /** Parsed `peds.ide` defs by lowercased model name (TEMP: resolves the env-picked main character). */
   private peds: null | ReturnType<typeof parsePedDefs> = null;
+  /** `popcycle.dat` zone-types for random map-car resolution (plan 059); null when absent. */
+  private popcycle: Map<string, PopcycleZone> | null = null;
+  /** Whether {@link ensurePopulationData} has run (popcycle/cargrp may legitimately be absent → null). */
+  private populationLoaded = false;
   /** procobj.dat rules by surface name; null when the data files are absent (no scatter). */
   private procObjRules: Map<string, ProcObjRule[]> | null = null;
   /** Surface-name table from surfinfo.dat (index = COL material id); pairs with procObjRules. */
@@ -440,6 +464,38 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     return buildWater([...quads, ...oceanFrame(quads, SEA_HALF, SEA_LEVEL)], texture);
   }
 
+  /**
+   * The map's specific-model car generators (binary IPL `CARS` sections in gta3.img) as parked-car placements
+   * for the vehicle LOD system. `id → model` is resolved from `vehicles.ide`; random (`id = -1`) generators are
+   * skipped (cargrp/popcycle resolution is a later phase — plan 059). Empty until {@link prepare} resolved the map.
+   */
+  async mapCarGenerators(options: {
+    cityAt: (x: number, y: number) => City;
+    hour: number;
+  }): Promise<VehiclePlacement[]> {
+    await this.ensureVehicleData();
+    await this.ensurePopulationData();
+    const generators = this.defs?.carGenerators ?? [];
+    const modelById = new Map<number, string>();
+    for (const def of this.vehicleDefs?.values() ?? []) {
+      modelById.set(def.id, def.model.toLowerCase());
+    }
+    const specific = carGeneratorPlacements(generators, modelById);
+    if (this.popcycle === null || this.carGroups === null) {
+      return specific; // no popcycle/cargrp shipped → only the specific-model generators
+    }
+    // Random (id = -1) generators: resolve via the zone-type popcycle weights → a cargrp model (B1, plan 059).
+    const popcycle = this.popcycle;
+    const random = randomCarPlacements(generators, {
+      accept: (model) => this.vehicleDefs?.has(model) ?? false,
+      cargrp: this.carGroups,
+      hour: options.hour,
+      popcycleFor: (position) => popcycle.get(CITY_POPCYCLE_ZONE[options.cityAt(position[0], position[1])]) ?? null,
+    });
+
+    return [...specific, ...random];
+  }
+
   async prepare(onProgress?: (fraction: number) => void): Promise<void> {
     await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
     if (this.defs) {
@@ -492,6 +548,20 @@ export class GtaSaWorldAdapter implements WorldAdapter {
     const colliders = buildCellColliders(buildCollisionIndex(this.fs), this.defs, this.grid, cx, cy);
 
     return scatterProcObjects(colliders, this.procObjRules, this.surfaceNames, cx, cy);
+  }
+
+  /** Lazily load popcycle.dat + cargrp.dat for random map-car resolution (plan 059) — absent-tolerant: either
+   *  missing leaves its field null, so a game without them simply spawns no random map cars. */
+  private async ensurePopulationData(): Promise<void> {
+    await Promise.resolve(); // VFS reads are synchronous; the WorldAdapter API is async
+    if (this.populationLoaded) {
+      return;
+    }
+    this.populationLoaded = true;
+    const popcycle = this.fs.getText('data/popcycle.dat');
+    const cargrp = this.fs.getText('data/cargrp.dat');
+    this.popcycle = popcycle === null ? null : parsePopcycle(popcycle);
+    this.carGroups = cargrp === null ? null : parseCarGroups(cargrp);
   }
 
   /** Lazily fetch + parse vehicles.ide, carcols.dat and handling.cfg (cached). */
