@@ -66,6 +66,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # No Rockstar assets are committed.
 /static/
 game-src
+mods-src
 issues
 ideas
 blog-src

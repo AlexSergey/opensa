@@ -1,9 +1,9 @@
 # map-optimizer
 
-An offline, **lossless** asset-conditioning tool for the game maps OpenSA loads. It takes a `--game` (the same
-`game-src/<game>/` layout the main `build-game` script uses), finds the model DFFs the map actually references,
-runs them through a composable, Gulp-style **plugin pipeline**, and writes optimized copies — without touching
-the originals.
+An offline, **lossless** asset-conditioning tool for the game maps OpenSA loads. It takes a `--game <path>` (a
+game-data dir: `gta.dat` + `data/` + `models/`), finds the model DFFs the map actually references, runs them
+through a composable, Gulp-style **plugin pipeline**, and writes optimized copies to `--out <path>` — without
+touching the originals.
 
 On the bundled `gostown` map it currently shrinks the models **~32%** (≈110 MB → ≈75 MB) by recomputing
 normals, welding duplicate vertices, and removing degenerate / duplicate faces — all changes that are provably
@@ -16,19 +16,19 @@ normals, welding duplicate vertices, and removing degenerate / duplicate faces �
 ## Usage
 
 ```bash
-# from the repo root — <game> is a folder under game-src/ (e.g. gostown)
-npx tsx map-optimizer/src/cli.ts --game gostown
+# from the repo root — --game is a path to the game data, --out where the build is written
+npx tsx map-optimizer/src/cli.ts --game ./game-src/gostown --out ./build
 
 # opt-in passes:
-npx tsx map-optimizer/src/cli.ts --game gostown --textures   # generate mip chains (plan 010)
-npx tsx map-optimizer/src/cli.ts --game original --refine     # experimental surface smoothing (plan 014)
+npx tsx map-optimizer/src/cli.ts --game ./game-src/gostown --out ./build --textures  # generate mip chains (plan 010)
+npx tsx map-optimizer/src/cli.ts --game ./game-src/original --out ./build --refine    # surface smoothing (plan 014)
 ```
 
-- Reads `game-src/<game>/` (models `*.img` + `data/` IDE/IPL to resolve the map's models).
-- Writes a **complete, drop-in build** to **`map-optimizer/out/<game>/`** (gitignored; the source is never
-  modified) — the whole `game-src/<game>/` tree mirrored, with each `models/*.img` **rebuilt**: optimized
-  entries swapped in, everything else (vehicles, peds, interiors, data, …) preserved. Point the game at it
-  and it runs. A **`report.json`** is written alongside.
+- `--game <path>` — game data (models `*.img` + `data/` IDE/IPL to resolve the map's models).
+- `--out <path>` — where the **complete, drop-in build** is written (gitignored; the source is never modified) —
+  the whole game-data tree mirrored, with each `models/*.img` **rebuilt**: optimized entries swapped in,
+  everything else (vehicles, peds, interiors, data, …) preserved. Point the game at it and it runs. A
+  **`report.json`** is written alongside.
 - `--textures` is **opt-in** (off by default).
 - Prints a summary: models processed/changed, vertices & faces removed, size reduction, and any per-asset
   failures (isolated — one bad model never aborts the run).
@@ -48,7 +48,7 @@ Read-only measurement tools (no output build), used to decide whether a transfor
 
 ```bash
 # curvature scan (plan 014) — how much of a region is flat / gently-curved / crease
-npx tsx map-optimizer/src/analyze-curvature.ts --game original --center 2100,1490,15 --radius 200
+npx tsx map-optimizer/src/analyze-curvature.ts --game ./game-src/original --center 2100,1490,15 --radius 200
 ```
 
 ## Pipeline
@@ -77,11 +77,11 @@ Every stage is a small, independently-tested pure transform wrapped in a `MapPlu
 ## How it works
 
 ```
---game <name>
+--game <path>  --out <path>
   resolve   reuse the build partition: open models/*.img + parse data/ IDE+IPL → the map's model DFFs
   read      DFF bytes → RWClump (../src parser) → neutral MeshIR
   pipeline  MeshIR ──▶ plugin1 ▶ … ▶ pluginN   (per model, concurrency-limited, errors isolated)
-  write     MeshIR → DFF bytes (in-house serializer)   → out/<game>/  + report.json
+  write     MeshIR → DFF bytes (in-house serializer)   → --out  + report.json
 ```
 
 - **Faithful chunk codec** (`src/adapters/gta-sa/codec/chunk.ts`): `writeRw(readRw(bytes))` is byte-exact, so

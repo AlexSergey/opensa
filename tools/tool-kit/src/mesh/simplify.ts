@@ -27,6 +27,23 @@ export interface SimplifyMesh {
   positions: Float64Array;
 }
 
+export interface SimplifyOptions {
+  /**
+   * Cap a collapse from creating an edge longer than `maxEdgeFactor ×` the mesh's longest input edge. QEM only
+   * scores planar error + rejects normal flips, so on flat surfaces it freely stretches triangles into long thin
+   * spikes; this bounds how far an edge can grow, killing those spikes with no triangle-budget cost. Omit (default)
+   * to leave decimation unbounded — existing callers are unchanged.
+   */
+  maxEdgeFactor?: number;
+  /**
+   * Never collapse a face group (material/texture) below this many faces. A flat surface has zero in-plane quadric
+   * error and its boundary pin only resists *perpendicular* motion, so QEM slides its boundary inward and collapses
+   * the whole surface to nothing — the surface (and its texture) vanishes, leaving a hole. This floors every group
+   * so each surface survives. Omit (default) to leave groups uncapped — existing callers are unchanged.
+   */
+  minFacesPerGroup?: number;
+}
+
 export interface SimplifyResult {
   attributes: SimplifyAttribute[];
   faceGroup: Int32Array;
@@ -53,13 +70,16 @@ class Simplifier {
   private readonly faceGroup: Int32Array;
   private faceLive: Uint8Array;
   private readonly faces: Int32Array;
+  private readonly groupLive = new Map<number, number>();
   private readonly heap: HeapEntry[] = [];
+  private readonly maxEdgeLimit: number;
+  private readonly minFacesPerGroup: number;
   private readonly positions: Float64Array;
   private readonly quadrics: Float64Array;
   private readonly vertFaces: Set<number>[];
   private readonly vertLive: Uint8Array;
 
-  constructor(mesh: SimplifyMesh) {
+  constructor(mesh: SimplifyMesh, options: SimplifyOptions) {
     this.positions = Float64Array.from(mesh.positions);
     this.faces = Int32Array.from(mesh.faces);
     this.faceGroup = Int32Array.from(mesh.faceGroup);
@@ -70,6 +90,11 @@ class Simplifier {
     this.vertFaces = Array.from({ length: vertexCount }, () => new Set<number>());
     this.vertLive = new Uint8Array(vertexCount).fill(1);
     this.faceLive = new Uint8Array(this.faceCount).fill(1);
+    this.maxEdgeLimit = options.maxEdgeFactor ? this.initialMaxEdge() * options.maxEdgeFactor : Infinity;
+    this.minFacesPerGroup = options.minFacesPerGroup ?? 0;
+    for (let f = 0; f < this.faceCount; f += 1) {
+      this.groupLive.set(this.faceGroup[f], (this.groupLive.get(this.faceGroup[f]) ?? 0) + 1);
+    }
 
     this.buildAdjacencyAndQuadrics();
     this.buildHeap();
@@ -121,7 +146,11 @@ class Simplifier {
       if (!entry || !this.isCurrent(entry)) {
         continue;
       }
-      if (!this.wouldFold(entry.u, entry.v, entry.target)) {
+      if (
+        !this.wouldFold(entry.u, entry.v, entry.target) &&
+        !this.wouldStretch(entry.u, entry.v, entry.target) &&
+        !this.wouldStarveGroup(entry.u, entry.v)
+      ) {
         this.collapse(entry.u, entry.v, entry.target);
       }
     }
@@ -248,6 +277,14 @@ class Simplifier {
     this.refreshNeighbors(u);
   }
 
+  private edgeLen(u: number, v: number): number {
+    return Math.hypot(
+      this.positions[u * 3] - this.positions[v * 3],
+      this.positions[u * 3 + 1] - this.positions[v * 3 + 1],
+      this.positions[u * 3 + 2] - this.positions[v * 3 + 2],
+    );
+  }
+
   private edgeRatio(u: number, v: number, target: [number, number, number]): number {
     const ux = this.positions[u * 3];
     const uy = this.positions[u * 3 + 1];
@@ -309,6 +346,16 @@ class Simplifier {
 
   private faceVerts(f: number): [number, number, number] {
     return [this.faces[f * 3], this.faces[f * 3 + 1], this.faces[f * 3 + 2]];
+  }
+
+  private initialMaxEdge(): number {
+    let m = 0;
+    for (let f = 0; f < this.faceCount; f += 1) {
+      const [a, b, c] = this.faceVerts(f);
+      m = Math.max(m, this.edgeLen(a, b), this.edgeLen(b, c), this.edgeLen(c, a));
+    }
+
+    return m;
   }
 
   private isCurrent(entry: HeapEntry): boolean {
@@ -412,6 +459,7 @@ class Simplifier {
   private removeFace(f: number): void {
     this.faceLive[f] = 0;
     this.faceCount -= 1;
+    this.groupLive.set(this.faceGroup[f], (this.groupLive.get(this.faceGroup[f]) ?? 0) - 1);
     for (const w of this.faceVerts(f)) {
       this.vertFaces[w].delete(f);
     }
@@ -474,10 +522,56 @@ class Simplifier {
 
     return false;
   }
+
+  /** True if collapsing edge (u,v) would drop a face group below {@link minFacesPerGroup} — keeps surfaces alive. */
+  private wouldStarveGroup(u: number, v: number): boolean {
+    if (this.minFacesPerGroup <= 0) {
+      return false;
+    }
+    const removed = new Map<number, number>(); // group → faces the collapse degenerates
+    for (const f of this.vertFaces[v]) {
+      if (this.faceVerts(f).includes(u)) {
+        removed.set(this.faceGroup[f], (removed.get(this.faceGroup[f]) ?? 0) + 1);
+      }
+    }
+    for (const [group, count] of removed) {
+      if ((this.groupLive.get(group) ?? 0) - count < this.minFacesPerGroup) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /** True if collapsing v→u@target would create an edge longer than {@link maxEdgeLimit} — blocks spike slivers. */
+  private wouldStretch(u: number, v: number, target: [number, number, number]): boolean {
+    for (const origin of [u, v]) {
+      for (const f of this.vertFaces[origin]) {
+        const verts = this.faceVerts(f);
+        if (verts.includes(u) && verts.includes(v)) {
+          continue;
+        }
+        const pts = verts.map((idx) =>
+          idx === u || idx === v
+            ? target
+            : ([this.positions[idx * 3], this.positions[idx * 3 + 1], this.positions[idx * 3 + 2]] as const),
+        );
+        for (let i = 0; i < 3; i += 1) {
+          const a = pts[i];
+          const b = pts[(i + 1) % 3];
+          if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) > this.maxEdgeLimit) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
 }
 
-export function simplify(mesh: SimplifyMesh, targetFaces: number): SimplifyResult {
-  const state = new Simplifier(mesh);
+export function simplify(mesh: SimplifyMesh, targetFaces: number, options: SimplifyOptions = {}): SimplifyResult {
+  const state = new Simplifier(mesh, options);
   state.run(targetFaces);
 
   return state.compact();

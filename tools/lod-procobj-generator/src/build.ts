@@ -4,6 +4,7 @@ import type { SourceTexture, TextureSource } from '@opensa/sa-lod/texture-source
 
 import { allocateLodIds, buildLodIde, lodAlias, patchGtaDat } from '@opensa/map-placement/ide';
 import { convertProcObj, type ProcObjSpecies } from '@opensa/map-placement/procobj';
+import { UNDERWATER_PROCOBJ } from '@opensa/map-placement/procobj-strip';
 import { retxdSwappedModels } from '@opensa/map-placement/retxd';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
@@ -17,6 +18,13 @@ import { encodeLodDff } from '@opensa/sa-lod/encode-dff';
 import { encodeLodTxd } from '@opensa/sa-lod/encode-txd';
 import { createModelSource } from '@opensa/sa-lod/model-source';
 import { rebuildMeshNormals } from '@opensa/sa-lod/normals';
+import {
+  applyMeshTrunkPrelight,
+  applyStockPrelight,
+  type FoliagePredicate,
+  type PrelightInfo,
+  stockPrelightColor,
+} from '@opensa/sa-lod/prelight';
 import { createTextureSource } from '@opensa/sa-lod/texture-source';
 import { editArchive } from '@opensa/tool-kit/archive/img';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -32,10 +40,16 @@ const IPL_NAME = 'lod_procobj';
 
 export interface BuildOptions {
   config: ProcObjLodConfig;
-  dffPath: string;
   gamePath: string;
+  /** Optional HD model folder (`<model>.dff` + `<model>.txd`); omitted → convert the game's own procobj models. */
+  inPath?: string;
+  /** Write the changed IMG entries loose to `<out>/gta3img/` instead of repacking `<out>/models/gta3.img`. */
+  loose: boolean;
   outPath: string;
-  txdPath: string;
+  /** Copy each model's trunk prelight from its stock DFF onto the LOD (and the swapped HD when `--in`). */
+  prelight: boolean;
+  /** Per-model `--prelight` overrides (`--prelight <info.json>`); models in `skip` are left untouched. */
+  prelightInfo?: PrelightInfo;
 }
 
 /** A registered LOD (pass 2): a {@link BuiltMesh} with its allocated alias/id and encoded DFF. */
@@ -58,6 +72,27 @@ interface BuiltMesh {
   textures: string[];
 }
 
+/** The changed IMG entries to emit: LOD DFFs + lod_procobj.txd/col + the swapped HD DFFs + custom TXDs. */
+export function collectImgEntries(
+  lods: readonly { alias: string; dff: Uint8Array }[],
+  lodTxd: Uint8Array,
+  lodCol: Uint8Array,
+  swap: ReadonlyMap<string, Uint8Array>,
+  retxdTxds: ReadonlyMap<string, Uint8Array>,
+): Map<string, Uint8Array> {
+  const entries = new Map<string, Uint8Array>();
+  for (const lod of lods) {
+    entries.set(`${lod.alias}.dff`, lod.dff);
+  }
+  entries.set(`${IPL_NAME}.txd`, lodTxd);
+  entries.set(`${IPL_NAME}.col`, lodCol);
+  for (const [name, bytes] of [...swap, ...retxdTxds]) {
+    entries.set(name, bytes);
+  }
+
+  return entries;
+}
+
 /**
  * Convert the `--dff ∩ procobj` species into static IPL instances with **simplified-copy** LODs: per species,
  * build a model-local mesh (frame-aware) → QEM decimate → re-derive normals → encode a low-poly DFF; pack one
@@ -66,16 +101,20 @@ interface BuiltMesh {
  * HD DFFs for `--dff`, and emit the drop-in under `--out`.
  */
 export function run(options: BuildOptions): void {
-  const { config, dffPath, gamePath, outPath, txdPath } = options;
+  const { config, gamePath, inPath, loose, outPath, prelight, prelightInfo } = options;
   const archive = openArchive(readBytes(join(gamePath, 'models', 'gta3.img')));
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const { idByModel, usedIds } = scanIdes(gamePath, dat.ide);
   const procModels = procObjModels(gamePath);
 
-  // Candidate species: a `--dff` model that scatters in procobj and has a stock object id.
-  const species = listDffModels(dffPath).filter((m) => procModels.has(m) && idByModel.has(m));
+  // Candidate species: a procobj scatter species that has a stock object id. With `--in`, narrowed to the models
+  // it ships; without it, **every** procobj species — converted straight from the game's own gta3.img. The
+  // never-touch UNDERWATER set (seaweed/starfish/searock) is dropped here too — `convertProcObj` never places it,
+  // so without this filter the no-`--in` run would bake dead LOD DFFs/ids/IDE rows for seabed scatter.
+  const candidates = inPath === undefined ? [...procModels] : listDffModels(inPath).filter((m) => procModels.has(m));
+  const species = candidates.filter((m) => idByModel.has(m) && !UNDERWATER_PROCOBJ.has(m));
   const modelSource = createModelSource([archive]);
-  const textureSource = combinedTextureSource(txdPath, archive);
+  const textureSource = inPath === undefined ? createTextureSource([archive]) : combinedTextureSource(inPath, archive);
 
   // Per species: build the simplified-copy mesh + bounds (height gate); ids/DFFs are assigned in a second pass.
   const built: BuiltMesh[] = [];
@@ -98,6 +137,17 @@ export function run(options: BuildOptions): void {
     console.log('lod-procobj-generator: no `--dff ∩ procobj` species to convert');
 
     return;
+  }
+
+  // `--prelight`: recolour each LOD mesh's trunk to its stock model's ambient (foliage kept) so the simplified
+  // copy isn't black/washed-out next to stock geometry — the procobj species are stock-present in gta3.img, so the
+  // ambient comes from each model's own DFF. Alpha-cutout textures are foliage; opaque ones are trunk/bark.
+  const foliageTextures = new Set(
+    [...new Set(built.flatMap((b) => b.textures))].filter((t) => textureSource.get(t)?.hasAlpha),
+  );
+  const isFoliage: FoliagePredicate = (name) => foliageTextures.has(name);
+  if (prelight) {
+    prelightLodMeshes(built, archive, isFoliage, prelightInfo);
   }
 
   // Register: allocate ids ≤ 18630 + a short alias each, then encode the LOD DFFs under their alias name.
@@ -138,9 +188,16 @@ export function run(options: BuildOptions): void {
     procObjMax: config.procObjMax,
     species: species_,
   });
+  // Only when the user supplied `--in` do we swap the HD DFF + retxd; game-model mode keeps the stock assets.
   const swapModels = lods.map((lod) => lod.model);
-  const swap = swapEntries(dffPath, swapModels);
-  const retxd = retxdSwappedModels(gamePath, dat.ide, dffPath, txdPath, swapModels);
+  const swap =
+    inPath === undefined
+      ? new Map<string, Uint8Array>()
+      : swapEntries(inPath, swapModels, prelight ? archive : null, isFoliage, prelightInfo);
+  const retxd =
+    inPath === undefined
+      ? { ides: new Map<string, string>(), txds: new Map<string, Uint8Array>() }
+      : retxdSwappedModels(gamePath, dat.ide, inPath, inPath, swapModels);
 
   // Emit: IDEs + patched gta.dat.
   writeText(join(outPath, IDE_REL), ide);
@@ -154,21 +211,14 @@ export function run(options: BuildOptions): void {
   }
   writeText(join(outPath, 'data', 'gta.dat'), gtaDat);
 
-  // Emit: gta3.img with the LOD DFFs + lod_procobj.txd/col + swapped HD DFFs + custom TXDs.
-  const img = editArchive(archive);
-  for (const lod of lods) {
-    img.set(`${lod.alias}.dff`, lod.dff);
-  }
-  img.set(`${IPL_NAME}.txd`, lodTxd);
-  img.set(`${IPL_NAME}.col`, lodCol);
-  for (const [name, bytes] of [...swap, ...retxd.txds]) {
-    img.set(name, bytes);
-  }
-  writeBytes(join(outPath, 'models', 'gta3.img'), img.build());
+  // Emit the changed IMG entries (LOD DFFs + lod_procobj.txd/col + swapped HD DFFs + custom TXDs): repacked into
+  // models/gta3.img, or loose to gta3img/ with --loose (mod-installer merges that folder back into gta3.img).
+  emitImg(archive, collectImgEntries(lods, lodTxd, lodCol, swap, retxd.txds), outPath, loose);
 
   console.log(
     `procobj→lod: ${lods.length} species · ${procObj?.objects ?? 0} static objects · ` +
-      `${swap.size} HD swapped (${retxd.txds.size} custom TXD) → ${outPath}`,
+      `${swap.size} HD swapped (${retxd.txds.size} custom TXD) → ` +
+      `${loose ? `${outPath}/gta3img/` : `${outPath}/models/gta3.img`}`,
   );
 }
 
@@ -182,6 +232,22 @@ function combinedTextureSource(txdPath: string, archive: ImgArchive): TextureSou
   const stock = createTextureSource([archive]);
 
   return { get: (name) => custom.get(name.toLowerCase()) ?? stock.get(name) };
+}
+
+/** Repack the changed entries into `<out>/models/gta3.img`, or write them loose to `<out>/gta3img/` (`--loose`). */
+function emitImg(archive: ImgArchive, entries: ReadonlyMap<string, Uint8Array>, outPath: string, loose: boolean): void {
+  if (loose) {
+    for (const [name, bytes] of entries) {
+      writeBytes(join(outPath, 'gta3img', name), bytes);
+    }
+
+    return;
+  }
+  const img = editArchive(archive);
+  for (const [name, bytes] of entries) {
+    img.set(name, bytes);
+  }
+  writeBytes(join(outPath, 'models', 'gta3.img'), img.build());
 }
 
 /** Model names under `--dff` (a `.dff` file or a directory), lowercased without extension. */
@@ -216,6 +282,25 @@ function loadCustomTextures(txdPath: string): Map<string, SourceTexture> {
   }
 
   return out;
+}
+
+/** `--prelight`: recolour each built LOD mesh's trunk to its stock model's ambient — foliage kept, skip-list honoured. */
+function prelightLodMeshes(
+  built: readonly BuiltMesh[],
+  archive: ImgArchive,
+  isFoliage: FoliagePredicate,
+  prelightInfo: PrelightInfo | undefined,
+): void {
+  for (const b of built) {
+    if (prelightInfo?.skip.has(b.model)) {
+      continue;
+    }
+    const stock = archive.get(`${b.model}.dff`);
+    const trunk = stock ? stockPrelightColor(new Uint8Array(stock)) : null;
+    if (trunk) {
+      applyMeshTrunkPrelight(b.mesh, trunk, isFoliage);
+    }
+  }
 }
 
 /** procobj scatter species (column 2 of each `procobj.dat` data row), lowercased. */
@@ -262,8 +347,18 @@ function scanIdes(
   return { idByModel, usedIds };
 }
 
-/** Read the user HD DFF bytes for each swapped model, keyed by its `<model>.dff` IMG entry. */
-function swapEntries(dffPath: string, models: readonly string[]): Map<string, Uint8Array> {
+/**
+ * Read the user HD DFF bytes for each swapped model, keyed by its `<model>.dff` IMG entry. When `archive` is given
+ * (`--prelight`), each swapped DFF inherits its stock model's trunk prelight before being packed — except models
+ * the `--prelight` info opts out (`prelightInfo.skip`), which are packed verbatim.
+ */
+function swapEntries(
+  dffPath: string,
+  models: readonly string[],
+  archive: ImgArchive | null,
+  isFoliage: FoliagePredicate,
+  prelightInfo: PrelightInfo | undefined,
+): Map<string, Uint8Array> {
   const isDir = statSync(dffPath).isDirectory();
   const files = isDir
     ? new Map(readdirSync(dffPath).map((f) => [base(f), join(dffPath, f)]))
@@ -271,9 +366,19 @@ function swapEntries(dffPath: string, models: readonly string[]): Map<string, Ui
   const swap = new Map<string, Uint8Array>();
   for (const model of models) {
     const file = files.get(model);
-    if (file) {
-      swap.set(`${model}.dff`, readBytes(file));
+    if (!file) {
+      continue;
     }
+    let bytes = readBytes(file);
+    if (archive && !prelightInfo?.skip.has(model)) {
+      const stock = archive.get(`${model}.dff`);
+      if (stock) {
+        bytes = applyStockPrelight(bytes, new Uint8Array(stock), isFoliage);
+      } else {
+        console.warn(`  ! ${model}: no stock DFF in gta3.img → prelight not transferred`);
+      }
+    }
+    swap.set(`${model}.dff`, bytes);
   }
 
   return swap;

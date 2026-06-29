@@ -6,11 +6,12 @@ simplified-copy LODs** — a decimated low-poly mesh, not a billboard impostor (
 deliberately leaves alone.
 
 ```sh
-tsx tools/lod-procobj-generator/src/cli.ts --dff <path> --txd <path> --out <path> --game <path>
+tsx tools/lod-procobj-generator/src/cli.ts --out <path> --game <path> [--in <dir>]
 ```
 
-- `--dff` — procobj HD DFF file or directory; intersected with `procobj.dat` to pick the species to convert
-- `--txd` — the HD models' TXD(s); LOD textures are downscaled from here, falling back to the **stock game TXD**
+- `--in` — optional folder of HD procobj models (`<model>.dff` + `<model>.txd`), intersected with `procobj.dat` to
+  pick the species. **Omit it to convert every `procobj.dat` species straight from the game's own `gta3.img`** (no
+  model/texture swap). With `--in`, LOD textures downscale from its TXDs, falling back to the stock game TXD.
 - `--out` — output drop-in directory
 - `--game` — game data (`gta.dat` + `data/` + `models/gta3.img`)
 - `--tris` — QEM target triangles per LOD model (default `200`)
@@ -18,14 +19,30 @@ tsx tools/lod-procobj-generator/src/cli.ts --dff <path> --txd <path> --out <path
 - `--draw` — LOD draw distance (default `300`)
 - `--max` — cap on converted procobj objects (default `20000`, `0` disables)
 - `--height` — optional min HD height (m) gate, drops short clutter (default `0` = off)
+- `--prelight [info.json]` — copy each model's **stock** trunk prelight (day ambient) onto its decimated LOD mesh
+  (and the swapped HD DFF when `--in`) so the simplified copy isn't black/washed-out next to stock geometry.
+  Applied **trunk-only** (opaque surfaces; foliage — alpha-cutout — keeps its own prelit). Optionally pass a JSON
+  of per-model overrides — `--prelight ./info.json` with `{ "cedar1_po": { "skip": true }, … }` opts those models
+  **out** (LOD keeps its source prelit; HD packed verbatim). Bare `--prelight` applies to every model. Shared with
+  `lod-trees-generator` via [`@opensa/sa-lod/prelight`](../sa-lod/src/prelight.ts).
+- `--loose` — write the changed IMG entries loose to `<out>/gta3img/` instead of repacking the full
+  `<out>/models/gta3.img` (much faster + a tiny drop; `mod-installer` merges a `gta3img/` folder back into
+  `gta3.img`). Same convention as `lod-trees-generator`.
 
 ## What it does
 
-Per `--dff ∩ procobj` species: build a model-local mesh (frame-aware), **QEM-decimate** it, re-derive smooth
-normals, and encode a low-poly DFF. Then it reuses the engine's vanilla procobj scatter to place each species as
-**static IPL instances** (HD instance → its LOD, thinned by MINDIST + a cap), strips those species from
-`procobj.dat`, swaps their HD DFF for `--dff`, and packs a drop-in `gta3.img` + `data/` files. The LODs share one
-`lod_procobj.txd` + `lod_procobj.col`, registered via `lod_procobj.ide` + a patched `gta.dat`.
+Per converted species (every `procobj.dat` species, or the subset shipped in `--in`): build a model-local mesh
+(frame-aware), **QEM-decimate** it, re-derive smooth normals, and encode a low-poly DFF. Then it reuses the engine's
+vanilla procobj scatter to place each species as **static IPL instances** (HD instance → its LOD, thinned by MINDIST
+
+- a cap), strips those species from `procobj.dat`, swaps their HD DFF for the `--in` model (only when `--in` is
+  given), and packs a drop-in `gta3.img` + `data/` files. The LODs share one `lod_procobj.txd` + `lod_procobj.col`,
+  registered via `lod_procobj.ide` + a patched `gta.dat`. The never-touch `UNDERWATER_PROCOBJ` species
+  (seaweed/starfish/searock) are skipped.
+
+A shared `--in` TXD is **trimmed** to just the textures the swapped procobj models use (via
+`@opensa/map-placement/retxd`), so a vegetation pack's tree/non-procobj textures don't bloat the output.
+`--prelight` optionally corrects the swapped HD + decimated LOD's trunk prelight from the stock model (see above).
 
 [`UNDERWATER_PROCOBJ`](../map-placement/src/procobj-strip.ts) species (seaweed/starfish/searock) are **never**
 converted.

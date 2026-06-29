@@ -3,11 +3,29 @@ import { simplify, type SimplifyMesh } from '@opensa/tool-kit/mesh/simplify';
 import type { MergedGroup, MergedMesh } from './mesh';
 
 /**
- * QEM-decimate a merged cell mesh to a far-view triangle budget (plan 002, 1c) via the shared `tool-kit`
- * simplifier. Each per-texture group becomes a face group, so collapses across texture seams (and the cell's
- * open silhouette) are pinned — the far contour and material edges survive. UV + colour ride along as
- * interpolated attributes; normals are dropped (the downstream normals pass re-derives them on the result).
- * A mesh already under budget is returned unchanged.
+ * Cap a collapse from stretching an edge beyond this × the model's longest input edge. QEM freely slivers flat
+ * surfaces (roads, walls, ground) into long thin spikes — e.g. a building's 9-unit edges grow to 50+ — which read
+ * as spikes poking out of the LOD. 1.5 keeps each decimated model's longest edge close to the original's with no
+ * triangle-budget cost (it just steers collapses), so surfaces stay flat instead of spiking.
+ */
+const MAX_EDGE_FACTOR = 1.5;
+
+/**
+ * Floor on faces kept per texture group. QEM collapses flat surfaces (zero in-plane error, boundary pin only
+ * resists perpendicular motion) all the way to nothing, deleting whole textured surfaces → holes in the LOD. This
+ * keeps every surface present with at least a coarse quad.
+ */
+const MIN_FACES_PER_GROUP = 2;
+
+/**
+ * QEM-decimate a merged mesh to a triangle budget (plan 002, 1c) via the shared `tool-kit` simplifier. Each
+ * per-texture group becomes a face group, so collapses across texture seams (and the open silhouette) are pinned
+ * — the contour and material edges survive. UV + colour (+ night colour when present) ride along as interpolated
+ * attributes; normals are dropped (the downstream normals pass re-derives them). Collapses are edge-length capped
+ * ({@link MAX_EDGE_FACTOR}) so flat surfaces don't sliver into spikes, and every group keeps
+ * {@link MIN_FACES_PER_GROUP} faces so no surface vanishes. Vertices are **not** welded — fusing coincident verts
+ * across a UV seam smears textures, and across stacked terrain layers collapses coverage. A mesh already under
+ * budget is returned unchanged.
  */
 export function decimateMesh(mesh: MergedMesh, targetTriangles: number): MergedMesh {
   const faceCount = mesh.groups.reduce((sum, group) => sum + group.indices.length / 3, 0);
@@ -15,12 +33,19 @@ export function decimateMesh(mesh: MergedMesh, targetTriangles: number): MergedM
     return mesh;
   }
 
-  const result = simplify(toSimplifyMesh(mesh), targetTriangles);
-  const [uv, color] = result.attributes;
+  const result = simplify(toSimplifyMesh(mesh), targetTriangles, {
+    maxEdgeFactor: MAX_EDGE_FACTOR,
+    minFacesPerGroup: MIN_FACES_PER_GROUP,
+  });
+  const [uv, color, night] = result.attributes;
+  const u8 = (data: ArrayLike<number>): Uint8Array =>
+    Uint8Array.from(data, (c) => Math.max(0, Math.min(255, Math.round(c))));
 
   return {
-    colors: Uint8Array.from(color.data, (c) => Math.max(0, Math.min(255, Math.round(c)))),
+    colors: u8(color.data),
     groups: regroup(result.faces, result.faceGroup, mesh.groups),
+    // `night` is present only when the source mesh carried night colours (the optional 3rd attribute).
+    ...(night ? { nightColors: u8(night.data) } : {}),
     normals: new Float32Array(result.positions.length), // zero — re-derived by the normals pass
     positions: Float32Array.from(result.positions),
     uvs: Float32Array.from(uv.data),
@@ -39,7 +64,7 @@ function regroup(faces: Int32Array, faceGroup: Int32Array, source: readonly Merg
     .filter((group) => group.indices.length > 0);
 }
 
-/** Flatten the per-texture groups into faces + a face-group id, with UV/colour as interpolated attributes. */
+/** Flatten the per-texture groups into faces + a face-group id, with UV/colour (+ night) as interpolated attributes. */
 function toSimplifyMesh(mesh: MergedMesh): SimplifyMesh {
   const faceCount = mesh.groups.reduce((sum, group) => sum + group.indices.length / 3, 0);
   const faces = new Int32Array(faceCount * 3);
@@ -54,13 +79,14 @@ function toSimplifyMesh(mesh: MergedMesh): SimplifyMesh {
     }
   });
 
-  return {
-    attributes: [
-      { data: Float64Array.from(mesh.uvs), size: 2 },
-      { data: Float64Array.from(mesh.colors), size: 4 },
-    ],
-    faceGroup,
-    faces,
-    positions: Float64Array.from(mesh.positions),
-  };
+  // Order matters — decimateMesh destructures [uv, color, night?]; `night` (optional) stays last.
+  const attributes = [
+    { data: Float64Array.from(mesh.uvs), size: 2 },
+    { data: Float64Array.from(mesh.colors), size: 4 },
+  ];
+  if (mesh.nightColors) {
+    attributes.push({ data: Float64Array.from(mesh.nightColors), size: 4 });
+  }
+
+  return { attributes, faceGroup, faces, positions: Float64Array.from(mesh.positions) };
 }

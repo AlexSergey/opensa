@@ -1,6 +1,7 @@
 import { ideRefs } from '@opensa/game-build/partition';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { isInterior } from '@opensa/renderware/parsers/text/interior';
 import { parseBinaryIpl } from '@opensa/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
 /**
@@ -9,10 +10,11 @@ import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
  * **refinement target** (large triangles that span real curvature) vs. flat (skip) vs. hard crease (keep
  * sharp). Read-only — measures whether road/terrain smoothing is worth building before any of it exists.
  *
- * Usage: `tsx map-optimizer/src/analyze-curvature.ts [--game original] [--center x,y,z] [--radius 150] [--area 4]`
+ * Usage: `tsx map-optimizer/src/analyze-curvature.ts [--game <path>] [--center x,y,z] [--radius 150] [--area 4]`
+ * (`--game` defaults to `./game-src/original`).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 
 import { clumpToIr } from './adapters/gta-sa/read';
 import {
@@ -70,8 +72,8 @@ function collectInstances(
   const raw = [...textInstances(dataDir), ...binaryInstances(archives)];
   const out: Instance[] = [];
   for (const instance of raw) {
-    if (instance.interior > 0) {
-      continue;
+    if (isInterior(instance.interior)) {
+      continue; // real interior (low byte ≠ 0, non-world); `interior > 0` dropped area-coded exteriors (e.g. 1024)
     }
     const model = idToModel.get(instance.id) ?? instance.modelName.toLowerCase();
     if (!model || model.startsWith('lod')) {
@@ -87,17 +89,20 @@ function distance(a: readonly number[], b: readonly number[]): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+function fromCwd(value: string): string {
+  return isAbsolute(value) ? value : resolve(process.cwd(), value);
+}
+
 function main(): void {
-  const game = argValue('--game') ?? 'original';
   const center = (argValue('--center') ?? '2100,1490,15').split(',').map(Number) as [number, number, number];
   const radius = Number(argValue('--radius') ?? 150);
   const thresholds: CurvatureThresholds = { ...DEFAULT_THRESHOLDS, areaThreshold: Number(argValue('--area') ?? 4) };
 
-  const root = process.cwd();
-  const gameDir = join(root, 'game-src', game);
+  const gameDir = fromCwd(argValue('--game') ?? './game-src/original');
+  const game = basename(gameDir);
   const modelsDir = join(gameDir, 'models');
   if (!statSync(gameDir, { throwIfNoEntry: false })?.isDirectory()) {
-    throw new Error(`game-src/${game} not found`);
+    throw new Error(`--game must be a game-data directory: ${gameDir}`);
   }
 
   const archives = readdirSync(modelsDir)

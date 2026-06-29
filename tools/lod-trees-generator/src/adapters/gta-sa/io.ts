@@ -2,8 +2,11 @@ import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 import type { RWTexture } from '@opensa/renderware/parsers/binary/types';
 
 import { openArchive } from '@opensa/renderware/archive/img-archive';
+import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
 import { parseDff } from '@opensa/renderware/parsers/binary/dff';
 import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
+import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
+import { parseIde } from '@opensa/renderware/parsers/text/ide.parser';
 import { decodeDxt } from '@opensa/rw-codec/dxt';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,6 +15,41 @@ import type { DecodedTexture, HdTree, HdTriangle, Rgba, Vec2, Vec3 } from '../..
 
 /** A name→RGBA texture map, combined from the `--txd` source. */
 export type Textures = Map<string, DecodedTexture>;
+
+/**
+ * Build the texture map for `models` from the game's own TXDs (the no-`--in` mode): resolve each model's TXD via
+ * the gta.dat IDEs (`objs` `id, model, txd, …`), then decode those TXDs out of the archive. Same `Textures` shape
+ * as {@link loadTextures}, so baking is identical.
+ */
+export function loadArchiveTextures(archive: ImgArchive, gamePath: string, models: readonly string[]): Textures {
+  const wanted = new Set(models.map((model) => model.toLowerCase()));
+  const txdNames = new Set<string>();
+  const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
+  for (const idePath of dat.ide) {
+    const file = datChildUrl(gamePath, idePath);
+    if (!existsSync(file)) {
+      continue;
+    }
+    for (const def of parseIde(readFileSync(file, 'utf8'))) {
+      if (wanted.has(def.modelName.toLowerCase())) {
+        txdNames.add(def.txdName.toLowerCase());
+      }
+    }
+  }
+
+  const textures: Textures = new Map();
+  for (const txd of txdNames) {
+    const bytes = archive.get(`${txd}.txd`);
+    if (!bytes) {
+      continue;
+    }
+    for (const rw of parseTxd(toArrayBuffer(new Uint8Array(bytes))).textures) {
+      textures.set(rw.name.toLowerCase(), decodeTexture(rw));
+    }
+  }
+
+  return textures;
+}
 
 /** Pick a tree-LOD DFF from the game archive as a structural template (1 geometry, 1 material, prelit). */
 export function loadTemplate(archive: ImgArchive): Uint8Array {
@@ -91,8 +129,8 @@ export function frameTransformPoint(rotation: readonly number[], position: Vec3,
  *  clump's **atomics** so each geometry is placed by its **frame transform** (a multi-atomic / frame-offset model
  *  was being baked from a mis-assembled mesh — the "LOD as if from the wrong model" bug). Warns about any
  *  referenced texture name that the `--txd` source doesn't provide (those faces render untextured). */
-export function loadTree(dffPath: string, model: string, textures: Textures): HdTree {
-  const dff = parseDff(toArrayBuffer(readBytes(dffPath)));
+export function loadTree(dffBytes: Uint8Array, model: string, textures: Textures): HdTree {
+  const dff = parseDff(toArrayBuffer(dffBytes));
   const triangles: HdTriangle[] = [];
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];

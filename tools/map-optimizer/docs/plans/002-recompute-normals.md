@@ -56,7 +56,7 @@ array. The DFF's own seam/hard-edge splits + a crease test make that sufficient.
 - **Crease correctness** is the crux — guarded by a unit test: two faces at 90° sharing a split edge keep
   their own-side normals (not averaged to 45°); two coplanar faces with a duplicated seam edge converge to one
   smooth normal.
-- **Idempotence/serialize path:** marking a mesh dirty routes it through `encodeDff`; a real `--game gostown`
+- **Idempotence/serialize path:** marking a mesh dirty routes it through `encodeDff`; a real `--game ./game-src/gostown`
   run recomputes the models that have normals and re-serializes them, with no new serializer failures
   (topology/anti-rip cases still throw and are isolated per asset).
 - Determinism: pure function, fixed weighting, no RNG.

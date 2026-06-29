@@ -17,10 +17,13 @@ export interface MergedGroup {
  * else left zero for a downstream normals pass; colours default to opaque white when a source vertex had no prelit.
  */
 export interface MergedMesh {
-  /** Prelit RGBA bytes, flattened (vertexCount × 4). */
+  /** Prelit RGBA bytes (SA **day** colours), flattened (vertexCount × 4). */
   colors: Uint8Array;
   /** Per-texture triangle groups (vertex indices into the attribute arrays). */
   groups: MergedGroup[];
+  /** SA **night** prelit RGBA bytes (the `0x253F2F9` "extra vertex colour" set), flattened (vertexCount × 4).
+   *  Optional — when absent, the encoder writes no night plugin (the engine falls back to the day colours). */
+  nightColors?: Uint8Array;
   /** Vertex normals, flattened (vertexCount × 3); zero where the source had none. */
   normals: Float32Array;
   /** Vertex positions, flattened (vertexCount × 3). */

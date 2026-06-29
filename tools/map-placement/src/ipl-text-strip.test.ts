@@ -2,7 +2,7 @@ import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { stripTextIpl } from './ipl-text';
+import { stripTextIpl } from './ipl-text-strip';
 
 /** A text IPL `inst` block from rows `[id, name, lod]`, with CRLF endings (as the real Rockstar files use). */
 function ipl(rows: readonly (readonly [number, string, number])[], eol = '\r\n'): string {

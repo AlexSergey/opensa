@@ -23,10 +23,13 @@ machinery either way, so it moves to a shared package both can use.
 
 ### CLI
 
+> **Note (as-built):** the original `--dff`/`--txd` were **unified into one `--in`** (a folder with both the
+> `.dff` and `.txd`). Omitting `--in` converts every `procobj.dat` species straight from the game's `gta3.img`.
+> The pipeline prose below still says "`--dff`/`--txd`" — read it as the contents of `--in`.
+
 ```
-tsx tools/lod-procobj-generator/src/cli.ts --dff <path> --txd <path> --out <path> --game <path>
-  --dff   procobj HD DFF file or directory (the species to convert; intersected with procobj.dat)
-  --txd   the HD models' TXD(s) — LOD textures are downscaled from here, falling back to the stock game TXD
+tsx tools/lod-procobj-generator/src/cli.ts --out <path> --game <path> [--in <dir>]
+  --in    optional HD model folder (<model>.dff + <model>.txd ∩ procobj.dat); omit → all procobj species from gta3.img
   --out   output drop-in directory
   --game  game-data dir (gta.dat + data/ + models/gta3.img)
   --tris  decimation target triangles per LOD model (default from config)

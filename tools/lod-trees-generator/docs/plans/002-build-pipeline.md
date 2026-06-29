@@ -1,5 +1,10 @@
 # 002 — build pipeline (HD trees → LOD impostors)
 
+> **CLI note (as-built):** the original `--dff`/`--txd` were **unified into one `--in`** (a folder with both the
+> `.dff` and `.txd`). **Omitting `--in`** bakes the built-in SA tree roster (`@opensa/map-placement/vegetation`)
+> straight from the game's `gta3.img` — no model/texture swap. The plans' prose still says "`--dff`/`--txd`"; read
+> it as `--in`.
+
 **Status: ✅ Done (P1–P7).** A folder of HD tree DFFs → SA-style LOD impostors: per-tree `lod<Name>.dff` +
 one shared `lodtrees.txd` (atlas) + one shared `lodtrees.col`. All stages verified by round-tripping the output
 through the engine's parsers (`parseDff`/`parseTxd`/`parseColLibrary`); the COL matches the `lodCedar1_hi`

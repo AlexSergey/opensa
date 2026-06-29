@@ -8,13 +8,13 @@ import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
 import { parseIde, parseTimedObjects } from '@opensa/renderware/parsers/text/ide.parser';
 import { parseBinaryIpl } from '@opensa/renderware/parsers/text/ipl-binary.parser';
 import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
+import { applyStockPrelight, type PrelightInfo } from '@opensa/sa-lod/prelight';
 import { editArchive } from '@opensa/tool-kit/archive/img';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { linkBinaryLods } from './ipl-binary-link';
 import { type AppendInst, applyTextEdits, type Repoint } from './ipl-text-append';
-import { applyStockPrelight } from './prelight';
 
 /** One generated impostor: the `lod<source>` name (DFF file + texture) for source model `source`. */
 export interface ImpostorRef {
@@ -23,21 +23,22 @@ export interface ImpostorRef {
 }
 
 export interface PlaceOptions {
-  /** User HD trees (`--dff`) dir/file — HD DFFs swapped for the LOD'd, non-procobj models. */
-  dffPath: string;
   /** Impostor LOD draw distance written to `lodtrees.ide` (`--draw`). */
   drawDistance: number;
   /** Lowercased names of the alpha-cutout (foliage) textures — the trunk-only `--prelight` split. */
   foliageTextures: ReadonlySet<string>;
   gamePath: string;
   impostors: readonly ImpostorRef[];
+  /** User HD model folder (`--in`, dff + txd) — its DFFs are swapped for the LOD'd, non-procobj models and its
+   *  TXDs wired into their IDE `txd`. Omitted (no `--in`) → no swap/retxd; the stock HD models stay. */
+  inPath?: string;
   /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`. */
   loose: boolean;
   outPath: string;
   /** Copy each swapped model's prelight (day vertex colours) from its stock DFF (`--prelight`). */
   prelight: boolean;
-  /** User HD textures (`--txd`) — packed + wired into the swapped models' IDE `txd` column. */
-  txdPath: string;
+  /** Per-model `--prelight` overrides; models in `skip` get the HD swap but no prelight transfer. */
+  prelightInfo?: PrelightInfo;
 }
 
 type GtaDat = ReturnType<typeof parseGtaDat>;
@@ -78,7 +79,8 @@ interface PlacedInst {
  * separate tool — see `lod-procobj-generator`).
  */
 export function placeMap(options: PlaceOptions): void {
-  const { dffPath, drawDistance, foliageTextures, gamePath, impostors, loose, outPath, prelight, txdPath } = options;
+  const { drawDistance, foliageTextures, gamePath, impostors, inPath, loose, outPath, prelight, prelightInfo } =
+    options;
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const registry = buildRegistry(impostors, allObjectIds(gamePath, dat));
   const bySource = new Map(registry.map((r) => [r.source, r]));
@@ -89,10 +91,16 @@ export function placeMap(options: PlaceOptions): void {
   const result = editAreas(archive, gamePath, dat, idToImpostor);
 
   // Swapped HD models (LOD'd, non-procobj) + their custom TXD: pack the TXD + retarget the models' IDE `txd`.
-  // procobj species keep their stock mesh so their runtime scatter is unchanged.
+  // procobj species keep their stock mesh. With no `--in` the HD models are the game's own → nothing to swap.
   const swapModels = [...result.placedSources].filter((m) => !procModels.has(m));
-  const swap = swapEntries(dffPath, swapModels, prelight ? archive : null, foliageTextures);
-  const retxd = retxdSwappedModels(gamePath, dat.ide, dffPath, txdPath, swapModels);
+  const swap =
+    inPath === undefined
+      ? new Map<string, Uint8Array>()
+      : swapEntries(inPath, swapModels, prelight ? archive : null, foliageTextures, prelightInfo);
+  const retxd =
+    inPath === undefined
+      ? { ides: new Map<string, string>(), txds: new Map<string, Uint8Array>() }
+      : retxdSwappedModels(gamePath, dat.ide, inPath, inPath, swapModels);
 
   // Emit: text IPLs, retxd'd IDEs, lodtrees.ide, patched gta.dat.
   for (const [iplPath, text] of result.texts) {
@@ -364,13 +372,15 @@ function sourceObjectIds(
 
 /**
  * Read the user HD DFF bytes for each model to swap, keyed by its `<model>.dff` IMG entry. When `archive` is
- * given (`--prelight`), each swapped DFF inherits its stock model's prelight before being packed.
+ * given (`--prelight`), each swapped DFF inherits its stock model's prelight before being packed — except models
+ * the `--prelight` info opts out (`prelightInfo.skip`), which are packed verbatim.
  */
 function swapEntries(
   dffPath: string,
   models: readonly string[],
   archive: ImgArchive | null,
   foliageTextures: ReadonlySet<string>,
+  prelightInfo: PrelightInfo | undefined,
 ): Map<string, Uint8Array> {
   const isDir = statSync(dffPath).isDirectory();
   const files = isDir
@@ -392,7 +402,7 @@ function swapEntries(
       continue;
     }
     let bytes = readBytes(file);
-    if (archive) {
+    if (archive && !prelightInfo?.skip.has(model)) {
       const stock = archive.get(`${model}.dff`);
       if (stock) {
         bytes = applyStockPrelight(bytes, new Uint8Array(stock), (name) => foliageTextures.has(name));

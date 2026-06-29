@@ -1,9 +1,9 @@
 # 011 — Full build output (clone game-src + rebuild archives)
 
 **Status: ✅ Implemented.** Change the output from "just the optimized assets" to a **complete, drop-in
-build**: `out/<game>/` mirrors `game-src/<game>/` entirely, with each `models/*.img` **rebuilt** so the
+build**: the `--out` dir mirrors the `--game` dir entirely, with each `models/*.img` **rebuilt** so the
 optimized entries are swapped in and **everything else is preserved** (vehicles, peds, interiors, all other
-models/textures, data files, …). Point the game at `out/<game>/` and it just runs. The loose optimized
+models/textures, data files, …). Point the game at `--out` and it just runs. The loose optimized
 `.dff`/`.txd` are **kept** alongside it (handy for inspection).
 
 ## Context / problem
@@ -15,7 +15,7 @@ assets dropped in place of the originals.
 
 ## Decisions
 
-- **Mirror the whole game-src tree.** `out/<game>/` is a copy of `game-src/<game>/` (`data/`, `anim/`,
+- **Mirror the whole game tree.** the `--out` dir is a copy of the `--game` dir (`data/`, `anim/`,
   `text/`, loose `models/` files, …) copied **verbatim** — except the model archives.
 - **Rebuild each `models/*.img` in place.** For every source archive, iterate **all** its entries: an entry we
   optimized (a map model `*.dff` or a mipped `*.txt`/`*.txd`) is written with the **optimized bytes**; every
@@ -32,9 +32,9 @@ assets dropped in place of the originals.
 
 ```
 finalize(outDir):
-  for each file under game-src/<game>/:
-     models/*.img   → rebuildArchive(src, optimized)  → out/<game>/models/<same>.img
-     everything else → copy verbatim                  → out/<game>/<same path>
+  for each file under <game-dir>/:
+     models/*.img   → rebuildArchive(src, optimized)  → <out>/models/<same>.img
+     everything else → copy verbatim                  → <out>/<same path>
 
 rebuildArchive(archive, optimized):
   entries = archive.names.map(name => ({ name, data: optimized.get(name) ?? archive.get(name) }))
@@ -43,9 +43,9 @@ rebuildArchive(archive, optimized):
 
 ## Scope
 
-- **In:** full game-src clone to `out/<game>/`; per-archive rebuild with optimized swaps + everything else
+- **In:** full game-data clone to `--out`; per-archive rebuild with optimized swaps + everything else
   preserved; adapter owns output (core no longer writes loose files); the run report still reports the
-  optimized-asset size delta; a fixture-based test + a real `--game original [--textures]` sanity run.
+  optimized-asset size delta; a fixture-based test + a real `--game ./game-src/original [--textures]` sanity run.
 - **Out (later):** a **streaming** VER2 writer (so a ~1 GB `gta3.img` isn't rebuilt fully in memory); delta /
   incremental builds; output to a single packed distributable; excluding interiors from the clone.
 

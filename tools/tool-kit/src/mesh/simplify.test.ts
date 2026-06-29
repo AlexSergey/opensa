@@ -63,5 +63,36 @@ describe('simplify', () => {
       const vertexCount = result.positions.length / 3;
       expect([...result.faces].every((v) => v >= 0 && v < vertexCount)).toBe(true);
     });
+
+    it('caps edge growth on a flat surface when maxEdgeFactor is set', () => {
+      const inputMaxEdge = Math.SQRT2; // unit grid → longest input edge is the quad diagonal
+      const uncapped = maxEdge(simplify(grid(8), 8));
+      const capped = maxEdge(simplify(grid(8), 8, { maxEdgeFactor: 1.5 }));
+      expect(uncapped).toBeGreaterThan(inputMaxEdge * 1.5); // unbounded QEM slivers the flat grid into long edges
+      expect(capped).toBeLessThanOrEqual(inputMaxEdge * 1.5 + 1e-9);
+    });
+
+    it('keeps a flat group alive with minFacesPerGroup that would otherwise collapse to nothing', () => {
+      const mesh = grid(8);
+      mesh.faceGroup = mesh.faceGroup.map((_, f) => (f < 6 ? 1 : 0)); // a small 6-face group within the flat grid
+      const groupFaces = (r: { faceGroup: Int32Array }): number => [...r.faceGroup].filter((g) => g === 1).length;
+
+      expect(groupFaces(simplify(mesh, 4))).toBeLessThan(2); // unbounded → the flat group is collapsed away
+      expect(groupFaces(simplify(mesh, 4, { minFacesPerGroup: 2 }))).toBeGreaterThanOrEqual(2);
+    });
   });
 });
+
+/** Longest edge over all faces of a simplify result. */
+function maxEdge(result: { faces: Int32Array; positions: Float64Array }): number {
+  const p = result.positions;
+  const len = (a: number, b: number): number =>
+    Math.hypot(p[a * 3] - p[b * 3], p[a * 3 + 1] - p[b * 3 + 1], p[a * 3 + 2] - p[b * 3 + 2]);
+  let m = 0;
+  for (let f = 0; f < result.faces.length; f += 3) {
+    const [a, b, c] = [result.faces[f], result.faces[f + 1], result.faces[f + 2]];
+    m = Math.max(m, len(a, b), len(b, c), len(c, a));
+  }
+
+  return m;
+}

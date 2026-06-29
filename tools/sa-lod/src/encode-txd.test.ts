@@ -1,22 +1,23 @@
 import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { toArrayBuffer } from '@opensa/renderware/test-utils';
+import { decodeDxt } from '@opensa/rw-codec/dxt';
 import { describe, expect, it } from 'vitest';
 
 import type { SourceTexture, TextureSource } from './texture-source';
 
 import { encodeLodTxd } from './encode-txd';
 
-/** A solid-colour RGBA texture of the given size. */
-function solid(size: number, r: number, g: number, b: number): SourceTexture {
+/** A solid-colour texture of the given size (opaque unless `alpha` given). */
+function solid(size: number, r: number, g: number, b: number, alpha = 255): SourceTexture {
   const rgba = new Uint8Array(size * size * 4);
   for (let i = 0; i < rgba.length; i += 4) {
     rgba[i] = r;
     rgba[i + 1] = g;
     rgba[i + 2] = b;
-    rgba[i + 3] = 255;
+    rgba[i + 3] = alpha;
   }
 
-  return { hasAlpha: false, height: size, rgba, width: size };
+  return { hasAlpha: alpha !== 255, height: size, rgba, width: size };
 }
 
 function source(textures: Record<string, SourceTexture>): TextureSource {
@@ -32,20 +33,25 @@ describe('encodeLodTxd', () => {
   });
 
   describe('positive cases', () => {
-    it('round-trips the cell textures (downscaled, named) through the engine parser', () => {
-      const textures = { grass: solid(128, 20, 180, 40), road: solid(256, 200, 100, 50) };
-      const txd = encodeLodTxd(['road', 'grass'], source(textures), 64);
+    it('round-trips downscaled, named, DXT-compressed textures (DXT1 opaque, DXT5 alpha)', () => {
+      const textures = { grass: solid(128, 20, 180, 40), leaf: solid(64, 10, 90, 10, 128) };
+      const txd = encodeLodTxd(['grass', 'leaf'], source(textures), 64);
       const parsed = parseTxd(toArrayBuffer(txd)).textures;
 
-      expect(parsed.map((t) => t.name).sort()).toEqual(['grass', 'road']);
-      const road = parsed.find((t) => t.name === 'road')!;
-      expect(road.width).toBe(64); // 256 → downscaled to the 64 budget
-      expect(road.height).toBe(64);
-      // Top-mip centre pixel keeps the source colour (RGBA round-trips through the BGRA store).
-      const mid = (road.width * (road.height / 2) + road.width / 2) * 4;
-      expect([road.mipmaps[0].data[mid], road.mipmaps[0].data[mid + 1], road.mipmaps[0].data[mid + 2]]).toEqual([
-        200, 100, 50,
-      ]);
+      expect(parsed.map((t) => t.name).sort()).toEqual(['grass', 'leaf']);
+      const grass = parsed.find((t) => t.name === 'grass')!;
+      const leaf = parsed.find((t) => t.name === 'leaf')!;
+      expect(grass.format).toBe('dxt1'); // opaque → DXT1
+      expect(leaf.format).toBe('dxt5'); // alpha → DXT5
+      expect([grass.width, grass.height]).toEqual([64, 64]); // 128 → downscaled to the 64 budget
+      expect(grass.mipmaps.length).toBeGreaterThan(1); // full mip chain
+
+      // Decoded top-mip centre pixel ≈ the source colour (DXT is lossy: 565 endpoints).
+      const decoded = decodeDxt('dxt1', grass.mipmaps[0].data, grass.width, grass.height);
+      const mid = (grass.width * (grass.height / 2) + grass.width / 2) * 4;
+      expect(Math.abs(decoded[mid] - 20)).toBeLessThanOrEqual(8);
+      expect(Math.abs(decoded[mid + 1] - 180)).toBeLessThanOrEqual(8);
+      expect(Math.abs(decoded[mid + 2] - 40)).toBeLessThanOrEqual(8);
     });
   });
 });

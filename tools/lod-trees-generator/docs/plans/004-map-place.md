@@ -1,5 +1,8 @@
 # 004 — map place (stage 2: attach impostor LODs to the tree HDs)
 
+> _As-built: the CLI's `--dff`/`--txd` were unified into one `--in` (omit it → built-in SA roster from gta3.img,
+> no HD swap); read the `--dff`/`--txd` prose below as the contents of `--in` (see [002](./002-build-pipeline.md))._
+
 Stage 1 ([003](./003-map-strip.md)) proved we can edit the coupled text/binary IPLs without crashing. Stage 2
 uses the same index discipline to **give every streamed tree HD a far-LOD = our impostor**, mirroring SA's own
 HD↔LOD pattern (streamed HD in a binary stream → bigbuilding LOD in the companion text IPL).

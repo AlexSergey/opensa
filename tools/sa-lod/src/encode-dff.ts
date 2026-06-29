@@ -15,31 +15,104 @@ import { encodeGeometryStruct } from '@opensa/rw-codec/geometry-struct';
 import type { MergedMesh } from './mesh';
 
 /**
- * Serialize a merged + decimated cell {@link MergedMesh} into a standard SA RenderWare DFF (plan 002, 1d) — a
- * one-atomic clump whose single multi-material geometry carries the cell's prelit/UV/normals, one material per
- * texture group, and a BinMesh PLG (so the **real** game renders the material splits). Built from scratch via the
- * map-optimizer chunk codec (`writeRw` + `encodeGeometryStruct`); the geometry stays in native Z-up,
- * cell-centre-relative space (the IPL inst places it back at the cell centre). u16 vertex indices cap a geometry
- * at 65 535 verts — far above a decimated cell, but asserted.
+ * Serialize a merged + decimated cell {@link MergedMesh} into a standard SA RenderWare DFF (plan 002, 1d) — a clump
+ * whose multi-material geometry carries the cell's prelit/UV/normals (+ the **night** prelit plugin when the mesh
+ * has `nightColors`, so the LOD isn't dark at night), one material per texture group, and a BinMesh PLG (so the
+ * **real** game renders the material splits). The geometry is emitted **two-sided** (see {@link doubleSided}).
+ * Built from scratch via the map-optimizer chunk codec (`writeRw` + `encodeGeometryStruct`); the geometry stays in
+ * native Z-up, cell-centre-relative space (the IPL inst places it back at the cell centre). u16 vertex indices cap
+ * a geometry at 65 535 verts, so a dense cell is split across several geometries/atomics (see {@link splitMesh}).
  */
-export function encodeLodDff(mesh: MergedMesh, name: string): Uint8Array {
-  const vertexCount = mesh.positions.length / 3;
-  if (vertexCount > 0xffff) {
-    throw new Error(`LOD ${name}: ${vertexCount} vertices exceeds the 65535 u16 limit — lower the LOD budget`);
-  }
+export function encodeLodDff(rawMesh: MergedMesh, name: string): Uint8Array {
+  // u16 vertex indices cap a geometry at 65 535 verts; a dense cell can exceed that, so split it across several
+  // geometries/atomics (all sharing the one identity frame) instead of decimating harder. Double-sided after the
+  // split — it only doubles indices, leaving the vertex count untouched.
+  const chunks = splitMesh(rawMesh, 0xffff).map(doubleSided);
 
   return writeRw({
     chunks: [
       container(RW_CLUMP, [
-        leaf(RW_STRUCT, u32s([1, 0, 0])), // numAtomics, numLights, numCameras
+        leaf(RW_STRUCT, u32s([chunks.length, 0, 0])), // numAtomics, numLights, numCameras
         frameList(name),
-        container(RW_GEOMETRY_LIST, [leaf(RW_STRUCT, u32s([1])), geometry(mesh, vertexCount)]),
-        atomic(),
+        container(RW_GEOMETRY_LIST, [
+          leaf(RW_STRUCT, u32s([chunks.length])),
+          ...chunks.map((chunk) => geometry(chunk, chunk.positions.length / 3)),
+        ]),
+        ...chunks.map((_, i) => atomic(i)),
         container(RW_EXTENSION, []),
       ]),
     ],
     trailing: new Uint8Array(0),
   });
+}
+
+/** Partition a merged mesh into sub-meshes each within `maxVerts` vertices (re-indexed), so each fits one DFF
+ *  geometry's u16 indices. Triangles are taken group by group; a chunk is flushed when the next triangle's new
+ *  vertices would overflow. A single triangle (≤3 verts) always fits a fresh chunk. */
+function splitMesh(mesh: MergedMesh, maxVerts: number): MergedMesh[] {
+  const totalVerts = mesh.positions.length / 3;
+  if (totalVerts <= maxVerts) {
+    return [mesh];
+  }
+  const chunks: MergedMesh[] = [];
+  const remap = new Int32Array(totalVerts);
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const colors: number[] = [];
+  const night: number[] = [];
+  const normals: number[] = [];
+  let groups = new Map<string, number[]>();
+  const reset = (): void => {
+    remap.fill(-1);
+    positions.length = uvs.length = colors.length = night.length = normals.length = 0;
+    groups = new Map<string, number[]>();
+  };
+  reset();
+  const addVertex = (v: number): number => {
+    if (remap[v] === -1) {
+      remap[v] = positions.length / 3;
+      positions.push(mesh.positions[v * 3], mesh.positions[v * 3 + 1], mesh.positions[v * 3 + 2]);
+      uvs.push(mesh.uvs[v * 2], mesh.uvs[v * 2 + 1]);
+      colors.push(mesh.colors[v * 4], mesh.colors[v * 4 + 1], mesh.colors[v * 4 + 2], mesh.colors[v * 4 + 3]);
+      normals.push(mesh.normals[v * 3], mesh.normals[v * 3 + 1], mesh.normals[v * 3 + 2]);
+      if (mesh.nightColors) {
+        night.push(mesh.nightColors[v * 4], mesh.nightColors[v * 4 + 1], mesh.nightColors[v * 4 + 2], mesh.nightColors[v * 4 + 3]); // prettier-ignore
+      }
+    }
+
+    return remap[v];
+  };
+  const flush = (): void => {
+    chunks.push({
+      colors: Uint8Array.from(colors),
+      groups: [...groups].map(([texture, indices]) => ({ indices: Uint32Array.from(indices), texture })),
+      ...(mesh.nightColors ? { nightColors: Uint8Array.from(night) } : {}),
+      normals: Float32Array.from(normals),
+      positions: Float32Array.from(positions),
+      uvs: Float32Array.from(uvs),
+    });
+    reset();
+  };
+  for (const group of mesh.groups) {
+    for (let i = 0; i < group.indices.length; i += 3) {
+      const tri = [group.indices[i], group.indices[i + 1], group.indices[i + 2]];
+      const fresh = tri.reduce((n, v) => n + (remap[v] === -1 ? 1 : 0), 0);
+      if (positions.length / 3 + fresh > maxVerts) {
+        flush();
+      }
+      let indices = groups.get(group.texture);
+      if (!indices) {
+        indices = [];
+        groups.set(group.texture, indices);
+      }
+      indices.push(addVertex(tri[0]), addVertex(tri[1]), addVertex(tri[2]));
+    }
+  }
+  if (positions.length > 0) {
+    flush();
+  }
+
+  return chunks;
 }
 
 const RW_VERSION = 0x1803ffff; // SA (RW 3.6.0.3)
@@ -50,13 +123,14 @@ const RW_MATERIAL_LIST = 0x08;
 const RW_FRAME_LIST = 0x0e;
 const RW_ATOMIC = 0x14;
 const RW_FRAME_NAME = 0x253f2fe;
+const RW_NIGHT_VERTEX_COLORS = 0x253f2f9; // SA "extra vertex colour" (night prelit) plugin
 /** Geometry flags: positions, textured, prelit, normals, light, modulate-material-colour. */
 const GEOMETRY_FLAGS = 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40;
 
-/** Atomic → frame 0, geometry 0 (flags 5 = render | collision-test). */
-function atomic(): RwChunk {
+/** Atomic → frame 0, geometry `geometryIndex` (flags 5 = render | collision-test). */
+function atomic(geometryIndex: number): RwChunk {
   return {
-    children: [leaf(RW_STRUCT, u32s([0, 0, 5, 0])), container(RW_EXTENSION, [])],
+    children: [leaf(RW_STRUCT, u32s([0, geometryIndex, 5, 0])), container(RW_EXTENSION, [])],
     type: RW_ATOMIC,
     version: RW_VERSION,
   };
@@ -67,7 +141,10 @@ function binMesh(mesh: MergedMesh): RwChunk {
   const totalIndices = mesh.groups.reduce((sum, group) => sum + group.indices.length, 0);
   const parts: number[] = [0, mesh.groups.length, totalIndices]; // flags(trilist), numMeshes, totalIndices
   mesh.groups.forEach((group, g) => {
-    parts.push(group.indices.length, g, ...group.indices);
+    parts.push(group.indices.length, g);
+    for (const index of group.indices) {
+      parts.push(index); // not `...group.indices` — spreading a large typed array overflows the call stack
+    }
   });
 
   return leaf(RW_BIN_MESH_PLG, u32s(parts));
@@ -104,6 +181,32 @@ function container(type: number, children: RwChunk[]): RwChunk {
   return { children, type, version: RW_VERSION };
 }
 
+/**
+ * Emit each triangle twice — once as `(a,b,c)`, once reversed `(a,c,b)` — so the geometry renders **two-sided**
+ * without an engine change. SA map geometry has inconsistent winding (and mostly no normals), and the engine
+ * back-face-culls opaque world materials (`FrontSide`), so ~a third of every surface would otherwise vanish
+ * ("shredded" LODs). The reversed copy is coincident: the real game (no world cull) draws identical pixels twice
+ * (harmless), the engine culls whichever copy faces away — so one always survives. Vertices are untouched (count
+ * unchanged); only the per-group index lists double. Lighting is vertex-normal Gouraud, so winding doesn't affect
+ * it. Applied to the render DFF only — the COL stays single-sided.
+ */
+function doubleSided(mesh: MergedMesh): MergedMesh {
+  const groups = mesh.groups.map((group) => {
+    const src = group.indices;
+    const indices = new Uint32Array(src.length * 2);
+    for (let i = 0; i < src.length; i += 3) {
+      const a = src[i];
+      const b = src[i + 1];
+      const c = src[i + 2];
+      indices.set([a, b, c, a, c, b], i * 2);
+    }
+
+    return { indices, texture: group.texture };
+  });
+
+  return { ...mesh, groups };
+}
+
 /** FrameList: one identity root frame named after the cell-LOD model. */
 function frameList(name: string): RwChunk {
   const record = new Uint8Array(56);
@@ -135,10 +238,15 @@ function geometry(mesh: MergedMesh, vertexCount: number): RwChunk {
     uvLayers: [mesh.uvs],
   };
 
+  const extension = [binMesh(mesh)];
+  if (mesh.nightColors) {
+    extension.push(nightColors(mesh.nightColors));
+  }
+
   return container(RW_GEOMETRY, [
     leaf(RW_STRUCT, encodeGeometryStruct(struct)),
     materialList(mesh),
-    container(RW_EXTENSION, [binMesh(mesh)]),
+    container(RW_EXTENSION, extension),
   ]);
 }
 
@@ -178,6 +286,15 @@ function materialList(mesh: MergedMesh): RwChunk {
     type: RW_MATERIAL_LIST,
     version: RW_VERSION,
   };
+}
+
+/** The "extra vertex colour" (night prelit) plugin chunk: a `u32` flag (1 = present) + numVertices × RGBA. */
+function nightColors(colors: Uint8Array): RwChunk {
+  const data = new Uint8Array(4 + colors.length);
+  new DataView(data.buffer).setUint32(0, 1, true);
+  data.set(colors, 4);
+
+  return leaf(RW_NIGHT_VERTEX_COLORS, data);
 }
 
 function stringChunk(value: string): RwChunk {

@@ -3,8 +3,8 @@ import { parseIpl } from '@opensa/renderware/parsers/text/ipl.parser';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { stripBinaryIpl } from './ipl-binary';
-import { stripTextIpl } from './ipl-text';
+import { stripBinaryIpl } from './ipl-binary-strip';
+import { stripTextIpl } from './ipl-text-strip';
 
 const HEADER_SIZE = 76;
 const INST_SIZE = 40;

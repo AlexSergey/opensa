@@ -15,7 +15,7 @@ map" contract, so this lives on its own with its own `out/`.
 ## Shape (mirrors map-optimizer)
 
 ```
-cli.ts  --game <name>  →  game-src/<name>/  →  out/<name>/
+cli.ts  --game <path>  →  game data dir  →  --out <path>  (drop-in build)
   core/        game-agnostic: Cell + grid, the LodAdapter contract, the Phase-0 summary
   adapters/    per-game I/O behind LodAdapter; gta-sa reuses ../src parsers READ-ONLY
   lod.config   cell size (MUST equal the engine streaming cellSize) + (later) decimation/atlas budgets

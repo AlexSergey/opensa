@@ -42,7 +42,7 @@ is purely a size optimization with **no visual change** (unreferenced data can't
 - **Attribute alignment** is the crux — a unit test prunes a middle vertex and checks the surviving
   positions/normals line up with the re-indexed triangles.
 - **Rebuild path:** a vertex-count drop (triangles unchanged) routes through `rebuildGeometry`; a real
-  `--game gostown` run (weld → dedupe → prune) removes orphaned verts, every output re-parses, and triangle
+  `--game ./game-src/gostown` run (weld → dedupe → prune) removes orphaned verts, every output re-parses, and triangle
   counts + material sets stay consistent. Guards (skin/multi-UV) still isolate per asset.
 - **Weld regression:** weld’s behaviour is unchanged (same tests pass through the shared helper).
 - Determinism: pure, stable order, no RNG.

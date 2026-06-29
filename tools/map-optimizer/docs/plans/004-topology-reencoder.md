@@ -60,5 +60,5 @@ change counts, so they're blocked. This plan rebuilds those siblings consistentl
 - **No-op safety:** weld with no duplicates leaves counts unchanged → the faithful overlay path → byte-identity
   preserved (regression-guarded).
 - **Guards** keep us from silently corrupting skin/multi-UV models (unit-tested throw).
-- **Real data:** `--game gostown` with weld removes redundant verts across the map models, every output
+- **Real data:** `--game ./game-src/gostown` with weld removes redundant verts across the map models, every output
   re-parses, and material splits stay intact; no new serializer failures.

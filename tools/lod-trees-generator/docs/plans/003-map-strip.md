@@ -1,5 +1,8 @@
 # 003 — map strip (stage 1: remove the source trees from the world)
 
+> _As-built: the CLI's `--dff`/`--txd` were unified into one `--in`; read the `--dff`/`--txd` prose below as the
+> contents of `--in` (see [002](./002-build-pipeline.md))._
+
 When `--game` is given, the generator removes every placement of the `--dff` trees (and their old `lod<name>`
 LODs) from the map, so the new impostors can replace them. This doc records **how SA actually links HD↔LOD**,
 because the obvious "just delete the rows" approach crashes the game — and the non-obvious reason why.

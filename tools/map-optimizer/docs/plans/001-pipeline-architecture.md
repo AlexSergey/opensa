@@ -12,7 +12,7 @@ plan (002+).
 > a faithful chunk-container codec (`chunk.ts`, byte-exact `writeRw(readRw())`), an in-place vertex-attribute
 > patcher (`geometry-struct.ts`), and the `encodeDff` orchestrator) + the `pass-through` plugin +
 > `optimizer.config.ts` + `src/cli.ts`. Verified: `tsc`/`eslint` clean; core + serializer unit tests; and
-> `--game gostown` round-trips **836/836** map models **byte-identical**. The serializer patches
+> `--game ./game-src/gostown` round-trips **836/836** map models **byte-identical**. The serializer patches
 > positions/normals/prelit/UVs only — topology edits and anti-rip recovered geometry throw (full re-encoder =
 > later). Build wiring: eslint `scripts`-config + `vitest` include + `.gitignore` cover `map-optimizer/**`.
 
@@ -37,9 +37,9 @@ which is the correctness gate before any geometry-mutating plugin lands.
 
 ## Decisions (proposed)
 
-- **Offline CLI, not runtime.** `map-optimizer --game <name>` reads `game-src/<name>/` and writes optimized
-  output to `map-optimizer/out/<name>/`. **Source is never overwritten.** (The runtime in-memory option from
-  the idea note stays a separate possibility; this project targets durable, portable assets.)
+- **Offline CLI, not runtime.** `map-optimizer --game <path> --out <path>` reads a game-data dir and writes the
+  optimized drop-in to `--out`. **Source is never overwritten.** (The runtime in-memory option from the idea note
+  stays a separate possibility; this project targets durable, portable assets.)
 - **Per unique model, not per placement.** Map objects are model definitions placed many times via IPL;
   optimize each **DFF once**, keyed by model name.
 - **Gulp-style pipeline.** An ordered list of plugins; each receives an **asset** (a "vinyl"-like object),
@@ -58,7 +58,7 @@ which is the correctness gate before any geometry-mutating plugin lands.
 ## Architecture
 
 ```
-map-optimizer --game <name>
+map-optimizer --game <path> --out <path>
   │
   ├─ resolve      reuse build partition: open models/*.img + parse data/ IDE+IPL
   │               → the unique EXTERIOR map model DFFs the game references
@@ -71,7 +71,7 @@ map-optimizer --game <name>
   │
   ├─ write        fromIR(ir) + raw passthrough → writeDff → bytes
   │
-  └─ output       write loose .dff to map-optimizer/out/<name>/  +  run report
+  └─ output       write the drop-in build to --out  +  run report
 ```
 
 ### Core contracts
@@ -97,8 +97,7 @@ interface MapPlugin {
 interface OptimizerConfig {
   plugins: MapPlugin[];
   concurrency?: number; // default ~4 (mirror build-game)
-  out?: string; // default map-optimizer/out/<game>
-}
+} // the output dir is the CLI's `--out <path>`
 ```
 
 `MeshIR` (first cut): `{ positions, normals, uvLayers, prelit, nightColors, materials, faces[] grouped by
@@ -127,15 +126,15 @@ map-optimizer/
   out/                       # generated, gitignored
 ```
 
-Tooling: reuse the repo's `tsx` + root tsconfig at first (run `tsx map-optimizer/src/index.ts --game <name>`);
-extracting a standalone package is a later option, not now.
+Tooling: reuse the repo's `tsx` + root tsconfig at first (run `tsx map-optimizer/src/cli.ts --game <path> --out
+<path>`); extracting a standalone package is a later option, not now.
 
 ## Scope
 
-- **In:** the CLI + `--game` input + folder validation; source resolution (unique exterior map models, via the
-  build partition); the **pipeline runner** (ordered plugins, concurrency, per-asset error isolation); the
+- **In:** the CLI + `--game`/`--out` inputs + folder validation; source resolution (unique exterior map models,
+  via the build partition); the **pipeline runner** (ordered plugins, concurrency, per-asset error isolation); the
   **Asset / MapPlugin / config** contracts; the **`MeshIR`** + `dff↔ir` codecs; the **DFF writer** at
-  **identity** fidelity with **raw passthrough** of unmodeled chunks; loose-DFF output to `out/<game>/`; the
+  **identity** fidelity with **raw passthrough** of unmodeled chunks; loose-DFF output to `--out`; the
   **reporting** skeleton; a **no-op `pass-through` plugin** exercising the whole loop; tests.
 - **Out (follow-up plans 002+):** every transform plugin (normals/smoothing, weld, dedupe, hole-fill, remesh,
   prelit/night conditioning, wind authoring); TXD/texture work; repacking output into `.img`; performance

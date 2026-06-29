@@ -60,6 +60,6 @@ flag flips), while preserving everything else byte-for-byte.
 - **Add-normals correctness:** a no-normals Struct + a mesh with normals → decode shows the normals block, the
   NORMALS flag set, the vertex count and positions unchanged, and the rest of the chunk preserved.
 - **Boundary:** a vertex-count change throws (the BinMeshPLG/remap work isn't done yet) — isolated per asset.
-- **Real data:** `--game gostown` with `recompute-normals({ addMissing: true })` adds normals to the
+- **Real data:** `--game ./game-src/gostown` with `recompute-normals({ addMissing: true })` adds normals to the
   normal-less map models and re-serializes them with no new serializer failures; default (no addMissing) still
   round-trips byte-identical.

@@ -40,13 +40,17 @@ export interface LodConfig {
    * exactly one engine cell (see plan 002 "Engine fit").
    */
   cellSize: number;
-  /** Far-view triangle budget per cell for QEM decimation (plan 002, 1c). */
-  decimateTargetTriangles: number;
+  /** Floor on a cell's kept triangle count — a cell with fewer HD triangles than this is left undecimated. Sparse
+   *  cells (e.g. open terrain / mountains) are already LOD-cheap; a flat ratio would over-thin them into holes. */
+  lodCellMinTris: number;
+  /** Fraction of a cell's merged triangles kept when decimating it as one welded mesh (the simplifier's group
+   *  floor + edge cap keep every surface present and unspiked, so a small fraction still covers the cell). */
+  lodCellRatio: number;
   /** Draw distance (world units) for emitted cell-LOD IDE defs — the original game's visibility gate. */
   lodDrawDistance: number;
   /** Max texture dimension (px) in a per-cell LOD TXD; sources are downscaled to it (plan 002, Phase 2). */
   lodTextureSize: number;
-  /** Output directory; defaults to `lod-generator/out/<game>/`. */
+  /** Output directory for the baked drop-in (the CLI passes `--out <path>`). */
   out?: string;
 }
 

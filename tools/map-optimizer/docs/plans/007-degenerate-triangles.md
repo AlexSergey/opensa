@@ -43,6 +43,6 @@ remove-degenerate-triangles → dedupe-faces → prune-vertices`.
 - **Conservatism:** the small default epsilon means only invisible faces go — guarded by a test that a thin
   (but non-zero) triangle is kept.
 - **Rebuild path:** a triangle-count drop with unchanged vertices routes through `rebuildGeometry`; a real
-  `--game gostown` run removes degenerate faces, every output re-parses, and triangle counts stay consistent
+  `--game ./game-src/gostown` run removes degenerate faces, every output re-parses, and triangle counts stay consistent
   through the rebuild. Guards (skin/multi-UV) still isolate per asset.
 - Determinism: pure, order-stable, no RNG.

@@ -42,8 +42,6 @@ export interface MapPlugin {
 export interface OptimizerConfig {
   /** Parallel asset workers (default 4). */
   concurrency?: number;
-  /** Output directory override (default `map-optimizer/out/<game>`). */
-  out?: string;
   /** Ordered transform stages. */
   plugins: MapPlugin[];
 }

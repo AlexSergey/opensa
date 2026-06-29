@@ -1,8 +1,9 @@
 # 009 — Pack the output into a VER2 `.img`
 
-**Status: ✅ Implemented.** The input is a GTA `.img` archive, so the output should be one too. On `finalize`
-the GTA-SA adapter packs every optimized model into a stock **VER2 `<game>.img`** under `out/<game>/`, making
-the result drop-in usable instead of a loose pile of `.dff` files.
+**Status: ✅ Implemented** (output later superseded by the full-build clone — see [011](./011-full-build-output.md)).
+The input is a GTA `.img` archive, so the output should be one too. On `finalize` the GTA-SA adapter packs every
+optimized model into a stock **VER2 `<game>.img`** under `--out`, making the result drop-in usable instead of a
+loose pile of `.dff` files.
 
 ## Context / problem
 
@@ -13,7 +14,7 @@ The output should mirror the input's packaging.
 ## Decisions
 
 - **VER2 `.img` on `finalize`.** The adapter accumulates each optimized `{ name, bytes }` during `write()` and,
-  in `finalize(outDir)`, packs them into `out/<game>/<game>.img` (entries sorted by name for a deterministic
+  in `finalize(outDir)`, packs them into `<out>/<game>.img` (entries sorted by name for a deterministic
   archive).
 - **Reuse the engine's tested packer.** `buildVer2Buffer` already exists in `../src/renderware/archive` (it's
   what `test-fixtures` uses); the adapter imports it **read-only** — same as it reuses `parseDff` /

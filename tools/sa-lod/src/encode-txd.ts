@@ -1,17 +1,18 @@
 import type { RwChunk } from '@opensa/rw-codec/chunk';
 
 import { RW_EXTENSION, RW_STRUCT, RW_TEXTURE_DICTIONARY, RW_TEXTURE_NATIVE, writeRw } from '@opensa/rw-codec/chunk';
-import { downsample } from '@opensa/rw-codec/mip';
-import { encodeRgba8888Struct } from '@opensa/rw-codec/texture-native';
+import { buildMipChain, downsample } from '@opensa/rw-codec/mip';
+import { encodeDxtStruct } from '@opensa/rw-codec/texture-native';
 
 import type { TextureSource } from './texture-source';
 
 /**
- * Build one per-cell TXD (plan 002, Phase 2) holding the cell's textures, **downscaled** to a far-LOD budget and
- * stored uncompressed A8R8G8B8. The cell DFF keeps its original material/texture **names** + UVs untouched
- * (perfect tiling — no atlas), so it resolves every texture from this single dictionary. Reuses the engine
- * `parseTxd` (via the source) + map-optimizer's `encodeRgba8888Struct` + chunk codec; a true single-texture
- * atlas (fewer draws) is a later optimisation. Names missing from the source are skipped.
+ * Build one shared LOD TXD holding the given textures, **downscaled** to a far-LOD budget and **DXT-compressed**
+ * (DXT5 for alpha-cutout textures, DXT1 for opaque) with a full mip chain — uncompressed A8R8G8B8 blows the IMG up
+ * ~4× (e.g. a full cell build's TXDs were ~324 MB raw vs ~81 MB DXT). The DFF keeps its original material/texture
+ * **names** + UVs untouched (perfect tiling — no atlas), so it resolves every texture from this single dictionary.
+ * Reuses the engine `parseTxd` (via the source) + `encodeDxtStruct` + chunk codec. Names missing from the source
+ * are skipped.
  */
 export function encodeLodTxd(textures: readonly string[], source: TextureSource, maxSize: number): Uint8Array {
   const natives: RwChunk[] = [];
@@ -32,9 +33,6 @@ export function encodeLodTxd(textures: readonly string[], source: TextureSource,
 }
 
 const RW_VERSION = 0x1803ffff;
-const NATIVE_PLATFORM = 8; // PC D3D8
-const NATIVE_FILTER = 0x1102; // linear + wrap addressing
-const NATIVE_HEADER = 88;
 
 function container(type: number, children: RwChunk[]): RwChunk {
   return { children, type, version: RW_VERSION };
@@ -59,26 +57,14 @@ function leaf(type: number, data: Uint8Array): RwChunk {
   return { data, type, version: RW_VERSION };
 }
 
-/** An 88-byte TextureNative header template (platform / filter / name / mask / rasterType / flags) for the
- *  uncompressed encoder to fill in the format + level fields. */
-function template(name: string): Uint8Array {
-  const header = new Uint8Array(NATIVE_HEADER);
-  const view = new DataView(header.buffer);
-  view.setUint32(0, NATIVE_PLATFORM, true);
-  view.setUint32(4, NATIVE_FILTER, true);
-  header.set(new TextEncoder().encode(name.slice(0, 31)), 8); // name[32], NUL-terminated
-  header[86] = 4; // rasterType (standard texture)
-
-  return header;
-}
-
 function textureNative(
   name: string,
   texture: { hasAlpha: boolean; height: number; rgba: Uint8Array; width: number },
   maxSize: number,
 ): RwChunk {
   const level = downscale(texture.rgba, texture.width, texture.height, maxSize);
-  const struct = encodeRgba8888Struct(template(name), [level], texture.hasAlpha);
+  const mips = buildMipChain(level.data, level.width, level.height);
+  const struct = encodeDxtStruct(name, texture.hasAlpha ? 'dxt5' : 'dxt1', mips);
 
   return container(RW_TEXTURE_NATIVE, [leaf(RW_STRUCT, struct), container(RW_EXTENSION, [])]);
 }

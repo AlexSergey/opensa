@@ -3,6 +3,8 @@ import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
+import { trimTxd } from './txd-trim';
+
 export interface CustomTxd {
   bytes: Uint8Array;
   name: string;
@@ -64,11 +66,30 @@ export function retxdSwappedModels(
   const custom = loadCustomTxds(txdPath);
   const dffFiles = dffByModel(dffPath);
   const modelToTxd = new Map<string, CustomTxd>();
+  // Per packed TXD, the union of texture names its repointed models actually reference — used to trim the TXD to
+  // just those (a shared mod TXD also holds textures for the models we dropped; only the repointed ones read it).
+  const txdUsed = new Map<CustomTxd, Set<string>>();
   for (const model of models) {
-    const txd = pickTxd(custom, dffFiles.get(model));
-    if (txd) {
-      modelToTxd.set(model, txd);
+    const dffFile = dffFiles.get(model);
+    if (!dffFile) {
+      continue; // can't inspect the DFF → don't risk repointing to a TXD that lacks its textures
     }
+    let refs: Set<string>;
+    try {
+      refs = dffTextures(dffFile);
+    } catch {
+      continue; // unparseable DFF → leave its stock txd
+    }
+    const txd = selectTxd(refs, custom);
+    if (!txd) {
+      continue;
+    }
+    modelToTxd.set(model, txd);
+    const used = txdUsed.get(txd) ?? new Set<string>();
+    for (const ref of refs) {
+      used.add(ref);
+    }
+    txdUsed.set(txd, used);
   }
 
   const modelToTxdName = new Map([...modelToTxd].map(([model, txd]) => [model, txd.name]));
@@ -83,7 +104,7 @@ export function retxdSwappedModels(
 
   const txds = new Map<string, Uint8Array>();
   for (const txd of new Set(modelToTxd.values())) {
-    txds.set(`${txd.name}.txd`, txd.bytes);
+    txds.set(`${txd.name}.txd`, trimTxd(txd.bytes, txdUsed.get(txd) ?? new Set<string>()));
   }
 
   return { ides, txds };
@@ -163,16 +184,4 @@ function loadCustomTxds(txdPath: string): CustomTxd[] {
 
     return { bytes, name: base(file), textures: new Set(parsed.textures.map((t) => t.name.toLowerCase())) };
   });
-}
-
-/** The custom TXD that covers the model's referenced textures, or `undefined` (→ keep its stock `txd`). */
-function pickTxd(custom: readonly CustomTxd[], dffFile: string | undefined): CustomTxd | undefined {
-  if (!dffFile) {
-    return undefined; // can't inspect the DFF → don't risk repointing to a TXD that lacks its textures
-  }
-  try {
-    return selectTxd(dffTextures(dffFile), custom);
-  } catch {
-    return undefined; // unparseable DFF → leave its stock txd
-  }
 }

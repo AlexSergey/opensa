@@ -1,11 +1,12 @@
 /**
- * Map-optimizer CLI. Mirrors `scripts/build-game.ts`: takes `--game <name>`, reads `game-src/<name>/`, runs
- * the configured model pipeline (and, with `--textures`, the texture mip pass), and emits a full drop-in
- * build under `map-optimizer/out/<name>/`. `--refine` appends the experimental surface-smoothing pass (plan
- * 014). Usage: `tsx map-optimizer/src/cli.ts --game <name> [--textures] [--refine] [--refine]`.
+ * Map-optimizer CLI. Takes `--game <path>` (a game-data dir: `gta.dat` + `data/` + `models/`), runs the configured
+ * model pipeline (and, with `--textures`, the texture mip pass), and emits a full drop-in build under `--out
+ * <path>`. `--refine` appends the experimental surface-smoothing pass (plan 014). Usage:
+ * `tsx map-optimizer/src/cli.ts --game <path> --out <path> [--textures] [--refine]`. Paths are relative to the
+ * current working directory (absolute paths pass through).
  */
 import { statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, isAbsolute, resolve } from 'node:path';
 
 import { createGtaSaAdapter } from './adapters/gta-sa';
 import { printReport, runPipeline, writeReport } from './core';
@@ -18,20 +19,24 @@ function argValue(flag: string): string | undefined {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
+function fromCwd(value: string): string {
+  return isAbsolute(value) ? value : resolve(process.cwd(), value);
+}
+
 async function main(): Promise<void> {
-  const game = argValue('--game');
-  if (!game) {
-    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <name> [--textures] [--refine]');
+  const gameArg = argValue('--game');
+  const outArg = argValue('--out');
+  if (!gameArg || !outArg) {
+    throw new Error('usage: tsx map-optimizer/src/cli.ts --game <path> --out <path> [--textures] [--refine]');
   }
 
-  const root = process.cwd();
-  const gameDir = join(root, 'game-src', game);
+  const gameDir = fromCwd(gameArg);
   if (!statSync(gameDir, { throwIfNoEntry: false })?.isDirectory()) {
-    throw new Error(`game-src/${game} not found`);
+    throw new Error(`--game must be a game-data directory: ${gameDir}`);
   }
 
-  const outDir = config.out ?? join(root, 'map-optimizer', 'out', game);
-  const adapter = createGtaSaAdapter(game, gameDir);
+  const outDir = fromCwd(outArg);
+  const adapter = createGtaSaAdapter(basename(gameDir), gameDir);
 
   // Texture mip pass (opt-in). Runs before the model run so both end up in the one finalized build.
   if (process.argv.includes('--textures')) {

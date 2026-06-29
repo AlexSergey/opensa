@@ -12,6 +12,8 @@ import { openArchives } from './io';
 import { mergeCell } from './merge';
 import { maxObjectId, resolveCells } from './resolve';
 
+export { stripOldLods } from './strip';
+
 /**
  * GTA-SA (RenderWare) LOD adapter. Phase 0 (assemble HD instances → cell grid) + Phase 1's merge (HD geometry →
  * one cell-relative mesh by texture) are implemented via read-only reuse of the engine's parsers. QEM decimation,
@@ -25,9 +27,17 @@ export function createGtaSaLodAdapter(game: string, gameDir: string, config: Lod
 
   return {
     bakeCell(cell: Cell): BakedCell {
+      // Merge the whole cell, then decimate it as one connected mesh (welded inside `decimateMesh`) to a fraction
+      // of its triangles. One shared budget across surfaces — and welded topology — keeps coverage far higher than
+      // decimating each model on its own did (which eroded every seam-split fragment → holes). Normals re-derived
+      // after.
       const merged = mergeCell(cell, config.cellSize, source);
-      const decimated = decimateMesh(merged, config.decimateTargetTriangles);
-      const mesh = rebuildMeshNormals(decimated); // re-derived on the final (decimated) cell mesh
+      const faceCount = merged.groups.reduce((sum, group) => sum + group.indices.length / 3, 0);
+      // At least `min` triangles so sparse cells aren't over-thinned into holes; no upper cap — OpenSA has no
+      // per-model streaming/material limits (this tool targets OpenSA, not the original game's streamer).
+      const target = Math.max(Math.ceil(faceCount * config.lodCellRatio), config.lodCellMinTris);
+      const decimated = decimateMesh(merged, target);
+      const mesh = rebuildMeshNormals(decimated);
 
       return { cx: cell.cx, cy: cell.cy, mesh };
     },

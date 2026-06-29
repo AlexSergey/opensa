@@ -8,11 +8,13 @@ import type { Cell } from '../../core/types';
 class MeshBuilder {
   private readonly colors: number[] = [];
   private readonly groups = new Map<string, number[]>();
+  private hasNight = false;
+  private readonly nightColors: number[] = [];
   private readonly normals: number[] = [];
   private readonly positions: number[] = [];
   private readonly uvs: number[] = [];
 
-  /** Append one geometry, transformed by `rotation` (quaternion) + `position`, offset to `origin`. */
+  /** Append one raw geometry, transformed by `rotation` (quaternion) + `position`, offset to `origin`. */
   add(geometry: RWGeometry, rotation: Quat, position: Vec3, origin: Vec3): void {
     const base = this.positions.length / 3;
     const vertexCount = geometry.positions.length / 3;
@@ -28,6 +30,7 @@ class MeshBuilder {
       this.pushNormal(geometry.normals, rotation, i);
       this.uvs.push(uv ? uv[i * 2] : 0, uv ? uv[i * 2 + 1] : 0);
       this.pushColor(geometry.prelitColors, i);
+      this.pushNightColor(geometry.nightColors, geometry.prelitColors, i);
     }
     for (const tri of geometry.triangles) {
       const texture = geometry.materials[tri.materialIndex]?.texture?.name.toLowerCase() ?? '';
@@ -39,6 +42,9 @@ class MeshBuilder {
     return {
       colors: Uint8Array.from(this.colors),
       groups: [...this.groups].map(([texture, indices]) => ({ indices: Uint32Array.from(indices), texture })),
+      // Only carry night colours when at least one source model had them — else the engine's day-at-night
+      // fallback applies (writing night = day everywhere would just be redundant bytes).
+      ...(this.hasNight ? { nightColors: Uint8Array.from(this.nightColors) } : {}),
       normals: Float32Array.from(this.normals),
       positions: Float32Array.from(this.positions),
       uvs: Float32Array.from(this.uvs),
@@ -63,6 +69,20 @@ class MeshBuilder {
     }
   }
 
+  /** Night prelit for vertex `i`: the source's night colours when present (marking the mesh as carrying them),
+   *  else its day prelit, else opaque white — so a night-bearing cell isn't black where some models lacked it. */
+  private pushNightColor(night: null | Uint8Array, day: null | Uint8Array, i: number): void {
+    if (night) {
+      this.hasNight = true;
+    }
+    const src = night ?? day;
+    if (src) {
+      this.nightColors.push(src[i * 4], src[i * 4 + 1], src[i * 4 + 2], src[i * 4 + 3]);
+    } else {
+      this.nightColors.push(255, 255, 255, 255);
+    }
+  }
+
   private pushNormal(normals: Float32Array | null, rotation: Quat, i: number): void {
     if (normals) {
       const [nx, ny, nz] = rotate(rotation, normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
@@ -74,12 +94,13 @@ class MeshBuilder {
 }
 
 /**
- * Merge a cell's HD instances into one cell-centre-relative, native Z-up mesh (Phase 1), triangles bucketed by
- * texture. Each instance's geometry is transformed by its IPL world transform — **rotation = the conjugate of
- * the IPL quaternion** (GTA stores its inverse; matches `build-region.ts`) — into world space, then offset to
- * the cell centre (keeps coordinates small for float precision; the cell-LOD instance is placed back at the
- * centre). The DFF **frame** transform is deliberately ignored, exactly as the engine does for map atomics
- * (SA re-frames them to identity — `build-clump.ts`). No decimation/atlas yet — that's Phase 1.1 / Phase 2.
+ * Merge a cell's instances into one cell-centre-relative, native Z-up mesh (Phase 1), triangles bucketed by
+ * texture. Every instance's atomics are placed by their IPL transform — **rotation = the conjugate of the IPL
+ * quaternion** (GTA stores its inverse; matches `build-region.ts`) — offset to the cell centre (small coords for
+ * float precision; the cell-LOD inst places it back). The DFF **frame** transform is ignored, as the engine does
+ * for map atomics (`build-clump.ts`). Decimation runs afterward on the whole merged cell (see `decimateMesh`), not
+ * per model, so the simplifier shares one budget across surfaces — keeping coverage far higher than decimating each
+ * model on its own (which over-thinned small models into holes).
  */
 export function mergeCell(cell: Cell, cellSize: number, source: ModelSource): MergedMesh {
   const origin: Vec3 = [(cell.cx + 0.5) * cellSize, (cell.cy + 0.5) * cellSize, 0];
@@ -89,11 +110,10 @@ export function mergeCell(cell: Cell, cellSize: number, source: ModelSource): Me
     if (!clump) {
       continue;
     }
-    const quaternion = conjugate(instance.rotation);
     for (const atomic of clump.atomics) {
       const geometry = clump.geometries[atomic.geometryIndex];
       if (geometry) {
-        builder.add(geometry, quaternion, instance.position, origin);
+        builder.add(geometry, conjugate(instance.rotation), instance.position, origin);
       }
     }
   }

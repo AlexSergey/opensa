@@ -29,10 +29,10 @@ the LOD sits at the wrong local origin (the same "bug 3" frame-transform fix the
 
 ## TXD (one shared `lod_procobj.txd`)
 
-`@opensa/sa-lod/encode-txd` writes **RGBA8888** (`encodeRgba8888Struct`), 2× box-downscaled until both dimensions
-are ≤ `--tex` (default **64 px**). Unlike the tree atlas (286 textures × 256² → needs DXT5 to avoid SA's
-silent-fail on a ~95 MB TXD), procobj LODs are few species at 64 px, so an uncompressed TXD stays small and loads
-fine. One shared dictionary (name-prefixed entries) = fewer IMG entries. Sources resolve `--txd` first, then the
+`@opensa/sa-lod/encode-txd` 2× box-downscales each texture until both dimensions are ≤ `--tex` (default **64 px**),
+then **DXT-compresses** it with a mip chain (**DXT1** opaque / **DXT5** alpha, via `encodeDxtStruct`) — the same
+encoder `lod-generator` uses, where uncompressed TXDs blew the IMG up ~4×. (On the stock procobj set: 15 DXT1 + 26
+DXT5.) One shared dictionary (name-prefixed entries) = fewer IMG entries. Sources resolve `--txd` first, then the
 **stock game TXD** as fallback.
 
 ## COL (one shared `lod_procobj.col`)

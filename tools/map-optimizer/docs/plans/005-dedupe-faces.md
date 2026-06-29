@@ -46,6 +46,6 @@ delete those, so the safe first dedupe removes only **literal duplicates**.
 - **Conservatism is the point** — guarded by tests that a reversed-winding twin and a differing-material twin
   are **kept**, while an exact (and a cyclically-rotated) duplicate is removed.
 - **Rebuild path:** a triangle-count change with unchanged vertices routes through `rebuildGeometry`; a real
-  `--game gostown` run (after weld) removes duplicate faces, every output re-parses, and per-face material
+  `--game ./game-src/gostown` run (after weld) removes duplicate faces, every output re-parses, and per-face material
   multisets are preserved (BinMeshPLG stays consistent). Guards (skin/multi-UV) still isolate per asset.
 - Determinism: pure, order-stable (keeps the first occurrence), no RNG.

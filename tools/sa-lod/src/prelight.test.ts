@@ -6,7 +6,15 @@ import { collectGeometryStructs } from '@opensa/rw-codec/dff';
 import { decodeGeometryStruct, encodeGeometryStruct } from '@opensa/rw-codec/geometry-struct';
 import { describe, expect, it } from 'vitest';
 
-import { applyStockPrelight, stockPrelightColor, trunkOnlyPrelit } from './prelight';
+import type { MergedMesh } from './mesh';
+
+import {
+  applyMeshTrunkPrelight,
+  applyStockPrelight,
+  parsePrelightInfo,
+  stockPrelightColor,
+  trunkOnlyPrelit,
+} from './prelight';
 
 const VERSION = 0x1803ffff;
 const PRELIT_FLAG = 0x0008;
@@ -43,6 +51,20 @@ function geometryStruct(numVertices: number, prelit: null | Uint8Array): Geometr
     prelit,
     triangles: [],
     uvLayers: [],
+  };
+}
+
+/** A two-group mesh: one opaque (trunk) group on verts 0–2, one foliage group on verts 3–5; colours start black. */
+function mesh(): MergedMesh {
+  return {
+    colors: new Uint8Array(6 * 4),
+    groups: [
+      { indices: Uint32Array.from([0, 1, 2]), texture: 'bark' },
+      { indices: Uint32Array.from([3, 4, 5]), texture: 'leaves' },
+    ],
+    normals: new Float32Array(6 * 3),
+    positions: new Float32Array(6 * 3),
+    uvs: new Float32Array(6 * 2),
   };
 }
 
@@ -103,6 +125,46 @@ describe('applyStockPrelight', () => {
 
       expect(struct.flags & PRELIT_FLAG).toBe(PRELIT_FLAG);
       expect([...struct.prelit!]).toEqual([150, 150, 150, 255, 150, 150, 150, 255, 150, 150, 150, 255]);
+    });
+  });
+});
+
+describe('applyMeshTrunkPrelight', () => {
+  describe('positive cases', () => {
+    it('recolours trunk vertices to the stock ambient and leaves foliage vertices untouched', () => {
+      const m = mesh();
+      applyMeshTrunkPrelight(m, [40, 50, 60, 255], (name) => name === 'leaves');
+
+      // Verts 0–2 (opaque `bark` group) → ambient; verts 3–5 (alpha `leaves` group) → kept (black).
+      expect([...m.colors.subarray(0, 12)]).toEqual([40, 50, 60, 255, 40, 50, 60, 255, 40, 50, 60, 255]);
+      expect([...m.colors.subarray(12)]).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    });
+  });
+});
+
+describe('parsePrelightInfo', () => {
+  describe('negative cases', () => {
+    it('throws on invalid JSON', () => {
+      expect(() => parsePrelightInfo('{not json')).toThrow();
+    });
+
+    it('throws when the root is not an object', () => {
+      expect(() => parsePrelightInfo('[1, 2, 3]')).toThrow(/JSON object/);
+    });
+
+    it('does not skip a model whose override lacks `skip: true`', () => {
+      const info = parsePrelightInfo('{ "veg_treea1": {}, "vgs_palm01": { "skip": false } }');
+      expect(info.skip.size).toBe(0);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('collects the `skip: true` models, lowercased', () => {
+      const info = parsePrelightInfo(
+        '{ "vegasSedge24": { "skip": true }, "vbg_fir_copse": { "skip": true }, "tree_hipoly09b": { "skip": true } }',
+      );
+
+      expect([...info.skip].sort()).toEqual(['tree_hipoly09b', 'vbg_fir_copse', 'vegassedge24']);
     });
   });
 });

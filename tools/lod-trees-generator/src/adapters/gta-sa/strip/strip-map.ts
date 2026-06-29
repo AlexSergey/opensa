@@ -1,5 +1,7 @@
 import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 
+import { stripBinaryIpl } from '@opensa/map-placement/ipl-binary-strip';
+import { stripTextIpl } from '@opensa/map-placement/ipl-text-strip';
 import { stripProcObj } from '@opensa/map-placement/procobj-strip';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
@@ -8,9 +10,6 @@ import { parseIde, parseTimedObjects } from '@opensa/renderware/parsers/text/ide
 import { editArchive } from '@opensa/tool-kit/archive/img';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-
-import { stripBinaryIpl } from './ipl-binary';
-import { stripTextIpl } from './ipl-text';
 
 export interface StripOptions {
   /** Tree model names (dff base, no extension) whose placements to remove. */

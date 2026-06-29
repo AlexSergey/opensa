@@ -28,7 +28,8 @@ so the engine (and the game) load it natively.
 - **Only fill missing chains.** Process a texture iff it has **one level**, is **power-of-two**, and a known
   format; skip already-mipped / NPOT / unknown (reported, left untouched).
 - **Downsample** = 2×2 box average to 1×1 (sRGB-correct averaging is a cheap follow-up).
-- **Output:** rebuilt TXDs go into the same `out/<game>/<game>.img` next to the optimized models.
+- **Output:** rebuilt TXDs go into the same `--out` build next to the optimized models (the per-archive rebuild
+  of [011](./011-full-build-output.md)).
 
 ## Phase 1 building blocks (this iteration)
 

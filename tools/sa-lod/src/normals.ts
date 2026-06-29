@@ -41,6 +41,7 @@ export function rebuildMeshNormals(mesh: MergedMesh, options: SmoothNormalsOptio
   return {
     colors: appendSplitsU8(mesh.colors, result.splitSources, 4),
     groups,
+    ...(mesh.nightColors ? { nightColors: appendSplitsU8(mesh.nightColors, result.splitSources, 4) } : {}),
     normals: result.normals,
     positions: appendSplitsF32(mesh.positions, result.splitSources, 3),
     uvs: appendSplitsF32(mesh.uvs, result.splitSources, 2),

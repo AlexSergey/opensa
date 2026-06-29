@@ -1,5 +1,8 @@
 # 007 — impostor improvements (aspect-aware atlas + stock prelight transfer)
 
+> _As-built: the CLI's `--dff`/`--txd` were unified into one `--in`; read the `--dff`/`--txd` prose below as the
+> contents of `--in` (see [002](./002-build-pipeline.md))._
+
 Two quality fixes for the placed assets. Independent. Both **implemented** (§A, §B).
 
 ---
@@ -91,7 +94,7 @@ alpha-cutout = foliage (`DecodedTexture.hasAlpha`, the `--txd` set). So:
 
 Crucially this runs on **both surfaces so they stay consistent**:
 
-- **HD DFF** (`applyStockPrelight`, `place/prelight.ts`) — per geometry, decode the Struct, and fill `prelit` via
+- **HD DFF** (`applyStockPrelight`, shared `@opensa/sa-lod/prelight`) — per geometry, decode the Struct, and fill `prelit` via
   `trunkOnlyPrelit(numVertices, existing, average, foliageMask)`; set the `PRELIT` flag. The foliage mask comes
   from `parseDff` materials (texture name → `isFoliage`), defaulting to all-trunk if the DFF won't parse.
 - **LOD atlas** (`applyTrunkPrelight`, `io.ts`) — the bake multiplies texture × vertex prelit, so the impostor
@@ -101,15 +104,24 @@ Crucially this runs on **both surfaces so they stay consistent**:
 
 ### Code touch
 
-- `place/prelight.ts` — `applyStockPrelight(customDff, stockDff, isFoliage)`, plus exported `stockPrelightColor`
-  and `trunkOnlyPrelit`.
-- `io.ts` — `applyTrunkPrelight(tree, colour)` (LOD-bake trunk recolour).
+- `@opensa/sa-lod/prelight` (shared with `lod-procobj-generator`) — `applyStockPrelight(customDff, stockDff,
+isFoliage)`, plus exported `stockPrelightColor`, `trunkOnlyPrelit`, and `parsePrelightInfo`/`PrelightInfo`.
+- `io.ts` — `applyTrunkPrelight(tree, colour)` (LOD-bake trunk recolour; HdTree-specific, stays in this tool).
 - `adapters/gta-sa/index.ts` — build the `foliageTextures` set (`hasAlpha`); in the adapter's `loadTree`, when
   `--prelight`, compute the stock trunk colour and `applyTrunkPrelight` the baked tree; pass `foliageTextures` to
   `placeMap`.
 - `place/place-map.ts` `swapEntries` — when `prelight`, fetch stock bytes via `archive.get('<model>.dff')` and run
   `applyStockPrelight(..., (n) => foliageTextures.has(n))` before `swap.set`.
 - `cli.ts` — `--prelight` boolean.
+
+### Per-model overrides — `--prelight <info.json>`
+
+`--prelight` optionally takes a JSON file of per-model overrides (`@opensa/sa-lod/prelight` `parsePrelightInfo` →
+`PrelightInfo { skip }`). Today the only knob is **`skip`** — a model listed `{ "<model>": { "skip": true } }` is
+opted **out** of the transfer entirely: its HD is packed **verbatim** (`swapEntries` skips `applyStockPrelight`)
+and its LOD is baked from its own prelit (`loadTree` skips `applyTrunkPrelight`). Bare `--prelight` (no path) keeps
+the apply-to-all default. The object-per-model shape leaves room for more knobs later. (e.g. a custom-tree whose
+own prelit is correct, where the stock-ambient overwrite would look wrong.)
 
 ### Edge cases
 

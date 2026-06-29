@@ -11,7 +11,8 @@
     "./encode-txd": "./src/encode-txd.ts",
     "./encode-col": "./src/encode-col.ts",
     "./model-source": "./src/model-source.ts",
-    "./texture-source": "./src/texture-source.ts"
+    "./texture-source": "./src/texture-source.ts",
+    "./prelight": "./src/prelight.ts"
   },
   "nx": {
     "tags": [

@@ -39,6 +39,11 @@ workflows) → the LOD tools (CLI). Sits beside `sa-lod` (mesh encode) under `to
 - `selectTxd(refs, custom)` / `editIdeTxd(text, modelToTxd)` — the **coverage gate**: a model is repointed only to
   a custom TXD that actually contains its textures (the one covering the most, ≥ 1 hit). A model whose textures
   aren't in any `--txd` keeps its **stock** `txd` — repointing it would strip its textures in-game.
+- `trimTxd(bytes, keep)` (`./txd-trim`) — before packing, each custom TXD is **trimmed to the union of texture
+  names its repointed models reference**, dropping the unused `TEXTURE_NATIVE` chunks (kept ones copied **verbatim**
+  — native format preserved, count fixed). A shared mod TXD often also holds textures for models we dropped
+  (procobj / non-tree); only the repointed models read it, so trimming is lossless + safe. Falls back to the whole
+  TXD on a locked/recovered/round-trip mismatch. (e.g. a 49 MB vegetation TXD → ~36 MB, 148 → 94 textures.)
 
 ### `./procobj-strip` — `procobj.dat` filter
 
@@ -71,7 +76,7 @@ workflows) → the LOD tools (CLI). Sits beside `sa-lod` (mesh encode) under `to
 
 ## Tests
 
-`ide.test.ts`, `retxd.test.ts`, `procobj-strip.test.ts`, `procobj/convert.test.ts` — each module unit-tested
+`ide.test.ts`, `retxd.test.ts`, `txd-trim.test.ts`, `procobj-strip.test.ts`, `procobj/convert.test.ts` — each module unit-tested
 (id allocation cap/determinism, coverage-gated retxd, the never-touch strip, MINDIST cull + IPL emit). Consumers
 (`lod-trees-generator`, `lod-procobj-generator`) cover the end-to-end wiring.
 
