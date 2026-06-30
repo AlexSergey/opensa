@@ -1,16 +1,23 @@
 # 004 — `--modloader` output (rename `--loose`)
 
 **Status: ✅ Implemented (P1–P2b); in-game verify (P3) pending.** Replace the `--loose` flag with **`--modloader`**: instead of a repacked `gta3.img` (+ a
-patched `data/gta.dat`), emit **two Modloader mods** under `<out>` — `lod/` (LODs + static IPL + stripped
-`procobj.dat`) + `hd/` (the swapped HD models via a `txdp` IDE). Loose model files Modloader injects into `gta3.img`
-by name; `loader.txt`s carry the gta.dat lines (no `gta.dat` edit); neither rewrites a stock IDE. Target is the
-**real game's `modloader.asi`** (`./2` "Project Props" for the loader format, `./5` "BSOR Vegetation" for `txdp`).
+patched `data/gta.dat`), emit **two Modloader mods** under `<out>` — `lod/` (LODs + static IPL + a `procobj.dat`
+that **disables** the converted species' scatter) + `hd/` (the swapped HD models via a `txdp` IDE). Loose model
+files Modloader injects into `gta3.img` by name; `loader.txt`s carry the gta.dat lines (no `gta.dat` edit); neither
+rewrites a stock IDE. Target is the **real game's `modloader.asi`** (Project Props 4 for the loader format, BSOR
+Vegetation for `txdp`).
+
+> **`procobj.dat` under `--modloader` = disable rows, not a strip.** OpenSA's Modloader merges `procobj.dat`
+> **additively** (a mod can't remove a species by omission), so `--modloader` ships only **disable rows** — each
+> converted `(surface, model)` rule re-stated with `spacing = 1e999` (→ `Infinity` ⇒ zero scatter). The additive
+> merge replaces the stock rule by key, so the species stops scattering while stock species are kept. `--out` keeps
+> the whole-file strip (`convertProcObj({ disableScatter })` selects). See `docs/plans/058-modloader.md`.
 
 > **The generation is unchanged.** What models/textures/collision/placements get produced is identical — only the
 > **emit/packaging layer** changes (which files, which folders, `loader.txt` vs `gta.dat` patch). This is an
 > output-format plan, not an algorithm change.
 
-## Reference format (from `./2/Project Props 1`)
+## Reference format (from Project Props 4)
 
 ```
 <mod>/
@@ -69,7 +76,7 @@ packages that same output (loose `gta3img/` + `loader.txt`).
 
 **HD shipped as a separate `hd/` mod via `txdp` (revised — matches lod-trees `008`).** The HD models carry our
 prelight, so we don't drop them. But the `--in` swap + retxd rewrites the swapped models' **stock IDEs** (to repoint
-their TXD), which Modloader would fully replace — fragile. Fix (the `./5` approach): ship the swapped (prelit) HD as
+their TXD), which Modloader would fully replace — fragile. Fix (the BSOR Vegetation approach): ship the swapped (prelit) HD as
 a **separate `hd/` mod** that adds a **`txdp` section** (`<stock txd>, <custom txd>`) instead of editing the stock
 IDE — the stock TXD inherits any missing texture from the custom parent. Built by `txdpSwappedModels`
 (`@opensa/map-placement/retxd`). The `lod/` mod keeps the decimated LODs + static IPL + stripped `procobj.dat`.
@@ -90,10 +97,13 @@ A for `--out`, B for `--modloader` — though for this tool A and B share the sa
 
 ## Scope: real game now, OpenSA next stage
 
-`--modloader` targets the **real game's `modloader.asi`** (the `./2` format). OpenSA's own `packages/modloader`
+`--modloader` targets the **real game's `modloader.asi`** (the Project Props 4 format). OpenSA's own `packages/modloader`
 currently only overrides `.dff`/`.txd` — it does **not** read `loader.txt`/IPL/IDE/COLFILE, so these mods' _defs and
-placements_ wouldn't load in OpenSA yet. **Next stage** (separate plan): extend `packages/modloader` to read
-`loader.txt` + virtualize IPL/IDE/COL so the same `--modloader` output also works in OpenSA.
+placements_ wouldn't load in OpenSA yet. **Next stage** — planned in
+[`docs/plans/058-modloader.md` "Extension"](../../../../docs/plans/058-modloader.md): the modloader decorator
+detects the loader file (any name/depth), merges its `IDE`/`IPL` lines into `gta.dat`, and serves files by basename
+(`.col` is auto-discovered, so no `COLFILE` needed); `resolveMap` loads the new defs + static IPL, so the same
+`lod/`+`hd/` output works in OpenSA.
 
 ## Phasing
 

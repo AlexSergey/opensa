@@ -2,7 +2,7 @@
   "name": "@opensa/modloader",
   "version": "0.0.0",
   "private": true,
-  "description": "A modloader/ overlay decorator over AssetFileSystem: override vehicle dff/txd by name + merge their settings into vehicles.ide/handling.cfg/carcols.dat — no engine changes.",
+  "description": "A modloader/ overlay decorator over AssetFileSystem: vehicle mods (override dff/txd by name + merge *.settings.txt into vehicles.ide/handling.cfg/carcols.dat) and map/asset mods (merge a loader file's IDE/IPL/COLFILE into gta.dat + serve new/modified IDE/IPL/col/stream/dff/txd + txdp by bare name + additively merge object.dat/procobj.dat) — no engine changes.",
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts"

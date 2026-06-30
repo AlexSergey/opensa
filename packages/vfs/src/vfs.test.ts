@@ -1,11 +1,25 @@
 import type { Manifest } from '@opensa/loaders';
 
 import { zipSync } from 'fflate';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { Vfs } from './vfs';
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
+
+/** UTF-16 LE bytes with a BOM — how some mod data/loader files ship (e.g. a Notepad-saved Loader.txt). */
+const utf16le = (value: string): Uint8Array => {
+  const out = new Uint8Array(2 + value.length * 2);
+  out.set([0xff, 0xfe]);
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    out[2 + i * 2] = code & 0xff;
+    out[3 + i * 2] = code >> 8;
+  }
+
+  return out;
+};
 
 /** A chunk zip with the given entries, matching how the build packs (bare names + loose paths). */
 const chunk = (entries: Record<string, Uint8Array>): Uint8Array => zipSync(entries);
@@ -45,6 +59,34 @@ describe('Vfs', () => {
       expect(new Uint8Array(vfs.get('cj.dff')!)).toEqual(text('DFF'));
       expect(vfs.getText('data/gta.dat')).toBe('IPL la.ipl');
       expect(vfs.names.sort()).toEqual(['cj.dff', 'data/gta.dat']);
+    });
+
+    it('decodes a UTF-16 (BOM) loose text file as text, not garbage (a Notepad-saved mod Loader.txt)', () => {
+      const vfs = new Vfs();
+      vfs.addChunk('data', 'd.zip', chunk({ 'modloader/m/loader.txt': utf16le('IPL data/maps/vinelumination.ipl') }));
+
+      expect(vfs.getText('modloader/m/loader.txt')).toBe('IPL data/maps/vinelumination.ipl');
+    });
+
+    it('decodes the real UTF-16 mod Loader.txt fixture (SA Brightened Project — Project Immerse-Yourself)', () => {
+      const bytes = new Uint8Array(readFileSync('tests/custom/modloader/utf16-loader.txt'));
+      const vfs = new Vfs();
+      vfs.addChunk('data', 'd.zip', chunk({ 'modloader/m/loader.txt': bytes }));
+
+      expect(vfs.getText('modloader/m/loader.txt')).toContain('IPL data\\maps\\vinelumination.ipl');
+    });
+
+    it('decodes a UTF-16 BE (BOM) loose text file too', () => {
+      const value = 'IDE data/maps/x.ide';
+      const be = new Uint8Array(2 + value.length * 2);
+      be.set([0xfe, 0xff]); // BE BOM
+      for (let i = 0; i < value.length; i += 1) {
+        be[3 + i * 2] = value.charCodeAt(i); // low byte second (big-endian)
+      }
+      const vfs = new Vfs();
+      vfs.addChunk('data', 'd.zip', chunk({ 'modloader/m/loader.txt': be }));
+
+      expect(vfs.getText('modloader/m/loader.txt')).toBe(value);
     });
 
     it('merges entries across chunks and verifies a complete set', () => {

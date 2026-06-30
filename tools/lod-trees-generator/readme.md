@@ -36,7 +36,7 @@ tsx tools/lod-trees-generator/src/cli.ts --out <path> --game <path> [--in <dir>]
       via a one-line `loader.txt`.
   - **`<out>/hd/`** — the swapped (prelit) `--in` HD models + the custom TXD in `gta3img/`, plus a `txdp` IDE
     (`lodtrees_hd.ide`) that **parents** each swapped model's stock TXD to the custom one — so the custom textures
-    resolve without rewriting the stock IDE (the [`./5`] BSOR-Vegetation approach; OpenSA's engine resolves `txdp`
+    resolve without rewriting the stock IDE (the BSOR Vegetation approach; OpenSA's engine resolves `txdp`
     too). Omitted when there's no `--in`.
 
   See `docs/plans/008-modloader-output.md`.

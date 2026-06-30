@@ -59,7 +59,7 @@ export class Vfs implements AssetFileSystem, AssetSink {
   getText(name: string): null | string {
     const bytes = this.files.get(name);
 
-    return bytes ? new TextDecoder().decode(bytes) : null;
+    return bytes ? decodeText(bytes) : null;
   }
 
   has(name: string): boolean {
@@ -70,4 +70,20 @@ export class Vfs implements AssetFileSystem, AssetSink {
   verify(manifest: Manifest): string[] {
     return verifyTotals(manifestTotals(manifest), { chunks: this.chunkCount, entries: this.entryCount });
   }
+}
+
+/**
+ * Decode loose text honouring a byte-order mark: some mod data/loader files ship as **UTF-16** (e.g. a
+ * MixMods `Loader.txt` saved by Notepad), which a plain UTF-8 decode turns to garbage — so the gta.dat
+ * directives never register. A UTF-8 BOM is stripped by the decoder; no BOM = UTF-8 (the common case).
+ */
+function decodeText(bytes: Uint8Array): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(bytes);
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes);
+  }
+
+  return new TextDecoder().decode(bytes);
 }

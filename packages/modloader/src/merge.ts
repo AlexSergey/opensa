@@ -6,9 +6,44 @@
  * - `handling.cfg` — flat car table (lines starting with a letter), key = the id (first whitespace token).
  */
 
+import { normalizeDatPath } from '@opensa/renderware/archive';
+import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
+
 /** Replace `car`-section lines in `carcols.dat` by model (column 0). */
 export function mergeCarcols(base: string, lines: readonly string[]): string {
   return mergeSectioned(base, 'car', 0, lines);
+}
+
+/**
+ * Append a loader file's `IDE`/`IPL` references to the stock `gta.dat`, skipping any path already listed (so a mod
+ * re-stating a stock IPL doesn't double-place). `resolveMap` then loads the mod's new object defs / `txdp` parents /
+ * placements; the referenced files are served by their bare name. Paths are kept verbatim — `resolveMap` normalizes
+ * them on read — only the dedup key is normalized.
+ */
+export function mergeGtaDat(base: string, refs: { ide: readonly string[]; ipl: readonly string[] }): string {
+  const dat = parseGtaDat(base);
+  const present = new Set([...dat.ide, ...dat.ipl].map(normalizeDatPath));
+  const eol = base.includes('\r\n') ? '\r\n' : '\n';
+  const added: string[] = [];
+  const add = (directive: 'IDE' | 'IPL', path: string): void => {
+    const key = normalizeDatPath(path);
+    if (!present.has(key)) {
+      present.add(key);
+      added.push(`${directive} ${path}`);
+    }
+  };
+  for (const path of refs.ide) {
+    add('IDE', path);
+  }
+  for (const path of refs.ipl) {
+    add('IPL', path);
+  }
+  if (added.length === 0) {
+    return base;
+  }
+  const head = base.replace(/\s*$/, '');
+
+  return `${head === '' ? '' : `${head}${eol}`}${added.join(eol)}${eol}`;
 }
 
 /** Replace car-table lines in `handling.cfg` by handling id (first token); comments/sub-tables are left alone. */

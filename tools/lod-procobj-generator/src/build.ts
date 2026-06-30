@@ -185,10 +185,12 @@ export function run(options: BuildOptions): void {
     ]),
   );
   // `--modloader` ships two mods under `<out>`: `lod/` (this build) + `hd/` (the swapped HD models). So the LOD
-  // mod's files (IPL + stripped procobj.dat from convertProcObj, the IDE, the IMG entries) go under `<out>/lod/`.
+  // mod's files (IPL + procobj.dat from convertProcObj, the IDE, the IMG entries) go under `<out>/lod/`. Under
+  // `--modloader` procobj.dat is emitted as disable rows (survives Modloader's additive `.dat` merge), not stripped.
   const lodOut = modloader ? join(outPath, 'lod') : outPath;
   const procObj = convertProcObj({
     archive,
+    disableScatter: modloader,
     gamePath,
     heightThreshold: config.procObjHeight,
     iplName: IPL_NAME,

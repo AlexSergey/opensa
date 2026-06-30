@@ -4,8 +4,8 @@
 **Modloader-native mods** instead of a repacked `gta3.img` (+ patched `data/gta.dat`) — **two** mods under `<out>`:
 `lod/` (the LOD attachment) + `hd/` (the swapped HD models). Loose model files Modloader injects into `gta3.img` by
 name; modified stock IPLs override their stock copies by name; one-line `loader.txt`s register the new IDEs;
-**neither rewrites a stock IDE** (the HD mod parents TXDs via `txdp`). Reference: MixMods **"LOD Vegetation" (`./4`)**
-for the LOD mod + **"BSOR Vegetation" (`./5`)** for the `txdp` HD mod.
+**neither rewrites a stock IDE** (the HD mod parents TXDs via `txdp`). Reference: MixMods **LOD Vegetation** for the
+LOD mod + **BSOR Vegetation** for the `txdp` HD mod.
 
 > **Decided (revised — see "Reference reality check"):** `--modloader` uses the **same mode-A far-LOD
 > attachment** as `--out`, just packaged for Modloader. The earlier "mode B (standalone `lod = -1`)" decision was
@@ -13,7 +13,7 @@ for the LOD mod + **"BSOR Vegetation" (`./5`)** for the `txdp` HD mod.
 > ships modified binary streams under a `gta3.img/` folder — so mode A is fully Modloader-compatible **and** avoids
 > the near-field double-draw. Mode B is dropped.
 
-## Reference reality check (`./4`, MixMods "LOD Vegetation")
+## Reference reality check (MixMods "LOD Vegetation")
 
 Verified against the real mod:
 
@@ -33,7 +33,7 @@ the **packaging** differs.
 
 ```
 <out>/
-  lod/                               # the LOD attachment (mode A — like the ./4 reference)
+  lod/                               # the LOD attachment (mode A — like the LOD Vegetation reference)
     loader.txt                       #   one line: `IDE data/maps/lodtrees.ide` (no IPL — stock IPLs override by name; no COLFILE — col embedded)
     data/maps/lodtrees.ide           #   impostor object defs (our own new IDE — NO stock IDE touched)
     data/maps/<area>.ipl …           #   the modified stock TEXT IPLs (only areas actually touched) — loose overrides
@@ -56,7 +56,7 @@ culled — no doubling. The reference uses mode A precisely for this; we now do 
 
 The HD models carry our prelight + processing, so we **don't** drop them. But the original `--in` swap rewrote the
 swapped models' **stock IDEs** (retxd repointing their `txd` to a custom TXD), which Modloader would fully replace —
-fragile. Fix (the [`./5`] "BSOR Vegetation" approach): ship the swapped HD as a **separate `hd/` mod** that, instead
+fragile. Fix (the BSOR Vegetation approach): ship the swapped HD as a **separate `hd/` mod** that, instead
 of editing the stock IDE, adds a **`txdp` (TXD-parent) section** — `<stock txd>, <custom txd>` — so the stock TXD
 inherits any texture it lacks from our custom parent TXD. The stock IDEs stay untouched, and OpenSA's engine
 resolves `txdp` too (`asset-cache`), so the same mod works in both. The `txdp` mapping is built by
@@ -74,10 +74,12 @@ resolves `txdp` too (`asset-cache`), so the same mod works in both. The `txdp` m
 
 ## Scope: real game now, OpenSA next stage
 
-`--modloader` targets the **real game's `modloader.asi`** (the `./4` format). OpenSA's own `packages/modloader`
+`--modloader` targets the **real game's `modloader.asi`** (the LOD Vegetation format). OpenSA's own `packages/modloader`
 currently only overrides `.dff`/`.txd` — not `loader.txt`/IPL/IDE — so these mods' defs/placements wouldn't load in
-OpenSA yet. **Next stage** (separate plan): extend `packages/modloader` to read `loader.txt` + virtualize IPL/IDE
-so the same `--modloader` output also works in OpenSA.
+OpenSA yet. **Next stage** — planned in [`docs/plans/058-modloader.md` "Extension"](../../../../docs/plans/058-modloader.md):
+extend the modloader decorator to detect the loader file (any name/depth), merge its `IDE`/`IPL` lines into
+`gta.dat`, and serve the files by basename; `resolveMap` + `setTxdParents` + `buildCollisionIndex` already do the
+rest, so the same `--modloader` output (`lod/`+`hd/`) loads in OpenSA.
 
 ## Phasing
 
@@ -90,7 +92,7 @@ so the same `--modloader` output also works in OpenSA.
 - **P3 — `lod/` mod verify (offline). ✅** On `non-modified` with the vegetation pack: 9814 instances attached
   (9463 appended, 351 repointed), 184 impostors; `lod/` = 25 modified text IPLs (LA/SF/country/vegas/levelmap), 155
   modified binary streams + 184 DFFs + `lodtrees.txd`/`.col` in `gta3img/`, `loader.txt` = `IDE
-data/maps/lodtrees.ide`. Matches the `./4` reference layout.
+data/maps/lodtrees.ide`. Matches the LOD Vegetation reference layout.
 - **P3b — `hd/` mod via `txdp` (revised — HD no longer dropped). ✅** `emitHdMod` (`place-map.ts`) +
   `txdpSwappedModels` (`retxd.ts`): the swapped (prelit) HD DFFs + custom TXD → `hd/gta3img/`, a `txdp` IDE
   (`lodtrees_hd.ide`) parenting each stock TXD → the custom TXD, a one-line `loader.txt`. Verified: `hd/` ships 138

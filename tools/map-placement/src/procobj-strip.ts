@@ -40,3 +40,38 @@ export function stripProcObj(text: string, keep: (model: string) => boolean): { 
 
   return { removed, text: lines.join(eol) };
 }
+
+/** A procobj `spacing` so large it parses to `Infinity` (`Number('1e999')`), making the scatter's `area / spacing`
+ *  exactly `0` → deterministically zero placements (a clean, OpenSA-only "disable"). */
+const DISABLED_SPACING = '1e999';
+/** Number of columns in a procobj.dat data row (mirrors the engine parser); fewer = a comment / malformed line. */
+const PROCOBJ_COLUMNS = 14;
+
+/**
+ * Build a `procobj.dat` fragment that **disables** scatter for the converted species — the Modloader-additive-merge
+ * alternative to {@link stripProcObj}'s removal (which an additive merge would undo, re-adding the species from
+ * stock). Re-emit each converted `(surface, model)` rule with its `spacing` column overflowed to `Infinity`, so the
+ * merge (keyed by surface+model) replaces the stock rule with a zero-density copy; only the affected rows are
+ * emitted (the merge keeps stock for the rest). {@link UNDERWATER_PROCOBJ} species are never touched.
+ */
+export function disableProcObj(text: string, isConverted: (model: string) => boolean): string {
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const rows: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+    const cells = trimmed.split(/\s+/);
+    const model = cells[1]?.toLowerCase();
+    if (cells.length >= PROCOBJ_COLUMNS && model && !UNDERWATER_PROCOBJ.has(model) && isConverted(model)) {
+      cells[2] = DISABLED_SPACING; // spacing column → ∞ ⇒ zero scatter for this (surface, model)
+      rows.push(cells.join('\t'));
+    }
+  }
+  if (rows.length === 0) {
+    return '';
+  }
+
+  return `# lod-procobj: scatter disabled for converted species (now static in lod_procobj.ipl)${eol}${rows.join(eol)}${eol}`;
+}
