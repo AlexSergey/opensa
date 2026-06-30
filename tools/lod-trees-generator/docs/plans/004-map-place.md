@@ -50,7 +50,7 @@ ids. No re-index needed — the inverse of the Stage-1 removal, and just as inde
   17 of 286) get a short `lodt<index>` alias — the DFF still references its `lod<source>` texture in
   `lodtrees.txd`, so visuals are unaffected.
 - Ship the impostor DFFs + the shared `lodtrees.txd` in the repacked `gta3.img` (or loose `gta3img/` with
-  `--loose`). Impostors get **no collision** (LODs never need it — the HD carries collision up close).
+  `--modloader`). Impostors get **no collision** (LODs never need it — the HD carries collision up close).
 
 ## HD DFF + TXD swap
 

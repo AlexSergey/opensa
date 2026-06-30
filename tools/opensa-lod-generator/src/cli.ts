@@ -3,7 +3,7 @@
  * assembles the cell grid and prints a sizing report (Phase 0). With `--out <path>` it bakes every cell (merge →
  * decimate → normals → per-cell DFF/TXD) and emits a drop-in build under that directory. `--strip-lods` then
  * removes the stock `lod*` building LODs from that build (the cell-LODs replace them). Usage:
- * `tsx lod-generator/src/cli.ts --game <path> [--cell <size>] [--out <path>] [--strip-lods]`. Paths are relative
+ * `tsx opensa-lod-generator/src/cli.ts --game <path> [--cell <size>] [--out <path>] [--strip-lods]`. Paths are relative
  * to the current working directory (absolute paths pass through).
  */
 import { statSync } from 'node:fs';
@@ -49,7 +49,9 @@ function fromCwd(value: string): string {
 function main(): void {
   const gameArg = argValue('--game');
   if (!gameArg) {
-    throw new Error('usage: tsx lod-generator/src/cli.ts --game <path> [--cell <size>] [--out <path>] [--strip-lods]');
+    throw new Error(
+      'usage: tsx opensa-lod-generator/src/cli.ts --game <path> [--cell <size>] [--out <path>] [--strip-lods]',
+    );
   }
 
   const gameDir = fromCwd(gameArg);

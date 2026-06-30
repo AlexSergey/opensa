@@ -13,7 +13,7 @@ import type { SubMesh } from '../core/ir';
  * Rebuild per-vertex normals from **smooth groups** (plan 015): SA prelit world geometry ships with broken or
  * absent normals, so the engine falls back to a naive whole-mesh average — smearing walls into gradients,
  * cancelling to zero at double faces, and feeding SSAO garbage (dark edges). The smooth-group algorithm lives in
- * `tool-kit` (shared with lod-generator); this adapter maps a {@link SubMesh} into its raw positions + index
+ * `tool-kit` (shared with opensa-lod-generator); this adapter maps a {@link SubMesh} into its raw positions + index
  * triples, then re-expands the result — duplicating UV/prelit/night onto each split vertex so seams survive.
  *
  * Result: flat walls stay flat, hard edges stay sharp, double faces get correct outward normals — no blended

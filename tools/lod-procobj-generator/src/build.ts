@@ -5,7 +5,7 @@ import type { SourceTexture, TextureSource } from '@opensa/sa-lod/texture-source
 import { allocateLodIds, buildLodIde, lodAlias, patchGtaDat } from '@opensa/map-placement/ide';
 import { convertProcObj, type ProcObjSpecies } from '@opensa/map-placement/procobj';
 import { UNDERWATER_PROCOBJ } from '@opensa/map-placement/procobj-strip';
-import { retxdSwappedModels } from '@opensa/map-placement/retxd';
+import { retxdSwappedModels, writeTxdpHdMod } from '@opensa/map-placement/retxd';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
 import { parseTxd } from '@opensa/renderware/parsers/binary/txd';
@@ -37,14 +37,19 @@ import { buildModelMesh, meshBounds } from './mesh-builder';
 const IDE_REL = 'data/maps/lod_procobj.ide';
 const IDE_DAT = 'DATA\\MAPS\\LOD_PROCOBJ.IDE';
 const IPL_NAME = 'lod_procobj';
+/** The HD mod (`<out>/hd/`) `txdp` IDE — parents each swapped model's stock TXD to the custom TXD, so the stock
+ *  IDEs stay untouched (the `./5` approach; see {@link emitHdMod}). */
+const TXDP_IDE_REL = 'data/maps/lod_procobj_hd.ide';
 
 export interface BuildOptions {
   config: ProcObjLodConfig;
   gamePath: string;
   /** Optional HD model folder (`<model>.dff` + `<model>.txd`); omitted → convert the game's own procobj models. */
   inPath?: string;
-  /** Write the changed IMG entries loose to `<out>/gta3img/` instead of repacking `<out>/models/gta3.img`. */
-  loose: boolean;
+  /** `--modloader`: emit two Modloader mods under `<out>` — `lod/` (LOD `gta3img/` + static IPL + stripped
+   *  `procobj.dat` + `loader.txt`) and `hd/` (the swapped HD models via a `txdp` IDE, no stock IDE rewritten) —
+   *  instead of repacking one `<out>/models/gta3.img` + patching `data/gta.dat` with the HD swap inlined. */
+  modloader: boolean;
   outPath: string;
   /** Copy each model's trunk prelight from its stock DFF onto the LOD (and the swapped HD when `--in`). */
   prelight: boolean;
@@ -101,7 +106,7 @@ export function collectImgEntries(
  * HD DFFs for `--dff`, and emit the drop-in under `--out`.
  */
 export function run(options: BuildOptions): void {
-  const { config, gamePath, inPath, loose, outPath, prelight, prelightInfo } = options;
+  const { config, gamePath, inPath, modloader, outPath, prelight, prelightInfo } = options;
   const archive = openArchive(readBytes(join(gamePath, 'models', 'gta3.img')));
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const { idByModel, usedIds } = scanIdes(gamePath, dat.ide);
@@ -179,46 +184,53 @@ export function run(options: BuildOptions): void {
       { hdId: idByModel.get(lod.model)!, height: lod.height, lodId: lod.id, lodModel: lod.alias },
     ]),
   );
+  // `--modloader` ships two mods under `<out>`: `lod/` (this build) + `hd/` (the swapped HD models). So the LOD
+  // mod's files (IPL + stripped procobj.dat from convertProcObj, the IDE, the IMG entries) go under `<out>/lod/`.
+  const lodOut = modloader ? join(outPath, 'lod') : outPath;
   const procObj = convertProcObj({
     archive,
     gamePath,
     heightThreshold: config.procObjHeight,
     iplName: IPL_NAME,
-    outPath,
+    outPath: lodOut,
     procObjMax: config.procObjMax,
     species: species_,
   });
-  // Only when the user supplied `--in` do we swap the HD DFF + retxd; game-model mode keeps the stock assets.
+  // The swapped (prelit) HD DFFs — with `--in`, regardless of mode (the HD carries our prelight; we don't drop it).
   const swapModels = lods.map((lod) => lod.model);
   const swap =
     inPath === undefined
       ? new Map<string, Uint8Array>()
       : swapEntries(inPath, swapModels, prelight ? archive : null, isFoliage, prelightInfo);
+
+  writeText(join(lodOut, IDE_REL), ide);
+  emitRegistration({ gamePath, modloader, outPath: lodOut, procObj });
+
+  if (modloader) {
+    // LOD mod: only the LOD assets to `<out>/lod/gta3img/`; the HD swap is a separate `<out>/hd/` mod that parents
+    // the stock TXDs to the custom one via `txdp` — so no stock IDE is rewritten (the `./5` approach).
+    emitImg(archive, collectImgEntries(lods, lodTxd, lodCol, new Map(), new Map()), lodOut, true);
+    const swapped = emitHdMod(inPath, gamePath, dat, swap, swapModels, outPath);
+    console.log(
+      `procobj→lod: ${lods.length} species · ${procObj?.objects ?? 0} static objects → ${outPath}/lod` +
+        (swapped > 0 ? ` · ${swapped} HD swapped (txdp) → ${outPath}/hd` : ''),
+    );
+
+    return;
+  }
+
+  // `--out`: repack everything (LOD assets + swapped HD + custom TXDs) into models/gta3.img + retxd the stock IDEs.
   const retxd =
     inPath === undefined
       ? { ides: new Map<string, string>(), txds: new Map<string, Uint8Array>() }
       : retxdSwappedModels(gamePath, dat.ide, inPath, inPath, swapModels);
-
-  // Emit: IDEs + patched gta.dat.
-  writeText(join(outPath, IDE_REL), ide);
   for (const [idePath, text] of retxd.ides) {
     writeText(join(outPath, idePath.replace(/\\/g, '/')), text);
   }
-  let gtaDat = patchGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'), IDE_DAT);
-  if (procObj) {
-    const eol = gtaDat.includes('\r\n') ? '\r\n' : '\n';
-    gtaDat = `${gtaDat.replace(/\s*$/, '')}${eol}${procObj.datLine}${eol}`;
-  }
-  writeText(join(outPath, 'data', 'gta.dat'), gtaDat);
-
-  // Emit the changed IMG entries (LOD DFFs + lod_procobj.txd/col + swapped HD DFFs + custom TXDs): repacked into
-  // models/gta3.img, or loose to gta3img/ with --loose (mod-installer merges that folder back into gta3.img).
-  emitImg(archive, collectImgEntries(lods, lodTxd, lodCol, swap, retxd.txds), outPath, loose);
-
+  emitImg(archive, collectImgEntries(lods, lodTxd, lodCol, swap, retxd.txds), outPath, false);
   console.log(
     `procobj→lod: ${lods.length} species · ${procObj?.objects ?? 0} static objects · ` +
-      `${swap.size} HD swapped (${retxd.txds.size} custom TXD) → ` +
-      `${loose ? `${outPath}/gta3img/` : `${outPath}/models/gta3.img`}`,
+      `${swap.size} HD swapped (${retxd.txds.size} custom TXD) → ${outPath}/models/gta3.img`,
   );
 }
 
@@ -234,7 +246,36 @@ function combinedTextureSource(txdPath: string, archive: ImgArchive): TextureSou
   return { get: (name) => custom.get(name.toLowerCase()) ?? stock.get(name) };
 }
 
-/** Repack the changed entries into `<out>/models/gta3.img`, or write them loose to `<out>/gta3img/` (`--loose`). */
+/**
+ * Emit the HD mod under `<out>/hd/` (`--modloader`): the swapped (prelit) procobj HD DFFs + the custom parent TXD,
+ * plus a `txdp` IDE parenting each swapped model's **stock** TXD to the custom one — so the stock IDEs are never
+ * rewritten (the `./5` approach). Returns the number of swapped DFFs; 0 (nothing written) without `--in` or when no
+ * model matched a custom TXD.
+ */
+function emitHdMod(
+  inPath: string | undefined,
+  gamePath: string,
+  dat: ReturnType<typeof parseGtaDat>,
+  swap: ReadonlyMap<string, Uint8Array>,
+  swapModels: readonly string[],
+  outPath: string,
+): number {
+  if (inPath === undefined) {
+    return 0;
+  }
+
+  return writeTxdpHdMod({
+    gamePath,
+    hdDir: join(outPath, 'hd'),
+    idePaths: dat.ide,
+    inPath,
+    swap,
+    swapModels,
+    txdpIdeRel: TXDP_IDE_REL,
+  });
+}
+
+/** Repack the changed entries into `<out>/models/gta3.img`, or write them loose to `<out>/gta3img/` (`--modloader`). */
 function emitImg(archive: ImgArchive, entries: ReadonlyMap<string, Uint8Array>, outPath: string, loose: boolean): void {
   if (loose) {
     for (const [name, bytes] of entries) {
@@ -248,6 +289,35 @@ function emitImg(archive: ImgArchive, entries: ReadonlyMap<string, Uint8Array>, 
     img.set(name, bytes);
   }
   writeBytes(join(outPath, 'models', 'gta3.img'), img.build());
+}
+
+/**
+ * Register the LODs (+ the static IPL) for the game to load: a Modloader `loader.txt` of `IDE`/`IPL` lines
+ * (`--modloader`, no `gta.dat` edit — Modloader merges them), or a patched `data/gta.dat` (default). Either way
+ * the IPL + stripped `procobj.dat` already sit at their `data/` paths (written by `convertProcObj`).
+ */
+function emitRegistration(args: {
+  gamePath: string;
+  modloader: boolean;
+  outPath: string;
+  procObj: null | { datLine: string };
+}): void {
+  const { gamePath, modloader, outPath, procObj } = args;
+  if (modloader) {
+    const lines = [`IDE ${IDE_REL}`];
+    if (procObj) {
+      lines.push(`IPL data/maps/${IPL_NAME}.ipl`);
+    }
+    writeText(join(outPath, 'loader.txt'), `${lines.join('\n')}\n`);
+
+    return;
+  }
+  let gtaDat = patchGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'), IDE_DAT);
+  if (procObj) {
+    const eol = gtaDat.includes('\r\n') ? '\r\n' : '\n';
+    gtaDat = `${gtaDat.replace(/\s*$/, '')}${eol}${procObj.datLine}${eol}`;
+  }
+  writeText(join(outPath, 'data', 'gta.dat'), gtaDat);
 }
 
 /** Model names under `--dff` (a `.dff` file or a directory), lowercased without extension. */

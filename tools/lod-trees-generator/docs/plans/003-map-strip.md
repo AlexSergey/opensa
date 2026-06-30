@@ -61,7 +61,7 @@ Both were real failure modes during bring-up.
 Text and binary are coupled: they must be stripped **together** and applied together. Replacing only the data
 files (original `gta3.img`) or only `gta3.img` (original data) reintroduces the index mismatch and crashes.
 
-Output under `--out`: a repacked `gta3.img` (or loose `gta3img/` with `--loose`), the edited text IPLs under
+Output under `--out`: a repacked `gta3.img` (or loose `gta3img/` with `--modloader`), the edited text IPLs under
 their `data/maps/...` paths, and `data/procobj.dat`. Orchestrated by
 [`strip-map.ts`](../../src/adapters/gta-sa/strip/strip-map.ts).
 

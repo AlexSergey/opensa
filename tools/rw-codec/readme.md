@@ -1,7 +1,7 @@
 # rw-codec
 
 The **pure, byte-level RenderWare codec** shared by the offline tools — no dependency on any tool's IR (extracted
-from map-optimizer so map-optimizer, lod-generator and vehicle-optimizer all consume one copy instead of
+from map-optimizer so map-optimizer, opensa-lod-generator and vehicle-optimizer all consume one copy instead of
 importing each other). A leaf: depends on nothing (its tests read engine fixtures, but the source is standalone).
 
 On the Nx monorepo move it becomes `@opensa/rw-codec` (`tools/rw-codec`) — see

@@ -3,7 +3,7 @@
 The same strict-SA theme as `lod-trees-generator`'s [005](../../../lod-trees-generator/docs/plans/005-sa-asset-format.md):
 **SA's RenderWare is strict where our parser/viewer is lenient**, so a DFF/TXD/COL/IDE that loads in the viewer can
 be invisible — or crash — in-game. Most of these are enforced by the shared `@opensa/sa-lod` / `@opensa/map-placement`
-encoders (the same ones `lod-generator` uses), so this tool inherits them; the list below is what specifically
+encoders (the same ones `opensa-lod-generator` uses), so this tool inherits them; the list below is what specifically
 matters for **procobj simplified-copy LODs** (a decimated mesh + a downscaled texture, _not_ a card impostor).
 
 ## Object id ≤ 18630
@@ -15,7 +15,7 @@ not widen the window. The LOD model name is the IMG entry base, so it must be �
 
 ## DFF (the decimated mesh)
 
-Encoded by `@opensa/sa-lod/encode-dff` (shared with `lod-generator`), which already handles the two classic traps:
+Encoded by `@opensa/sa-lod/encode-dff` (shared with `opensa-lod-generator`), which already handles the two classic traps:
 
 - **Tristrip flag must match the data** — the geometry is written as a triangle **list**; leaving
   `rpGEOMETRYTRISTRIP` set makes SA read it as a strip → draws nothing.
@@ -31,7 +31,7 @@ the LOD sits at the wrong local origin (the same "bug 3" frame-transform fix the
 
 `@opensa/sa-lod/encode-txd` 2× box-downscales each texture until both dimensions are ≤ `--tex` (default **64 px**),
 then **DXT-compresses** it with a mip chain (**DXT1** opaque / **DXT5** alpha, via `encodeDxtStruct`) — the same
-encoder `lod-generator` uses, where uncompressed TXDs blew the IMG up ~4×. (On the stock procobj set: 15 DXT1 + 26
+encoder `opensa-lod-generator` uses, where uncompressed TXDs blew the IMG up ~4×. (On the stock procobj set: 15 DXT1 + 26
 DXT5.) One shared dictionary (name-prefixed entries) = fewer IMG entries. Sources resolve `--txd` first, then the
 **stock game TXD** as fallback.
 

@@ -1,4 +1,4 @@
-# 001 — lod-generator architecture
+# 001 — opensa-lod-generator architecture
 
 **Status: ✅ Base scaffolded (Phase 0 runs).** A standalone subproject that regenerates the map's LODs from the
 HD models, kept separate from `map-optimizer` because LOD baking is **additive and custom**, not lossless
@@ -32,7 +32,7 @@ cli.ts  --game <path>  →  game data dir  →  --out <path>  (drop-in build)
 
 ## Principles
 
-- **Never modify `../src`** — read-only reuse of the engine's parsers; every writer lives in lod-generator
+- **Never modify `../src`** — read-only reuse of the engine's parsers; every writer lives in opensa-lod-generator
   (same rule that keeps map-optimizer self-contained).
 - **Game-agnostic core, per-game adapter** — RenderWare/GTA-SA specifics stay in `adapters/gta-sa`.
 - **Engine fit, not change** — the engine already streams a per-cell HD/LOD grid (`world-grid.ts` /

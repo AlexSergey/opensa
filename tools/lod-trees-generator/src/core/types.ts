@@ -1,7 +1,7 @@
 /**
  * Game-agnostic types for the tree-LOD generator. The core renders + packs + emits; everything game-specific
  * (DFF/TXD/IDE I/O, encoding) lives behind a {@link TreeLodAdapter} so a future game plugs in without touching
- * the core (cf. lod-generator's core/adapter split).
+ * the core (cf. opensa-lod-generator's core/adapter split).
  */
 
 /** A decoded source texture as raw RGBA (`width*height*4`), ready for software sampling. */

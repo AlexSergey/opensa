@@ -32,8 +32,10 @@ export interface GtaSaTreeLodOptions {
   gamePath: string;
   /** HD model folder (`<model>.dff` + `<model>.txd`); omit → bake the built-in SA tree roster from `gta3.img`. */
   inPath?: string;
-  /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking a full `gta3.img`. */
-  loose: boolean;
+  /** `--modloader`: emit two Modloader mods under `<out>` — `lod/` (the far-LOD attachment as loose stock-IPL
+   *  overrides + `gta3img/` + a one-line `loader.txt`) and `hd/` (the swapped HD models via a `txdp` IDE, no stock
+   *  IDE rewrite) — instead of repacking one `gta3.img` + patching `gta.dat` with the `--in` HD swap inlined. */
+  modloader: boolean;
   outPath: string;
   /** Copy each swapped HD model's prelight from its stock DFF (`--prelight`). */
   prelight: boolean;
@@ -44,7 +46,7 @@ export interface GtaSaTreeLodOptions {
 }
 
 export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLodAdapter {
-  const { debugPng, gamePath, inPath, loose, outPath, prelight, prelightInfo, strip } = options;
+  const { debugPng, gamePath, inPath, modloader, outPath, prelight, prelightInfo, strip } = options;
   const archive = openTemplateArchive(gamePath);
   const isDir = inPath !== undefined && statSync(inPath).isDirectory();
   // Model list (dff file names) + their textures: from `--in` when given, else the built-in SA roster from gta3.img.
@@ -100,7 +102,7 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
         stripMap({
           dffNames: impostors.map((i) => i.name.replace(/^lod/i, '')),
           gamePath,
-          loose,
+          modloader,
           outPath,
         });
 
@@ -117,7 +119,7 @@ export function createGtaSaTreeLodAdapter(options: GtaSaTreeLodOptions): TreeLod
           source: i.name.replace(/^lod/i, ''),
         })),
         inPath,
-        loose,
+        modloader,
         outPath,
         prelight,
         prelightInfo,

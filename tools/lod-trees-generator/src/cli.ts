@@ -12,7 +12,11 @@
  *     --prelight [info]  copy the stock model's trunk prelight onto each swapped tree (HD + baked LOD; foliage kept).
  *                        Optionally pass a JSON file (`--prelight ./info.json`) of per-model overrides, e.g.
  *                        `{ "tree_hipoly09b": { "skip": true } }` to opt that model out of the prelight transfer.
- *     --loose           write changed IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`
+ *     --modloader       emit TWO Modloader mods (real game) under `<out>`: `lod/` (the far-LOD attachment —
+ *                       modified text IPLs as loose overrides + impostor dff/txd/col + streams in `gta3img/` +
+ *                       `lodtrees.ide` via a one-line `loader.txt`) and `hd/` (the swapped HD models + custom TXD,
+ *                       parented via a `txdp` IDE so NO stock IDE is rewritten). Without it the build repacks one
+ *                       `gta3.img` + patches `gta.dat`, with the `--in` HD swap inlined.
  *     --strip           verification mode: strip all source trees from the map (empty world) instead of placing
  *     --debug-png       also write a per-impostor PNG preview of each baked card atlas to `<out>` (default off)
  *   All paths are relative to the current working directory (absolute paths pass through).
@@ -66,7 +70,7 @@ function main(): void {
   };
 
   const debugPng = process.argv.includes('--debug-png');
-  const loose = process.argv.includes('--loose');
+  const modloader = process.argv.includes('--modloader');
   const prelight = process.argv.includes('--prelight');
   const strip = process.argv.includes('--strip');
 
@@ -87,7 +91,7 @@ function main(): void {
       debugPng,
       gamePath,
       inPath,
-      loose,
+      modloader,
       outPath,
       prelight,
       prelightInfo,

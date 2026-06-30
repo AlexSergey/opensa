@@ -1,6 +1,6 @@
 /**
  * Rebuild per-vertex normals from **smooth groups** (map-optimizer plan 015), decoupled from any mesh type so
- * both map-optimizer (SubMesh) and lod-generator (merged cell mesh) can drive it. Operates on raw
+ * both map-optimizer (SubMesh) and opensa-lod-generator (merged cell mesh) can drive it. Operates on raw
  * `positions` + flat triangle **index triples** and returns new normals, the remapped indices, and the list of
  * appended (split) vertices — each caller then duplicates *its own* attributes (uv / prelit / colour) for the
  * splits via `splitSources`.

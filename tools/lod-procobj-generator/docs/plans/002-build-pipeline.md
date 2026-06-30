@@ -21,7 +21,7 @@ CLI (`cli.ts` → `run({ config, dffPath, gamePath, outPath, txdPath })`):
   HD height gate).
 - `--prelight [info.json]` (a flag, optionally with a per-model override file) — copy each model's stock trunk
   prelight onto its LOD (+ swapped HD). See **Prelight** below.
-- `--loose` — emit the changed IMG entries loose to `<out>/gta3img/` instead of repacking `<out>/models/gta3.img`
+- `--modloader` — emit the changed IMG entries loose to `<out>/gta3img/` instead of repacking `<out>/models/gta3.img`
   (see S6).
 
 ## Stages (as built in `run()`)
@@ -97,7 +97,7 @@ If no species survive → log + return (no output written).
   `convertProcObj` IPL `datLine` appended.
 - IMG entries (`collectImgEntries`): each `<alias>.dff`, `lod_procobj.txd`, `lod_procobj.col`, the swapped HD DFFs,
   and the custom TXDs. `emitImg` either **repacks** them into `<out>/models/gta3.img` (`editArchive(archive)` →
-  `build()`), or with **`--loose`** writes each entry to `<out>/gta3img/<name>` (skips the full-archive rebuild;
+  `build()`), or with **`--modloader`** writes each entry to `<out>/gta3img/<name>` (skips the full-archive rebuild;
   `mod-installer` merges that top-level `gta3img/` folder back into `gta3.img` — same convention as
   `lod-trees-generator`).
 - Report: `procobj→lod: N species · M static objects · K HD swapped (J custom TXD) → <out>/{models/gta3.img|gta3img/}`.

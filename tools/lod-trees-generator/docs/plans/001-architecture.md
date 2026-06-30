@@ -32,7 +32,7 @@ tsx tools/lod-trees-generator/src/cli.ts --in <path> --out <path> --game <path>
 (The full bake flags — atlas size, card count, draw distance — live in `src/config.ts` and will be exposed as
 flags once the algorithm is settled.)
 
-## Architecture (mirrors `lod-generator`)
+## Architecture (mirrors `opensa-lod-generator`)
 
 ```
 src/

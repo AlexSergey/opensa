@@ -50,7 +50,7 @@ export default defineConfig({
       'tools/timecyc-builder/**/*.test.ts',
       'scripts/**/*.test.ts',
       'tools/map-optimizer/**/*.test.ts',
-      'tools/lod-generator/**/*.test.ts',
+      'tools/opensa-lod-generator/**/*.test.ts',
       'tools/vehicle-optimizer/**/*.test.ts',
       'tools/tool-kit/**/*.test.ts',
       'tools/rw-codec/**/*.test.ts',

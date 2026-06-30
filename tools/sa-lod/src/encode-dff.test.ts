@@ -52,10 +52,10 @@ describe('encodeLodDff', () => {
       expect(clump.geometries.length).toBe(clump.atomics.length);
       expect(clump.geometries.every((g) => g.positions.length / 3 <= 0xffff)).toBe(true);
       const tris = clump.geometries.reduce((s, g) => s + g.triangles.length, 0);
-      expect(tris).toBe(n * 2); // two-sided: every source triangle plus its reverse, across all chunks
+      expect(tris).toBe(n); // single-sided by default — every source triangle once, across all chunks
     });
 
-    it('round-trips through the engine parser with geometry, materials and prelit intact', () => {
+    it('round-trips through the engine parser, single-sided by default, geometry/materials/prelit intact', () => {
       const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_3_-7')));
       expect(clump.atomics).toHaveLength(1);
       expect(clump.frames).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('encodeLodDff', () => {
 
       const geometry = clump.geometries[0];
       expect(geometry.positions).toHaveLength(12);
-      expect(geometry.triangles).toHaveLength(4); // two-sided: each of the 2 source tris is emitted both ways
+      expect(geometry.triangles).toHaveLength(2); // single-sided default — each of the 2 source tris emitted once
       expect(geometry.prelitColors).not.toBeNull();
       expect(geometry.uvLayers[0]).toHaveLength(8);
       expect(geometry.materials.map((m) => m.texture?.name)).toEqual(['road', 'grass']);
@@ -72,11 +72,12 @@ describe('encodeLodDff', () => {
     it('assigns each triangle to its texture group via the BinMesh split', () => {
       const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_cell')));
       const materials = clump.geometries[0].triangles.map((t) => t.materialIndex).sort();
-      expect(materials).toEqual([0, 0, 1, 1]); // both windings of one triangle per group
+      expect(materials).toEqual([0, 1]); // one triangle per group, single-sided
     });
 
-    it('emits geometry two-sided — each source triangle plus its reversed copy', () => {
-      const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_cell')));
+    it('emits geometry two-sided when doubleSided — each source triangle plus its reversed copy', () => {
+      const clump = parseDff(toArrayBuffer(encodeLodDff(sampleMesh(), 'lod_cell', { doubleSided: true })));
+      expect(clump.geometries[0].triangles).toHaveLength(4); // 2 source tris, both windings
       const tris = clump.geometries[0].triangles.filter((t) => t.materialIndex === 0);
       // source (0,1,2) and its reverse (0,2,1) — same vertices, opposite winding.
       expect(tris.map((t) => [t.a, t.b, t.c])).toEqual([

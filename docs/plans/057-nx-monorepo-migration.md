@@ -25,7 +25,7 @@ apps/
 packages/   (tag type:engine)
   renderware/ · game-build/ · loaders/ · vfs/ · game/
 tools/      (tag type:tool)
-  rw-codec/ · tool-kit/ · map-optimizer/ · lod-generator/ · vehicle-optimizer/ · timecyc-builder/
+  rw-codec/ · tool-kit/ · map-optimizer/ · opensa-lod-generator/ · vehicle-optimizer/ · timecyc-builder/
 root: game-src/ · tests/ · e2e/ · scripts/ · deploy/ · static/ · nx.json · configs
 ```
 
@@ -50,7 +50,7 @@ game → renderware                      (independent branch; loading injected b
 apps/web    → game, loaders, renderware, vfs
 apps/viewer → renderware, game
 tools: tool-kit → renderware;  rw-codec → renderware
-       map-optimizer/lod-generator/vehicle-optimizer/timecyc-builder → renderware, game-build, rw-codec, tool-kit
+       map-optimizer/opensa-lod-generator/vehicle-optimizer/timecyc-builder → renderware, game-build, rw-codec, tool-kit
 ```
 
 ## Key facts that shape the work
@@ -58,7 +58,7 @@ tools: tool-kit → renderware;  rw-codec → renderware
 - **The only cycle, `loaders ↔ game-build`, is thin.** `game-build/partition.ts` imports a single **type**
   `GroupName` from `loaders/types`; `loaders` uses `game-build/partition` heavily. Break it by moving `GroupName`
   into `game-build` (or a shared types module). Pure refactor, no layout change — do it **first**.
-- **`map-optimizer` is a de-facto shared lib** (lod-generator imports it 9×, vehicle-optimizer 6×). The shared
+- **`map-optimizer` is a de-facto shared lib** (opensa-lod-generator imports it 9×, vehicle-optimizer 6×). The shared
   part is the **RW codec** (`codec/{chunk,dff,geometry-struct,dxt,texture-native}` + `lib/mip`). Extract it to
   **`tools/rw-codec`** (decided — its own package) so tools consume it instead of importing each other.
 - **Tools import engine internals**, not a barrel (`renderware/parsers/binary/dff`, `archive/img-archive`,
@@ -74,7 +74,7 @@ tools: tool-kit → renderware;  rw-codec → renderware
 ## Docs move with their packages
 
 Each subproject's `docs/` travels with the code: `map-optimizer/docs` → `tools/map-optimizer/docs`,
-`vehicle-optimizer/docs` → `tools/vehicle-optimizer/docs`, `lod-generator/docs` → `tools/lod-generator/docs`
+`vehicle-optimizer/docs` → `tools/vehicle-optimizer/docs`, `opensa-lod-generator/docs` → `tools/opensa-lod-generator/docs`
 (and `tool-kit`/`timecyc-builder` docs if/when they exist). The new `docs/plans/README.md` index links all plan
 sets across the repo; **update those links on each move** so the central docs stay the source of truth.
 
@@ -83,10 +83,10 @@ sets across the repo; **update those links on each move** so the central docs st
 1. **Break the `loaders ↔ game-build` cycle** (move `GroupName`). No layout change. ✅ **Done** — `GroupName`
    now lives in `game-build/partition.ts`, re-exported from `loaders/types.ts`; game-build no longer imports
    loaders (consumers untouched). 983 tests green.
-2. **Extract `rw-codec`** from map-optimizer → `tools/rw-codec`; repoint lod-generator + vehicle-optimizer.
+2. **Extract `rw-codec`** from map-optimizer → `tools/rw-codec`; repoint opensa-lod-generator + vehicle-optimizer.
    ✅ **Done** — pure codec (chunk, geometry-struct decode/encode, dff collectors, dxt±encode, texture-native,
    mip) now lives in top-level `rw-codec/`; the `SubMesh`/`MeshIR` glue (`encodeDff`, `applyMeshToStruct`,
-   `rebuildGeometry`) stays in map-optimizer and imports it. lod-generator + vehicle-optimizer import rw-codec,
+   `rebuildGeometry`) stays in map-optimizer and imports it. opensa-lod-generator + vehicle-optimizer import rw-codec,
    not map-optimizer. Tests split (pure → rw-codec, glue → map-optimizer); 983 green. (Folder is top-level for
    now; physically lands under `tools/` in step 4.)
 
@@ -100,7 +100,7 @@ sets across the repo; **update those links on each move** so the central docs st
    ✅ **Pilot done — `@opensa/rw-codec`.** Validated that `@opensa/*` → `.ts` resolves across **tsc + vite +
    vitest + tsx** via the workspace symlink + `exports`, **no `tsconfig paths`, no build**. 983 green. Rollout
    order: `rw-codec` ✅ → `tool-kit` ✅ → engine packages from `src/` (`renderware` ✅ → `game-build` ✅ →
-   `loaders` ✅ → `vfs` ✅ → `game` ✅) → CLI tools (`map-optimizer` ✅, `lod-generator` ✅,
+   `loaders` ✅ → `vfs` ✅ → `game` ✅) → CLI tools (`map-optimizer` ✅, `opensa-lod-generator` ✅,
    `vehicle-optimizer` ✅, `timecyc-builder` ✅) — import-leaves, given a trivial `package.json` (no `exports`,
    nothing to repoint). **All 11 `@opensa/*` packages now registered; `eslint .` + tsc + 983 tests green.**
    - **Engine ✅ done** — all 5 made in place (`package.json` + `@opensa` name + `exports`), the whole app + tools

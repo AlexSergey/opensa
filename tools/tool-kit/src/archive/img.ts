@@ -5,7 +5,7 @@ import { buildVer2Buffer, openArchive } from '@opensa/renderware/archive/img-arc
 /**
  * An **editable** GTA IMG (VER2) archive: open, read, add-with-replace, delete, then rebuild a fresh `.img`.
  * Wraps the engine's read (`openArchive`) + write (`buildVer2Buffer`) primitives (read-only reuse) with the
- * mutation surface the offline tools need — map-optimizer (swap optimized entries) and lod-generator (emit
+ * mutation surface the offline tools need — map-optimizer (swap optimized entries) and opensa-lod-generator (emit
  * cell-LOD DFFs/atlas TXDs, strip old LODs). Edits are tracked lazily: untouched entries are read straight from
  * the source on rebuild, so opening a large archive is cheap. Entry names are case-insensitive (GTA convention).
  */

@@ -25,9 +25,18 @@ tsx tools/lod-procobj-generator/src/cli.ts --out <path> --game <path> [--in <dir
   of per-model overrides — `--prelight ./info.json` with `{ "cedar1_po": { "skip": true }, … }` opts those models
   **out** (LOD keeps its source prelit; HD packed verbatim). Bare `--prelight` applies to every model. Shared with
   `lod-trees-generator` via [`@opensa/sa-lod/prelight`](../sa-lod/src/prelight.ts).
-- `--loose` — write the changed IMG entries loose to `<out>/gta3img/` instead of repacking the full
-  `<out>/models/gta3.img` (much faster + a tiny drop; `mod-installer` merges a `gta3img/` folder back into
-  `gta3.img`). Same convention as `lod-trees-generator`.
+- `--modloader` — emit **two** independent **Modloader mods** (real game) under `<out>`, so **no stock IDE is
+  rewritten**:
+  - **`<out>/lod/`** — the LODs: LOD DFFs + `lod_procobj.txd`/`.col` in `gta3img/` (injected into `gta3.img` by
+    name; col auto-discovered), the new static IPL + stripped `procobj.dat` at their `data/` paths, and a
+    `loader.txt` (`IDE` + `IPL`).
+  - **`<out>/hd/`** — the swapped (prelit) `--in` procobj HD models + the custom TXD in `gta3img/`, plus a `txdp`
+    IDE (`lod_procobj_hd.ide`) that **parents** each swapped model's stock TXD to the custom one — so the custom
+    textures resolve without rewriting the stock IDE (the same approach as `lod-trees-generator`). Omitted with no
+    `--in`.
+
+  Without `--modloader`, repacks one `<out>/models/gta3.img` + patches `data/gta.dat` with the `--in` HD swap
+  inlined. See [`docs/plans/004-modloader-output.md`](./docs/plans/004-modloader-output.md).
 
 ## What it does
 
@@ -53,6 +62,6 @@ A thin orchestrator over two shared packages. Plans: [`001` architecture](./docs
 [`002` build pipeline](./docs/plans/002-build-pipeline.md) · [`003` SA asset format](./docs/plans/003-sa-asset-format.md).
 
 - **[`@opensa/sa-lod`](../sa-lod/)** — the simplified-copy LOD pipeline (decimate → normals → encode DFF/TXD/COL),
-  shared with [`lod-generator`](../lod-generator/).
+  shared with [`opensa-lod-generator`](../opensa-lod-generator/).
 - **[`@opensa/map-placement`](../map-placement/)** — SA map-edit workflows (procobj scatter → static IPL, id
   allocation, IDE/gta.dat edits, swapped-HD retexture), shared with `lod-trees-generator`.

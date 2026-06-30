@@ -72,10 +72,10 @@ ideas
 blog-src
 NO_COMMIT
 
-# map-optimizer / lod-generator are tracked sub-projects; ignore only their generated output + local scratch.
+# map-optimizer / opensa-lod-generator are tracked sub-projects; ignore only their generated output + local scratch.
 tools/map-optimizer/out/
 tools/map-optimizer/*.jpg
-tools/lod-generator/out/
+tools/opensa-lod-generator/out/
 tools/vehicle-optimizer/out/
 tools/lod-trees-generator/out/
 

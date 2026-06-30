@@ -3,7 +3,7 @@
 **Implemented** (phases 1–5; in-game verify pending — see the task plan). The build pipeline is detailed in
 [002](./002-build-pipeline.md); the strict-SA format requirements in [003](./003-sa-asset-format.md). Split procobj
 LOD generation out of `lod-trees-generator` into a dedicated tool whose
-LODs are **simplified copies of the HD model** (decimated geometry, like `lod-generator`) — not crossed-billboard
+LODs are **simplified copies of the HD model** (decimated geometry, like `opensa-lod-generator`) — not crossed-billboard
 impostors. Extract the shared bits into a reusable package, and strip procobj entirely from `lod-trees-generator`.
 
 ## Why a separate tool
@@ -13,11 +13,11 @@ procobj clutter (bushes, rocks, joshua, scrub). Those read better as a **low-pol
 procobj lives at. Two different LOD strategies → two tools. procobj placement (scatter → static IPL) is the same
 machinery either way, so it moves to a shared package both can use.
 
-| Tool                          | Input                     | LOD strategy                       | Placement                            |
-| ----------------------------- | ------------------------- | ---------------------------------- | ------------------------------------ |
-| `lod-trees-generator`         | tree HDs (`--dff/txd`)    | **impostor** (cards + atlas)       | attach to streamed/text HD instances |
-| `lod-procobj-generator` (new) | procobj HDs (`--dff/txd`) | **simplified copy** (QEM decimate) | procobj scatter → static IPL         |
-| `lod-generator` (existing)    | whole-map cells           | **simplified copy** (QEM decimate) | per-cell merged static IPL           |
+| Tool                              | Input                     | LOD strategy                       | Placement                            |
+| --------------------------------- | ------------------------- | ---------------------------------- | ------------------------------------ |
+| `lod-trees-generator`             | tree HDs (`--dff/txd`)    | **impostor** (cards + atlas)       | attach to streamed/text HD instances |
+| `lod-procobj-generator` (new)     | procobj HDs (`--dff/txd`) | **simplified copy** (QEM decimate) | procobj scatter → static IPL         |
+| `opensa-lod-generator` (existing) | whole-map cells           | **simplified copy** (QEM decimate) | per-cell merged static IPL           |
 
 ## The new tool
 
@@ -55,7 +55,7 @@ P6 Strip    — remove converted species from procobj.dat
 P7 Write    — repack gta3.img (+ LOD DFFs/TXD), data/maps/*.ipl + *.ide, patched gta.dat
 ```
 
-P1–P2 are **lod-generator's mechanism applied to a single model** instead of a merged cell. P4/P6 are
+P1–P2 are **opensa-lod-generator's mechanism applied to a single model** instead of a merged cell. P4/P6 are
 `lod-trees-generator`'s procobj `convert.ts`/`world.ts`, but the LOD instance now points at a **simplified-copy
 model id** instead of an impostor id.
 
@@ -65,9 +65,9 @@ Mirror both existing tools: a game-agnostic `core/` (the species-LOD contract + 
 `adapters/gta-sa/` binding to RenderWare DFF/TXD + SA IPL/IDE/procobj. The new tool is mostly **orchestration** —
 the heavy lifting lives in the shared packages below.
 
-## LOD = simplified copy (reused from `lod-generator`)
+## LOD = simplified copy (reused from `opensa-lod-generator`)
 
-`lod-generator` already does HD → low-poly: **QEM edge-collapse** (`@opensa/tool-kit/mesh/simplify`), smooth-normal
+`opensa-lod-generator` already does HD → low-poly: **QEM edge-collapse** (`@opensa/tool-kit/mesh/simplify`), smooth-normal
 rebuild (`@opensa/tool-kit/mesh/smooth-normals`), then encode a one-atomic multi-material DFF + a downscaled
 RGBA8888 TXD. Its per-cell pipeline is:
 
@@ -83,7 +83,7 @@ For the new tool the granularity changes (per **species** model, not per **cell*
 identical. So these modules are the extraction target (see below) — the new tool feeds one HD model through them
 and gets a `lod<species>.dff` + its textures.
 
-**Frame transform note:** `lod-generator`'s `merge.ts` already applies the DFF frame transform — same fix
+**Frame transform note:** `opensa-lod-generator`'s `merge.ts` already applies the DFF frame transform — same fix
 `lod-trees-generator` just got (bug 3). Confirm it bakes atomics×frames; reuse as-is.
 
 ## procobj placement (reused from `lod-trees-generator`)
@@ -98,7 +98,7 @@ LOD instance references the **simplified-copy** model (id/name from P3) instead 
 
 ### Keep `@opensa/tool-kit` as-is (pure, game-agnostic)
 
-`mesh/simplify`, `mesh/smooth-normals`, `archive/img` — already shared by `lod-generator`,
+`mesh/simplify`, `mesh/smooth-normals`, `archive/img` — already shared by `opensa-lod-generator`,
 `lod-trees-generator`, `map-optimizer`. Both LOD tools keep using it. **Do not** add SA-format knowledge here.
 
 ### Two new packages (chosen): `@opensa/map-placement` + `@opensa/sa-lod`
@@ -119,7 +119,7 @@ tools/map-placement/src/        ← extracted from lod-trees-generator/place + s
     strip.ts                    stripProcObj + UNDERWATER_PROCOBJ never-touch constant
   package.json                  exports "./ids", "./gta-dat", "./ipl-text", "./ipl-binary", "./retxd", "./procobj"
 
-tools/sa-lod/src/               ← extracted from lod-generator adapter
+tools/sa-lod/src/               ← extracted from opensa-lod-generator adapter
   model-source.ts               lazy parseDff cache
   decimate.ts                   QEM driver (wraps tool-kit/simplify)
   normals.ts                    smooth-normal rebuild (wraps tool-kit/smooth-normals)
@@ -135,17 +135,17 @@ tools (CLI). Both sit beside `tool-kit` (generic) and `rw-codec` under `tools/`.
 
 ### What moves where
 
-| Source (today)                                                                                       | Destination                                      |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `lod-trees-generator/place/ide.ts` (alloc/alias/dat/IDE)                                             | `map-placement/ids.ts` + `gta-dat.ts`            |
-| `lod-trees-generator/place/ipl-text-append.ts` + `strip/ipl-text.ts`                                 | `map-placement/ipl-text.ts`                      |
-| `lod-trees-generator/place/ipl-binary-link.ts` + `strip/ipl-binary.ts`                               | `map-placement/ipl-binary.ts`                    |
-| `lod-trees-generator/place/retxd.ts`                                                                 | `map-placement/retxd.ts`                         |
-| _(removed)_ `lod-trees-generator/procobj/{convert,world}.ts` (git history)                           | `map-placement/procobj/*` (rebuilt, generalised) |
-| `lod-trees-generator/strip/procobj.ts` (+ `UNDERWATER_PROCOBJ`)                                      | `map-placement/procobj/strip.ts`                 |
-| `lod-generator/adapters/gta-sa/{model-source,decimate,normals,dff,texture-source,cell-txd,merge}.ts` | `sa-lod/*`                                       |
+| Source (today)                                                                                              | Destination                                      |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `lod-trees-generator/place/ide.ts` (alloc/alias/dat/IDE)                                                    | `map-placement/ids.ts` + `gta-dat.ts`            |
+| `lod-trees-generator/place/ipl-text-append.ts` + `strip/ipl-text.ts`                                        | `map-placement/ipl-text.ts`                      |
+| `lod-trees-generator/place/ipl-binary-link.ts` + `strip/ipl-binary.ts`                                      | `map-placement/ipl-binary.ts`                    |
+| `lod-trees-generator/place/retxd.ts`                                                                        | `map-placement/retxd.ts`                         |
+| _(removed)_ `lod-trees-generator/procobj/{convert,world}.ts` (git history)                                  | `map-placement/procobj/*` (rebuilt, generalised) |
+| `lod-trees-generator/strip/procobj.ts` (+ `UNDERWATER_PROCOBJ`)                                             | `map-placement/procobj/strip.ts`                 |
+| `opensa-lod-generator/adapters/gta-sa/{model-source,decimate,normals,dff,texture-source,cell-txd,merge}.ts` | `sa-lod/*`                                       |
 
-After extraction, `lod-trees-generator`, `lod-generator`, and the new tool import from `map-placement` / `sa-lod`
+After extraction, `lod-trees-generator`, `opensa-lod-generator`, and the new tool import from `map-placement` / `sa-lod`
 (+ `tool-kit`). Their adapters become thin. (Phase 1 already removed procobj from `lod-trees-generator`; its
 `convert.ts`/`world.ts` are recovered from git history when building `map-placement/procobj`.)
 
@@ -177,9 +177,9 @@ Note: the **memory** `ipl-lod-index-coupling` and `sa-generated-asset-format` st
    imports them back, green. The IPL **append/strip** modules (`ipl-text-append`, `ipl-binary-link`,
    `strip/ipl-*`) stayed in `lod-trees-generator` — they're impostor/strip-specific, not shared.
 3. **Scaffold `@opensa/sa-lod`** ✅ **Done.** Created the package; moved `decimate`/`normals`/`encode-dff` (was
-   `dff`)/`encode-txd` (was `cell-txd`)/`model-source`/`texture-source` from `lod-generator` + a new `mesh.ts`
-   (the `MergedMesh`/`MergedGroup` **types** only). `lod-generator` repointed (core/types, core/index, merge,
-   adapter, finalize), green. `merge.ts`/`MeshBuilder` stayed in `lod-generator` (cell-specific) — the new tool
+   `dff`)/`encode-txd` (was `cell-txd`)/`model-source`/`texture-source` from `opensa-lod-generator` + a new `mesh.ts`
+   (the `MergedMesh`/`MergedGroup` **types** only). `opensa-lod-generator` repointed (core/types, core/index, merge,
+   adapter, finalize), green. `merge.ts`/`MeshBuilder` stayed in `opensa-lod-generator` (cell-specific) — the new tool
    writes its own frame-aware single-model builder. Encoders renamed `encodeLodDff`/`encodeLodTxd`; model/texture
    sources now take `ImgArchive[]`. Added both new packages to the eslint Node-globals override.
 4. **Rebuild + generalise `procobj/convert` + `world`** ✅ **Done.** Recovered both from git's dangling blobs into

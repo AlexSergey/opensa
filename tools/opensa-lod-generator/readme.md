@@ -1,4 +1,4 @@
-# lod-generator
+# opensa-lod-generator
 
 A separate, **custom** (non-lossless) tool that regenerates the map's distant LODs from the HD models. Unlike
 `map-optimizer` (which conditions existing assets without changing what's authored), this **bakes new content**:
@@ -11,7 +11,7 @@ writes its own build.
 
 > **OpenSA only.** This tool targets OpenSA's engine, not the original game. The output is standard RenderWare so
 > it loads in stock SA too, but the per-cell budget isn't tuned for SA's streamer (uncapped materials/size crash
-> real SA on stream-in — OpenSA has no such limits). See the `lod-generator-decimation` memory for the real-SA
+> real SA on stream-in — OpenSA has no such limits). See the `opensa-lod-generator-decimation` memory for the real-SA
 > findings if that support is ever revisited.
 
 ## Usage
@@ -19,11 +19,11 @@ writes its own build.
 ```bash
 # from the repo root — --game is a path to the game data (e.g. ./game-src/original)
 # assemble the world into cells + print a sizing report (Phase 0):
-npx tsx lod-generator/src/cli.ts --game ./game-src/original --cell 256
+npx tsx opensa-lod-generator/src/cli.ts --game ./game-src/original --cell 256
 
 # bake every cell (merge → QEM decimate → smooth normals → per-cell DFF/TXD) and emit a drop-in build under
 # --out (models/lods.img + data/lods.ide/.ipl + gta.dat lines):
-npx tsx lod-generator/src/cli.ts --game ./game-src/original --out ./build
+npx tsx opensa-lod-generator/src/cli.ts --game ./game-src/original --out ./build
 ```
 
 - `--game <path>` — path to the game data (`gta.dat` + `data/` + `models/`).
@@ -35,7 +35,7 @@ npx tsx lod-generator/src/cli.ts --game ./game-src/original --out ./build
   stock far-LODs don't double up with the cell-LODs (both are `lod*`-named → both bucket into OpenSA's LOD ring).
 
 ```
-lod-generator original:  cellSize=256
+opensa-lod-generator original:  cellSize=256
   cells      — 520
   instances  — 30981 HD (5958 unique models)
   per cell   — up to 422 instances
@@ -53,7 +53,7 @@ Stripping the old `lod*` models is done via `--strip-lods` (**plan 002**, 1d-iii
 > **Targets OpenSA, not the original game.** Output is standard RenderWare so it loads in stock SA too, but the
 > per-cell budget isn't tuned for SA's streamer — uncapped cell-LODs (hundreds of materials, MB-scale models) crash
 > real SA on stream-in (OpenSA has no such limits). The original-game caps were removed; see the
-> `lod-generator-decimation` memory if SA support is revisited.
+> `opensa-lod-generator-decimation` memory if SA support is revisited.
 
 **Decimation:** each cell is merged then QEM-decimated **as one mesh** (not per model) to `lodCellRatio` (0.2) of
 its triangles, floored at `lodCellMinTris` (1000) so sparse terrain isn't over-thinned. Two guards keep the far
@@ -61,7 +61,7 @@ view clean — an edge-length cap (no flat-surface spikes) and a per-texture-gro
 vertices are **not** welded (welding smears textures / collapses stacked terrain). The DFF is emitted **two-sided**
 (OpenSA back-face culling would otherwise hole SA's inconsistently-wound ground) and **split across multiple
 atomics** when a cell exceeds the 65 535-vertex DFF limit. See plan 002 (Phase 1c/1d-i) and the
-`lod-generator-decimation` memory for the tuning history + the open flat-island-erosion issue.
+`opensa-lod-generator-decimation` memory for the tuning history + the open flat-island-erosion issue.
 
 **What's baked:** exterior building/terrain instances only. **Trees** (the `@opensa/map-placement/vegetation`
 roster) are excluded — they get billboard impostors from [`lod-trees-generator`](../lod-trees-generator/), and
@@ -72,7 +72,7 @@ and the stock `lod*` models are dropped too.
 ## Layout
 
 ```
-lod-generator/
+opensa-lod-generator/
   src/
     cli.ts                 # --game (Phase 0 report) / --out (full bake) / --strip-lods
     lod.config.ts          # cell size (= engine streaming grid) + decimation budget (cell ratio + min tris)

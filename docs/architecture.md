@@ -22,7 +22,7 @@ packages/                    (tag type:engine)
   vfs/         @opensa/vfs          unzip → AssetFileSystem
   game-build/  @opensa/game-build   partitioning shared by the loaders + build scripts
 tools/                       (tag type:tool — offline; read the engine, never the app)
-  rw-codec/ · tool-kit/ · map-optimizer/ · lod-generator/ · vehicle-optimizer/ · timecyc-builder/
+  rw-codec/ · tool-kit/ · map-optimizer/ · opensa-lod-generator/ · vehicle-optimizer/ · timecyc-builder/
 root: game-src/ · static/ · tests/ · e2e/ · scripts/ · deploy/ · nx.json · *.html · configs
 ```
 

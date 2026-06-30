@@ -1,7 +1,7 @@
 import type { ImgArchive } from '@opensa/renderware/archive/img-archive';
 
 import { allocateLodIds, buildLodIde, lodAlias, patchGtaDat } from '@opensa/map-placement/ide';
-import { retxdSwappedModels } from '@opensa/map-placement/retxd';
+import { retxdSwappedModels, writeTxdpHdMod } from '@opensa/map-placement/retxd';
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { datChildUrl } from '@opensa/renderware/archive/resolve-paths';
 import { parseGtaDat } from '@opensa/renderware/parsers/text/gta-dat.parser';
@@ -32,8 +32,11 @@ export interface PlaceOptions {
   /** User HD model folder (`--in`, dff + txd) — its DFFs are swapped for the LOD'd, non-procobj models and its
    *  TXDs wired into their IDE `txd`. Omitted (no `--in`) → no swap/retxd; the stock HD models stay. */
   inPath?: string;
-  /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking `gta3.img`. */
-  loose: boolean;
+  /** `--modloader`: emit **two** Modloader mods under `<out>` — `lod/` (the mode-A far-LOD attachment: modified
+   *  text IPLs as loose overrides + streams/assets in `gta3img/` + `lodtrees.ide` via `loader.txt`) and `hd/` (the
+   *  swapped HD models, parented to the custom TXD via a `txdp` IDE so no stock IDE is rewritten). Default (false):
+   *  one repacked `gta3.img` + patched gta.dat, with the `--in` HD swap inlined. */
+  modloader: boolean;
   outPath: string;
   /** Copy each swapped model's prelight (day vertex colours) from its stock DFF (`--prelight`). */
   prelight: boolean;
@@ -52,6 +55,12 @@ interface Impostor {
 
 const IDE_REL = 'data/maps/lodtrees.ide';
 const IDE_DAT = 'DATA\\MAPS\\lodtrees.IDE';
+/** `loader.txt` for the LOD mod (`<out>/lod/`): only the `IDE` line — the modified stock IPLs override their stock
+ *  copies by name (no `IPL` line needed), and SA auto-discovers the `.col` embedded in `gta3.img` (no `COLFILE`). */
+const LOADER_TXT = `IDE ${IDE_REL}\n`;
+/** The HD mod (`<out>/hd/`) `txdp` IDE path — parents each swapped model's stock TXD to the custom TXD, so the
+ *  stock IDEs stay untouched (see {@link emitHdMod} + the `./5` reference). */
+const TXDP_IDE_REL = 'data/maps/lodtrees_hd.ide';
 
 /** Per-area accumulator over the text IPL's shared instance-index space (binary streams + text rows alike). */
 interface AreaEdit {
@@ -71,38 +80,34 @@ interface PlacedInst {
 }
 
 /**
- * Stage 2 — attach an impostor LOD to every placed tree HD (binary-stream **and** text-IPL instances). For each
- * we ensure a LOD = its impostor: append a leaf instance at the HD's transform and link the HD's `lod` (binary
- * stream field / text `lod` column) to it, or repoint an existing LOD row. Then register the impostors
- * (`lodtrees.ide` + `gta.dat`) and pack the impostor DFFs + `lodtrees.txd` + the swapped HD DFFs (LOD'd,
- * non-procobj models) into `--out`. procobj species keep their stock HD + runtime scatter (procobj LODs are a
- * separate tool — see `lod-procobj-generator`).
+ * Stage 2 — attach the impostor LODs as the far-LOD of every placed tree HD: per area, append a leaf instance at
+ * the HD's transform + link the HD's `lod` (binary stream field / text `lod` column), or repoint an existing LOD
+ * row. The packaging then differs by output target:
+ * - **Default (`--out`):** repack `gta3.img` (modified streams + assets) + patch `gta.dat`, with the `--in` HD swap.
+ * - **`--modloader`:** the **same** attachment, packaged as **two** Modloader mods under `<out>` — `lod/` (the LOD
+ *   attachment) + `hd/` (the swapped HD models, via `txdp` so no stock IDE is rewritten). See {@link placeModloader}.
+ *
+ * procobj species keep their stock HD + runtime scatter (procobj LODs are a separate tool — `lod-procobj-generator`).
  */
 export function placeMap(options: PlaceOptions): void {
-  const { drawDistance, foliageTextures, gamePath, impostors, inPath, loose, outPath, prelight, prelightInfo } =
-    options;
+  const { gamePath, impostors, modloader, outPath } = options;
   const dat = parseGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'));
   const registry = buildRegistry(impostors, allObjectIds(gamePath, dat));
-  const bySource = new Map(registry.map((r) => [r.source, r]));
-  const idToImpostor = sourceObjectIds(gamePath, dat, bySource);
+  const idToImpostor = sourceObjectIds(gamePath, dat, new Map(registry.map((r) => [r.source, r])));
   const procModels = procObjModels(gamePath);
-
   const archive = openArchive(readBytes(join(gamePath, 'models', 'gta3.img')));
+
+  // Attach impostors as far-LODs (edit stock streams + companion text IPLs) — shared by both output targets.
   const result = editAreas(archive, gamePath, dat, idToImpostor);
 
-  // Swapped HD models (LOD'd, non-procobj) + their custom TXD: pack the TXD + retarget the models' IDE `txd`.
-  // procobj species keep their stock mesh. With no `--in` the HD models are the game's own → nothing to swap.
-  const swapModels = [...result.placedSources].filter((m) => !procModels.has(m));
-  const swap =
-    inPath === undefined
-      ? new Map<string, Uint8Array>()
-      : swapEntries(inPath, swapModels, prelight ? archive : null, foliageTextures, prelightInfo);
-  const retxd =
-    inPath === undefined
-      ? { ides: new Map<string, string>(), txds: new Map<string, Uint8Array>() }
-      : retxdSwappedModels(gamePath, dat.ide, inPath, inPath, swapModels);
+  if (modloader) {
+    placeModloader(options, { archive, dat, procModels, registry, result });
 
-  // Emit: text IPLs, retxd'd IDEs, lodtrees.ide, patched gta.dat.
+    return;
+  }
+
+  // `--out`: repack gta3.img + patch gta.dat, with the `--in` HD swap.
+  const { retxd, swap } = computeSwap(options, result.placedSources, procModels, archive, dat);
   for (const [iplPath, text] of result.texts) {
     writeText(join(outPath, iplPath.replace(/\\/g, '/')), text);
   }
@@ -110,21 +115,17 @@ export function placeMap(options: PlaceOptions): void {
     writeText(join(outPath, idePath.replace(/\\/g, '/')), text);
   }
   const ids = new Map(registry.map((r) => [r.alias, r.id]));
-  writeText(join(outPath, IDE_REL), buildLodIde(ids, 'lodtrees', drawDistance));
+  writeText(join(outPath, IDE_REL), buildLodIde(ids, 'lodtrees', options.drawDistance));
   writeText(
     join(outPath, 'data', 'gta.dat'),
     patchGtaDat(readFileSync(join(gamePath, 'data', 'gta.dat'), 'utf8'), IDE_DAT),
   );
-
-  // Emit: gta3.img (edited streams + impostor DFFs + lodtrees.txd + swapped HD DFFs + custom TXDs).
-  const extras = new Map([...swap, ...retxd.txds]);
-  emitImg(archive, result.streams, registry, extras, outPath, loose);
-
+  emitImg(archive, result.streams, registry, new Map([...swap, ...retxd.txds]), outPath, outPath, false);
   console.log(
     `place: ${result.attached} tree instances → impostor LODs ` +
       `(${result.appended} appended, ${result.repointed} repointed) · ${swap.size} HD DFFs swapped ` +
       `(${retxd.txds.size} custom TXD, ${retxd.ides.size} IDEs retxd'd) · ${registry.length} impostors ` +
-      `· LOD draw ${drawDistance} → ${loose ? `${outPath}/gta3img/` : `${outPath}/gta3.img`}`,
+      `· LOD draw ${options.drawDistance} → ${outPath}/gta3.img`,
   );
 }
 
@@ -205,6 +206,29 @@ function claim(claimed: Map<number, number>, index: number, id: number): boolean
   return owner === id;
 }
 
+/** HD swap + retxd for the LOD'd, non-procobj placed models — `--out` (`--in`) only. With no `--in` there's
+ *  nothing to swap (the stock HD stays). procobj species keep their stock mesh. */
+function computeSwap(
+  options: PlaceOptions,
+  placedSources: ReadonlySet<string>,
+  procModels: ReadonlySet<string>,
+  archive: ImgArchive,
+  dat: GtaDat,
+): { retxd: { ides: Map<string, string>; txds: Map<string, Uint8Array> }; swap: Map<string, Uint8Array> } {
+  const { foliageTextures, gamePath, inPath, prelight, prelightInfo } = options;
+  const swapModels = [...placedSources].filter((m) => !procModels.has(m));
+  const swap =
+    inPath === undefined
+      ? new Map<string, Uint8Array>()
+      : swapEntries(inPath, swapModels, prelight ? archive : null, foliageTextures, prelightInfo);
+  const retxd =
+    inPath === undefined
+      ? { ides: new Map<string, string>(), txds: new Map<string, Uint8Array>() }
+      : retxdSwappedModels(gamePath, dat.ide, inPath, inPath, swapModels);
+
+  return { retxd, swap };
+}
+
 /**
  * Per-area: attach an impostor LOD to every placed tree HD — binary-stream HDs (link the binary `lod` field) and
  * text-IPL HDs (set the text row's `lod` column) alike — appending leaf LOD rows / repointing existing ones into
@@ -275,34 +299,71 @@ function editAreas(
       }
     });
 
+    if (edit.appends.length === 0 && edit.repoints.size === 0 && setLods.size === 0) {
+      continue; // no tree placements in this area — leave the stock text IPL untouched (don't ship a no-op copy)
+    }
     texts.set(textRef, applyTextEdits(textRaw, { appends: edit.appends, repoints: edit.repoints, setLods }).text);
   }
 
   return { ...out, streams, texts };
 }
 
-/** Repack the IMG, or write only changed entries loose to `<out>/gta3img/`. */
+/**
+ * Emit the HD mod under `<out>/hd/`: the swapped (prelit) HD DFFs + the custom parent TXD, plus a `txdp` IDE that
+ * parents each swapped model's **stock** TXD to the custom one (so the stock IDEs are never rewritten — the `./5`
+ * approach). Returns the number of swapped DFFs; 0 (nothing written) when there's no `--in` or no model matched a
+ * custom TXD. procobj species are excluded (their HD stays stock — handled by `lod-procobj-generator`).
+ */
+function emitHdMod(
+  options: PlaceOptions,
+  placedSources: ReadonlySet<string>,
+  procModels: ReadonlySet<string>,
+  archive: ImgArchive,
+  dat: GtaDat,
+): number {
+  const { foliageTextures, gamePath, inPath, outPath, prelight, prelightInfo } = options;
+  if (inPath === undefined) {
+    return 0;
+  }
+  const swapModels = [...placedSources].filter((m) => !procModels.has(m));
+  const swap = swapEntries(inPath, swapModels, prelight ? archive : null, foliageTextures, prelightInfo);
+
+  return writeTxdpHdMod({
+    gamePath,
+    hdDir: join(outPath, 'hd'),
+    idePaths: dat.ide,
+    inPath,
+    swap,
+    swapModels,
+    txdpIdeRel: TXDP_IDE_REL,
+  });
+}
+
+/** Repack the IMG, or write only changed entries loose to `<destDir>/gta3img/`. The baked impostor DFFs +
+ *  `lodtrees.txd`/`.col` are read from `srcPath` (the top-level `--out`, where stage 1 wrote them); the IMG /
+ *  `gta3img/` is written under `destDir` (which differs from `srcPath` for the `--modloader` `lod/` subfolder). */
 function emitImg(
   archive: ImgArchive,
   streams: ReadonlyMap<string, Uint8Array>,
   registry: readonly Impostor[],
   swap: ReadonlyMap<string, Uint8Array>,
-  outPath: string,
+  srcPath: string,
+  destDir: string,
   loose: boolean,
 ): void {
   const entries = new Map<string, Uint8Array>(streams);
   for (const r of registry) {
-    entries.set(`${r.alias}.dff`, readBytes(join(outPath, `${r.name}.dff`)));
+    entries.set(`${r.alias}.dff`, readBytes(join(srcPath, `${r.name}.dff`)));
   }
-  entries.set('lodtrees.txd', readBytes(join(outPath, 'lodtrees.txd')));
-  entries.set('lodtrees.col', readBytes(join(outPath, 'lodtrees.col'))); // SA auto-discovers .col in the IMG
+  entries.set('lodtrees.txd', readBytes(join(srcPath, 'lodtrees.txd')));
+  entries.set('lodtrees.col', readBytes(join(srcPath, 'lodtrees.col'))); // SA auto-discovers .col in the IMG
   for (const [name, bytes] of swap) {
     entries.set(name, bytes);
   }
 
   if (loose) {
     for (const [name, bytes] of entries) {
-      writeBytes(join(outPath, 'gta3img', name), bytes);
+      writeBytes(join(destDir, 'gta3img', name), bytes);
     }
 
     return;
@@ -311,7 +372,7 @@ function emitImg(
   for (const [name, bytes] of entries) {
     img.set(name, bytes);
   }
-  writeBytes(join(outPath, 'gta3.img'), img.build());
+  writeBytes(join(destDir, 'gta3.img'), img.build());
 }
 
 function groupStreams(archive: ImgArchive): Map<string, string[]> {
@@ -325,6 +386,50 @@ function groupStreams(archive: ImgArchive): Map<string, string[]> {
   }
 
   return groups;
+}
+
+/**
+ * `--modloader` — emit **two** self-contained Modloader mods under `<out>`:
+ * - **`lod/`** — the mode-A far-LOD attachment ({@link editAreas}), mirroring the MixMods "LOD Vegetation" layout:
+ *   modified text IPLs as loose stock overrides, modified binary streams + impostor DFFs + `lodtrees.txd`/`.col`
+ *   into `gta3img/` (injected by name; col auto-discovered), `lodtrees.ide` via a one-line `loader.txt`. No
+ *   `gta.dat` patch, no stock IDE rewritten; the `lod`-link means no near-field double-draw.
+ * - **`hd/`** — the swapped (prelit) `--in` HD models ({@link emitHdMod}), parented to the custom TXD via a `txdp`
+ *   IDE so **no stock IDE is rewritten** (the `./5` approach). Empty/absent when there's no `--in`.
+ *
+ * Two independent mods so the HD swap (which carries our prelight) isn't lost, yet neither overrides a stock IDE.
+ */
+function placeModloader(
+  options: PlaceOptions,
+  ctx: {
+    archive: ImgArchive;
+    dat: GtaDat;
+    procModels: ReadonlySet<string>;
+    registry: readonly Impostor[];
+    result: ReturnType<typeof editAreas>;
+  },
+): void {
+  const { archive, dat, procModels, registry, result } = ctx;
+  const { drawDistance, outPath } = options;
+  const lodOut = join(outPath, 'lod');
+
+  // lod/ — the LOD attachment mod.
+  for (const [iplPath, text] of result.texts) {
+    writeText(join(lodOut, iplPath.replace(/\\/g, '/')), text); // stock text IPL — overrides by name
+  }
+  const ids = new Map(registry.map((r) => [r.alias, r.id]));
+  writeText(join(lodOut, IDE_REL), buildLodIde(ids, 'lodtrees', drawDistance));
+  writeText(join(lodOut, 'loader.txt'), LOADER_TXT);
+  emitImg(archive, result.streams, registry, new Map(), outPath, lodOut, true);
+
+  // hd/ — the swapped HD models (only with `--in`).
+  const swapped = emitHdMod(options, result.placedSources, procModels, archive, dat);
+
+  console.log(
+    `place (modloader): ${result.attached} tree instances → impostor LODs ` +
+      `(${result.appended} appended, ${result.repointed} repointed) · ${registry.length} impostors → ${outPath}/lod` +
+      (swapped > 0 ? ` · ${swapped} HD DFFs swapped (txdp) → ${outPath}/hd` : ''),
+  );
 }
 
 /** procobj scatter species — their HD DFFs are left stock (not swapped). */

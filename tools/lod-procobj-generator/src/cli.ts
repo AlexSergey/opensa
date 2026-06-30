@@ -15,7 +15,10 @@
  *     --prelight [info]  copy the stock model's trunk prelight onto each LOD (and swapped HD with `--in`); foliage
  *                        kept. Optionally pass `--prelight ./info.json` of per-model `{ "<model>": { "skip": true } }`
  *                        overrides to opt a model out of the transfer.
- *     --loose   write the changed IMG entries loose to `<out>/gta3img/` instead of repacking `<out>/models/gta3.img`
+ *     --modloader emit TWO Modloader mods (real game) under `<out>`: `lod/` (LOD dff/txd/col in `gta3img/` + the
+ *                 static IPL + stripped `procobj.dat` + a `loader.txt` of IDE/IPL lines) and `hd/` (the swapped HD
+ *                 models + custom TXD, parented via a `txdp` IDE so NO stock IDE is rewritten). No `gta.dat` patch.
+ *                 Without it, repacks one `<out>/models/gta3.img` + patches `data/gta.dat`, HD swap inlined.
  *   All paths are relative to the current working directory (absolute paths pass through).
  */
 import { parsePrelightInfo, type PrelightInfo } from '@opensa/sa-lod/prelight';
@@ -65,7 +68,7 @@ function main(): void {
     tris: Number(argValue('--tris') ?? config.tris),
   };
 
-  const loose = process.argv.includes('--loose');
+  const modloader = process.argv.includes('--modloader');
   const prelight = process.argv.includes('--prelight');
 
   // `--prelight` is a bare flag, OR `--prelight <info.json>` of per-model overrides (a following non-flag token).
@@ -79,7 +82,7 @@ function main(): void {
     prelightInfo = parsePrelightInfo(readFileSync(file, 'utf8'));
   }
 
-  run({ config: merged, gamePath, inPath, loose, outPath, prelight, prelightInfo });
+  run({ config: merged, gamePath, inPath, modloader, outPath, prelight, prelightInfo });
 }
 
 main();

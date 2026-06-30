@@ -14,20 +14,31 @@ import { encodeGeometryStruct } from '@opensa/rw-codec/geometry-struct';
 
 import type { MergedMesh } from './mesh';
 
+export interface EncodeLodDffOptions {
+  /**
+   * Emit each triangle in both windings (see {@link doubleSided}). **OpenSA-specific** — it back-face-culls opaque
+   * world materials, and a merged cell's inconsistent winding would otherwise hole the ground. Off by default: a
+   * single authored model (e.g. a procobj impostor) has consistent winding and renders fine single-sided in the
+   * real game, where doubling is just an unproven structural change + wasted triangles.
+   */
+  doubleSided?: boolean;
+}
+
 /**
- * Serialize a merged + decimated cell {@link MergedMesh} into a standard SA RenderWare DFF (plan 002, 1d) — a clump
- * whose multi-material geometry carries the cell's prelit/UV/normals (+ the **night** prelit plugin when the mesh
- * has `nightColors`, so the LOD isn't dark at night), one material per texture group, and a BinMesh PLG (so the
- * **real** game renders the material splits). The geometry is emitted **two-sided** (see {@link doubleSided}).
- * Built from scratch via the map-optimizer chunk codec (`writeRw` + `encodeGeometryStruct`); the geometry stays in
- * native Z-up, cell-centre-relative space (the IPL inst places it back at the cell centre). u16 vertex indices cap
- * a geometry at 65 535 verts, so a dense cell is split across several geometries/atomics (see {@link splitMesh}).
+ * Serialize a merged + decimated {@link MergedMesh} into a standard SA RenderWare DFF (plan 002, 1d) — a clump
+ * whose multi-material geometry carries the prelit/UV/normals (+ the **night** prelit plugin when the mesh has
+ * `nightColors`, so the LOD isn't dark at night), one material per texture group, and a BinMesh PLG (so the
+ * **real** game renders the material splits). Optionally **two-sided** (`options.doubleSided`, for OpenSA — see
+ * {@link doubleSided}). Built from scratch via the map-optimizer chunk codec (`writeRw` + `encodeGeometryStruct`);
+ * the geometry stays in native Z-up, model-local space (the IPL inst places it). u16 vertex indices cap a geometry
+ * at 65 535 verts, so a dense mesh is split across several geometries/atomics (see {@link splitMesh}).
  */
-export function encodeLodDff(rawMesh: MergedMesh, name: string): Uint8Array {
-  // u16 vertex indices cap a geometry at 65 535 verts; a dense cell can exceed that, so split it across several
-  // geometries/atomics (all sharing the one identity frame) instead of decimating harder. Double-sided after the
-  // split — it only doubles indices, leaving the vertex count untouched.
-  const chunks = splitMesh(rawMesh, 0xffff).map(doubleSided);
+export function encodeLodDff(rawMesh: MergedMesh, name: string, options: EncodeLodDffOptions = {}): Uint8Array {
+  // u16 vertex indices cap a geometry at 65 535 verts; a dense mesh can exceed that, so split it across several
+  // geometries/atomics (all sharing the one identity frame) instead of decimating harder. Double-side after the
+  // split (OpenSA only) — it only doubles indices, leaving the vertex count untouched.
+  const prepare = options.doubleSided ? doubleSided : (mesh: MergedMesh): MergedMesh => mesh;
+  const chunks = splitMesh(rawMesh, 0xffff).map(prepare);
 
   return writeRw({
     chunks: [

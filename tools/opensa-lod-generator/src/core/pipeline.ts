@@ -9,7 +9,7 @@ export interface CellSummary {
 }
 
 export function printSummary(game: string, cellSize: number, summary: CellSummary): void {
-  console.log(`lod-generator ${game}:  cellSize=${cellSize}`);
+  console.log(`opensa-lod-generator ${game}:  cellSize=${cellSize}`);
   console.log(`  cells      — ${summary.cells}`);
   console.log(`  instances  — ${summary.instances} HD (${summary.uniqueModels} unique models)`);
   console.log(`  per cell   — up to ${summary.maxInstancesPerCell} instances`);

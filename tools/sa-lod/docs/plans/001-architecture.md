@@ -2,14 +2,14 @@
 
 **Status: ✅ As-built (shared library).** `@opensa/sa-lod` is a `type:tool` **library** (no CLI): the
 **simplified-copy LOD mesh pipeline** — QEM decimation, smooth-normal rebuild, and RenderWare DFF/TXD/COL encode
-from a merged mesh. Extracted from `lod-generator`'s adapter (+ a new `mesh.ts` types module) — see
+from a merged mesh. Extracted from `opensa-lod-generator`'s adapter (+ a new `mesh.ts` types module) — see
 `lod-procobj-generator` [001 §extraction, phase 3](../../../lod-procobj-generator/docs/plans/001-architecture.md).
-(The JSDoc "plan 002 / plan 015" references in the source point at **`lod-generator`'s** plans, where these modules
+(The JSDoc "plan 002 / plan 015" references in the source point at **`opensa-lod-generator`'s** plans, where these modules
 originated.)
 
 ## Why it exists
 
-Two tools make "simplified copy" LODs — `lod-generator` (per merged **cell**) and `lod-procobj-generator` (per
+Two tools make "simplified copy" LODs — `opensa-lod-generator` (per merged **cell**) and `lod-procobj-generator` (per
 **species** model). Both feed a mesh through the **same** transforms (decimate → re-normal → encode) and the same
 SA-strict encoders. That pipeline lives here so both import it; `tool-kit` stays generic (pure mesh ops), this
 package adds the **RenderWare encode** knowledge.
@@ -20,7 +20,7 @@ Layering: `@opensa/rw-codec` + `@opensa/tool-kit` (bytes / generic mesh) → `@o
 
 ## The interchange: `MergedMesh`
 
-`./mesh` defines the contract. A **producer** (a cell merge in `lod-generator`; a single frame-baked model in
+`./mesh` defines the contract. A **producer** (a cell merge in `opensa-lod-generator`; a single frame-baked model in
 `lod-procobj-generator`'s `mesh-builder.ts`) builds a `MergedMesh`: native **Z-up** space, triangles bucketed into
 per-texture `MergedGroup`s (no atlas), vertex attributes as parallel arrays indexed by the group `indices`. Normals
 ride from the source when present (else zero, for the normals pass); colours default to opaque white when a source
@@ -44,12 +44,13 @@ vertex had no prelit. `sa-lod` consumes it; it does not produce it (each tool ow
 
 ### Encoders (SA-strict)
 
-- `./encode-dff` — `encodeLodDff(mesh, name)` → a standard SA RenderWare DFF: a multi-material geometry (one
-  material per texture group) + a **BinMesh PLG** (so the real game renders the splits), native Z-up
-  cell/model-local space (the IPL `inst` places it). Emitted **two-sided** (each triangle both windings — indices
-  only) so OpenSA's back-face culling doesn't hole SA's inconsistently-wound ground. u16 indices cap a geometry at
-  65 535 verts, so a dense cell is **split across several geometries/atomics** in the one clump (`splitMesh`), all
-  sharing the identity frame.
+- `./encode-dff` — `encodeLodDff(mesh, name, options?)` → a standard SA RenderWare DFF: a multi-material geometry
+  (one material per texture group) + a **BinMesh PLG** (so the real game renders the splits), native Z-up
+  cell/model-local space (the IPL `inst` places it). **Optionally two-sided** (`options.doubleSided`, each triangle
+  both windings — indices only): the cell-LOD tool (OpenSA-only) enables it so OpenSA's back-face culling doesn't
+  hole a merged cell's inconsistently-wound ground; single-sided by default, which the real game wants for a single
+  authored model (e.g. a procobj impostor). u16 indices cap a geometry at 65 535 verts, so a dense mesh is **split
+  across several geometries/atomics** in the one clump (`splitMesh`), all sharing the identity frame.
 - `./encode-txd` — `encodeLodTxd(textures, source, maxSize)` → one TXD, each texture **2× box-downscaled** until
   ≤ `maxSize`, then **DXT-compressed** with a full mip chain (**DXT1** opaque / **DXT5** alpha, via
   `encodeDxtStruct`) — uncompressed A8R8G8B8 blows the IMG up ~4× (a full cell build's TXDs were ~324 MB raw vs
@@ -104,6 +105,6 @@ downscaled levels, 112-byte COL3). `prelight.test.ts` — the stock-ambient aver
 
 ## Consumers
 
-`lod-generator` (per-cell) and `lod-procobj-generator` (per-species), paired with `@opensa/map-placement`
+`opensa-lod-generator` (per-cell) and `lod-procobj-generator` (per-species), paired with `@opensa/map-placement`
 ([001](../../../map-placement/docs/plans/001-architecture.md)) for the map-file side. `lod-trees-generator` also
 imports `./encode-col` + `./prelight` (its impostor bake is otherwise its own).

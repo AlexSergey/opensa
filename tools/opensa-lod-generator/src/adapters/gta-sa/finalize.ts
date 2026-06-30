@@ -75,7 +75,9 @@ export function writeBuild(options: BuildOptions): void {
   options.baked.forEach((cell, i) => {
     const id = options.firstId + i;
     const name = cellModelName(cell.cx, cell.cy);
-    img.set(`${name}.dff`, encodeLodDff(cell.mesh, name));
+    // Two-sided: this build targets OpenSA, which back-face-culls opaque world materials; a merged cell's
+    // inconsistent winding would hole the ground otherwise (the real game renders single-sided fine).
+    img.set(`${name}.dff`, encodeLodDff(cell.mesh, name, { doubleSided: true }));
     img.set(`${name}.txd`, encodeLodTxd(cellTextures(cell), options.textureSource, options.lodTextureSize));
     objs.push(ideObjsLine(id, name, options.drawDistance));
     insts.push(iplInstLine(id, name, cellCentre(cell, options.cellSize)));

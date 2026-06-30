@@ -1,7 +1,7 @@
 # 001 — vehicle-optimizer architecture
 
 **Status: ✅ Base scaffolded (inspect runs).** A standalone tool for fitting vehicle models — **uniform scale**
-and **reflection/specular/env-map copy** — kept separate from map-optimizer (map conditioning) and lod-generator
+and **reflection/specular/env-map copy** — kept separate from map-optimizer (map conditioning) and opensa-lod-generator
 (distant LODs) because it's a focused, custom **vehicle** tool whose output must run in the **real game**.
 
 ## Why a separate project
@@ -10,7 +10,7 @@ The output is standard RenderWare DFF/COL for **real GTA SA** (not OpenSA-specif
 vehicle-domain edits (scale a rig, copy material effects). It reuses the shared RW codec but answers to a
 different goal than the map tools, so it lives on its own with its own `out/`.
 
-## Shape (mirrors map-optimizer / lod-generator)
+## Shape (mirrors map-optimizer / opensa-lod-generator)
 
 ```
 cli.ts  --model <path> [--scale <factor>] [--prototype <path>]  →  out/<filename>.dff   (paths relative to cli.ts)

@@ -8,7 +8,7 @@
  * the prefix (e.g. `LODCJ_SLOT_BANK`, a casino-interior prop, not a LOD). The
  * runtime consumers (`buildWorldGrid`, `build-colliders`) drop interiors via
  * `isInterior` *before* this check, so such interior false-positives never
- * reach it. A **destructive** caller (e.g. `lod-generator`'s `--strip-lods`)
+ * reach it. A **destructive** caller (e.g. `opensa-lod-generator`'s `--strip-lods`)
  * must NOT rely on the name alone — confirm a model is a LOD by checking it is
  * actually referenced as a `lod` target (some instance's `lod` index points to
  * it); deleting a name-matched non-LOD crashed the game.

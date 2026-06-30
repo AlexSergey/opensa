@@ -28,8 +28,8 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
   [`map-optimizer/docs/plans/`](../../tools/map-optimizer/docs/plans/) (`001`–`015`).
 - **vehicle-optimizer** — scale + reflection-strength transfer for vehicle DFFs.
   [`vehicle-optimizer/docs/plans/`](../../tools/vehicle-optimizer/docs/plans/) (`001`–`003`).
-- **lod-generator** — chunked LOD bake (merge → QEM decimate → per-cell TXD → drop-in build).
-  [`lod-generator/docs/plans/`](../../tools/lod-generator/docs/plans/) (`001`–`002`).
+- **opensa-lod-generator** — chunked LOD bake (merge → QEM decimate → per-cell TXD → drop-in build).
+  [`opensa-lod-generator/docs/plans/`](../../tools/opensa-lod-generator/docs/plans/) (`001`–`002`).
 - **lod-trees-generator** — SA-style tree LOD impostors (crossed-billboard cards + baked alpha atlas) from HD
   trees, plus the map strip + place stages (text↔binary IPL LOD-index coupling), the SA asset-format checklist,
   and aspect-aware atlas + `--prelight` trunk transfer. (procobj is now its own tool.)
@@ -53,7 +53,7 @@ Core runtime + RenderWare parsing, world streaming, rendering, characters, vehic
   procobj convert/strip), used by lod-trees-generator + lod-procobj-generator.
   [`map-placement/docs/plans/`](../../tools/map-placement/docs/plans/) (`001` architecture & API).
 - **sa-lod** — shared simplified-copy LOD pipeline (decimate → normals → encode DFF/TXD/COL), extracted from
-  lod-generator, used by it + lod-procobj-generator.
+  opensa-lod-generator, used by it + lod-procobj-generator.
   [`sa-lod/docs/plans/`](../../tools/sa-lod/docs/plans/) (`001` architecture & API).
 - **rw-codec** — shared pure RW chunk/DFF/DXT/geometry-struct codec, extracted from map-optimizer (plan 057,
   step 2). Top-level `rw-codec/` now; moves under `tools/` in the migration. No plans doc.

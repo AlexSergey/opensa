@@ -4,12 +4,12 @@
 from the HD models: cut the world into equal square cells, and for each cell emit **one decimated merged mesh +
 one atlas texture**. Strip the old LOD models, and emit fresh IPL placing the new cell-LODs. The modern
 open-world LOD scheme (cf. GTA V SLOD). **The engine already renders this** (its streaming is a per-cell HD/LOD
-grid), so this is **entirely a lod-generator task** — no `../src` render change, only a cell-size config match.
+grid), so this is **entirely a opensa-lod-generator task** — no `../src` render change, only a cell-size config match.
 
 **Target: OpenSA only (decided 2026-06-29).** Originally dual-target (OpenSA + original SA), but the original-game
 path was dropped: stock SA crashes on the cell-LODs (no-collision stock LODs, then per-model material/texture +
 size limits the streamer can't take) and the fixes cost too much coverage for no OpenSA benefit — see the
-`lod-generator-decimation` memory for the full real-SA diagnosis if it's ever revisited. Output is still standard
+`opensa-lod-generator-decimation` memory for the full real-SA diagnosis if it's ever revisited. Output is still standard
 RenderWare DFF/TXD + text IDE/IPL (loads in stock SA), just not budgeted for SA's streamer. The dual-target
 sections below are kept for that history.
 
@@ -59,7 +59,7 @@ world → grid of N×N-unit cells   (= the engine's streaming cellSize)
     mesh via the shared `tool-kit/mesh/smooth-normals` core (extracted from map-optimizer plan 015 — now used by
     both tools). Densest cell: 85 959 → 102 053 verts (+16 k splits at hard edges), **all unit-length**, tris
     unchanged. Runs post-decimate once that lands. (Shared `tool-kit` also now holds the editable **IMG** module
-    — open/add-replace/delete/rebuild — used by map-optimizer + lod-generator emit. Monorepo-package move:
+    — open/add-replace/delete/rebuild — used by map-optimizer + opensa-lod-generator emit. Monorepo-package move:
     `docs/ideas/monorepo-packages.md`.)
   - **1c — QEM decimate. ✅ Done** (`tool-kit/mesh/simplify.ts` + `@opensa/sa-lod/decimate.ts`):
     Garland–Heckbert edge-collapse on the **whole merged cell** (not per model — per-model over-thins small
@@ -80,39 +80,34 @@ world → grid of N×N-unit cells   (= the engine's streaming cellSize)
     night colour). **Open:** tiny flat decorative islands (sidewalk grass, forest-floor patches) still erode at
     the 20 % budget — flat collapses are free and the per-group floor only protects 2 faces for the whole texture;
     a per-component floor fixed it but 3–4× the triangles, so deferred for a targeted fix (see the
-    `lod-generator-decimation` memory).
-  - **1d — emit.** Split:
-    - **1d-i — DFF writer. ✅ Done** (`@opensa/sa-lod/encode-dff.ts`): build a standard SA clump from scratch
-      (FrameList + GeometryList + Atomic + per-texture MaterialList + **BinMesh PLG** so the real game renders
-      the splits, + the **night-colour** plugin when present) via the map-optimizer chunk codec +
-      `encodeGeometryStruct`. Geometry is emitted **two-sided** (each triangle written both windings — indices
-      only, verts untouched): SA map geometry has inconsistent winding + mostly-missing normals and OpenSA
-      back-face-culls opaque world materials, so a third of the ground would otherwise cull; the reversed copy is
-      coincident (harmless in real SA, no engine change). A cell that exceeds the DFF **65 535-vertex u16 limit**
-      is **split across multiple geometries/atomics** in the one clump (`splitMesh`), all sharing the identity
-      frame. Round-trips through the engine `parseDff`.
-    - **1d-ii — finalize. ✅ Done** (`adapters/gta-sa/finalize.ts`, CLI `--out <path>`): bake every cell → one
-      `models/lods.img` (cell DFF + per-cell TXD each, plus one shared `lods.col` of **bounds-only COL3** models —
-      one per cell, named to its model — so SA has collision to stream them; without it the game faults
-      `MODEL_DOES_NOT_HAVE_COLLISION_LOADED`) via the tool-kit editable IMG, emit `data/maps/lods.ide` (cell-LOD defs,
-      `lodDrawDistance` 1500) + `data/maps/lods.ipl` (inst at cell centre, lod = −1), register all three in
-      `data/gta.dat` (decided), mirror the rest to `--out`. Cell-LOD ids start at **max IDE id + 1** (decided) —
-      the count exceeds the stock ≤18630 model ceiling, so this build needs an extended ID limit (fastman92
-      "model special features", 0–19999). Dual-target: `lod`-prefix name (OpenSA bucket) + IDE/IPL + big drawDist
-      (original + Project2DFX). Validated in-memory: built IMG round-trips — `lod_3_-7` → 4000 tris / 81 textures,
-      **81/81 covered by its cell TXD**. By default **additive** (old `lod*` coexist); `--strip-lods` removes them
-      (1d-iii). Trees are excluded from the bake (handled by `lod-trees-generator`); procobj is never in the IPLs.
-    - **1d-iii — strip old LODs. ✅ Done** (`adapters/gta-sa/strip.ts`, CLI `--strip-lods`): on the finished build,
-      drop every stock-LOD instance from the text IPLs and the binary streams in `gta3.img` — repairing the shared
-      text↔binary `lod`-index space via the proven `@opensa/map-placement/ipl-{text,binary}-strip` (moved out of
-      `lod-trees-generator`) — and delete its `.dff`/`.txd` from `gta3.img`. **A model is a stock LOD only when it
-      is both `lod*`-named AND actually referenced as a `lod` target** — the name alone is unreliable
-      (`LODCJ_SLOT_BANK` is a real interior prop placed directly, never pointed to → kept; the crude `startsWith
+    `opensa-lod-generator-decimation` memory).
+  - **1d — emit.** Split: - **1d-i — DFF writer. ✅ Done** (`@opensa/sa-lod/encode-dff.ts`): build a standard SA clump from scratch
+    (FrameList + GeometryList + Atomic + per-texture MaterialList + **BinMesh PLG** so the real game renders
+    the splits, + the **night-colour** plugin when present) via the map-optimizer chunk codec +
+    `encodeGeometryStruct`. The cell-LOD bake emits geometry **two-sided** (`encodeLodDff(…, { doubleSided: true })`)
+    — see [Two-sided geometry](#two-sided-geometry-opensa-cull-fix) for why + why it's opt-in. A mesh that exceeds
+    the DFF **65 535-vertex u16 limit** is **split across multiple geometries/atomics** in the one clump
+    (`splitMesh`), all sharing the identity frame. Round-trips through the engine `parseDff`. - **1d-ii — finalize. ✅ Done** (`adapters/gta-sa/finalize.ts`, CLI `--out <path>`): bake every cell → one
+    `models/lods.img` (cell DFF + per-cell TXD each, plus one shared `lods.col` of **bounds-only COL3** models —
+    one per cell, named to its model — so SA has collision to stream them; without it the game faults
+    `MODEL_DOES_NOT_HAVE_COLLISION_LOADED`) via the tool-kit editable IMG, emit `data/maps/lods.ide` (cell-LOD defs,
+    `lodDrawDistance` 1500) + `data/maps/lods.ipl` (inst at cell centre, lod = −1), register all three in
+    `data/gta.dat` (decided), mirror the rest to `--out`. Cell-LOD ids start at **max IDE id + 1** (decided) —
+    the count exceeds the stock ≤18630 model ceiling, so this build needs an extended ID limit (fastman92
+    "model special features", 0–19999). Dual-target: `lod`-prefix name (OpenSA bucket) + IDE/IPL + big drawDist
+    (original + Project2DFX). Validated in-memory: built IMG round-trips — `lod_3_-7` → 4000 tris / 81 textures,
+    **81/81 covered by its cell TXD**. By default **additive** (old `lod*` coexist); `--strip-lods` removes them
+    (1d-iii). Trees are excluded from the bake (handled by `lod-trees-generator`); procobj is never in the IPLs. - **1d-iii — strip old LODs. ✅ Done** (`adapters/gta-sa/strip.ts`, CLI `--strip-lods`): on the finished build,
+    drop every stock-LOD instance from the text IPLs and the binary streams in `gta3.img` — repairing the shared
+    text↔binary `lod`-index space via the proven `@opensa/map-placement/ipl-{text,binary}-strip` (moved out of
+    `lod-trees-generator`) — and delete its `.dff`/`.txd` from `gta3.img`. **A model is a stock LOD only when it
+    is both `lod*`-named AND actually referenced as a `lod` target** — the name alone is unreliable
+    (`LODCJ_SLOT_BANK` is a real interior prop placed directly, never pointed to → kept; the crude `startsWith
 'lod'` test wrongly stripped it and crashed loading `int_veg.ipl`). The **same** `isOldLod` predicate gates
-      instance-removal _and_ DFF-deletion, so a deleted model can't have surviving instances (no dangling refs).
-      The cell-LOD `lods.*` assets are skipped (they're `lod*`-named too); IDE defs left as-is. Verified on the
-      stock map: 5803 instances + 4082 IMG entries removed, `int_veg`/`lods.*` untouched, archives re-parse.
-      Remaining: verify DFF/TXD size vs the stream-model limit in-game.
+    instance-removal _and_ DFF-deletion, so a deleted model can't have surviving instances (no dangling refs).
+    The cell-LOD `lods.*` assets are skipped (they're `lod*`-named too); IDE defs left as-is. Verified on the
+    stock map: 5803 instances + 4082 IMG entries removed, `int_veg`/`lods.*` untouched, archives re-parse.
+    Remaining: verify DFF/TXD size vs the stream-model limit in-game.
 - **Phase 2 — per-cell TXD (revised from "atlas").** Probing showed **88 % of a cell's texture groups tile**
   (UV > 1.5 — roads/pavement/terrain), so a true UV-remap atlas would smear the bulk. **Decision: per-cell TXD,
   not an atlas** — one TXD per cell holding the cell's textures (downscaled to `lodTextureSize`, default 64),
@@ -166,6 +161,33 @@ A generated `lod_<cx>_<cy>` model (lod-prefixed) is auto-bucketed into `cell.lod
 `../src` change** — only **config**: the bake cell size must equal the streaming `cellSize` (one baked LOD = one
 engine cell), plus the LOD-ring distance (also config).
 
+## Two-sided geometry (OpenSA cull fix)
+
+**Problem.** OpenSA's renderer draws opaque world materials `FrontSide` (back-face-culled — `build-clump.ts`:
+`side: transparent ? DoubleSide : FrontSide`). SA map geometry has **inconsistent triangle winding** and **mostly
+no vertex normals** (measured: ~29 046 / 31 472 ground verts had zero normals), and a cell merges arbitrary HD
+geometry, so a merged cell ends up with ~a third of its triangles facing away → culled → the ground reads as
+shredded shards / holes from above.
+
+**Why not the obvious fixes.** (a) _Make the engine render LODs `DoubleSide`_ — rejected: must not touch `../src`,
+and the build must also load in the real game. (b) _Re-wind the geometry consistently (all outward)_ — there's no
+robust outward reference for arbitrary merged concave geometry; a `force-up` heuristic only fixed flat ground, not
+walls. (c) _Per-triangle normal-based winding_ — most source verts have no normals.
+
+**Solution — emit it two-sided in the DFF** (`encode-dff.ts` `doubleSided`): write each triangle in **both**
+windings (`a,b,c` **and** `a,c,b`). **Indices only — the vertex count is untouched**, so it doesn't push toward
+the u16 split, and lighting is vertex-normal Gouraud (winding-independent). Whatever a surface's winding, one copy
+always faces the camera; OpenSA's `FrontSide` cull keeps that one and drops the other. The real game doesn't cull
+the world, so it draws both coincident copies (identical pixels — harmless). Generation-only, no engine change.
+
+**Opt-in** (`EncodeLodDffOptions.doubleSided`, default **off**): the cell-LOD bake turns it on
+(`finalize.ts`); the _other_ `encode-dff` reuser — `lod-procobj-generator`, a **real-game** target — leaves it
+**off**, because a single authored impostor has consistent winding and renders fine single-sided, and doubling is
+just an unproven structural change + wasted triangles for the real game. (`lod-trees-generator` has its own
+billboard encoder and is unaffected.) Cost: ~2× the cell-LOD's triangle/index count — fine for OpenSA, and the
+reason the cell-LOD tool is OpenSA-only anyway (the real game can't take the merged cells regardless; see the
+`opensa-lod-generator-decimation` memory).
+
 ## Procedural clutter (procobj / trees / rocks)
 
 Two distinct kinds, handled differently:
@@ -187,7 +209,7 @@ bushes / cacti / rocks / trees / underwater`) → **not in IPL**, so not in the 
   engine's cell grid + HD/LOD streaming (renders the cell-LODs as-is); for Phase 4, the procobj scatter.
 - **Reuse (sibling `../map-optimizer`):** the **DXT encoder + VER2 archive writer** (its plans 010/011) for the
   atlas TXD + packing; **smooth-group normals** (its plan 015) for the decimated cells; the DFF serializer.
-- **New (in lod-generator):** **QEM decimator** (attribute-aware — preserve material/UV-seam boundaries, weight
+- **New (in opensa-lod-generator):** **QEM decimator** (attribute-aware — preserve material/UV-seam boundaries, weight
   silhouette/border edges so the far contour survives); **rectangle-pack atlas builder** + UV remap; **prelit
   re-bake** onto the decimated mesh (barycentric sample from HD); an **IPL writer** (text `inst` — trivial); the
   **bake driver** + `finalize` (currently stubbed in the gta-sa adapter).
@@ -221,7 +243,7 @@ bushes / cacti / rocks / trees / underwater`) → **not in IPL**, so not in the 
 
 ## Relationship to other plans
 
-- **lod-generator 001** — the architecture this implements (`LodAdapter.bakeCell` / `finalize`).
+- **opensa-lod-generator 001** — the architecture this implements (`LodAdapter.bakeCell` / `finalize`).
 - **map-optimizer 015 / 010 / 011** — reused for normals + the atlas TXD / archive writers.
 - **map-optimizer 014** (terrain smoothing — shelved): independent. Chunked LODs _reduce_ detail and so sidestep
   every reason 014 failed (no curvature recovery, no relaxation, no substrate move).

@@ -16,8 +16,8 @@ export interface StripOptions {
   dffNames: string[];
   /** Game-data dir (`data/`, `models/gta3.img`). */
   gamePath: string;
-  /** Write modified IMG entries loose to `<out>/gta3img/` instead of repacking a full `gta3.img`. */
-  loose: boolean;
+  /** `--modloader`: write modified IMG entries loose to `<out>/gta3img/` instead of repacking a full `gta3.img`. */
+  modloader: boolean;
   outPath: string;
 }
 
@@ -29,7 +29,7 @@ type GtaDat = ReturnType<typeof parseGtaDat>;
  * (a repacked `gta3.img` by default, or loose entries in `gta3img/` with `loose`), plus the edited data files.
  */
 export function stripMap(options: StripOptions): void {
-  const { dffNames, gamePath, loose, outPath } = options;
+  const { dffNames, gamePath, modloader, outPath } = options;
   const treeNames = new Set<string>();
   for (const name of dffNames) {
     treeNames.add(name.toLowerCase());
@@ -46,12 +46,12 @@ export function stripMap(options: StripOptions): void {
   const textRemoved = stripTextIpls(gamePath, dat, treeNames, keepId, outPath, maps);
   const streams = stripStreams(archive, keepId, maps);
   const procRemoved = stripProcObjFile(gamePath, treeNames, outPath);
-  emitImg(archive, streams.edited, loose, outPath);
+  emitImg(archive, streams.edited, modloader, outPath);
 
   console.log(
     `strip: ${dffNames.length} tree models · removed ${streams.removed + textRemoved} instances ` +
       `(${streams.edited.size} streams, binary ${streams.removed} / text ${textRemoved}) · procobj ${procRemoved} ` +
-      `→ ${loose ? `${outPath}/gta3img/` : `${outPath}/gta3.img`}`,
+      `→ ${modloader ? `${outPath}/gta3img/` : `${outPath}/gta3.img`}`,
   );
 }
 

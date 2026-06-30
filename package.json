@@ -46,7 +46,7 @@
     "packages/modloader",
     "packages/game",
     "tools/map-optimizer",
-    "tools/lod-generator",
+    "tools/opensa-lod-generator",
     "tools/vehicle-optimizer",
     "tools/timecyc-builder",
     "tools/lod-trees-generator",

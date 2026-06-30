@@ -212,12 +212,12 @@ const customJsConfig = {
   ...js.configs.recommended,
 };
 
-// Node build/pack scripts + the map-optimizer / lod-generator tools: Node globals (Buffer, process, …), console.
+// Node build/pack scripts + the map-optimizer / opensa-lod-generator tools: Node globals (Buffer, process, …), console.
 const scriptsConfig = {
   files: [
     'scripts/**/*.{js,mjs,cjs,ts}',
     'tools/map-optimizer/**/*.{js,mjs,cjs,ts}',
-    'tools/lod-generator/**/*.{js,mjs,cjs,ts}',
+    'tools/opensa-lod-generator/**/*.{js,mjs,cjs,ts}',
     'tools/vehicle-optimizer/**/*.{js,mjs,cjs,ts}',
     'tools/tool-kit/**/*.{js,mjs,cjs,ts}',
     'tools/rw-codec/**/*.{js,mjs,cjs,ts}',

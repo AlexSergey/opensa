@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CustomTxd } from './retxd';
 
-import { editIdeTxd, selectTxd } from './retxd';
+import { editIdeTxd, selectTxd, txdpIde, txdpPairs } from './retxd';
 
 const ide = (rows: readonly string[]): string => ['objs', ...rows, 'end', ''].join('\r\n');
 const txd = (name: string, textures: readonly string[]): CustomTxd => ({
@@ -73,6 +73,66 @@ describe('selectTxd', () => {
 
     it('picks the TXD with the most hits when textures span several', () => {
       expect(selectTxd(new Set(['bark1', 'leaf1', 'stone1']), [rocks, trees])).toBe(trees);
+    });
+  });
+});
+
+describe('txdpPairs', () => {
+  describe('negative cases', () => {
+    it('skips a model whose stock TXD is unknown (no IDE row found)', () => {
+      const pairs = txdpPairs(new Map([['veg_tree3', 'vegetation']]), new Map());
+
+      expect(pairs.size).toBe(0);
+    });
+
+    it('skips a self-parent (model already uses the custom TXD as its stock TXD)', () => {
+      const pairs = txdpPairs(new Map([['veg_tree3', 'vegetation']]), new Map([['veg_tree3', 'vegetation']]));
+
+      expect(pairs.size).toBe(0);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('parents each model’s stock TXD (child) to its custom TXD (parent)', () => {
+      const pairs = txdpPairs(new Map([['veg_tree3', 'vegetation']]), new Map([['veg_tree3', 'gta_tree_boak']]));
+
+      expect([...pairs]).toEqual([['gta_tree_boak', 'vegetation']]);
+    });
+
+    it('collapses models sharing one stock TXD to a single parent link', () => {
+      const pairs = txdpPairs(
+        new Map([
+          ['veg_tree3', 'vegetation'],
+          ['veg_tree4', 'vegetation'],
+        ]),
+        new Map([
+          ['veg_tree3', 'gta_tree_boak'],
+          ['veg_tree4', 'gta_tree_boak'],
+        ]),
+      );
+
+      expect([...pairs]).toEqual([['gta_tree_boak', 'vegetation']]);
+    });
+  });
+});
+
+describe('txdpIde', () => {
+  describe('negative cases', () => {
+    it('emits an empty (header/footer only) section for no pairs', () => {
+      expect(txdpIde(new Map())).toBe('txdp\n\nend\n');
+    });
+  });
+
+  describe('positive cases', () => {
+    it('emits a `txdp` section of `child, parent` rows ending in `end`', () => {
+      const ide = txdpIde(
+        new Map([
+          ['gta_tree_boak', 'vegetation'],
+          ['vgsn_nitree', 'vegetation'],
+        ]),
+      );
+
+      expect(ide).toBe('txdp\ngta_tree_boak, vegetation\nvgsn_nitree, vegetation\nend\n');
     });
   });
 });
