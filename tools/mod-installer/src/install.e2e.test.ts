@@ -88,6 +88,44 @@ describe('install (end-to-end)', () => {
       expect(byName.get('decal')?.format).toBe('dxt5'); // added, alpha
     });
 
+    it('routes each mod by kind: a loader mod is baked (gta.dat + gta3.img), a plain mod overlays', () => {
+      const game = join(root, 'game');
+      const mods = join(root, 'mods');
+      const out = join(root, 'out');
+
+      // Base: gta.dat + a stock IDE + a seeded gta3.img.
+      write(join(game, 'data', 'gta.dat'), 'IDE DATA\\MAPS\\stock.ide\n');
+      write(join(game, 'data', 'maps', 'stock.ide'), 'objs\nend\n');
+      const baseImg = createImg();
+      baseImg.set('base.dff', Uint8Array.from([1]));
+      write(join(game, 'models', 'gta3.img'), baseImg.build());
+
+      // a_loader: a Modloader mod (loader.txt registers a new IDE + a scattered dff) → BAKED.
+      write(join(mods, 'a_loader', 'loader.txt'), 'IDE data/maps/extra.ide');
+      write(join(mods, 'a_loader', 'files', 'extra.ide'), 'objs\n5000, ext, exttxd, 1500, 0\nend\n');
+      write(join(mods, 'a_loader', 'deep', 'extra.dff'), Uint8Array.from([7, 7]));
+
+      // b_plain: a plain mod (file overlay + gta3img/) → OVERLAID.
+      write(join(mods, 'b_plain', 'data', 'extra-note.txt'), 'plain');
+      write(join(mods, 'b_plain', 'gta3img', 'plain.dff'), Uint8Array.from([8]));
+
+      install({ gamePath: game, inPath: mods, outPath: out });
+
+      // a_loader baked: gta.dat gained the new IDE (canonicalised), the IDE is on disk, the dff is in gta3.img.
+      const gtaDat = readFileSync(join(out, 'data', 'gta.dat'), 'utf8');
+      expect(gtaDat).toContain('IDE DATA\\MAPS\\extra.ide');
+      expect(readFileSync(join(out, 'data', 'maps', 'extra.ide'), 'utf8')).toContain('5000, ext');
+      expect(existsSync(join(out, 'loader.txt'))).toBe(false); // loader parsed, never copied
+      // b_plain overlaid: its file copied, its gta3img/ merged (not copied as a folder).
+      expect(readFileSync(join(out, 'data', 'extra-note.txt'), 'utf8')).toBe('plain');
+      expect(existsSync(join(out, 'gta3img'))).toBe(false);
+      // both mods' assets + the base coexist in gta3.img.
+      const img = openImg(new Uint8Array(readFileSync(join(out, 'models', 'gta3.img'))));
+      expect(img.has('base.dff')).toBe(true);
+      expect(img.has('extra.dff')).toBe(true); // baked (a_loader, scattered)
+      expect(img.has('plain.dff')).toBe(true); // overlaid (b_plain, gta3img/)
+    });
+
     it('applies a mod-shipped .txd file before merging its sibling PNG folder (files-first)', () => {
       const version = 0x1803ffff;
       const game = join(root, 'game');

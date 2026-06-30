@@ -40,8 +40,8 @@ tsx tools/mod-installer/src/cli.ts --game ./game-src/non-modified --in ./mods --
    `gta3img/` is applied **after** the file copy so its entries land on whichever `gta3.img` this mod ships (or the
    inherited one). If `--out` has no `gta3.img` yet, the entries seed a fresh archive.
 
-This is the exact inverse of `lod-trees-generator`'s `--loose` output (`gta3img/` loose entries) — mod-installer is
-what **applies** such drops.
+`gta3img/` is a generic "loose IMG entries" convention (a binary `gta3.img` can't be patched file-by-file, so a mod
+ships the entries as a folder); mod-installer is what **applies** such a drop into `gta3.img`.
 
 ## Modules
 
@@ -68,8 +68,8 @@ copy/overwrite, `readdirSync`/`statSync` for the mod scan).
    fresh archive if absent); wired into `apply-mod`.
 4. **CLI + tests** ✅ — `cli.ts`; `sortMods` unit test (plain vs numeric) + a tmpdir IMG-merge integration test
    (seed + replace-by-name). `tsc`/`eslint`/tests green.
-5. **Verify** — _pending the user_: run on `./game-src/non-modified` + a couple of `--loose` drops from the LOD
-   tools; confirm the merged `--out` loads in-game.
+5. **Verify** — _pending the user_: run on `./game-src/non-modified` + a couple of mod folders (each mirroring the
+   game tree, with an optional `gta3img/`); confirm the merged `--out` loads in-game.
 
 ## Decisions (resolved)
 

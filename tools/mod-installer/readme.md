@@ -21,13 +21,39 @@ tsx tools/mod-installer/src/cli.ts --game ./game-src/non-modified --in ./mods --
 1. `--out` is wiped, then the `--game` tree is copied in (the base).
 2. Mod subfolders of `--in` are sorted **plain alphabetical** (`mod1`, `mod10`, `mod2` — not numeric-aware) and
    applied in order; a later mod wins on a conflict.
-3. Per mod: copy **every** top-level entry except `gta3img/` over `--out` (overlay — overwrites matching files,
-   keeps the rest); then merge the mod's `gta3img/` loose files into `--out/models/gta3.img` (add or replace by
-   name), so they land on whichever `gta3.img` the mod ships or the inherited one.
+3. Per mod, one of two modes:
+   - **Modloader mod** (its subtree carries a `loader.txt`-style file with `IDE`/`IPL`/`COLFILE` directives) — it is
+     **baked** (see below).
+   - **Plain mod** (no loader) — **overlay**: copy every top-level entry except `gta3img/` over `--out` (overwrites
+     matching files, keeps the rest), then merge the mod's `gta3img/` loose files into `--out/models/gta3.img` (add
+     or replace by name). A PNG folder beside a loose `<name>.txd` merges into that TXD (see below).
 
-It's the inverse of the LOD tools' `--loose` output (a `gta3img/` drop) — mod-installer **applies** such drops.
+Each mod applies onto the **accumulated** `--out`, so several mods that touch different files (or different
+textures / different `gta3.img` entries) all coexist; only when two mods change the **same** item does the later
+one win. `gta3img/` is a generic "loose IMG entries" convention — a binary `gta3.img` can't be patched file-by-file,
+so a mod expresses "add/replace these entries" as a folder; any source (the LOD tools, hand-built mods, …) can ship
+one.
 
 A guard refuses to wipe a dangerous `--out` (the filesystem root, or a path that is/contains `--game` / `--in`).
+
+## Baking Modloader mods
+
+A **Modloader-style** mod (a `loader.txt`/`Loader.txt`/`to gta.dat.txt` — any `.txt` carrying `IDE`/`IPL`/`COLFILE`
+directives — plus files scattered anywhere in its tree) is **baked** into a flat, stock-loadable `--out` — the
+on-disk equivalent of what `@opensa/modloader` does at runtime (whose pure merge logic it reuses). Per such mod:
+
+- the loader's `IDE`/`IPL` lines are appended to `--out/data/gta.dat` (deduped, canonicalised to the stock
+  `DATA\MAPS\…` style — backslashes + uppercase directory, filename as-authored);
+- each `.ide`/text `.ipl` is written to disk — **overwriting the stock file** with that bare name if one exists
+  (e.g. a modified `LAn.ide`), else the **loader-declared path** (a new `reLIT.ide`);
+- `object.dat`/`procobj.dat` are **additively merged** onto the stock (other `.dat` overwrite);
+- every `.dff`/`.txd`/`.col`/`.ifp` (and `_streamN.ipl`) is **injected into `--out/models/gta3.img` by bare name**
+  (`COLFILE` is dropped — SA auto-discovers the embedded `.col`);
+- UTF-16 loaders are read BOM-aware; CLEO `.cs` and prose `.txt` are ignored.
+
+Folder names are irrelevant (files match by bare name). Note: injecting a large model bundle bloats `gta3.img` —
+baking trades disk size for not needing a runtime loader. See
+[`docs/plans/004-bake-modloader-mods.md`](./docs/plans/004-bake-modloader-mods.md).
 
 ## Texture folders → loose `.txd`
 

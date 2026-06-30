@@ -2,6 +2,7 @@ import { cpSync, readdirSync, rmSync } from 'node:fs';
 import { join, parse, resolve, sep } from 'node:path';
 
 import { applyMod } from './apply-mod';
+import { bakeMod } from './bake-mod';
 
 export interface InstallOptions {
   gamePath: string;
@@ -24,7 +25,10 @@ export function guardOut(outPath: string, gamePath: string, inPath: string): voi
 
 /**
  * Build a merged install: wipe `--out`, copy the `--game` base into it, then apply every mod folder under `--in`
- * (alphabetical) on top — plain files overwrite, `gta3img/` entries merge into `gta3.img`. Later mods win.
+ * (alphabetical) on top. A mod carrying a **loader file** (a `loader.txt`-style mod) is **baked** — its loader's
+ * defs/placements are registered in `gta.dat`, its scattered assets injected into `gta3.img`, its data files merged
+ * ({@link bakeMod}); every other mod is a plain **overlay** (files overwrite, `gta3img/`/PNG-folders merge). Later
+ * mods win.
  */
 export function install(options: InstallOptions): void {
   const gamePath = resolve(options.gamePath);
@@ -41,11 +45,21 @@ export function install(options: InstallOptions): void {
       .map((entry) => entry.name),
   );
   let merged = 0;
+  let baked = 0;
   for (const mod of mods) {
-    merged += applyMod(join(inPath, mod), outPath).merged;
+    const bake = bakeMod(join(inPath, mod), outPath);
+    if (bake.baked) {
+      merged += bake.assets;
+      baked += 1;
+    } else {
+      merged += applyMod(join(inPath, mod), outPath).merged;
+    }
   }
 
-  console.log(`mod-installer: ${mods.length} mod(s) → ${outPath} (${merged} gta3.img entries merged)`);
+  console.log(
+    `mod-installer: ${mods.length} mod(s) (${baked} baked) → ${outPath} ` +
+      `(${merged} entries merged into gta3.img / loose .txd)`,
+  );
 }
 
 /** Mod folder names sorted plain case-insensitive ascending (`mod1`, `mod10`, `mod2` — **not** numeric-aware). */
