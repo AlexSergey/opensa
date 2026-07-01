@@ -1,6 +1,6 @@
 import type { IplInstance, MapDefinitions } from '../parsers/text';
 
-import { isInterior, isLodModel } from '../parsers/text';
+import { isInterior } from '../parsers/text';
 
 /** One grid cell's placed instances, split into full-detail (HD) and LOD. */
 export interface GridCell {
@@ -15,7 +15,10 @@ export type WorldGrid = Map<string, GridCell>;
 
 /**
  * Bucket the map's exterior instances into a square grid of the given cell size,
- * splitting each cell into HD (full-detail) and LOD (`lod`-prefixed models) lists.
+ * splitting each cell into HD (full-detail) and LOD lists. An instance is a LOD iff
+ * it is a **LOD target** — `instance.isLod`, set by {@link resolveMap} from the IPL
+ * `lod` index (the authoritative test; the `lod`-name prefix is only a heuristic and
+ * mis-buckets name-mismatched LODs like `nw_lodbit_18` and base geometry named `lod*`).
  * Instances with no catalog def are skipped (they can't be rendered). Exterior vs
  * interior is decided by {@link isInterior} — the real interior id is the low byte
  * of the IPL `interior` field (`value & 0xFF`), so `interior === 0` was too strict
@@ -36,7 +39,7 @@ export function buildWorldGrid(defs: MapDefinitions, cellSize: number): WorldGri
       cell = { cx, cy, hd: [], lod: [] };
       grid.set(key, cell);
     }
-    (isLodModel(def.modelName) ? cell.lod : cell.hd).push(instance);
+    (instance.isLod ? cell.lod : cell.hd).push(instance);
   }
 
   return grid;

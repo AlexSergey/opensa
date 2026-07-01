@@ -57,6 +57,7 @@ export default defineConfig({
       'tools/lod-trees-generator/**/*.test.ts',
       'tools/map-placement/**/*.test.ts',
       'tools/sa-lod/**/*.test.ts',
+      'tools/sa-lod-generator/**/*.test.ts',
       'tools/lod-procobj-generator/**/*.test.ts',
       'tools/mod-installer/**/*.test.ts',
       'tools/vehicle-installer/**/*.test.ts',

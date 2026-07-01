@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { SourceTexture, TextureSource } from './texture-source';
 
-import { encodeLodTxd } from './encode-txd';
+import { encodeHalvedTxd, encodeLodTxd } from './encode-txd';
 
 /** A solid-colour texture of the given size (opaque unless `alpha` given). */
 function solid(size: number, r: number, g: number, b: number, alpha = 255): SourceTexture {
@@ -52,6 +52,41 @@ describe('encodeLodTxd', () => {
       expect(Math.abs(decoded[mid] - 20)).toBeLessThanOrEqual(8);
       expect(Math.abs(decoded[mid + 1] - 180)).toBeLessThanOrEqual(8);
       expect(Math.abs(decoded[mid + 2] - 40)).toBeLessThanOrEqual(8);
+    });
+  });
+});
+
+describe('encodeHalvedTxd', () => {
+  describe('negative cases', () => {
+    it('never drops a dimension below 1px', () => {
+      const txd = encodeHalvedTxd(['dot'], source({ dot: solid(1, 5, 5, 5) }), 3);
+      const dot = parseTxd(toArrayBuffer(txd)).textures[0];
+      expect([dot.width, dot.height]).toEqual([1, 1]);
+    });
+  });
+
+  describe('positive cases', () => {
+    it('halves each side per step (½ dim = ¼ area), DXT + mips', () => {
+      const txd = encodeHalvedTxd(
+        ['grass', 'leaf'],
+        source({ grass: solid(128, 20, 180, 40), leaf: solid(64, 1, 2, 3, 128) }),
+        1,
+      );
+      const parsed = parseTxd(toArrayBuffer(txd)).textures;
+      const grass = parsed.find((t) => t.name === 'grass')!;
+      const leaf = parsed.find((t) => t.name === 'leaf')!;
+
+      expect([grass.width, grass.height]).toEqual([64, 64]); // 128 → ½
+      expect([leaf.width, leaf.height]).toEqual([32, 32]); // 64 → ½
+      expect(grass.format).toBe('dxt1'); // opaque
+      expect(leaf.format).toBe('dxt5'); // alpha
+      expect(grass.mipmaps.length).toBeGreaterThan(1);
+    });
+
+    it('applies multiple halving steps', () => {
+      const txd = encodeHalvedTxd(['grass'], source({ grass: solid(128, 20, 180, 40) }), 2);
+      const grass = parseTxd(toArrayBuffer(txd)).textures[0];
+      expect([grass.width, grass.height]).toEqual([32, 32]); // 128 → ¼
     });
   });
 });

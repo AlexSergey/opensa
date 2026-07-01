@@ -1,0 +1,11 @@
+{
+  "name": "@opensa/sa-lod-generator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Regenerate GTA-SA per-object LODs as HD-quality clones (clone HD geometry + empty COL + 50% textures) for the real game. CLI tool.",
+  "nx": {
+    "tags": [
+      "type:tool"
+    ]
+  }
+}

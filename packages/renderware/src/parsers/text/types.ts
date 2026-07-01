@@ -54,6 +54,13 @@ export interface IplCarGenerator {
 export interface IplInstance {
   id: number;
   interior: number;
+  /**
+   * Whether this instance is a **LOD stand-in** — i.e. some other instance's `lod` field points at it (resolved
+   * per-area in `resolveMap`, since `lod` indexes the file's own list / the companion text IPL). This is the
+   * authoritative LOD test; the `lod`-name prefix is only a heuristic (see the `lod-detection-name-vs-target`
+   * memory). Absent until `resolveMap` sets it.
+   */
+  isLod?: boolean;
   /** Index of the LOD instance, or -1 for none. */
   lod: number;
   modelName: string;

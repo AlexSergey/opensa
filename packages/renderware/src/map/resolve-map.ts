@@ -63,11 +63,14 @@ export function resolveMap(fs: AssetFileSystem, options: ResolveMapOptions = {})
       continue; // .ZON = zone definitions, not object placement (no inst, no streams)
     }
     const text = fs.getText(normalizeDatPath(iplPath));
-    if (text !== null) {
-      instances.push(...parseIpl(text));
-    }
+    const textInstances = text !== null ? parseIpl(text) : [];
     // Full-detail placement lives in the matching binary stream IPLs (bare `<base>_streamN.ipl`).
-    loadBinaryStreams(fs, iplBasename(iplPath), instances, carGenerators);
+    const streamInstances: IplInstance[] = [];
+    loadBinaryStreams(fs, iplBasename(iplPath), streamInstances, carGenerators);
+    // Flag LOD-target instances before flattening — the `lod` index is per-area (text file + its companion
+    // binary streams share one index space; see the `ipl-lod-index-coupling` memory).
+    markLodTargets(textInstances, streamInstances);
+    instances.push(...textInstances, ...streamInstances);
   }
 
   // Standalone script-gated groups (plan 042) — the configured "world state" extras (bare `<name>.ipl`).
@@ -96,5 +99,24 @@ function loadBinaryStreams(
     carGenerators.push(...parseBinaryCarGenerators(buffer));
     index += 1;
     buffer = fs.get(`${basename}_stream${index}.ipl`);
+  }
+}
+
+/**
+ * Mark every LOD-target instance (`isLod`) within one area. Both a text IPL's own `lod` field and its companion
+ * binary streams' `lod` fields index the **text** instance list (targets never live in a binary stream), so both
+ * mark into `textInstances`. This is the authoritative LOD classification (vs the `lod`-name heuristic).
+ */
+function markLodTargets(textInstances: IplInstance[], streamInstances: IplInstance[]): void {
+  const mark = (lod: number): void => {
+    if (lod >= 0 && lod < textInstances.length) {
+      textInstances[lod].isLod = true;
+    }
+  };
+  for (const instance of textInstances) {
+    mark(instance.lod);
+  }
+  for (const instance of streamInstances) {
+    mark(instance.lod);
   }
 }

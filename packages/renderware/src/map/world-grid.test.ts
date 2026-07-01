@@ -55,8 +55,10 @@ describe('buildWorldGrid', () => {
       expect(grid.get(cellKey(1, 0))?.hd).toHaveLength(1);
     });
 
-    it('splits HD and LOD by model name within a cell', () => {
-      const defs = mapDefs([def(1, 'house'), def(2, 'LODhouse')], [inst(1, [10, 10, 0]), inst(2, [20, 20, 0])]);
+    it('splits HD and LOD by the instance isLod flag (not the model name)', () => {
+      const hd = inst(1, [10, 10, 0]);
+      const lod = { ...inst(2, [20, 20, 0]), isLod: true };
+      const defs = mapDefs([def(1, 'house'), def(2, 'houselod')], [hd, lod]);
       const cell = buildWorldGrid(defs, 250).get(cellKey(0, 0));
 
       expect(cell?.hd).toHaveLength(1);
