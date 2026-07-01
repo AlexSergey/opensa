@@ -1,4 +1,5 @@
 import { ideRefs } from '@opensa/game-build/partition';
+import { hasHdTwin } from '@opensa/map-placement/lod-twin';
 import { SA_TREE_MODELS } from '@opensa/map-placement/vegetation';
 import { isInterior } from '@opensa/renderware/parsers/text/interior';
 import { parseBinaryIpl } from '@opensa/renderware/parsers/text/ipl-binary.parser';
@@ -108,19 +109,6 @@ function collectInstances(
   // Second pass: keep HD; keep a `lod*` only when it has no placed HD twin (base geometry, else redundant).
 
   return raw.filter((instance) => !isLodModel(instance.model) || !hasHdTwin(instance.model, placed));
-}
-
-/** Whether a `lod*` model has a placed **HD twin** — its name with the `lod`/`lod<N>` prefix stripped is a placed,
- *  non-LOD model (e.g. `lodlae2_roads89` → `lae2_roads89`, `lod1blockk_lae` → `blockk_lae`). Such LODs are
- *  redundant (the HD is baked); a `lod*` with no twin is base geometry that must be baked itself. */
-function hasHdTwin(lodModel: string, placed: ReadonlySet<string>): boolean {
-  for (const twin of [lodModel.replace(/^lod\d+/, ''), lodModel.replace(/^lod/, '')]) {
-    if (twin !== lodModel && twin.length > 0 && !isLodModel(twin) && placed.has(twin)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 function textInstances(dataDir: string): ReturnType<typeof parseIpl> {

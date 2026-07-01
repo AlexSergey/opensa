@@ -98,6 +98,33 @@ describe('rebuildGeometry', () => {
       expect(view.getUint32(16, true)).toBe(0); // split: materialIndex
       expect([view.getUint32(20, true), view.getUint32(24, true), view.getUint32(28, true)]).toEqual([0, 1, 2]);
     });
+
+    it('re-emits both UV layers of a dual-UV geometry (no longer refused)', () => {
+      const dual = struct(3, 1);
+      dual.uvLayers = [new Float32Array([0, 0, 1, 0, 1, 1]), new Float32Array([9, 9, 9, 9, 9, 9])];
+      const geometry: RwChunk = {
+        children: [
+          { data: encodeGeometryStruct(dual), type: RW_STRUCT, version: 0 },
+          {
+            children: [{ data: new Uint8Array(0), type: RW_BIN_MESH_PLG, version: 0 }],
+            type: RW_EXTENSION,
+            version: 0,
+          },
+        ],
+        type: 0x0f,
+        version: 0,
+      };
+      const m = mesh(3, [{ a: 0, b: 1, c: 2, material: 0 }]);
+      m.uvs = new Float32Array([0.1, 0.1, 0.2, 0.2, 0.3, 0.3]);
+      m.extraUvs = [new Float32Array([0.4, 0.4, 0.5, 0.5, 0.6, 0.6])];
+
+      rebuildGeometry(geometry, m);
+
+      const decoded = decodeGeometryStruct(geometry.children![0].data!);
+      expect(decoded.uvLayers.length).toBe(2);
+      expect([...decoded.uvLayers[0]]).toEqual([0.1, 0.1, 0.2, 0.2, 0.3, 0.3].map((v) => Math.fround(v)));
+      expect([...decoded.uvLayers[1]]).toEqual([0.4, 0.4, 0.5, 0.5, 0.6, 0.6].map((v) => Math.fround(v)));
+    });
   });
 });
 

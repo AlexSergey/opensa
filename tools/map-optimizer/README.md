@@ -22,6 +22,8 @@ npx tsx map-optimizer/src/cli.ts --game ./game-src/gostown --out ./build
 # opt-in passes:
 npx tsx map-optimizer/src/cli.ts --game ./game-src/gostown --out ./build --textures  # generate mip chains (plan 010)
 npx tsx map-optimizer/src/cli.ts --game ./game-src/original --out ./build --refine    # surface smoothing (plan 014)
+npx tsx map-optimizer/src/cli.ts --game ./game-src/original --out ./build --weld-seams # close cross-model prelit tile seams (plan 016)
+npx tsx map-optimizer/src/cli.ts --game ./game-src/original --out ./build --stitch-gaps # close/hide cross-model geometry cracks (plan 017)
 ```
 
 - `--game <path>` — game data (models `*.img` + `data/` IDE/IPL to resolve the map's models).
@@ -29,7 +31,12 @@ npx tsx map-optimizer/src/cli.ts --game ./game-src/original --out ./build --refi
   the whole game-data tree mirrored, with each `models/*.img` **rebuilt**: optimized entries swapped in,
   everything else (vehicles, peds, interiors, data, …) preserved. Point the game at it and it runs. A
   **`report.json`** is written alongside.
-- `--textures` is **opt-in** (off by default).
+- `--textures` / `--refine` / `--weld-seams` / `--stitch-gaps` are all **opt-in** (off by default). `--weld-seams`
+  (plan 016) averages prelit RGB at world-coincident boundary vertices of **uniquely-placed** models to close tile
+  seams; `--stitch-gaps` (plan 017) closes/hides cross-model geometry cracks — welds near-coincident boundary
+  vertices, splits T-junction edges, and skirts wide-gap edges. **`--stitch-gaps` on a full-size map is
+  memory-heavy** (it holds the whole map's boundary in the pre-pass) — run it with a bigger heap:
+  `NODE_OPTIONS=--max-old-space-size=8192 npx tsx map-optimizer/src/cli.ts … --stitch-gaps`.
 - Prints a summary: models processed/changed, vertices & faces removed, size reduction, and any per-asset
   failures (isolated — one bad model never aborts the run).
 

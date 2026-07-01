@@ -1,5 +1,6 @@
 import { openArchive } from '@opensa/renderware/archive/img-archive';
 import { parseDff } from '@opensa/renderware/parsers/binary/dff';
+import { isLodModel } from '@opensa/renderware/parsers/text/lod';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -8,9 +9,23 @@ import type { Asset, AssetRef, WriteResult } from '../../core/asset';
 
 import { writeFullBuild } from './build';
 import { encodeDff } from './codec/dff';
+import { computeGapStitches, type GapModel, type GapStitchOptions, type GapStitchResult } from './gap-stitch';
 import { clumpToIr } from './read';
-import { resolveMap } from './resolve';
+import { type Placement, resolveMap, resolvePlacements } from './resolve';
+import { computeSeamOverrides, type SeamModel, type SeamWeldOptions, type SeamWeldResult } from './seam-weld';
 import { optimizeTxd } from './textures';
+
+/** GTA-SA gap-stitch op, exposed for the optional cross-model geometry stitch (plan 017). */
+export interface GtaSaGapOps {
+  /** Compute per-model position overrides that close hairline cross-model cracks (uniquely-placed models only). */
+  buildGapStitches(options?: GapStitchOptions): GapStitchResult;
+}
+
+/** GTA-SA seam-weld op, exposed for the optional cross-model prelit weld (plan 016). */
+export interface GtaSaSeamOps {
+  /** Compute per-model prelit overrides that close cross-model tile seams (uniquely-placed models only). */
+  buildSeamOverrides(options?: SeamWeldOptions): SeamWeldResult;
+}
 
 /** GTA-SA texture-pass ops, exposed alongside the {@link GameAdapter} for the optional mip pass (plan 010). */
 export interface GtaSaTextureOps {
@@ -37,7 +52,10 @@ export interface TextureOutcome {
  * The serializer patches vertex attributes in place (positions/normals/prelit/UVs); topology edits and
  * anti-rip recovered geometry are not yet expressible and surface as per-asset failures.
  */
-export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter & GtaSaTextureOps {
+export function createGtaSaAdapter(
+  game: string,
+  gameDir: string,
+): GameAdapter & GtaSaGapOps & GtaSaSeamOps & GtaSaTextureOps {
   const modelsDir = join(gameDir, 'models');
   const dataDir = join(gameDir, 'data');
   // Open every models/*.img once, keyed by filename (so `finalize` can rebuild each in place). gta3.img is the
@@ -68,7 +86,75 @@ export function createGtaSaAdapter(game: string, gameDir: string): GameAdapter &
   // Optimized models + textures collected during the run, packed into a VER2 .img on finalize().
   const packed: { data: Uint8Array; name: string }[] = [];
 
+  // Uniquely-placed models (placed exactly once), for the world-context passes. `lod*` are dropped by default
+  // (the engine's LOD gate — reused by every LOD tool): a far-LOD isn't co-visible with its HD, so editing that
+  // pair is pointless (plan 016). `_lodbit`/`_lod` tiles are NOT `lod*`-prefixed → kept as HD-tier.
+  const uniquePlacements = (includeLods?: boolean): Map<string, Placement> => {
+    const placements = resolvePlacements(dataDir, gta3);
+    const counts = new Map<string, number>();
+    for (const placement of placements) {
+      counts.set(placement.modelName, (counts.get(placement.modelName) ?? 0) + 1);
+    }
+    const unique = new Map<string, Placement>();
+    for (const placement of placements) {
+      if (counts.get(placement.modelName) === 1 && (includeLods || !isLodModel(placement.modelName))) {
+        unique.set(placement.modelName, placement);
+      }
+    }
+
+    return unique;
+  };
+
   return {
+    buildGapStitches(options?: GapStitchOptions): GapStitchResult {
+      const models: GapModel[] = [];
+      for (const [name, placement] of uniquePlacements(options?.includeLods)) {
+        const bytes = getModel(`${name}.dff`);
+        if (!bytes) {
+          continue;
+        }
+        try {
+          const geometries = parseDff(bytes).geometries.map((geometry) => ({
+            positions: geometry.positions,
+            triangles: geometry.triangles.map((triangle) => ({ a: triangle.a, b: triangle.b, c: triangle.c })),
+          }));
+          models.push({ geometries, name, placement: { position: placement.position, rotation: placement.rotation } });
+        } catch {
+          continue; // unparseable model — skip it, the stitch is best-effort
+        }
+      }
+
+      return computeGapStitches(models, options);
+    },
+    buildSeamOverrides(options?: SeamWeldOptions): SeamWeldResult {
+      const models: SeamModel[] = [];
+      for (const [name, placement] of uniquePlacements(options?.includeLods)) {
+        const bytes = getModel(`${name}.dff`);
+        if (!bytes) {
+          continue;
+        }
+        try {
+          const geometries = parseDff(bytes)
+            .geometries.filter((geometry) => geometry.prelitColors)
+            .map((geometry) => ({
+              positions: geometry.positions,
+              prelit: geometry.prelitColors!,
+              triangles: geometry.triangles.map((triangle) => ({ a: triangle.a, b: triangle.b, c: triangle.c })),
+            }));
+          if (geometries.length > 0) {
+            models.push({
+              geometries,
+              name,
+              placement: { position: placement.position, rotation: placement.rotation },
+            });
+          }
+        } catch {
+          continue; // unparseable model — skip it, the weld pass is best-effort
+        }
+      }
+
+      return computeSeamOverrides(models, options);
+    },
     finalize(outDir: string): void {
       // Mirror the whole game into out/, rebuilding each model archive with the optimized entries swapped in
       // and everything else (vehicles, peds, …) preserved — a drop-in build (plan 011).

@@ -13,6 +13,9 @@ export function remapVertices(mesh: SubMesh, oldToNew: Int32Array, sourceOf: rea
   if (mesh.uvs) {
     mesh.uvs = pickFloats(mesh.uvs, sourceOf, 2);
   }
+  if (mesh.extraUvs?.length) {
+    mesh.extraUvs = mesh.extraUvs.map((layer) => pickFloats(layer, sourceOf, 2));
+  }
   if (mesh.prelitColors) {
     mesh.prelitColors = pickBytes(mesh.prelitColors, sourceOf, 4);
   }

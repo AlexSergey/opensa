@@ -100,6 +100,14 @@ const MANIFEST: readonly Fixture[] = [
   extract('junk.txd', 'txd/junk.txd'),
   extract('compfukhouse3.dff', 'world/compfukhouse3.dff'),
   extract('mcstraps_LAe2.dff', 'world/mcstraps_LAe2.dff'),
+  // Two co-located San Fierro crack-factory shells that share boundary geometry — the map-optimizer seam-weld
+  // (plan 016) real-asset pair: a genuine cross-model prelit seam (~455 boundary groups, differing prelit).
+  extract('cf_ext_dem_sfs.dff', 'world/cf_ext_dem_sfs.dff'),
+  extract('crackfact_sfs.dff', 'world/crackfact_sfs.dff'),
+  // A Vegas road ramp meeting a junction slab — the map-optimizer gap-stitch (plan 017) real-asset pair: their
+  // boundaries meet at a few points (variant A) then diverge, a genuine cross-model geometry seam.
+  extract('vegassroad0522a.dff', 'world/vegassroad0522a.dff'),
+  extract('vgssspagjun08.dff', 'world/vgssspagjun08.dff'),
 
   // --- Derived: a stock VER2 archive holding a single extracted vehicle ---
   { dest: `${OUT}/img/admiral.img`, entry: 'admiral.dff', type: 'archive' },

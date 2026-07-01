@@ -10,8 +10,9 @@ import type { SubMesh, Triangle } from '../../../core/ir';
  * Rebuild a Geometry whose vertex and/or triangle count changed (plan 004): re-encode the Struct from the IR,
  * regenerate `BinMeshPLG` (trilist) and the per-vertex `NIGHT_VERTEX_COLORS` chunk, and recompute the bounding
  * sphere. Mutates the geometry chunk in place. Refuses (throws) on data the IR can't faithfully remap — skin,
- * >1 UV layer, ≠1 morph target — so a count-changing plugin on such a model fails per-asset rather than
- * silently corrupting it.
+ * ≠1 morph target — so a count-changing plugin on such a model fails per-asset rather than silently corrupting
+ * it. Multi-UV geometry IS supported: extra UV layers are carried on the IR and remapped by the vertex-editing
+ * plugins, so they re-emit alongside layer 0.
  */
 
 const PRELIT_FLAG = 0x0008;
@@ -86,9 +87,6 @@ export function rebuildGeometry(geometry: RwChunk, mesh: SubMesh): void {
   if (original.morphs.length !== 1) {
     throw new Error(`rebuild unsupported: "${mesh.name}" has ${original.morphs.length} morph targets`);
   }
-  if (original.uvLayers.length > 1) {
-    throw new Error(`rebuild unsupported: "${mesh.name}" has ${original.uvLayers.length} UV layers`);
-  }
   if (extension?.children?.some((child) => child.type === RW_SKIN)) {
     throw new Error(`rebuild unsupported: "${mesh.name}" is skinned`);
   }
@@ -107,7 +105,7 @@ export function rebuildGeometry(geometry: RwChunk, mesh: SubMesh): void {
     numVertices: vertexCount,
     prelit,
     triangles: mesh.triangles.map((triangle) => ({ ...triangle })),
-    uvLayers: mesh.uvs ? [mesh.uvs] : [],
+    uvLayers: uvLayersOf(mesh, vertexCount),
   };
   structChunk.data = encodeGeometryStruct(rebuilt);
 
@@ -193,4 +191,20 @@ function buildNightColors(nightColors: Uint8Array): Uint8Array {
   out.set(nightColors, 4);
 
   return out;
+}
+
+/** Layer 0 (`uvs`) plus any extra UV layers, each kept only when it matches the rebuilt vertex count — a
+ *  topology plugin that forgot to remap an extra layer drops it here rather than corrupting the Struct. */
+function uvLayersOf(mesh: SubMesh, vertexCount: number): Float32Array[] {
+  const layers: Float32Array[] = [];
+  if (mesh.uvs) {
+    layers.push(mesh.uvs);
+  }
+  for (const layer of mesh.extraUvs ?? []) {
+    if (layer.length === vertexCount * 2) {
+      layers.push(layer);
+    }
+  }
+
+  return layers;
 }

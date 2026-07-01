@@ -22,7 +22,10 @@ import type { SubMesh } from '../core/ir';
 
 export type { SmoothNormalsOptions };
 
-type Rebuilt = Pick<SubMesh, 'nightColors' | 'normals' | 'positions' | 'prelitColors' | 'triangles' | 'uvs'>;
+type Rebuilt = Pick<
+  SubMesh,
+  'extraUvs' | 'nightColors' | 'normals' | 'positions' | 'prelitColors' | 'triangles' | 'uvs'
+>;
 
 export function createSmoothNormals(options: SmoothNormalsOptions = {}): MapPlugin {
   return {
@@ -70,6 +73,7 @@ export function rebuildSmoothNormals(mesh: SubMesh, options: SmoothNormalsOption
   const { splitSources } = result;
 
   return {
+    extraUvs: mesh.extraUvs?.map((layer) => appendSplitsF32(layer, splitSources, 2)),
     nightColors: mesh.nightColors ? appendSplitsU8(mesh.nightColors, splitSources, 4) : null,
     normals: result.normals,
     positions: appendSplitsF32(mesh.positions, splitSources, 3),

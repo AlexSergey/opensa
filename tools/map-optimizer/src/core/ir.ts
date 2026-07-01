@@ -12,6 +12,9 @@ export interface MeshIR {
 
 /** One renderable sub-mesh (typically one source geometry / LOD). */
 export interface SubMesh {
+  /** UV layers beyond the first (each flattened uv), when a model ships more than one (SA dual-UV geometry).
+   *  Carried and remapped alongside {@link uvs} so the count-changing rebuild path can re-emit them. */
+  extraUvs?: Float32Array[];
   /** Number of material slots `triangles[*].material` indexes into. */
   materialCount: number;
   /** Stable name for diagnostics (e.g. `geometry_0`). */

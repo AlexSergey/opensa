@@ -5,6 +5,7 @@
   "description": "SA map placement workflows shared by the LOD tools: object-id allocation, IDE/gta.dat editing, swapped-HD retexture, procobj scatter conversion/stripping, and the curated SA vegetation roster.",
   "exports": {
     "./ide": "./src/ide.ts",
+    "./lod-twin": "./src/lod-twin.ts",
     "./retxd": "./src/retxd.ts",
     "./procobj-strip": "./src/procobj-strip.ts",
     "./procobj": "./src/procobj/convert.ts",

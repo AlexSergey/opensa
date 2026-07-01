@@ -10,6 +10,7 @@ export function clumpToIr(clump: RWClump): MeshIR {
 
 function toSubMesh(geometry: RWGeometry, index: number): SubMesh {
   return {
+    extraUvs: geometry.uvLayers.slice(1),
     materialCount: geometry.materials.length,
     name: `geometry_${index}`,
     nightColors: geometry.nightColors,

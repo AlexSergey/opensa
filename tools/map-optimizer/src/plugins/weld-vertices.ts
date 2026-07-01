@@ -59,6 +59,11 @@ function vertexKey(mesh: SubMesh, v: number): string {
   if (mesh.uvs) {
     parts.push(mesh.uvs[v * 2], mesh.uvs[v * 2 + 1]);
   }
+  if (mesh.extraUvs) {
+    for (const layer of mesh.extraUvs) {
+      parts.push(layer[v * 2], layer[v * 2 + 1]);
+    }
+  }
   if (mesh.prelitColors) {
     const o = v * 4;
     parts.push(mesh.prelitColors[o], mesh.prelitColors[o + 1], mesh.prelitColors[o + 2], mesh.prelitColors[o + 3]);
